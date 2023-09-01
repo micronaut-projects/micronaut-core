@@ -10,7 +10,7 @@ The quickest way to start using Consul is via Docker:
 docker run -p 8500:8500 consul
 ----
 
-Alternatively you can https://www.consul.io/docs/install[install and run a local Consul instance].
+Alternatively you can https://developer.hashicorp.com/consul/docs/install[install and run a local Consul instance].
 
 == Enabling Distributed Configuration with Consul
 

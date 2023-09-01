@@ -41,7 +41,7 @@ In some cases you may wish to integrate a library that does not support non-bloc
 
 ==== Writable
 
-In this case you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] interface has various signatures that allow writing to traditional blocking streams like jdk:java.io.Writer[] or jdk:java.io.OutputStream[].
+In this case you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] interface has various signatures that allow writing to traditional blocking streams like link:{jdkapi}/java.base/java/io/Writer.html[Writer] or link:{jdkapi}/java.base/java/io/OutputStream.html[OutputStream].
 
 When returning a api:core.io.Writable[], the blocking I/O operation is shifted to the I/O thread pool so the Netty event loop is not blocked.
 
@@ -53,7 +53,7 @@ snippet::io.micronaut.docs.writable.TemplateController[tags="imports,clazz", ind
 
 <1> The controller creates a simple template
 <2> The controller method returns a api:core.io.Writable[]
-<3> The returned function receives a jdk:java.io.Writer[] and calls `writeTo` on the template.
+<3> The returned function receives a link:{jdkapi}/java.base/java/io/Writer.html[Writer] and calls `writeTo` on the template.
 
 ==== InputStream
 

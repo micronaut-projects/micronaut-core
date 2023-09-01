@@ -14,7 +14,7 @@ include::test-suite/src/test/resources/io/micronaut/docs/i18n/messages_en.proper
 include::test-suite/src/test/resources/io/micronaut/docs/i18n/messages_es.properties[]
 ----
 
-You can use api:context.i18n.ResourceBundleMessageSource[], an implementation of api:context.MessageSource[] which eases accessing link:{javase}/java/util/ResourceBundle.html[Resource Bundles] and provides cache functionality, to access the previous messages.
+You can use api:context.i18n.ResourceBundleMessageSource[], an implementation of api:context.MessageSource[] which eases accessing link:{jdkapi}/java.base/java/util/ResourceBundle.html[Resource Bundles] and provides cache functionality, to access the previous messages.
 
 WARNING: Do not instantiate a new `ResourceBundleMessageSource` each time you retrieve a message. Instantiate it once, for example in a factory.
 

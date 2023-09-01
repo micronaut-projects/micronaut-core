@@ -37,15 +37,15 @@ This approach is not recommended however, as it requires reflection and increase
 
 === Annotation Inheritance
 
-The Micronaut framework will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regard to annotation inheritance:
+The Micronaut framework will respect the rules defined in Java's link:{jdkapi}/java.base/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API with regard to annotation inheritance:
 
-* Annotations meta-annotated with jdk:java.lang.annotation.Inherited[] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
-* Annotations not meta-annotated with jdk:java.lang.annotation.Inherited[] will not be included in the metadata
+* Annotations meta-annotated with link:{jdkapi}/java.base/java/lang/annotation/Inherited.html[Inherited] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
+* Annotations not meta-annotated with link:{jdkapi}/java.base/java/lang/annotation/Inherited.html[Inherited] will not be included in the metadata
 
-The Micronaut framework differs from the jdk:java.lang.reflect.AnnotatedElement[] API in that it extends these rules to methods and method parameters such that:
+The Micronaut framework differs from the link:{jdkapi}/java.base/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in that it extends these rules to methods and method parameters such that:
 
-* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:inject.ExecutableMethod[] API from a api:inject.BeanDefinition[] or an <<aop, AOP interceptor>>.
-* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method parameter of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:core.type.Argument[] interface from the `getArguments` method of the api:inject.ExecutableMethod[] API.
+* Any annotations annotated with link:{jdkapi}/java.base/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] and present on a method of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:inject.ExecutableMethod[] API from a api:inject.BeanDefinition[] or an <<aop, AOP interceptor>>.
+* Any annotations annotated with link:{jdkapi}/java.base/java/lang/annotation/Inherited.html[Inherited] and present on a method parameter of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:core.type.Argument[] interface from the `getArguments` method of the api:inject.ExecutableMethod[] API.
 
 In general behaviour which you may wish to override is not inherited by default including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
 

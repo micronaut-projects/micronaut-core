@@ -2,7 +2,7 @@ Don't define `allowed-origins` or `allowed-origins-regex` to allow any origin fo
 
 For multiple valid origins, set the `allowed-origins` key of the configuration to a list of strings.
 
-You can also define via `allowed-origins-regex` a regular expression (`^http(|s)://www\.google\.com$`). The Regular expression is passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
+You can also define via `allowed-origins-regex` a regular expression (`^http(|s)://www\.google\.com$`). The Regular expression is passed to link:{jdkapi}/java.base/java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{jdkapi}/java.base/java/util/regex/Matcher.html#matches--[Matcher#matches].
 
 .Example CORS Configuration
 [configuration]
