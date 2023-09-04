@@ -36,6 +36,8 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
 import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Null
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Requires
@@ -2934,6 +2936,345 @@ class MyBean {
             def type = method.parameters[0].getGenericType()
         then:
             type.hasAnnotation(Valid)
+    }
+
+    void "test interface with type with not inherited generic annotations and conflicting method"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.util.List;
+
+interface MyImpl extends BaseRepository<Long, @NotNull MyBean>, Finder<Long, @Null MyBean> {
+}
+
+interface BaseRepository<K, V> {
+V findById(K key);
+}
+
+interface Finder<K, V> {
+V findById(K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+        then:
+            method.getAnnotationNames().isEmpty()
+            method.getReturnType().isEmpty()
+            type.hasAnnotation(NotNull)
+            !type.hasAnnotation(Null)
+    }
+
+    void "test interface with type with not inherited generic annotations and conflicting method different order"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.util.List;
+
+interface MyImpl extends Finder<Long, @Null MyBean>, BaseRepository<Long, @NotNull MyBean>  {
+}
+
+interface BaseRepository<K, V> {
+V findById(K key);
+}
+
+interface Finder<K, V> {
+V findById(K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+        then:
+            method.getAnnotationNames().isEmpty()
+            method.getReturnType().isEmpty()
+            !type.hasAnnotation(NotNull)
+            type.hasAnnotation(Null)
+    }
+
+    void "test interface with conflicting method having not inherited method annotations"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.util.List;
+
+interface MyImpl extends BaseRepository<Long, MyBean>, Finder<Long, MyBean> {
+}
+
+interface BaseRepository<K, V> {
+@NotNull V findById(K key);
+}
+
+interface Finder<K, V> {
+@Null V findById(K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+        then:
+            method.getReturnType().isEmpty()
+            method.getGenericReturnType().isEmpty()
+            method.hasAnnotation(NotNull)
+            !method.hasAnnotation(Null)
+    }
+
+    void "test interface with type with inherited generic annotations and conflicting method"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.lang.annotation.Inherited;
+import java.util.List;
+
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE_USE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+interface MyImpl extends BaseRepository<Long, @MyAnnotation1 MyBean>, Finder<Long, @MyAnnotation2 MyBean> {
+}
+
+interface BaseRepository<K, V> {
+V findById(K key);
+}
+
+interface Finder<K, V> {
+V findById(K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation1 {
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation2 {
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+        then:
+            method.getAnnotationNames().isEmpty()
+            method.getReturnType().isEmpty()
+            type.hasAnnotation("test.MyAnnotation1")
+            !type.hasAnnotation("test.MyAnnotation2")
+    }
+
+    void "test interface with conflicting method having inherited method annotations"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.lang.annotation.Inherited;
+import java.util.List;
+
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE_USE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+interface MyImpl extends BaseRepository<Long, MyBean>, Finder<Long, MyBean> {
+}
+
+interface BaseRepository<K, V> {
+@MyAnnotation1 V findById(K key);
+}
+
+interface Finder<K, V> {
+@MyAnnotation2 V findById(K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation1 {
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation2 {
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+        then:
+            method.getAnnotationNames() == ["test.MyAnnotation1"] as Set
+            method.getGenericReturnType().isEmpty()
+            method.getReturnType().isEmpty()
+            method.getGenericReturnType().getType().isEmpty()
+            method.getReturnType().getGenericType().isEmpty()
+    }
+
+    void "test interface with conflicting method having inherited method parameter annotations"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import java.lang.annotation.Inherited;
+import java.util.List;
+
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE_USE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+interface MyImpl extends BaseRepository<Long, MyBean>, Finder<Long, MyBean> {
+}
+
+interface BaseRepository<K, V> {
+V findById(@MyAnnotation1 K key);
+}
+
+interface Finder<K, V> {
+V findById(@MyAnnotation2 K key);
+}
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation1 {
+}
+
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@Retention(RUNTIME)
+@Documented
+@Inherited
+@interface MyAnnotation2 {
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("findById").get()
+        then:
+            method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
+            method.getParameters()[0].getType().getAnnotationNames().isEmpty()
+            method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
