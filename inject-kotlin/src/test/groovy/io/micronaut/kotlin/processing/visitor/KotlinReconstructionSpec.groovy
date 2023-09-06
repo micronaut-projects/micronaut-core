@@ -599,10 +599,26 @@ abstract class Base<T> {
         if (level == 4) {
             return
         }
+        type.getName()
         type.getAnnotationNames()
         type.getAllTypeArguments().entrySet().forEach { e1 ->
             e1.value.entrySet().forEach { e2 ->
                 initializeAllTypeArguments0(e2.value, level + 1)
+            }
+        }
+        if (type.isWildcard()) {
+            def we = type as WildcardElement
+            if (we.isRawType()) {
+                return
+            }
+            if (!we.lowerBounds.isEmpty()) {
+                we.lowerBounds.forEach {
+                    initializeAllTypeArguments0(it, level + 1)
+                }
+            } else {
+                we.upperBounds.forEach {
+                    initializeAllTypeArguments0(it, level + 1)
+                }
             }
         }
     }

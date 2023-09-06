@@ -61,6 +61,10 @@ internal open class KotlinClassElement(
         definedType ?: declaration.asStarProjectedType()
     }
 
+    val plainKotlinType: KSType by lazy {
+        kotlinType.starProjection().makeNullable()
+    }
+
     private val asType: KotlinClassElement by lazy {
         if (definedType == null) {
             this
@@ -139,7 +143,9 @@ internal open class KotlinClassElement(
         javaName?.asString() ?: declaration.qualifiedName!!.asString()
     }
 
-    private val internalName = declaration.getBinaryName(visitorContext.resolver, visitorContext)
+    private val internalName: String by lazy {
+        declaration.getBinaryName(visitorContext.resolver, visitorContext)
+    }
 
     private val resolvedInterfaces: Collection<ClassElement> by lazy {
         declaration.superTypes.map { it.resolve() }
@@ -502,12 +508,12 @@ internal open class KotlinClassElement(
             visitorContext.resolver.getKSNameFromString(type)
         ) ?: return false
         val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName) ?: return false
-        return kotlinClassByName.asStarProjectedType().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
+        return kotlinClassByName.asStarProjectedType().makeNullable().isAssignableFrom(plainKotlinType)
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
         if (type is KotlinClassElement) {
-            return type.kotlinType.starProjection().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
+            return type.plainKotlinType.isAssignableFrom(plainKotlinType)
         }
         return super.isAssignable(type)
     }
