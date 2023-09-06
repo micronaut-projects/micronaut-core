@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Vetoed;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -49,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -617,7 +617,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
 
         Map<String, ClassElement> typeVariables = interfaceToAdapt.getTypeArguments();
-        Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
+        Map<String, ClassElement> genericTypes = CollectionUtils.newLinkedHashMap(paramLen);
         for (int i = 0; i < paramLen; i++) {
             ParameterElement targetParam = targetParams[i];
             ParameterElement sourceParam = sourceParams[i];

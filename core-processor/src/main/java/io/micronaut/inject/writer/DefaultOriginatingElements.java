@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.Element;
 
 import java.util.*;
@@ -36,7 +37,7 @@ final class DefaultOriginatingElements implements OriginatingElements {
      * @param originatingElements The elements
      */
     DefaultOriginatingElements(Element... originatingElements) {
-        this.originatingElements = new LinkedHashMap<>(originatingElements != null ? originatingElements.length : 5);
+        this.originatingElements = CollectionUtils.newLinkedHashMap(originatingElements != null ? originatingElements.length : 5);
         if (originatingElements != null) {
             for (Element originatingElement : originatingElements) {
                 if (originatingElement != null) {

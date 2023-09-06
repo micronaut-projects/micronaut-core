@@ -291,7 +291,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
         @Override
         public JsonNode build() {
-            Map<String, JsonNode> built = new LinkedHashMap<>(values.size());
+            Map<String, JsonNode> built = CollectionUtils.newLinkedHashMap(values.size());
             for (Map.Entry<String, ValueBuilder> entry : values.entrySet()) {
                 built.put(entry.getKey(), entry.getValue().build());
             }

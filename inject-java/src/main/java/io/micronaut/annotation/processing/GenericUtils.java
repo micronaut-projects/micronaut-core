@@ -228,19 +228,20 @@ public class GenericUtils {
      * @return The type bounds
      */
     protected Map<String, TypeMirror> resolveBoundTypes(DeclaredType type) {
-        Map<String, TypeMirror> boundTypes = new LinkedHashMap<>(2);
         TypeElement element = (TypeElement) type.asElement();
 
         List<? extends TypeParameterElement> typeParameters = element.getTypeParameters();
         List<? extends TypeMirror> typeArguments = type.getTypeArguments();
         if (typeArguments.size() == typeParameters.size()) {
+            Map<String, TypeMirror> boundTypes = CollectionUtils.newLinkedHashMap(typeParameters.size());
             Iterator<? extends TypeMirror> i = typeArguments.iterator();
             for (TypeParameterElement typeParameter : typeParameters) {
                 boundTypes.put(typeParameter.toString(), resolveTypeReference(i.next(), boundTypes));
             }
+            return boundTypes;
         }
 
-        return boundTypes;
+        return Collections.emptyMap();
     }
 
     private void resolveGenericTypeParameter(Map<String, TypeMirror> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, TypeMirror> boundTypes) {
@@ -297,7 +298,7 @@ public class GenericUtils {
                                 typeArguments.put(name, types);
                             } else {
                                 List<? extends TypeParameterElement> typeParameters = current.getTypeParameters();
-                                Map<String, TypeMirror> types = new LinkedHashMap<>(typeParameters.size());
+                                Map<String, TypeMirror> types = CollectionUtils.newLinkedHashMap(typeParameters.size());
                                 if (typeParameters.size() == superArguments.size()) {
                                     Iterator<? extends TypeMirror> i = superArguments.iterator();
                                     for (TypeParameterElement typeParameter : typeParameters) {

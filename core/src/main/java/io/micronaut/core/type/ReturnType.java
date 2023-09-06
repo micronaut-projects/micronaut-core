@@ -15,10 +15,11 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
+
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -73,7 +74,7 @@ public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataPro
      * @return A {@link ReturnType}
      */
     static <T1> ReturnType<T1> of(Class<T1> type, Argument<?>... typeArguments) {
-        Map<String, Argument<?>> argumentMap = new LinkedHashMap<>(typeArguments.length);
+        Map<String, Argument<?>> argumentMap = CollectionUtils.newLinkedHashMap(typeArguments.length);
         for (Argument<?> argument : typeArguments) {
             argumentMap.put(argument.getName(), argument);
         }

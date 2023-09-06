@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.json.JsonMapper;
@@ -31,7 +32,6 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -125,7 +125,7 @@ public class ComputeInstanceMetadataResolverUtils {
     @Experimental
     public static void populateMetadata(AbstractComputeInstanceMetadata instanceMetadata, JsonNode metadata) {
         if (metadata != null) {
-            Map<String, String> finalMetadata = new HashMap<>(metadata.size());
+            Map<String, String> finalMetadata = CollectionUtils.newHashMap(metadata.size());
             for (Map.Entry<String, JsonNode> entry : metadata.entries()) {
                 JsonNode value = entry.getValue();
                 if (value.isString()) {
@@ -155,7 +155,7 @@ public class ComputeInstanceMetadataResolverUtils {
      */
     public static void populateMetadata(AbstractComputeInstanceMetadata instanceMetadata, Map<?, ?> metadata) {
         if (metadata != null) {
-            Map<String, String> finalMetadata = new HashMap<>(metadata.size());
+            Map<String, String> finalMetadata = CollectionUtils.newHashMap(metadata.size());
             for (Map.Entry<?, ?> entry : metadata.entrySet()) {
                 Object key = entry.getKey();
                 Object value = entry.getValue();

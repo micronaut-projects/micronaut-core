@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
 import io.micronaut.core.util.ArrayUtils
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.visitor.VisitorContext
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -245,10 +246,10 @@ class AstGenericUtils {
 
         populateTypeArguments(classNode, typeArguments)
 
-        Map<String, Map<String, ClassNode>> elements = new LinkedHashMap<>(typeArguments.size())
+        Map<String, Map<String, ClassNode>> elements = CollectionUtils.newLinkedHashMap(typeArguments.size())
         for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
             Map<String, Object> value = entry.getValue()
-            HashMap<String, ClassNode> submap = new LinkedHashMap<>(value.size())
+            HashMap<String, ClassNode> submap = CollectionUtils.newLinkedHashMap(value.size())
             for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
                 def v = genericEntry.getValue()
                 ClassNode te = null

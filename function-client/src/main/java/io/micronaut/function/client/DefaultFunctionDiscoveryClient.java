@@ -16,6 +16,7 @@
 package io.micronaut.function.client;
 
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
@@ -27,7 +28,6 @@ import reactor.core.publisher.Flux;
 
 import java.net.URI;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -52,7 +52,7 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
      */
     public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
         this.discoveryClient = discoveryClient;
-        this.functionDefinitionMap = new HashMap<>(definitions.length);
+        this.functionDefinitionMap = CollectionUtils.newHashMap(definitions.length);
         for (FunctionDefinition definition : definitions) {
             functionDefinitionMap.put(definition.getName(), definition);
         }
