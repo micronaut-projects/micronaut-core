@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.inject.ast
 
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
+import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.util.CollectionUtils
@@ -62,10 +63,10 @@ class MyBean {}
         definition
 
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 3
-        def enumEl = AllElementsVisitor.VISITED_CLASS_ELEMENTS.find { 
+        def enumEl = AllElementsVisitor.VISITED_CLASS_ELEMENTS.find {
             it.name == 'test.HelloController$Channel'
         }
-        
+
         enumEl
         def enmConsts = ((KotlinEnumElement) enumEl).elements()
         enmConsts
@@ -2362,6 +2363,45 @@ enum class MyType {
         expect:
             theType instanceof GenericElement
             (theType as GenericElement).resolved().isEnum()
+    }
+
+    void "test executable visitor"() {
+        def result = KotlinCompiler.compile("test.MyClass", '''
+package io.micronaut.core.beans
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class TestEntity3(val firstName: String = "Denis",
+                       val lastName: String,
+                       val job: String? = "IT",
+                       val age: Int) {
+
+    @Executable
+    fun test4(i: Int? = 88) : String {
+        return "$i"
+    }
+
+    @Executable
+    fun test3(i: Int = 88) : String {
+        return "$i"
+    }
+
+    @Executable
+    fun test2(a: String = "A") : String {
+        return a
+    }
+
+    @Executable
+    fun test1(a: String = "A", b: String, i: Int = 99) : String {
+        return "$a $b $i"
+    }
+
+}
+''', {})
+        expect:
+            !result.component2().component2().messages.contains("@Nullable on primitive types")
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
