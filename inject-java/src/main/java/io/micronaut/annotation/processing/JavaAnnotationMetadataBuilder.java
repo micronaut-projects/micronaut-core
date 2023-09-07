@@ -54,6 +54,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -345,8 +346,20 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         String memberName,
         Object annotationValue,
         Map<CharSequence, Object> annotationValues) {
+        readAnnotationRawValues(originatingElement, annotationName, member, memberName, annotationValue, annotationValues, new HashMap<>());
+    }
+
+    @Override
+    protected void readAnnotationRawValues(
+        Element originatingElement,
+        String annotationName,
+        Element member,
+        String memberName,
+        Object annotationValue,
+        Map<CharSequence, Object> annotationValues,
+        Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue value && !annotationValues.containsKey(memberName)) {
-            final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
+            final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member, resolvedDefaults);
             value.accept(resolver, this);
             Object resolvedValue = resolver.resolvedValue;
             if (resolvedValue != null) {
@@ -389,7 +402,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected Object readAnnotationValue(Element originatingElement, Element member, String annotationName, String memberName, Object annotationValue) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue value) {
-            final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
+            final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member, new HashMap<>());
             value.accept(visitor, this);
             return visitor.resolvedValue;
         } else if (memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass())) {
@@ -605,14 +618,17 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         private final Element originatingElement;
         private final ExecutableElement member;
         private Object resolvedValue;
+        private final Map<String, Map<CharSequence, Object>> resolvedDefaults;
 
         /**
          * @param originatingElement
          * @param member
+         * @param resolvedDefaults
          */
-        MetadataAnnotationValueVisitor(Element originatingElement, ExecutableElement member) {
+        MetadataAnnotationValueVisitor(Element originatingElement, ExecutableElement member, Map<String, Map<CharSequence, Object>> resolvedDefaults) {
             this.originatingElement = originatingElement;
             this.member = member;
+            this.resolvedDefaults = resolvedDefaults;
         }
 
         @Override
@@ -690,7 +706,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
             if (a instanceof javax.lang.model.element.AnnotationValue) {
-                resolvedValue = readNestedAnnotationValue(originatingElement, a);
+                resolvedValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
             }
             return null;
         }
@@ -844,7 +860,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
-                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(originatingElement, a);
+                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
                 values.add(annotationValue);
                 return null;
             }
