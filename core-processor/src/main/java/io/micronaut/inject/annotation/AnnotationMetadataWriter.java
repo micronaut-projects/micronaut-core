@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -89,14 +90,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    AnnotationMetadataSupport.class,
-                    "getDefaultValues",
-                    String.class
-            )
-    );
-
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
@@ -122,7 +115,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     io.micronaut.core.annotation.AnnotationValue.class,
                     String.class,
                     Map.class,
-                    Map.class
+                    AnnotationDefaultValuesProvider.class
             )
     );
 
@@ -404,7 +397,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().forEach(annotationRepeatableContainer::remove);
             AnnotationMetadataSupport.registerRepeatableAnnotations(annotationRepeatableContainer);
             if (!annotationRepeatableContainer.isEmpty()) {
-                pushStringMapOf(staticInit, annotationMetadata.annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+                pushStringMapOf(staticInit, annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
                 staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
             }
         }
@@ -683,17 +676,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             pushStringMapOf(methodVisitor, values, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true));
 
-            Integer defaultIndex = defaultsStorage.get(annotationName);
-            if (defaultIndex == null) {
-                methodVisitor.push(annotationName);
-                methodVisitor.invokeStatic(Type.getType(AnnotationMetadataSupport.class), METHOD_GET_DEFAULT_VALUES);
-                methodVisitor.dup();
-                int localIndex = methodVisitor.newLocal(Type.getType(Map.class));
-                methodVisitor.storeLocal(localIndex);
-                defaultsStorage.put(annotationName, localIndex);
-            } else {
-                methodVisitor.loadLocal(defaultIndex);
-            }
+            methodVisitor.getStatic(Type.getType(AnnotationMetadataSupport.class), "ANNOTATION_DEFAULT_VALUES_PROVIDER", Type.getType(AnnotationDefaultValuesProvider.class));
             methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
         } else if (value instanceof EvaluatedExpressionReference expressionReference) {
             Type type = Type.getType(getTypeDescriptor(expressionReference.expressionClassName()));

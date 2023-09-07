@@ -44,7 +44,9 @@ import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
@@ -105,6 +107,17 @@ public final class AnnotationMetadataSupport {
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
+
+    /**
+     * The annotation default values provider.
+     * @since 4.3.0
+     */
+    public static final AnnotationDefaultValuesProvider ANNOTATION_DEFAULT_VALUES_PROVIDER = new AnnotationDefaultValuesProvider() {
+        @Override
+        public Map<CharSequence, Object> provide(String annotationName) {
+            return AnnotationMetadataSupport.getDefaultValues(annotationName);
+        }
+    };
 
     static {
         // some common ones for startup optimization
@@ -189,14 +202,13 @@ public final class AnnotationMetadataSupport {
             Map.of("qualifier", Annotation.class)
         );
 
-        Map<CharSequence, Object> builderDefaults = Map.of("accessorStyle", new AnnotationValue("io.micronaut.core.annotation.AccessorsStyle", Map.of("writePrefixes", new String[]{""}), AnnotationMetadataSupport.getDefaultValues("io.micronaut.core.annotation.AccessorsStyle")), "creatorMethod", "build");
         coreAnnotationsDefaults.put(
             Introspected.IntrospectionBuilder.class.getName(),
-            builderDefaults
+            Map.of("accessorStyle", new AnnotationValue("io.micronaut.core.annotation.AccessorsStyle", Map.of("writePrefixes", new String[]{""}), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER), "creatorMethod", "build")
         );
         coreAnnotationsDefaults.put(
             Introspected.class.getName(),
-            Map.ofEntries(Map.entry("accessKind", new String[]{"METHOD"}), Map.entry("annotationMetadata", true), Map.entry("builder", new AnnotationValue("io.micronaut.core.annotation.Introspected$IntrospectionBuilder", Map.of(), builderDefaults)), Map.entry("classNames", new String[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("excludedAnnotations", new AnnotationClassValue[0]), Map.entry("excludes", new String[0]), Map.entry("includedAnnotations", new AnnotationClassValue[0]), Map.entry("includes", new String[0]), Map.entry("indexed", new AnnotationValue[0]), Map.entry("packages", new String[0]), Map.entry("visibility", new String[]{"DEFAULT"}), Map.entry("withPrefix", "with"))
+            Map.ofEntries(Map.entry("accessKind", new String[]{"METHOD"}), Map.entry("annotationMetadata", true), Map.entry("builder", new AnnotationValue("io.micronaut.core.annotation.Introspected$IntrospectionBuilder", Map.of(), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER)), Map.entry("classNames", new String[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("excludedAnnotations", new AnnotationClassValue[0]), Map.entry("excludes", new String[0]), Map.entry("includedAnnotations", new AnnotationClassValue[0]), Map.entry("includes", new String[0]), Map.entry("indexed", new AnnotationValue[0]), Map.entry("packages", new String[0]), Map.entry("visibility", new String[]{"DEFAULT"}), Map.entry("withPrefix", "with"))
         );
         coreAnnotationsDefaults.put(
             MapFormat.class.getName(),
@@ -231,8 +243,16 @@ public final class AnnotationMetadataSupport {
             Map.of("interfaces", new AnnotationClassValue[0])
         );
         coreAnnotationsDefaults.put(
+            "io.micronaut.aop.Adapter",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
             "io.micronaut.validation.annotation.ValidatedElement",
             Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            AccessorsStyle.class.getName(),
+            Map.of("readPrefixes", new String[]{"get"}, "writePrefixes", new String[]{"set"})
         );
 
         CORE_ANNOTATION_DEFAULTS = Collections.unmodifiableMap(coreAnnotationsDefaults);
