@@ -5,13 +5,13 @@ This table summarizes the configuration modules and dependencies to add to your 
 |Dependency|Description
 
 |`io.micronaut.sql:micronaut-jdbc-dbcp`
-|Configures SQL jdk:javax.sql.DataSource[]s using https://commons.apache.org/proper/commons-dbcp/[Commons DBCP]
+|Configures SQL link:{jdkapi}/java.sql/javax/sql/DataSource.html[DataSource]s using https://commons.apache.org/proper/commons-dbcp/[Commons DBCP]
 
 |`io.micronaut.sql:micronaut-jdbc-hikari`
-|Configures SQL jdk:javax.sql.DataSource[]s using https://github.com/brettwooldridge/HikariCP[Hikari Connection Pool]
+|Configures SQL link:{jdkapi}/java.sql/javax/sql/DataSource.html[DataSource]s using https://github.com/brettwooldridge/HikariCP[Hikari Connection Pool]
 
 |`io.micronaut.sql:micronaut-jdbc-tomcat`
-|Configures SQL jdk:javax.sql.DataSource[]s using https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html[Tomcat Connection Pool]
+|Configures SQL link:{jdkapi}/java.sql/javax/sql/DataSource.html[DataSource]s using https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html[Tomcat Connection Pool]
 
 |`io.micronaut.sql:micronaut-hibernate-jpa`
 |Configures Hibernate/JPA `EntityManagerFactory` beans

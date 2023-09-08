@@ -16,7 +16,7 @@ TIP: If the route argument name cannot or should not match the name of the part 
 
 === Chunk Data Types
 
-api:io.micronaut.http.multipart.PartData[] represents a chunk of data received in a multipart request. api:io.micronaut.http.multipart.PartData[] interface methods convert the data to a `byte[]`, link:{javase}java/io/InputStream.html[InputStream], or a link:{javase}java/nio/ByteBuffer.html[ByteBuffer].
+api:io.micronaut.http.multipart.PartData[] represents a chunk of data received in a multipart request. api:io.micronaut.http.multipart.PartData[] interface methods convert the data to a `byte[]`, link:{jdkapi}/java.base/java/io/InputStream.html[InputStream], or a link:{jdkapi}/java.base/java/nio/ByteBuffer.html[ByteBuffer].
 
 NOTE: Data can only be retrieved from a api:io.micronaut.http.multipart.PartData[] once. The underlying buffer is released, causing further attempts to fail.
 

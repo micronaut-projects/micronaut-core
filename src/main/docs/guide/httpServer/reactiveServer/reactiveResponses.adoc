@@ -1,12 +1,12 @@
 The previous section introduced the notion of Reactive programming using https://projectreactor.io[Project Reactor] and Micronaut.
 
-The Micronaut framework supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+The Micronaut framework supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or link:{jdkapi}/java.base/java/util/concurrent/CompletableFuture.html[CompletableFuture] from any controller method.
 
 NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
 
 NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut RxJava dependency to your project to include the necessary converters.
 
-The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
+The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a link:{jdkapi}/java.base/java/util/concurrent/CompletableFuture.html[CompletableFuture].
 
 When returning a reactive type, The Micronaut framework subscribes to the returned reactive type on the same thread as the request (a Netty Event Loop thread). It is therefore important that if you perform any blocking operations, you offload those operations to an appropriately configured thread pool, for example using the https://projectreactor.io[Project Reactor] or https://github.com/ReactiveX/RxJava[RxJava] `subscribeOn(..)` facility or ann:scheduling.annotation.ExecuteOn[].
 
@@ -22,7 +22,7 @@ To summarize, the following table illustrates some common response types and the
 |Any type that implements the rs:Publisher[] interface
 |`Publisher<String> hello()`
 
-|jdk:java.util.concurrent.CompletableFuture[]
+|link:{jdkapi}/java.base/java/util/concurrent/CompletableFuture.html[CompletableFuture]
 |A Java `CompletableFuture` instance
 |`CompletableFuture<String> hello()`
 
@@ -30,7 +30,7 @@ To summarize, the following table illustrates some common response types and the
 |An api:http.HttpResponse[] and optional response body
 |`HttpResponse<Publisher<String>> hello()`
 
-|jdk:java.lang.CharSequence[]
+|link:{jdkapi}/java.base/java/lang/CharSequence.html[CharSequence]
 |Any implementation of `CharSequence`
 |`String hello()`
 

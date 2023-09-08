@@ -1,6 +1,6 @@
 Once the job of the <<compilerArch, Micronaut Compiler>> is complete and the required classes generated, it is up to the api:context.BeanContext[] to load the classes for runtime execution.
 
-Whilst the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] is used to define instances of api:inject.BeanDefinitionReference[], the instances themselves are instead loaded with api:core.io.service.SoftServiceLoader[] which is a more lenient implementation that allows checking if the service is actually present before loading and also allows parallel loading of services.
+Whilst the link:{jdkapi}/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] is used to define instances of api:inject.BeanDefinitionReference[], the instances themselves are instead loaded with api:core.io.service.SoftServiceLoader[] which is a more lenient implementation that allows checking if the service is actually present before loading and also allows parallel loading of services.
 
 The api:context.BeanContext[] performs the following steps:
 
@@ -15,7 +15,7 @@ image::arch/beancontext.png[]
 
 The api:context.ApplicationContext[] is a specialized version of the api:context.BeanContext[] that adds the notion of one or more active environments (encapsulated by api:context.env.Environment[]) and <<conditionalBeans, conditional bean loading>> based on this environment.
 
-The api:context.env.Environment[] is loaded from one or more defined api:context.env.PropertySource[] instances that are discovered via the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] by loading instances of api:context.env.PropertySourceLoader[].
+The api:context.env.Environment[] is loaded from one or more defined api:context.env.PropertySource[] instances that are discovered via the link:{jdkapi}/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] by loading instances of api:context.env.PropertySourceLoader[].
 
 A developer can extend Micronaut to load a api:context.env.PropertySource[] through an entirely custom mechanism by adding another implementation and the associated `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file referencing this class.
 

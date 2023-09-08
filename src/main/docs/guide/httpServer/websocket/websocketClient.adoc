@@ -46,7 +46,7 @@ The above example defines a send method that returns a reactor:Mono[].
 public abstract java.util.concurrent.Future<String> sendAsync(String message);
 ----
 
-The above example defines a send method that executes asynchronously and returns a jdk:java.util.concurrent.Future[] to access the results.
+The above example defines a send method that executes asynchronously and returns a link:{jdkapi}/java.base/java/util/concurrent/Future.html[Future] to access the results.
 
 Once you have defined a client class you can connect to the client socket and start sending messages:
 

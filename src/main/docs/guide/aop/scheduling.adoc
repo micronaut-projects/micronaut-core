@@ -53,7 +53,7 @@ The above example allows the task execution frequency to be configured with the 
 
 == Configuring the Scheduled Task Thread Pool
 
-Tasks executed by `@Scheduled` are run by default on a jdk:java.util.concurrent.ScheduledExecutorService[] configured to have twice the number of threads as available processors.
+Tasks executed by `@Scheduled` are run by default on a link:{jdkapi}/java.base/java/util/concurrent/ScheduledExecutorService.html[ScheduledExecutorService] configured to have twice the number of threads as available processors.
 
 You can configure this thread pool in your configuration file (e.g `application.yml`):
 

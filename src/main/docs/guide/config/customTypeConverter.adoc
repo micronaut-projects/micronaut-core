@@ -6,7 +6,7 @@ Consider the following api:context.annotation.ConfigurationProperties[]:
 
 snippet::io.micronaut.docs.config.converters.MyConfigurationProperties[tags="class", indent=0]
 
-The type `MyConfigurationProperties` has a property named `updatedAt` of type jdk:java.time.LocalDate[].
+The type `MyConfigurationProperties` has a property named `updatedAt` of type link:{jdkapi}/java.base/java/time/LocalDate.html[LocalDate].
 
 To bind this property from a map via configuration:
 

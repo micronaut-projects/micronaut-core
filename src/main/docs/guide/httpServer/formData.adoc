@@ -12,4 +12,4 @@ Alternatively, instead of using a POJO you can bind form data directly to method
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,args,endclass", indent=0, title="Binding Form Data to Parameters"]
 
-As you can see from the example above, this approach lets you use features such as support for jdk:java.util.Optional[] types and restrict the parameters to be bound. When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound.
+As you can see from the example above, this approach lets you use features such as support for link:{jdkapi}/java.base/java/util/Optional.html[Optional] types and restrict the parameters to be bound. When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound.

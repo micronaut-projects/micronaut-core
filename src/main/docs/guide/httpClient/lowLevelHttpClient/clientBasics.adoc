@@ -108,7 +108,7 @@ On the client you can call this endpoint and decode the JSON into a map using th
 
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="jsonmap", indent=0, title="Decoding the response body to a Map"]
 
-The above example decodes the response into a jdk:java.util.Map[] representing the JSON. You can use the `Argument.of(..)` method to customize the type of the key and value:
+The above example decodes the response into a link:{jdkapi}/java.base/java/util/Map.html[Map] representing the JSON. You can use the `Argument.of(..)` method to customize the type of the key and value:
 
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="jsonmaptypes", indent=0, title="Decoding the response body to a Map"]
 

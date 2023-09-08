@@ -1,4 +1,4 @@
-The goal of <<introspection, Bean Introspections>> is to provide an alternative to reflection and the JDK's https://docs.oracle.com/en/java/javase/17/docs/api/java.desktop/java/beans/Introspector.html[Introspector API] that is coupled to the `java.desktop` module in recent versions of Java.
+The goal of <<introspection, Bean Introspections>> is to provide an alternative to reflection and the JDK's link:{jdkapi}/java.desktop/java/beans/Introspector.html[Introspector API] that is coupled to the `java.desktop` module in recent versions of Java.
 
 Many libraries in Java need to programmatically discover what methods represent properties of a class in some way and whilst the https://en.wikipedia.org/wiki/JavaBeans[JavaBeans specification] tried to establish a standard convention, the language itself has evolved to include other constructs like Records that represent properties as components.
 

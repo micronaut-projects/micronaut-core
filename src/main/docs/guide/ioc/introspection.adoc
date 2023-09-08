@@ -1,3 +1,3 @@
-Since Micronaut framework 1.1, a compile-time replacement for the JDK's jdk:java.beans.Introspector[] class has been included.
+Since Micronaut framework 1.1, a compile-time replacement for the JDK's link:{jdkapi}/java.desktop/java/beans/Introspector.html[Introspector] class has been included.
 
 The api:core.beans.BeanIntrospector[] and api:core.beans.BeanIntrospection[] interfaces allow looking up bean introspections to instantiate and read/write bean properties without using reflection or caching reflective metadata, which consume excessive memory for large beans.
