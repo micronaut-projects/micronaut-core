@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -61,6 +62,21 @@ public class HeadersTest {
                 .build()));
     }
 
+    /**
+     * Multiple Headers are properly received as list and not as single header
+     */
+    @Test
+    void multipleHeadersAreReceivedAsList() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/foo/receive-multiple-headers")
+                    .header(HttpHeaders.ETAG, "A")
+                    .header(HttpHeaders.ETAG, "B"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("2")
+                .build()));
+    }
+
     @Controller("/foo")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController {
@@ -72,6 +88,11 @@ public class HeadersTest {
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
         String getFooAsJson(@Header("Foo") String foo, @Header("fOo") String foo2) {
             return "{\"status\":\"" + foo + foo2 + "\"}";
+        }
+
+        @Get(value = "/receive-multiple-headers", processes = MediaType.TEXT_PLAIN)
+        String receiveMultipleHeaders(HttpRequest<?> request) {
+            return String.valueOf(request.getHeaders().getAll(HttpHeaders.ETAG).size());
         }
     }
 }
