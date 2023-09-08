@@ -15,7 +15,6 @@
  */
 package io.micronaut.validation.routes;
 
-import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
@@ -38,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Visits methods annotated with HttpMethodMapping and validates the
@@ -50,7 +48,6 @@ import java.util.stream.Collectors;
 @SupportedOptions(RouteValidationVisitor.VALIDATION_OPTION)
 public class RouteValidationVisitor implements TypeElementVisitor<Object, Object> {
 
-    static final String MICRONAUT_PROCESSING_INCREMENTAL = "micronaut.processing.incremental";
     static final String VALIDATION_OPTION = "micronaut.route.validation";
     private static final String METHOD_MAPPING_ANN = "io.micronaut.http.annotation.HttpMethodMapping";
     private final List<RouteValidationRule> rules = new ArrayList<>();
@@ -94,7 +91,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
                 }
 
                 return UriMatchTemplate.of(uriValue.toString());
-            }).collect(Collectors.toList());
+            }).toList();
 
             RouteParameterElement[] parameters = Arrays.stream(element.getParameters())
                     .map(RouteParameterElement::new)
@@ -123,40 +120,13 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
 
     /**
      * Check whether to skip route validation.
-     * <p>
-     * Route validation is disabled when using Java 8 or below with incremental compilation. The
-     * Java 8 compiler does not load parameter names for compiled classes, so in this case it is
-     * impossible to match route parameters to method parameters.
      *
      * @param visitorContext The visitor context
      * @return A boolean indicating whether to skip route validation.
      */
     private static boolean shouldSkipRouteValidation(VisitorContext visitorContext) {
-        int javaVersion = getVersion();
-        if (javaVersion < 9) {
-            String incremental = visitorContext.getOptions().get(MICRONAUT_PROCESSING_INCREMENTAL);
-            if (incremental != null && incremental.equals("true")) {
-                return true;
-            }
-        }
         String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
         return prop != null && prop.equals("false");
     }
 
-    private static int getVersion() {
-        String version = CachedEnvironment.getProperty("java.version");
-        if (version.startsWith("1.")) {
-            version = version.substring(2, 3);
-        } else {
-            int dot = version.indexOf(".");
-            if (dot != -1) {
-                version = version.substring(0, dot);
-            }
-        }
-        try {
-            return Integer.parseInt(version);
-        } catch (NumberFormatException ignored) {
-            return -1;
-        }
-    }
 }

@@ -102,7 +102,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 .toList()
 
             if (elements.isNotEmpty()) {
-                val classElementsCache: MutableMap<KSClassDeclaration, ClassElement> = HashMap()
+                val classElementsCache: MutableMap<KotlinClassNativeElement, ClassElement> = HashMap()
 
                 // The visitor X with a higher priority should process elements of A before
                 // the visitor Y which is processing elements of B but also using elements A
@@ -227,7 +227,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private inner class ElementVisitor(
         private val loadedVisitor: LoadedVisitor,
         private val classDeclaration: KSClassDeclaration,
-        private val classElementsCache: MutableMap<KSClassDeclaration, ClassElement>
+        private val classElementsCache: MutableMap<KotlinClassNativeElement, ClassElement>
     ) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
@@ -240,10 +240,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
                 if (loadedVisitor.matches(classDeclaration)) {
-                    val classElement = classElementsCache.computeIfAbsent(classDeclaration) { cd ->
+                    val classElement = classElementsCache.computeIfAbsent(KotlinClassNativeElement(classDeclaration)) { _ ->
                         newClassElement(
                             visitorContext,
-                            cd
+                            classDeclaration
                         )
                     }
 
