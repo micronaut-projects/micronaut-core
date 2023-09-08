@@ -2,7 +2,7 @@ The Micronaut framework supports sending files to the client in a couple of easy
 
 == Sending File Objects
 
-It is possible to return a jdk:java.io.File[] object from your controller method, and the data will be returned to the client. The `Content-Type` header of file responses is calculated based on the name of the file.
+It is possible to return a link:{jdkapi}/java.base/java/io/File.html[File] object from your controller method, and the data will be returned to the client. The `Content-Type` header of file responses is calculated based on the name of the file.
 
 To control either the media type of the file being sent, or to set the file to be downloaded (i.e. using the `Content-Disposition` header), instead construct a api:http.server.types.files.SystemFile[] with the file to use. For example:
 
@@ -36,7 +36,7 @@ public StreamedFile download() {
 
 The server supports returning `304` (Not Modified) responses if the files being transferred have not changed, and the request contains the appropriate header. In addition, if the client accepts encoded responses, the Micronaut framework encodes the file if appropriate. Encoding happens if the file is text-based and larger than 1KB by default. The threshold at which data is encoded is configurable. See the server configuration reference for details.
 
-TIP: To use a custom data source to send data through an input stream, construct a link:{javase}java/io/PipedInputStream.html[PipedInputStream] and link:{javase}java/io/PipedOutputStream.html[PipedOutputStream] to write data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
+TIP: To use a custom data source to send data through an input stream, construct a link:{jdkapi}/java.base/java/io/PipedInputStream.html[PipedInputStream] and link:{jdkapi}/java.base/java/io/PipedOutputStream.html[PipedOutputStream] to write data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
 
 == Cache Configuration
 

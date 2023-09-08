@@ -50,7 +50,7 @@ class DefaultHttpFactories {
             try {
                 return sd.load();
             } catch (Throwable e) {
-                LOG.warn("Unable to load default request factory for definition [" + definition + "]: " + e.getMessage(), e);
+                LOG.warn("Unable to load default request factory for definition [{}]: {}", definition, e.getMessage(), e);
             }
         }
         return new SimpleHttpRequestFactory();
@@ -70,7 +70,7 @@ class DefaultHttpFactories {
             try {
                 return sd.load();
             } catch (Throwable e) {
-                LOG.warn("Unable to load default response factory for definition [" + definition + "]: " + e.getMessage(), e);
+                LOG.warn("Unable to load default response factory for definition [{}]: {}", definition, e.getMessage(), e);
             }
         }
         return new SimpleHttpResponseFactory();

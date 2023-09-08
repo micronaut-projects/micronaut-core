@@ -26,6 +26,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
+/**
+ * Micronaut deserializers for jackson.
+ */
 @Internal
 public class MicronautDeserializers extends SimpleDeserializers {
     private final ConversionService conversionService;

@@ -146,7 +146,7 @@ public class JavaParser implements Closeable {
 
             @Override
             public SourceVersion getSourceVersion() {
-                return SourceVersion.RELEASE_8;
+                return SourceVersion.RELEASE_17;
             }
 
             @Override

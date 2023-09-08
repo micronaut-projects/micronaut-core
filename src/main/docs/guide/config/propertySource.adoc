@@ -77,7 +77,7 @@ To securely externalize configuration consider using a secrets manager system su
 
 * https://micronaut-projects.github.io/micronaut-aws/latest/guide/#secretsmanager[AWS Secrets Manager].
 * https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager[Google Cloud Secrets Manager].
-* https://docs.micronaut.io/latest/guide/#distributedConfigurationVault[HashiCorp Vault].
+* <<distributedConfigurationVault, HashiCorp Vault>>
 * https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/index.html#config-client[Kubernetes Secrets].
 * https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault[Oracle Cloud Vault].
 

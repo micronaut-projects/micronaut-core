@@ -17,7 +17,6 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.naming.Named;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -26,13 +25,12 @@ import io.micronaut.validation.routes.RouteValidationResult;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Validates all route uri variables are present in the route arguments.
@@ -48,22 +46,20 @@ public class MissingParameterRule implements RouteValidationRule {
         Set<String> variables = templates.stream().flatMap(t -> t.getVariableNames().stream()).collect(Collectors.toSet());
         Set<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toCollection(LinkedHashSet::new));
 
-        routeVariables.addAll(Arrays.stream(parameters)
-                .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.Body"))
-                .map(ParameterElement::getType)
-                .filter(Objects::nonNull)
-                .flatMap(MissingParameterRule::findProperties)
-                .map(Named::getName)
-                .collect(Collectors.toList()));
-
-        // RequestBean has properties inside
-        routeVariables.addAll(Arrays.stream(parameters)
-                .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.RequestBean"))
-                .map(ParameterElement::getType)
-                .flatMap(MissingParameterRule::findProperties)
-                .filter(p -> p.getAnnotationMetadata().hasStereotype(Bindable.class))
-                .map(p -> p.getAnnotationMetadata().stringValue(Bindable.class).orElse(p.getName()))
-                .collect(Collectors.toSet()));
+        for (ParameterElement parameter : parameters) {
+            if (parameter.hasAnnotation("io.micronaut.http.annotation.Body")) {
+                for (AnnotatedElement element : findProperties(parameter.getType())) {
+                    routeVariables.add(element.getName());
+                }
+            }
+            if (parameter.hasAnnotation("io.micronaut.http.annotation.RequestBean")) {
+                for (AnnotatedElement element : findProperties(parameter.getType())) {
+                    if (element.getAnnotationMetadata().hasStereotype(Bindable.class)) {
+                        routeVariables.add(element.getAnnotationMetadata().stringValue(Bindable.class).orElse(element.getName()));
+                    }
+                }
+            }
+        }
 
         List<String> errorMessages = new ArrayList<>();
 
@@ -76,13 +72,13 @@ public class MissingParameterRule implements RouteValidationRule {
         return new RouteValidationResult(errorMessages.toArray(new String[0]));
     }
 
-    private static Stream<? extends AnnotatedElement> findProperties(ClassElement t) {
+    private static Collection<? extends AnnotatedElement> findProperties(ClassElement t) {
         if (t.isRecord()) {
             Optional<MethodElement> primaryConstructor = t.getPrimaryConstructor();
             if (primaryConstructor.isPresent()) {
-                return Arrays.stream(primaryConstructor.get().getParameters());
+                return Arrays.asList(primaryConstructor.get().getParameters());
             }
         }
-        return t.getBeanProperties().stream();
+        return t.getBeanProperties();
     }
 }

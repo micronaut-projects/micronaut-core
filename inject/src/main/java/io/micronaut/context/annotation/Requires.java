@@ -234,7 +234,7 @@ public @interface Requires {
     }
 
     /**
-     * Used to express an operation system family.
+     * Used to express an operating system family.
      */
     enum Family {
         LINUX, MAC_OS, WINDOWS, SOLARIS, OTHER

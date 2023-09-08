@@ -36,7 +36,7 @@ import java.util.function.Function;
 public sealed interface MultiObjectBody extends HttpBody permits ImmediateMultiObjectBody, ImmediateSingleObjectBody, StreamingMultiObjectBody {
     /**
      * Coerce this value to an {@link InputStream}. This implements
-     * {@link io.micronaut.http.server.netty.binders.InputStreamBodyBinder}. Requires the objects
+     * {@link io.micronaut.http.server.netty.binders.NettyInputStreamBodyBinder}. Requires the objects
      * of this body to be {@link io.netty.buffer.ByteBuf}s.<br>
      * Ownership is transferred to the stream, it must be closed to release all buffers.
      *

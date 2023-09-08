@@ -1736,7 +1736,7 @@ public class DefaultHttpClient implements
     }
 
     private void traceBody(String type, ByteBuf content) {
-        log.trace(type + " Body");
+        log.trace("{} Body", type);
         log.trace("----");
         log.trace(content.toString(defaultCharset));
         log.trace("----");

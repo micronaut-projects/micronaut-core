@@ -18,6 +18,7 @@ package io.micronaut.context.visitor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -41,7 +42,8 @@ public class ExecutableVisitor implements TypeElementVisitor<Object, Executable>
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         for (ParameterElement parameter : element.getParameters()) {
-            if (parameter.getType().isPrimitive() && parameter.isNullable()) {
+            if (parameter.getType().isPrimitive() && parameter.isNullable()
+                && !(parameter instanceof KotlinParameterElement kotlinParameterElement && kotlinParameterElement.hasDefault())) {
                 context.warn("@Nullable on primitive types will allow the method to be executed at runtime with null values, causing an exception", parameter);
             }
         }

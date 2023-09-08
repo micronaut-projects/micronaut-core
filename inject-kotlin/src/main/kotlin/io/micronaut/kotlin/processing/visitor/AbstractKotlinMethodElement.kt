@@ -114,6 +114,16 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         if (nativeType == overridden.nativeType) {
             return false // The same method
         }
+        val thisType = getDeclaringType()
+        val thatType = overridden.getDeclaringType()
+        if (thisType.getName() == thatType.getName()) {
+            // The same type
+            return false
+        }
+        if (!thisType.isAssignable(thatType)) {
+            // not a parent class
+            return false
+        }
         return overridee == overridden.declaration
     }
 
