@@ -117,7 +117,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 StatusRouteInfo<Object, Object> routeInfo = statusRoute.toRouteInfo();
                 if (statusRoutes.contains(routeInfo)) {
                     final StatusRouteInfo<Object, Object> existing = statusRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
-                    throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.status() + "]. New route: " + statusRoute + ". Existing: " + existing);
+                    throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.statusCode() + "]. New route: " + statusRoute + ". Existing: " + existing);
                 }
                 statusRoutes.add(routeInfo);
             }
@@ -435,15 +435,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             @NonNull Class<?> originatingClass,
             @NonNull HttpStatus status,
             HttpRequest<?> request) {
-        return findStatusInternal(originatingClass, status, request);
+        return findStatusInternal(originatingClass, status.getCode(), request);
     }
 
     @Override
     public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
-        return findStatusInternal(null, status, request);
+        return findStatusInternal(null, status.getCode(), request);
     }
 
-    private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, @NonNull HttpStatus status, HttpRequest<?> request) {
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
+        return findStatusInternal(originatingClass, statusCode, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(int statusCode, HttpRequest<?> request) {
+        return findStatusInternal(null, statusCode, request);
+    }
+
+    private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, int status, HttpRequest<?> request) {
         Collection<MediaType> accept =
                 request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
