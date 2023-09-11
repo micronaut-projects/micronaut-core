@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiTreeChangeListener
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.resolve.jvm.extensions.AnalysisHandlerExtension
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import java.io.File
@@ -176,6 +177,7 @@ private class KspCompileTestingComponentRegistrar(
 
             this.processingOptions.putAll(compilation.kspArgs)
 
+            this.languageVersionSettings = configuration.languageVersionSettings
             this.incremental = this@KspCompileTestingComponentRegistrar.incremental
             this.incrementalLog = this@KspCompileTestingComponentRegistrar.incrementalLog
             this.allWarningsAsErrors = this@KspCompileTestingComponentRegistrar.allWarningsAsErrors
