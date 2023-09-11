@@ -605,9 +605,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
         } else {
             if (!hasValues) {
-                existing = existing == null ? new LinkedHashMap<>(3) : existing;
+                existing = existing == null ? CollectionUtils.newLinkedHashMap(3) : existing;
             } else {
-                existing = new LinkedHashMap<>(values.size());
+                existing = CollectionUtils.newLinkedHashMap(values.size());
                 existing.putAll(values);
             }
             currentAnnotationValues.put(annotation, existing);

@@ -358,7 +358,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private Map<String, ClassElement> resolveTypeArguments(Map<String, ClassElement> typeArguments, ClassElement... types) {
         Map<String, ClassElement> resolvedTypes = null;
         if (typeArguments.size() == types.length) {
-            resolvedTypes = new LinkedHashMap<>(typeArguments.size());
+            resolvedTypes = CollectionUtils.newLinkedHashMap(typeArguments.size());
             final Iterator<String> i = typeArguments.keySet().iterator();
             for (ClassElement type : types) {
                 final String variable = i.next();

@@ -32,7 +32,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,7 +78,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
             List<ServiceInstanceList> serviceInstanceLists) {
         this.beanContext = beanContext;
         if (CollectionUtils.isNotEmpty(serviceInstanceLists)) {
-            this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.size());
+            this.serviceInstanceLists = CollectionUtils.newHashMap(serviceInstanceLists.size());
             for (ServiceInstanceList provider : serviceInstanceLists) {
                 this.serviceInstanceLists.put(provider.getID(), provider);
             }

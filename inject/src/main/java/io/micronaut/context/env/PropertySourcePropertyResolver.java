@@ -797,7 +797,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (o instanceof CharSequence) {
                     i.set(resolvePlaceHoldersIfNecessary(o));
                 } else if (o instanceof Map<?,?> submap) {
-                    Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
+                    Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();

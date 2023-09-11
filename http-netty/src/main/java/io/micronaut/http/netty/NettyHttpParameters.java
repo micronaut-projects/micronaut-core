@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MutableHttpParameters;
 
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
     public NettyHttpParameters(Map<String, List<String>> parameters,
                                ConversionService conversionService,
                                @Nullable BiConsumer<CharSequence, List<String>> onChange) {
-        this.valuesMap = new LinkedHashMap<>(parameters.size());
+        this.valuesMap = CollectionUtils.newLinkedHashMap(parameters.size());
         this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
         this.onChange = onChange;
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {

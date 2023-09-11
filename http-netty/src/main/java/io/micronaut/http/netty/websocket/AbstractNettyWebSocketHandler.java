@@ -25,6 +25,7 @@ import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -61,7 +62,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -559,7 +559,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private Map<Argument<?>, Object> prepareBoundVariables(ExecutableMethod<?, ?> executable, List<?> parameters) {
-        Map<Argument<?>, Object> preBound = new HashMap<>(executable.getArguments().length);
+        Map<Argument<?>, Object> preBound = CollectionUtils.newHashMap(executable.getArguments().length);
         for (Argument argument : executable.getArguments()) {
             Class<?> type = argument.getType();
             for (Object object : parameters) {
