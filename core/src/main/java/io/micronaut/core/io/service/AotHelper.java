@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.optim;
+package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
 
@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
  * @author Jonas Konrad
  */
 @Internal
-public final class AotHelper {
+final class AotHelper {
     /**
      * If this setting is enabled, any attempts to use {@link io.micronaut.core.io.service.SoftServiceLoader} on a
      * service type that is not optimized by aot will produce an exception.
