@@ -20,6 +20,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 
+import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -51,7 +52,10 @@ class ResettableReadTimeoutHandler extends ReadTimeoutHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         super.handlerRemoved(ctx);
-        ctx.pipeline().remove(ctx.name() + "-reset-interceptor");
+        try {
+            ctx.pipeline().remove(ctx.name() + "-reset-interceptor");
+        } catch (NoSuchElementException ignored) {
+        }
     }
 
     @Override
