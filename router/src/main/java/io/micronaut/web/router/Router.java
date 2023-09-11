@@ -259,6 +259,29 @@ public interface Router {
             HttpRequest<?> request);
 
     /**
+     * Found a {@link RouteMatch} for the given status code.
+     *
+     * @param originatingClass The class the error originates from
+     * @param statusCode       The HTTP status
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    default <R> Optional<RouteMatch<R>> findStatusRoute(
+            @NonNull Class<?> originatingClass,
+            int statusCode,
+            HttpRequest<?> request) {
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(statusCode);
+        } catch (IllegalArgumentException iae) {
+            // custom status code
+            return Optional.empty();
+        }
+        return findStatusRoute(originatingClass, status, request);
+    }
+
+    /**
      * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
      *
      * @param status           The HTTP status
@@ -269,6 +292,27 @@ public interface Router {
     <R> Optional<RouteMatch<R>> findStatusRoute(
             @NonNull HttpStatus status,
             HttpRequest<?> request);
+
+    /**
+     * Found a {@link RouteMatch} for the given status code.
+     *
+     * @param statusCode       The HTTP status code
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    default <R> Optional<RouteMatch<R>> findStatusRoute(
+            int statusCode,
+            HttpRequest<?> request) {
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(statusCode);
+        } catch (IllegalArgumentException iae) {
+            // custom status code
+            return Optional.empty();
+        }
+        return findStatusRoute(status, request);
+    }
 
     /**
      * Build a filtered {@link org.reactivestreams.Publisher} for an action.

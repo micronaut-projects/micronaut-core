@@ -41,6 +41,13 @@ public interface StatusRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reque
     HttpStatus status();
 
     /**
+     * @return The status
+     */
+    default int statusCode() {
+        return status().getCode();
+    }
+
+    /**
      * Match the given HTTP status.
      *
      * @param status The status to match
@@ -51,10 +58,45 @@ public interface StatusRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reque
     /**
      * Match the given HTTP status.
      *
+     * @param statusCode The status to match
+     * @return The route match
+     */
+    default Optional<RouteMatch<R>> match(int statusCode) {
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(statusCode);
+        } catch (IllegalArgumentException iae) {
+            // custom status code
+            return Optional.empty();
+        }
+        return match(status);
+    }
+
+    /**
+     * Match the given HTTP status.
+     *
      * @param originatingClass The class where the error originates from
      * @param status The status to match
      * @return The route match
      */
     Optional<RouteMatch<R>> match(Class<?> originatingClass, HttpStatus status);
+
+    /**
+     * Match the given HTTP status.
+     *
+     * @param originatingClass The class where the error originates from
+     * @param statusCode The status to match
+     * @return The route match
+     */
+    default Optional<RouteMatch<R>> match(Class<?> originatingClass, int statusCode) {
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(statusCode);
+        } catch (IllegalArgumentException iae) {
+            // custom status code
+            return Optional.empty();
+        }
+        return match(originatingClass, status);
+    }
 
 }
