@@ -53,4 +53,22 @@ class ExternalConfigurationSpec extends Specification {
         cleanup:
         server.stop()
     }
+
+    def "configuration via logger.config should work without configuring levels"() {
+        when:
+        def server = ApplicationContext.run(EmbeddedServer, [
+                "logger.config": "src/external/external-logback.xml",
+        ])
+        Logger fromXml = (Logger) LoggerFactory.getLogger("i.should.not.exist")
+        Logger external = (Logger) LoggerFactory.getLogger("external.logging")
+
+        then: 'logback.xml is ignored as we have set a configurationFile'
+        fromXml.level == null
+
+        and: 'external configuration is used'
+        external.level == Level.TRACE
+
+        cleanup:
+        server.stop()
+    }
 }
