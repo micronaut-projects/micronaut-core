@@ -6,5 +6,5 @@ import java.util.*
 abstract class AbstractCustomCrudRepo : CrudRepo<String, Long> {
 
     @Marker
-    abstract override fun findById(aLong: Long): Optional<String>
+    abstract override fun findById(id: Long): Optional<String>
 }
