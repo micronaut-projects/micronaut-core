@@ -45,11 +45,12 @@ import java.util.Map;
 @Context
 @Requires(beans = LoggingSystem.class)
 @Requires(beans = Environment.class)
-@Requires(property = PropertiesLoggingLevelsConfigurer.LOGGER_LEVELS_PROPERTY_PREFIX)
+@Requires(property = PropertiesLoggingLevelsConfigurer.LOGGER_PROPERTY_PREFIX)
 @Internal
 final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListener<RefreshEvent> {
 
-    static final String LOGGER_LEVELS_PROPERTY_PREFIX = "logger.levels";
+    static final String LOGGER_PROPERTY_PREFIX = "logger";
+    static final String LOGGER_LEVELS_PROPERTY_PREFIX = LOGGER_PROPERTY_PREFIX + ".levels";
     private static final Logger LOGGER = LoggerFactory.getLogger(PropertiesLoggingLevelsConfigurer.class);
 
     private final Environment environment;
