@@ -342,6 +342,29 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Map<CharSequence, Object> annotationValues);
 
     /**
+     * Read the given member and value, applying conversions if necessary, and place the data in the given map.
+     *
+     * @param originatingElement The originating element
+     * @param annotationName     The annotation name
+     * @param member             The member being read from
+     * @param memberName         The member
+     * @param annotationValue    The value
+     * @param annotationValues   The values to populate
+     * @param resolvedDefaults   The resolved defaults
+     * @since 4.3.0
+     */
+    protected void readAnnotationRawValues(
+            T originatingElement,
+            String annotationName,
+            T member,
+            String memberName,
+            Object annotationValue,
+            Map<CharSequence, Object> annotationValues,
+            Map<String, Map<CharSequence, Object>> resolvedDefaults) {
+        readAnnotationRawValues(originatingElement, annotationName, member, memberName, annotationValue, annotationValues);
+    }
+
+    /**
      * Validates an annotation value.
      *
      * @param originatingElement The originating element
@@ -505,10 +528,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The annotation value
      */
     protected AnnotationValue<?> readNestedAnnotationValue(T annotationElement, A annotationType) {
+        return readNestedAnnotationValue(annotationElement, annotationType, new HashMap<>());
+    }
+
+    protected AnnotationValue<?> readNestedAnnotationValue(T annotationElement, A annotationType, Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         final String annotationTypeName = getAnnotationTypeName(annotationType);
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);
+        T theType = getTypeForAnnotation(annotationType);
         if (annotationValues.isEmpty()) {
-            return new AnnotationValue<>(annotationTypeName, Collections.emptyMap());
+            Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
+            return new AnnotationValue<>(annotationTypeName, Collections.emptyMap(), annotationDefaults);
         }
 
         Map<CharSequence, Object> resolvedValues = CollectionUtils.newLinkedHashMap(annotationValues.size());
@@ -538,8 +567,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     memberName,
                     annotationValue,
                     resolvedValues);
+
         }
-        return new AnnotationValue<>(annotationTypeName, resolvedValues);
+        Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
+        return new AnnotationValue<>(annotationTypeName, resolvedValues, annotationDefaults);
+    }
+
+    private Map<CharSequence, Object> resolveAnnotationDefaults(T annotationElement, String annotationTypeName, Map<String, Map<CharSequence, Object>> resolvedDefaults) {
+        Map<CharSequence, Object> defaults = resolvedDefaults.get(annotationTypeName);
+        if (defaults != null) {
+            return defaults;
+        }
+        defaults = new LinkedHashMap<>();
+        // To prevent recursion we set the map and modify it later
+        resolvedDefaults.put(annotationTypeName, defaults);
+        Map<? extends T, ?> nativeDefaultValues = readAnnotationDefaultValues(annotationTypeName, annotationElement);
+        Map<CharSequence, Object> annotationDefaults = getAnnotationDefaults(annotationElement, annotationTypeName, nativeDefaultValues, resolvedDefaults);
+        defaults.putAll(annotationDefaults);
+        return annotationDefaults;
     }
 
     /**
@@ -637,7 +682,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement,
                                                             String annotationName,
-                                                            Map<? extends T, ?> elementDefaultValues) {
+                                                            Map<? extends T, ?> elementDefaultValues,
+                                                            Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         if (elementDefaultValues == null) {
             return null;
         }
@@ -652,7 +698,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         member,
                         memberName,
                         annotationValue,
-                        defaultValues);
+                        defaultValues,
+                        resolvedDefaults);
             }
         }
         return defaultValues;
@@ -878,7 +925,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             defaultValues = new LinkedHashMap<>(defaults);
         } else {
             Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType);
-            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues);
+            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues, new HashMap<>());
             if (defaultValues != null) {
                 // Add the default for any retention type annotation
                 ANNOTATION_DEFAULTS.put(annotationName, new LinkedHashMap<>(defaultValues));

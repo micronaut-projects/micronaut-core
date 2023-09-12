@@ -634,6 +634,28 @@ class Test {
         properties[2].get("name", String).get() == "prop4"
     }
 
+    void "test read beandef annotation with a default annotation value"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import jakarta.inject.Singleton;
+
+@Singleton
+@TopLevel2
+class Test {
+}
+''')
+            AnnotationMetadata metadata = definition.getAnnotationMetadata()
+
+        then:
+            AnnotationValue nestedAnnotation = metadata.getAnnotation(TopLevel2).getDefaultValues().get("nested")
+            nestedAnnotation.annotationName == "io.micronaut.inject.annotation.Nested"
+            nestedAnnotation.getDefaultValues().get("num") == 10
+
+    }
+
     void "test annotation metadata string value array types"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''

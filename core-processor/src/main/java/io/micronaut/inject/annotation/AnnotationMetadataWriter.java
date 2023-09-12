@@ -17,8 +17,10 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
@@ -44,6 +46,7 @@ import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,14 +90,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    AnnotationMetadataSupport.class,
-                    "getDefaultValues",
-                    String.class
-            )
-    );
-
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
@@ -120,7 +115,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     io.micronaut.core.annotation.AnnotationValue.class,
                     String.class,
                     Map.class,
-                    Map.class
+                    AnnotationDefaultValuesProvider.class
             )
     );
 
@@ -395,33 +390,81 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Map<String, GeneratorAdapter> loadTypeMethods) {
             final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
-                final Map<CharSequence, Object> annotationValues = entry.getValue();
-                final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
-                String annotationName = entry.getKey();
-
-                // skip already registered
-                if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()) {
-                    continue;
-                }
-
-                invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
-
-                if (!typeOnly) {
-                    pushStringMapOf(staticInit, annotationValues, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
-                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
-                } else {
-                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
-                }
-            }
+            writeAnnotationDefaultsInternal(owningType, classWriter, staticInit, defaultsStorage, loadTypeMethods, annotationDefaultValues, new HashSet<>());
         }
         if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
-            AnnotationMetadataSupport.registerRepeatableAnnotations(annotationMetadata.annotationRepeatableContainer);
-            if (!annotationMetadata.annotationRepeatableContainer.isEmpty()) {
-                pushStringMapOf(staticInit, annotationMetadata.annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+            Map<String, String> annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
+            AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().forEach(annotationRepeatableContainer::remove);
+            AnnotationMetadataSupport.registerRepeatableAnnotations(annotationRepeatableContainer);
+            if (!annotationRepeatableContainer.isEmpty()) {
+                pushStringMapOf(staticInit, annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
                 staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
             }
         }
+    }
+
+    private static void writeAnnotationDefaultsInternal(Type owningType,
+                                                        ClassWriter classWriter,
+                                                        GeneratorAdapter staticInit,
+                                                        Map<String, Integer> defaultsStorage,
+                                                        Map<String, GeneratorAdapter> loadTypeMethods,
+                                                        Map<String, Map<CharSequence, Object>> annotationDefaultValues,
+                                                        Set<String> writtenAnnotations) {
+        for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
+            writeAnnotationDefaultsInternal(owningType,
+                classWriter,
+                staticInit,
+                defaultsStorage,
+                loadTypeMethods,
+                writtenAnnotations,
+                entry.getKey(),
+                entry.getValue());
+        }
+    }
+
+    private static void writeAnnotationDefaultsInternal(Type owningType,
+                                                        ClassWriter classWriter,
+                                                        GeneratorAdapter staticInit,
+                                                        Map<String, Integer> defaultsStorage,
+                                                        Map<String, GeneratorAdapter> loadTypeMethods,
+                                                        Set<String> writtenAnnotations,
+                                                        String annotationName,
+                                                        Map<CharSequence, Object> annotationValues) {
+        final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
+
+        // skip already registered
+        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent() || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
+            return;
+        }
+
+        if (!writtenAnnotations.add(annotationName)) {
+            return;
+        }
+
+        for (Map.Entry<CharSequence, Object> values : annotationValues.entrySet()) {
+            Object value = values.getValue();
+            if (value instanceof AnnotationValue<?> annotationValue && CollectionUtils.isNotEmpty(annotationValue.getDefaultValues())) {
+                writeAnnotationDefaultsInternal(owningType,
+                    classWriter,
+                    staticInit,
+                    defaultsStorage,
+                    loadTypeMethods,
+                    writtenAnnotations,
+                    annotationValue.getAnnotationName(),
+                    annotationValue.getDefaultValues());
+            }
+        }
+
+        invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue<>(annotationName));
+
+        if (!typeOnly) {
+            pushStringMapOf(staticInit, annotationValues, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+            staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
+        } else {
+            staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
+        }
+
+        writtenAnnotations.add(annotationName);
     }
 
     private static void instantiateInternal(
@@ -633,17 +676,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             pushStringMapOf(methodVisitor, values, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true));
 
-            Integer defaultIndex = defaultsStorage.get(annotationName);
-            if (defaultIndex == null) {
-                methodVisitor.push(annotationName);
-                methodVisitor.invokeStatic(Type.getType(AnnotationMetadataSupport.class), METHOD_GET_DEFAULT_VALUES);
-                methodVisitor.dup();
-                int localIndex = methodVisitor.newLocal(Type.getType(Map.class));
-                methodVisitor.storeLocal(localIndex);
-                defaultsStorage.put(annotationName, localIndex);
-            } else {
-                methodVisitor.loadLocal(defaultIndex);
-            }
+            methodVisitor.getStatic(Type.getType(AnnotationMetadataSupport.class), "ANNOTATION_DEFAULT_VALUES_PROVIDER", Type.getType(AnnotationDefaultValuesProvider.class));
             methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
         } else if (value instanceof EvaluatedExpressionReference expressionReference) {
             Type type = Type.getType(getTypeDescriptor(expressionReference.expressionClassName()));

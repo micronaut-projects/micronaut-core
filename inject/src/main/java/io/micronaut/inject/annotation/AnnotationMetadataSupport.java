@@ -17,15 +17,20 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
@@ -38,7 +43,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
@@ -48,12 +56,18 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.Format;
+import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
+import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
@@ -71,6 +85,7 @@ import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -85,15 +100,38 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class AnnotationMetadataSupport {
 
+    private static final Map<String, Map<CharSequence, Object>> CORE_ANNOTATION_DEFAULTS;
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
+    private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
 
+    /**
+     * The annotation default values provider.
+     * @since 4.3.0
+     */
+    public static final AnnotationDefaultValuesProvider ANNOTATION_DEFAULT_VALUES_PROVIDER = new AnnotationDefaultValuesProvider() {
+        @Override
+        public Map<CharSequence, Object> provide(String annotationName) {
+            return AnnotationMetadataSupport.getDefaultValues(annotationName);
+        }
+    };
+
     static {
         // some common ones for startup optimization
         Arrays.asList(
+                Any.class,
+                jakarta.annotation.Nullable.class,
+                Nonnull.class,
+                ReadableBytes.class,
+                Format.class,
+                Indexed.class,
+                Bindable.class,
+                DefaultScope.class,
+                Internal.class,
+                DefaultImplementation.class,
                 Nullable.class,
                 NonNull.class,
                 PreDestroy.class,
@@ -121,18 +159,113 @@ public final class AnnotationMetadataSupport {
                 ConfigurationBuilder.class,
                 Introspected.class,
                 Parameter.class,
-                Replaces.class,
                 Requirements.class,
                 Factory.class).forEach(ann ->
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
 
+        Map<String, Map<CharSequence, Object>> coreAnnotationsDefaults = new HashMap<>(100);
+        coreAnnotationsDefaults.put(
+            Deprecated.class.getName(),
+            Map.of("forRemoval", false)
+        );
+        coreAnnotationsDefaults.put(
+            Order.class.getName(),
+            Map.of("value", 0)
+        );
+        coreAnnotationsDefaults.put(
+            Executable.class.getName(),
+            Map.of("processOnStartup", false)
+        );
+        coreAnnotationsDefaults.put(
+            ConfigurationProperties.class.getName(),
+            Map.of("cliPrefix", new String[0], "excludes", new String[0], "includes", new String[0])
+        );
+        coreAnnotationsDefaults.put(
+            EachProperty.class.getName(),
+            Map.of("excludes", new String[0], "includes", new String[0], "list", false)
+        );
+        coreAnnotationsDefaults.put(
+            ConfigurationReader.class.getName(),
+            Map.of("excludes", new String[0], "includes", new String[0])
+        );
+        coreAnnotationsDefaults.put(
+            Bean.class.getName(),
+            Map.of("typed", new AnnotationClassValue[0])
+        );
+        coreAnnotationsDefaults.put(
+            Requires.class.getName(),
+            Map.ofEntries(Map.entry("beans", new AnnotationClassValue[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("condition", TrueCondition.class), Map.entry("entities", new AnnotationClassValue[0]), Map.entry("env", new String[0]), Map.entry("missing", new AnnotationClassValue[0]), Map.entry("missingBeans", new AnnotationClassValue[0]), Map.entry("missingClasses", new String[0]), Map.entry("missingConfigurations", new String[0]), Map.entry("notEnv", new String[0]), Map.entry("notOs", new String[0]), Map.entry("os", new String[0]), Map.entry("resources", new String[0]), Map.entry("sdk", "MICRONAUT"))
+        );
+        coreAnnotationsDefaults.put(
+            Replaces.class.getName(),
+            Map.of("qualifier", Annotation.class)
+        );
 
+        coreAnnotationsDefaults.put(
+            Introspected.IntrospectionBuilder.class.getName(),
+            Map.of("accessorStyle", new AnnotationValue("io.micronaut.core.annotation.AccessorsStyle", Map.of("writePrefixes", new String[]{""}), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER), "creatorMethod", "build")
+        );
+        coreAnnotationsDefaults.put(
+            Introspected.class.getName(),
+            Map.ofEntries(Map.entry("accessKind", new String[]{"METHOD"}), Map.entry("annotationMetadata", true), Map.entry("builder", new AnnotationValue("io.micronaut.core.annotation.Introspected$IntrospectionBuilder", Map.of(), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER)), Map.entry("classNames", new String[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("excludedAnnotations", new AnnotationClassValue[0]), Map.entry("excludes", new String[0]), Map.entry("includedAnnotations", new AnnotationClassValue[0]), Map.entry("includes", new String[0]), Map.entry("indexed", new AnnotationValue[0]), Map.entry("packages", new String[0]), Map.entry("visibility", new String[]{"DEFAULT"}), Map.entry("withPrefix", "with"))
+        );
+        coreAnnotationsDefaults.put(
+            MapFormat.class.getName(),
+            Map.of("keyFormat", "HYPHENATED", "transformation", "NESTED")
+        );
+        coreAnnotationsDefaults.put(
+            Parallel.class.getName(),
+            Map.of("shutdownOnError", true)
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.constructor.TestConstructorAnn",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.AroundConstruct",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.InterceptorBinding",
+            Map.of("bindMembers", false, "kind", "AROUND", "value", Annotation.class)
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.InterceptorBean",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.Around",
+            Map.of("cacheableLazyTarget", false, "hotswap", false, "lazy", false, "proxyTarget", false, "proxyTargetMode", "ERROR")
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.Introduction",
+            Map.of("interfaces", new AnnotationClassValue[0])
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.aop.Adapter",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            "io.micronaut.validation.annotation.ValidatedElement",
+            Map.of()
+        );
+        coreAnnotationsDefaults.put(
+            AccessorsStyle.class.getName(),
+            Map.of("readPrefixes", new String[]{"get"}, "writePrefixes", new String[]{"set"})
+        );
+
+        CORE_ANNOTATION_DEFAULTS = Collections.unmodifiableMap(coreAnnotationsDefaults);
+        ANNOTATION_DEFAULTS.putAll(CORE_ANNOTATION_DEFAULTS);
+
+        Map<String, String> coreRepeatableAnnotationsContainers = new LinkedHashMap<>();
         for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
-            REPEATABLE_ANNOTATIONS_CONTAINERS.put(e.getKey().getName(), e.getValue().getName());
+            coreRepeatableAnnotationsContainers.put(e.getKey().getName(), e.getValue().getName());
         }
 
-        REPEATABLE_ANNOTATIONS_CONTAINERS.put("io.micronaut.aop.InterceptorBinding", "io.micronaut.aop.InterceptorBindingDefinitions");
+        coreRepeatableAnnotationsContainers.put("io.micronaut.aop.InterceptorBinding", "io.micronaut.aop.InterceptorBindingDefinitions");
+        CORE_REPEATABLE_ANNOTATIONS_CONTAINERS = Collections.unmodifiableMap(coreRepeatableAnnotationsContainers);
+        REPEATABLE_ANNOTATIONS_CONTAINERS.putAll(coreRepeatableAnnotationsContainers);
     }
 
     /**
@@ -147,6 +280,24 @@ public final class AnnotationMetadataSupport {
                 new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class),
                 new AbstractMap.SimpleEntry<>(ReflectionConfig.class, ReflectionConfig.ReflectionConfigList.class)
         );
+    }
+
+    /**
+     * @return The core repeatable annotations.
+     * @since 4.3.0
+     */
+    @Internal
+    public static Map<String, String> getCoreRepeatableAnnotationsContainers() {
+        return CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
+    }
+
+    /**
+     * @return The core annotation defaults.
+     * @since 4.3.0
+     */
+    @Internal
+    public static Map<String, Map<CharSequence, Object>> getCoreAnnotationDefaults() {
+        return CORE_ANNOTATION_DEFAULTS;
     }
 
     /**
