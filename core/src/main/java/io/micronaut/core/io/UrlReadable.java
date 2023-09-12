@@ -56,8 +56,8 @@ class UrlReadable implements Readable {
         try {
             return con.getInputStream();
         } catch (IOException ex) {
-            if (con instanceof HttpURLConnection) {
-                ((HttpURLConnection) con).disconnect();
+            if (con instanceof HttpURLConnection connection) {
+                connection.disconnect();
             }
             throw ex;
         }

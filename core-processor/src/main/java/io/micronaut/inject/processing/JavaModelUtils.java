@@ -166,8 +166,8 @@ public class JavaModelUtils {
                     builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                     Element enclosing = enclosingElement.getEnclosingElement();
 
-                    if (enclosing instanceof TypeElement) {
-                        enclosingElement = (TypeElement) enclosing;
+                    if (enclosing instanceof TypeElement element) {
+                        enclosingElement = element;
                         nestingKind = enclosingElement.getNestingKind();
                     } else {
                         break;
@@ -200,8 +200,8 @@ public class JavaModelUtils {
                     builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                     Element enclosing = enclosingElement.getEnclosingElement();
 
-                    if (enclosing instanceof TypeElement) {
-                        enclosingElement = (TypeElement) enclosing;
+                    if (enclosing instanceof TypeElement element) {
+                        enclosingElement = element;
                         nestingKind = enclosingElement.getNestingKind();
                     } else {
                         break;
@@ -224,8 +224,8 @@ public class JavaModelUtils {
         }
         if (enclosingElement == null) {
             return StringUtils.EMPTY_STRING;
-        } else if (enclosingElement instanceof PackageElement) {
-            return ((PackageElement) enclosingElement).getQualifiedName().toString();
+        } else if (enclosingElement instanceof PackageElement element) {
+            return element.getQualifiedName().toString();
         } else {
             return enclosingElement.toString();
         }

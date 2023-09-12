@@ -68,7 +68,7 @@ public final class ExtendedParameter extends AnnotatedNode {
 
     @Override
     public boolean equals(Object o) {
-        return (o instanceof ExtendedParameter) &&
-                (this.parameter == ((ExtendedParameter) o).parameter);
+        return (o instanceof ExtendedParameter ep) &&
+                (this.parameter == ep.parameter);
     }
 }

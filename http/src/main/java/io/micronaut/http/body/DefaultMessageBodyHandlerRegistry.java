@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -140,6 +141,8 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
+        } else if (beanDefinitions.isEmpty()) {
+            return null;
         } else {
             List<BeanDefinition<MessageBodyWriter>> exactMatch = beanDefinitions.stream()
                 .filter(d -> {
@@ -153,11 +156,18 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // Pick the highest priority
-                return beanDefinitions.stream()
-                    .max(OrderUtil.REVERSE_COMPARATOR)
+                List<MessageBodyWriter> ordered = beanDefinitions.stream()
+                    .sorted(OrderUtil.COMPARATOR)
                     .map(beanLocator::getBean)
-                    .orElse(null);
+                    .toList();
+                // look for one that's isWriteable first
+                for (MessageBodyWriter writer : ordered) {
+                    if (mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType))) {
+                        return writer;
+                    }
+                }
+                // none isWriteable, just return the first
+                return CollectionUtils.isNotEmpty(ordered) ? ordered.get(0) : null;
             }
         }
     }

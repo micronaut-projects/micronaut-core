@@ -69,6 +69,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private final ClassPathResourceLoader resourceLoader;
     private final ApplicationContextConfiguration configuration;
     private Environment environment;
+    /**
+     * True if the {@link #environment} was created by this context,
+     * false if the {@link #environment} was provided by {@link #setEnvironment(Environment)}
+     */
+    private boolean environmentManaged;
 
     /**
      * Construct a new ApplicationContext for the given environment name.
@@ -172,6 +177,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     public Environment getEnvironment() {
         if (environment == null) {
             environment = createEnvironment(configuration);
+            environmentManaged = true;
         }
         return environment;
     }
@@ -182,6 +188,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Internal
     public void setEnvironment(Environment environment) {
         this.environment = environment;
+        this.environmentManaged = false;
     }
 
     @Override
@@ -200,7 +207,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     public synchronized @NonNull
     ApplicationContext stop() {
         ApplicationContext stop = (ApplicationContext) super.stop();
+        if (environment != null && environmentManaged) {
+            environment.stop();
+        }
         environment = null;
+        environmentManaged = false;
         return stop;
     }
 

@@ -78,7 +78,7 @@ public class JsonArray extends JsonContainer {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof JsonArray && ((JsonArray) o).values.equals(values);
+        return o instanceof JsonArray ja && ja.values.equals(values);
     }
 
     @Override

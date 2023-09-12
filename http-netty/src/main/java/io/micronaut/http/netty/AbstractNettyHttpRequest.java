@@ -97,8 +97,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     @NonNull
     @Override
     public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
-        if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest) {
-            return (io.netty.handler.codec.http.FullHttpRequest) this.nettyRequest;
+        if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest request) {
+            return request;
         }
         DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(
                 this.nettyRequest.protocolVersion(),
@@ -115,14 +115,14 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         if (isStream()) {
             return (StreamedHttpRequest) this.nettyRequest;
         } else {
-            if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest) {
+            if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest request) {
 
                 return new DefaultStreamedHttpRequest(
                         io.netty.handler.codec.http.HttpVersion.HTTP_1_1,
                         this.nettyRequest.method(),
                         this.nettyRequest.uri(),
                         true,
-                        Publishers.just(new DefaultLastHttpContent(((io.netty.handler.codec.http.FullHttpRequest) this.nettyRequest).content()))
+                        Publishers.just(new DefaultLastHttpContent(request.content()))
                         );
             } else {
                 return new DefaultStreamedHttpRequest(

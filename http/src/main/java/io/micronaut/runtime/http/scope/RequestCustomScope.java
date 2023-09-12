@@ -85,8 +85,8 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
         final CreatedBean<T> createdBean = super.doCreate(creationContext);
         final T bean = createdBean.bean();
-        if (bean instanceof RequestAware) {
-            ((RequestAware) bean).setRequest(request);
+        if (bean instanceof RequestAware aware) {
+            aware.setRequest(request);
         }
         return createdBean;
     }

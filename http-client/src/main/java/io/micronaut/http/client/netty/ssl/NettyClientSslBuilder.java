@@ -169,7 +169,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             if (this.getTrustStore(ssl).isPresent()) {
                 return super.getTrustManagerFactory(ssl);
             } else {
-                if (ssl instanceof AbstractClientSslConfiguration && ((AbstractClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
+                if (ssl instanceof AbstractClientSslConfiguration configuration && configuration.isInsecureTrustAllCertificates()) {
                     if (LOG.isWarnEnabled()) {
                         LOG.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
                     }

@@ -17,8 +17,8 @@ public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
     @Override
     public BeanElement visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
         Element producingElement = beanElement.getProducingElement();
-        if (producingElement instanceof MemberElement) {
-            producingElement = ((MemberElement) producingElement).getDeclaringType();
+        if (producingElement instanceof MemberElement element) {
+            producingElement = element.getDeclaringType();
         }
         final String name = producingElement.getName();
         if (name.startsWith("testbe")) {

@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
@@ -587,6 +588,84 @@ interface Deserializer<T> {
             deserializerTypeParam.simpleName == "String[]"
             !deserializerTypeParam.isTypeVariable()
             !(deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test intercepted type arguments"() {
+        given:
+            BeanDefinition definition = buildSimpleInterceptedBeanDefinition('test.AImplementationLong', '''
+package test;
+
+import io.micronaut.aop.Introduction;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.Prototype;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
+
+@MyIntroductionBean
+@Secondary
+class AImplementationLong implements AInterface<Long, Long> {
+
+    private Long l1,l2;
+
+    @Override
+    public void set(Long s, Long s2) {
+        l1=s;
+        l2=s2;
+    }
+
+    @Override
+    public String get(Long s, Long s2) {
+        return s.getClass().getName() +","+s.getClass().getName();
+    }
+}
+
+@MyIntroductionBean
+@Secondary
+class AImplementationString implements AInterface<String, String> {
+
+    private String s1,s2;
+
+    @Override
+    public void set(String s, String s2) {
+        s1=s;
+        this.s2=s2;
+    }
+
+    @Override
+    public String get(String s, String s2) {
+        return s.getClass().getName() +","+s.getClass().getName();
+    }
+}
+
+interface AInterface<K, V> {
+
+    void set(K k, V v);
+
+    String get(K k, V v);
+}
+
+@Introduction
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE})
+@Documented
+@DefaultScope(Prototype.class)
+@interface MyIntroductionBean {
+}
+
+''')
+
+        when:
+            def arguments = definition.getTypeArguments(ClassUtils.forName("test.AInterface", definition.getClass().classLoader).orElseThrow())
+        then:
+            arguments[0].type == Long
+            arguments[1].type == Long
     }
 
     void "test repeatable inner type annotation 1"() {

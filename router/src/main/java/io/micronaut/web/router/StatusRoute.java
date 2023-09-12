@@ -44,6 +44,13 @@ public interface StatusRoute extends Route {
      */
     HttpStatus status();
 
+    /**
+     * @return The status
+     */
+    default int statusCode() {
+        return status().getCode();
+    }
+
     @Override
     StatusRoute consumes(MediaType... mediaType);
 

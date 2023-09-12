@@ -292,8 +292,8 @@ public class ConnectionManager {
         AtomicInteger count = new AtomicInteger();
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> {
-                if (c instanceof Pool.Http1ConnectionHolder) {
-                    if (((Pool.Http1ConnectionHolder) c).hasLiveRequests()) {
+                if (c instanceof Pool.Http1ConnectionHolder holder) {
+                    if (holder.hasLiveRequests()) {
                         count.incrementAndGet();
                     }
                 } else {
@@ -497,8 +497,7 @@ public class ConnectionManager {
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
-        if (proxyAddress instanceof InetSocketAddress) {
-            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+        if (proxyAddress instanceof InetSocketAddress isa) {
             if (isa.isUnresolved()) {
                 proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
             }
@@ -704,8 +703,7 @@ public class ConnectionManager {
 
                         @Override
                         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                            if (evt instanceof SslHandshakeCompletionEvent) {
-                                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                            if (evt instanceof SslHandshakeCompletionEvent event) {
                                 if (!event.isSuccess()) {
                                     InitialConnectionErrorHandler.setFailureCause(ctx.channel(), event.cause());
                                 }
@@ -1066,9 +1064,20 @@ public class ConnectionManager {
             ScheduledFuture<?> ttlFuture;
             volatile boolean windDownConnection = false;
 
+            private ResettableReadTimeoutHandler readTimeoutHandler;
+
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
+            }
+
+            /**
+             * Reset the read timeout, i.e. start it from 0 again.
+             */
+            private void resetReadTimeout() {
+                if (readTimeoutHandler != null) {
+                    readTimeoutHandler.resetReadTimeoutMn();
+                }
             }
 
             /**
@@ -1081,15 +1090,19 @@ public class ConnectionManager {
             final void addTimeoutHandlers(String before) {
                 // read timeout handles timeouts *during* a request
                 configuration.getReadTimeout()
-                    .ifPresent(dur -> channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
-                        @Override
-                        protected void readTimedOut(ChannelHandlerContext ctx) {
-                            if (hasLiveRequests()) {
-                                fireReadTimeout(ctx);
-                                ctx.close();
+                    .ifPresent(dur -> {
+                        ResettableReadTimeoutHandler readTimeoutHandler = new ResettableReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
+                            @Override
+                            protected void readTimedOut(ChannelHandlerContext ctx) {
+                                if (hasLiveRequests()) {
+                                    fireReadTimeout(ctx);
+                                    ctx.close();
+                                }
                             }
-                        }
-                    }));
+                        };
+                        this.readTimeoutHandler = readTimeoutHandler;
+                        channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, readTimeoutHandler);
+                    });
                 // pool idle timeout happens *outside* a request
                 configuration.getConnectionPoolIdleTimeout()
                     .ifPresent(dur -> channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
@@ -1162,9 +1175,13 @@ public class ConnectionManager {
                     return true;
                 }
                 if (channel.eventLoop().inEventLoop()) {
+                    resetReadTimeout();
                     dispatch0(sink);
                 } else {
-                    channel.eventLoop().execute(() -> dispatch0(sink));
+                    channel.eventLoop().execute(() -> {
+                        resetReadTimeout();
+                        dispatch0(sink);
+                    });
                 }
                 return true;
             }

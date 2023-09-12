@@ -48,8 +48,7 @@ public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGener
             String applicationName = serviceInstance.getId();
 
             joiner.add(applicationName);
-            if (serviceInstance instanceof EmbeddedServerInstance) {
-                EmbeddedServerInstance esi = (EmbeddedServerInstance) serviceInstance;
+            if (serviceInstance instanceof EmbeddedServerInstance esi) {
                 Optional<String> id = esi.getEmbeddedServer().getApplicationConfiguration().getInstance().getId();
                 if (id.isPresent()) {
                     joiner.add(id.get());

@@ -321,8 +321,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         if (coroutineHelper != null) {
             Executable<?, ?> target = boundExecutable.getTarget();
-            if (target instanceof ExecutableMethod<?, ?>) {
-                ExecutableMethod<?, ?> executableMethod = (ExecutableMethod<?, ?>) target;
+            if (target instanceof ExecutableMethod<?, ?> executableMethod) {
                 if (executableMethod.isSuspend()) {
                     return Flux.deferContextual(ctx -> {
                         try {

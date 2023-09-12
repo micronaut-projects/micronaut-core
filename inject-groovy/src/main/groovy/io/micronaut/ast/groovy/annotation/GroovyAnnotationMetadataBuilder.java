@@ -281,16 +281,16 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getElementName(AnnotatedNode element) {
-        if (element instanceof ClassNode) {
-            return ((ClassNode) element).getName();
-        } else if (element instanceof MethodNode) {
-            return ((MethodNode) element).getName();
-        } else if (element instanceof FieldNode) {
-            return ((FieldNode) element).getName();
-        } else if (element instanceof PropertyNode) {
-            return ((PropertyNode) element).getName();
-        } else if (element instanceof PackageNode) {
-            return ((PackageNode) element).getName();
+        if (element instanceof ClassNode node) {
+            return node.getName();
+        } else if (element instanceof MethodNode node) {
+            return node.getName();
+        } else if (element instanceof FieldNode node) {
+            return node.getName();
+        } else if (element instanceof PropertyNode node) {
+            return node.getName();
+        } else if (element instanceof PackageNode node) {
+            return node.getName();
         }
         throw new IllegalArgumentException("Cannot establish name for node type: " + element.getClass().getName());
     }

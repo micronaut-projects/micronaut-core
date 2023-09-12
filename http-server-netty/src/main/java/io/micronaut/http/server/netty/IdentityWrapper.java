@@ -32,7 +32,7 @@ final class IdentityWrapper {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof IdentityWrapper && ((IdentityWrapper) o).object == this.object;
+        return o instanceof IdentityWrapper iw && iw.object == this.object;
     }
 
     @Override

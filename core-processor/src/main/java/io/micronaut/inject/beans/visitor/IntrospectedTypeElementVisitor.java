@@ -105,7 +105,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     return;
                 }
                 int introspectionIndex = index.getAndIncrement();
-                processBuilderDefinition(ce, context, introspected, introspectionIndex);
+                processBuilderDefinition(ce, context, ce.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage);
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                     targetPackage,
                     element.getName(),
@@ -136,7 +136,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         int introspectionIndex = j++;
-                        processBuilderDefinition(classElement, context, introspected, introspectionIndex);
+                        processBuilderDefinition(classElement, context, classElement.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                             targetPackage,
                             element.getName(),
@@ -157,7 +157,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
             }
         } else {
-            processBuilderDefinition(element, context, introspected, 0);
+            processBuilderDefinition(element, context, introspected, 0, targetPackage);
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                 targetPackage,
                 element,
@@ -168,7 +168,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
-    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index) {
+    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage) {
         AnnotationValue<Introspected.IntrospectionBuilder> builder = introspected.getAnnotation("builder", Introspected.IntrospectionBuilder.class).orElse(null);
         if (builder != null) {
             String builderMethod = builder.stringValue("builderMethod").orElse(null);
@@ -200,7 +200,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             null,
                             returnType,
                             methodMetadata,
-                            index
+                            index,
+                            targetPackage
                         );
                     } else {
                         context.fail("Builder return type is not public. The method must be static and accessible.", methodElement);
@@ -224,8 +225,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         builderClassElement.getDefaultConstructor().orElse(null),
                         builderClassElement,
                         builderClassElement.getTargetAnnotationMetadata(),
-                        index
-                    );
+                        index,
+                        targetPackage);
                 } else {
                     context.fail("Builder class not found on compilation classpath: " + builderClass.getName(), element);
                 }
@@ -286,7 +287,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         MethodElement defaultConstructor,
         ClassElement builderType,
         AnnotationMetadata builderMetadata,
-        int index) {
+        int index, String targetPackage) {
         if (builderMetadata == null) {
             builderMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
@@ -303,7 +304,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             MethodElement creatorMethodElement = builderType.getEnclosedElement(buildMethodQuery).orElse(null);
             if (creatorMethodElement != null) {
                 final BeanIntrospectionWriter builderWriter = new BeanIntrospectionWriter(
-                    classToBuild.getPackageName(),
+                    targetPackage,
                     builderType.getName(),
                     index,
                     classToBuild,
@@ -359,8 +360,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             AnnotationMetadata annotationMetadata;
             if (metadata) {
                 annotationMetadata = beanProperty.getTargetAnnotationMetadata();
-                if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-                    annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+                    annotationMetadata = hierarchy.merge();
                 }
             } else {
                 annotationMetadata = AnnotationMetadata.EMPTY_METADATA;

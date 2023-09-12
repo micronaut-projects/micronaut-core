@@ -72,8 +72,7 @@ public class HealthResultFilter {
     @ResponseFilter
     public void doFilter(MutableHttpResponse<?> response) {
         Object body = response.body();
-        if (body instanceof HealthResult) {
-            HealthResult healthResult = (HealthResult) body;
+        if (body instanceof HealthResult healthResult) {
             HealthStatus status = healthResult.getStatus();
 
             HttpStatus httpStatus = healthEndpoint

@@ -196,8 +196,8 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     private Object valueToString(Map.Entry<CharSequence, Object> entry) {
         final Object v = entry.getValue();
-        if (v instanceof Object[]) {
-            return Arrays.toString((Object[]) v);
+        if (v instanceof Object[] objects) {
+            return Arrays.toString(objects);
         }
         return v;
     }

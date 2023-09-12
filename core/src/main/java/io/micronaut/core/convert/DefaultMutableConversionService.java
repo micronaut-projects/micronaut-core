@@ -331,7 +331,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // Reader -> String
         addConverter(Reader.class, String.class, (object, targetType, context) -> {
-            BufferedReader reader = object instanceof BufferedReader ? (BufferedReader) object : new BufferedReader(object);
+            BufferedReader reader = object instanceof BufferedReader br ? br : new BufferedReader(object);
             try {
                 return Optional.of(IOUtils.readText(reader));
             } catch (IOException e) {
@@ -652,9 +652,9 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // String -> Array
         addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, ConversionContext context) -> {
-            if (object instanceof AnnotationClassValue && targetType.equals(AnnotationClassValue[].class)) {
+            if (object instanceof AnnotationClassValue value && targetType.equals(AnnotationClassValue[].class)) {
                 AnnotationClassValue[] array = new AnnotationClassValue[1];
-                array[0] = (AnnotationClassValue) object;
+                array[0] = value;
                 return Optional.of(array);
             }
 
@@ -756,8 +756,8 @@ public class DefaultMutableConversionService implements MutableConversionService
                 return Optional.of(object.doubleValue());
             }
             if (targetNumberType == BigInteger.class) {
-                if (object instanceof BigDecimal) {
-                    return Optional.of(((BigDecimal) object).toBigInteger());
+                if (object instanceof BigDecimal decimal) {
+                    return Optional.of(decimal.toBigInteger());
                 }
                 return Optional.of(BigInteger.valueOf(object.longValue()));
             }
@@ -1036,8 +1036,8 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair;
-        if (typeConverter instanceof FormattingTypeConverter) {
-            pair = new ConvertiblePair(sourceType, targetType, ((FormattingTypeConverter) typeConverter).annotationType().getName());
+        if (typeConverter instanceof FormattingTypeConverter converter) {
+            pair = new ConvertiblePair(sourceType, targetType, converter.annotationType().getName());
         } else {
             pair = new ConvertiblePair(sourceType, targetType);
         }

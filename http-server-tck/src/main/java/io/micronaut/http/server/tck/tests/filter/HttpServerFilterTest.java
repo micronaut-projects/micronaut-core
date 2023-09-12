@@ -96,8 +96,8 @@ public class HttpServerFilterTest {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
-            if (routeMatch instanceof MethodBasedRouteMatch) {
-                MethodBasedRouteMatch<?, ?> methodRoute = ((MethodBasedRouteMatch) routeMatch);
+            if (routeMatch instanceof MethodBasedRouteMatch match) {
+                MethodBasedRouteMatch<?, ?> methodRoute = match;
                 if (methodRoute.hasAnnotation(RolesAllowed.class)) {
                     String role = request.getHeaders().get(HttpHeaders.AUTHORIZATION);
                     if (role == null) {

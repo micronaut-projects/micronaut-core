@@ -564,6 +564,40 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 read timeout during dispatch'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.read-timeout': '5s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        // do one request
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        conn.clientChannel.unfreezeTime()
+        // wait for one part of the interval
+        TimeUnit.SECONDS.sleep(2)
+        conn.advance()
+
+        // second request
+        def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
+        conn.advance()
+
+        // todo: move to advanceTime once IdleStateHandler supports it
+        // wait for the second part of the interval: below read-timeout, but together with the first sleep, above it
+        TimeUnit.SECONDS.sleep(3)
+        conn.advance()
+
+        assert !future.isDone()
+        conn.testExchangeResponse(future)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 ttl'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.connect-ttl': '100s',

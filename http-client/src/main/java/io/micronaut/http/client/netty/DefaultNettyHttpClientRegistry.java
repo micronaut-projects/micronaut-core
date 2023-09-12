@@ -391,8 +391,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
                 MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
-                    if (codec instanceof MapperMediaTypeCodec) {
-                        codecs.add(((MapperMediaTypeCodec) codec).cloneWithFeatures(jsonFeatures));
+                    if (codec instanceof MapperMediaTypeCodec typeCodec) {
+                        codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
                     } else {
                         codecs.add(codec);
                     }

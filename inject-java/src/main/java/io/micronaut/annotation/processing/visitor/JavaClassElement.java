@@ -751,8 +751,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             TypeMirror superclass = classNode.getSuperclass();
             if (superclass instanceof DeclaredType dt) {
                 Element element = dt.asElement();
-                if (element instanceof TypeElement) {
-                    return (TypeElement) element;
+                if (element instanceof TypeElement typeElement) {
+                    return typeElement;
                 }
             }
             return null;
@@ -764,8 +764,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             Collection<TypeElement> result = new ArrayList<>(interfaces.size());
             for (TypeMirror ifaceMirror : interfaces) {
                 final Element ifaceEl = visitorContext.getTypes().asElement(ifaceMirror);
-                if (ifaceEl instanceof TypeElement) {
-                    result.add((TypeElement) ifaceEl);
+                if (ifaceEl instanceof TypeElement element) {
+                    result.add(element);
                 }
             }
             return result;

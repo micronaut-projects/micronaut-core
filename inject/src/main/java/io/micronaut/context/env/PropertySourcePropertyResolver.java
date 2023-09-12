@@ -363,15 +363,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             String index = name.substring(i + 1, name.length() - 1);
                             if (value != null) {
                                 if (StringUtils.isNotEmpty(index)) {
-                                    if (value instanceof List) {
+                                    if (value instanceof List list) {
                                         try {
-                                            value = ((List) value).get(Integer.valueOf(index));
+                                            value = list.get(Integer.valueOf(index));
                                         } catch (NumberFormatException e) {
                                             // ignore
                                         }
-                                    } else if (value instanceof Map) {
+                                    } else if (value instanceof Map map) {
                                         try {
-                                            value = ((Map) value).get(index);
+                                            value = map.get(index);
                                         } catch (NumberFormatException e) {
                                             // ignore
                                         }
@@ -470,8 +470,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             finalMap.put(keys[i], new HashMap<>());
                         }
                         Object next = finalMap.get(keys[i]);
-                        if (next instanceof Map) {
-                            finalMap = ((Map) next);
+                        if (next instanceof Map map1) {
+                            finalMap =map1;
                         }
                     }
                     finalMap.put(keys[keys.length - 1], value);
@@ -657,8 +657,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (StringUtils.isDigits(propertyIndex)) {
                 Integer number = Integer.valueOf(propertyIndex);
                 List list;
-                if (container instanceof List) {
-                    list = (List) container;
+                if (container instanceof List list1) {
+                    list = list1;
                 } else {
                     list = new ArrayList(10);
                     containerSet.accept(list);
@@ -668,8 +668,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 expandProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
-                if (container instanceof Map) {
-                    map = (Map) container;
+                if (container instanceof Map map1) {
+                    map = map1;
                 } else {
                     map = new LinkedHashMap(10);
                     containerSet.accept(map);
@@ -689,8 +689,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
             Object v = containerGet.get();
             Map map;
-            if (v instanceof Map) {
-                map = (Map) v;
+            if (v instanceof Map map1) {
+                map = map1;
             } else {
                 map = new LinkedHashMap(10);
                 containerSet.accept(map);
@@ -700,19 +700,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     private void collapseProperty(String prefix, Map<String, Object> entries, Object value) {
-        if (value instanceof List) {
-            for (int i = 0; i < ((List) value).size(); i++) {
-                Object item = ((List) value).get(i);
+        if (value instanceof List list) {
+            for (int i = 0; i < list.size(); i++) {
+                Object item = list.get(i);
                 if (item != null) {
                     collapseProperty(prefix + "[" + i + "]", entries, item);
                 }
             }
             entries.put(prefix, value);
-        } else if (value instanceof Map) {
-            for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
+        } else if (value instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry: map.entrySet()) {
                 Object key = entry.getKey();
-                if (key instanceof CharSequence) {
-                    collapseProperty(prefix + "." + ((CharSequence) key).toString(), entries, entry.getValue());
+                if (key instanceof CharSequence sequence) {
+                    collapseProperty(prefix + "." + sequence.toString(), entries, entry.getValue());
                 }
             }
         } else {
@@ -797,16 +797,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
             return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(value.toString());
-        } else if (value instanceof List) {
-            List<?> list = (List) value;
+        } else if (value instanceof List list) {
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
             while (i.hasNext()) {
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
                     i.set(resolvePlaceHoldersIfNecessary(o));
-                } else if (o instanceof Map) {
-                    Map<?, ?> submap = (Map) o;
+                } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
@@ -840,8 +838,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public void close() throws Exception {
-        if (propertyPlaceholderResolver instanceof AutoCloseable) {
-            ((AutoCloseable) propertyPlaceholderResolver).close();
+        if (propertyPlaceholderResolver instanceof AutoCloseable closeable) {
+            closeable.close();
         }
     }
 

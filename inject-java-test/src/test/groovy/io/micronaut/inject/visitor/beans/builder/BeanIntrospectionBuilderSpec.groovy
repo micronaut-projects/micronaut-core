@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor.beans.builder
 
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.beans.exceptions.IntrospectionException
 import spock.lang.Specification
 
 class BeanIntrospectionBuilderSpec extends Specification {
@@ -57,6 +58,31 @@ class BeanIntrospectionBuilderSpec extends Specification {
         introspection.isBuildable()
         result.name == "Fred"
         result.age == 20
+    }
+
+    void 'test build type with import'() {
+        given:
+        def introspection = BeanIntrospection.getIntrospection(TestBuildMe5)
+        def builder = introspection.builder()
+        def result = builder.with("name", "Fred").with("age", 20).build()
+
+
+        expect:
+        introspection.hasBuilder()
+        introspection.isBuildable()
+        result.name == "Fred"
+        result.age == 20
+    }
+
+    void 'test build type with import, no builder declaration'() {
+        when:
+        def introspection = BeanIntrospection.getIntrospection(TestBuildMe6)
+        def builder = introspection.builder()
+        def result = builder.with("name", "Fred").with("age", 20).build()
+
+
+        then:
+        thrown(IntrospectionException)
     }
 
     void 'test build type with builder method'() {

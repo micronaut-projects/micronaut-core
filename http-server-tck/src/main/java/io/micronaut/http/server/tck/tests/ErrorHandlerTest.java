@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;

@@ -250,8 +250,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
             if (body != null && !variableSatisfied) {
-                if (body instanceof Map) {
-                    for (Map.Entry<Object, Object> entry : ((Map<Object, Object>) body).entrySet()) {
+                if (body instanceof Map<?,?> map) {
+                    for (Map.Entry<?, ?> entry : map.entrySet()) {
                         String k = entry.getKey().toString();
                         Object v = entry.getValue();
                         if (v != null) {
@@ -328,8 +328,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 HttpStatus.class == reactiveValueType;
 
                         Publisher<?> publisher;
-                        if (!isSingle && httpClient instanceof StreamingHttpClient) {
-                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, errorType, valueType);
+                        if (!isSingle && httpClient instanceof StreamingHttpClient client) {
+                            publisher = httpClientResponseStreamingPublisher(client, acceptTypes, request, errorType, valueType);
                         } else {
                             publisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         }
@@ -363,8 +363,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                             @Override
                             protected void doOnError(Throwable t) {
-                                if (t instanceof HttpClientResponseException) {
-                                    HttpClientResponseException e = (HttpClientResponseException) t;
+                                if (t instanceof HttpClientResponseException e) {
                                     if (e.getStatus() == HttpStatus.NOT_FOUND) {
                                         if (reactiveValueType == Optional.class) {
                                             future.complete(Optional.empty());
@@ -447,8 +446,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.getHeaders().remove(HttpHeaders.ACCEPT);
         }
 
-        if (streamingHttpClient instanceof SseClient && Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-            SseClient sseClient = (SseClient) streamingHttpClient;
+        if (streamingHttpClient instanceof SseClient sseClient && Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
             if (reactiveValueArgument.getType() == Event.class) {
                 return sseClient.eventStream(
                         request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
@@ -490,12 +488,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (definedValue == null && !argument.isNullable()) {
             throw new IllegalArgumentException(
-                    String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behaviour", argument.getName(), context.getExecutableMethod().toString())
+            "Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behaviour".formatted(argument.getName(), context.getExecutableMethod().toString())
             );
         }
 
-        if (definedValue instanceof Optional) {
-            return ((Optional) definedValue).orElse(null);
+        if (definedValue instanceof Optional optional) {
+            return optional.orElse(null);
         } else {
             return definedValue;
         }
@@ -510,11 +508,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 return supplier.get();
             }
         } catch (RuntimeException t) {
-            if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
+            if (t instanceof HttpClientResponseException exception && exception.getStatus() == HttpStatus.NOT_FOUND) {
                 if (returnType == Optional.class) {
                     return Optional.empty();
                 } else if (HttpResponse.class.isAssignableFrom(returnType)) {
-                    return ((HttpClientResponseException) t).getResponse();
+                    return exception.getResponse();
                 }
                 return null;
             } else {

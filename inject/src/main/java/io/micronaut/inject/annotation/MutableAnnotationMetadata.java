@@ -99,13 +99,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             return new MutableAnnotationMetadata();
         }
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            return  ((AnnotationMetadataHierarchy) annotationMetadata).merge();
-        } else if (annotationMetadata instanceof MutableAnnotationMetadata) {
-            return  ((MutableAnnotationMetadata) annotationMetadata).clone();
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+            return  hierarchy.merge();
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata metadata) {
+            return  metadata.clone();
+        } else if (annotationMetadata instanceof DefaultAnnotationMetadata defaultAnnotationMetadata) {
             MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
-            metadata.addAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            metadata.addAnnotationMetadata(defaultAnnotationMetadata);
             return metadata;
         } else {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
@@ -906,8 +906,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
         source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).merge();
+        if (source instanceof AnnotationMetadataHierarchy hierarchy) {
+            source = hierarchy.merge();
         }
         if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
             if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
