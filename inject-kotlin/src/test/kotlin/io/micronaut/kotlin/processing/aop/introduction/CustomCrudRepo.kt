@@ -6,5 +6,5 @@ import java.util.*
 interface CustomCrudRepo : CrudRepo<String, Long> {
 
     @Marker
-    override fun findById(aLong: Long): Optional<String>
+    override fun findById(id: Long): Optional<String>
 }
