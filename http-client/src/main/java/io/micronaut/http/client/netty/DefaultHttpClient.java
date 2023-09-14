@@ -417,7 +417,7 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Constructor used by micronaut-oracle-cloud
+     * Constructor used by micronaut-oracle-cloud.
      *
      * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
