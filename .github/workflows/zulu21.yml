@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['21-ea+34']
+        java: ['21-ea']
     steps:
       - name: Free disk space
         run: |
