@@ -1,0 +1,30 @@
+plugins {
+    id "java"
+    id "org.graalvm.buildtools.native"
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+dependencies {
+    testImplementation project(":context")
+    testImplementation libs.logback.classic
+    testImplementation libs.junit.jupiter
+}
+
+graalvmNative {
+    toolchainDetection = false
+    metadataRepository {
+        enabled = true
+    }
+    binaries {
+        all {
+            resources.autodetect()
+        }
+    }
+}

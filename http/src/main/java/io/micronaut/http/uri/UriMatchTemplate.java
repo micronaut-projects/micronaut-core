@@ -17,6 +17,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.util.ArrayList;
@@ -200,7 +201,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 return new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
             } else {
                 int count = matcher.groupCount();
-                Map<String, Object> variableMap = new LinkedHashMap<>(count);
+                Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(count);
                 for (int j = 0; j < variables.size(); j++) {
                     int index = (j * 2) + 2;
                     if (index > count) {

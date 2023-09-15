@@ -407,14 +407,26 @@ public class DefaultHttpClient implements
         this((URI) null, new DefaultHttpClientConfiguration());
     }
 
+
     /**
      * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
      */
     public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+        this(uri, configuration, new NettyClientSslBuilder(new ResourceResolver()));
+    }
+
+    /**
+     * Constructor used by micronaut-oracle-cloud.
+     *
+     * @param uri           The URI
+     * @param configuration The {@link HttpClientConfiguration} object
+     * @param clientSslBuilder The SSL builder
+     */
+    public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration, @NonNull ClientSslBuilder clientSslBuilder) {
         this(
             uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-            new NettyClientSslBuilder(new ResourceResolver()),
+            clientSslBuilder,
             createDefaultMediaTypeRegistry(),
             createDefaultMessageBodyHandlerRegistry(),
             AnnotationMetadataResolver.DEFAULT,

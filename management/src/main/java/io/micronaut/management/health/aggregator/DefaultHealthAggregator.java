@@ -17,6 +17,7 @@ package io.micronaut.management.health.aggregator;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
@@ -29,7 +30,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -112,7 +112,7 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
      * @return The aggregated details for the results
      */
     protected Object aggregateDetails(List<HealthResult> results) {
-        Map<String, Object> details = new HashMap<>(results.size());
+        Map<String, Object> details = CollectionUtils.newHashMap(results.size());
         results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails(), HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)));
         return details;
     }

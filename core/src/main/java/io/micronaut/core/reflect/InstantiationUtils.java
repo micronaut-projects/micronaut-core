@@ -24,6 +24,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +94,7 @@ public class InstantiationUtils {
             try {
                 if (constructorArguments.length > 0) {
 
-                    Map bindMap = new LinkedHashMap(propertiesMap.size());
+                    Map bindMap = CollectionUtils.newLinkedHashMap(propertiesMap.size());
                     Set<Map.Entry<?, ?>> entries = propertiesMap.entrySet();
                     for (Map.Entry<?, ?> entry : entries) {
                         Object key = entry.getKey();

@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -295,7 +294,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
-            typeParameters = new LinkedHashMap<>(genericTypes.length);
+            typeParameters = CollectionUtils.newLinkedHashMap(genericTypes.length);
             for (Argument<?> genericType : genericTypes) {
                 typeParameters.put(genericType.getName(), genericType);
             }

@@ -68,11 +68,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
     @Nullable
-    private final Map<CharSequence, Object> defaultValues;
+    private Map<CharSequence, Object> defaultValues;
+    @Nullable
     private final Function<Object, Object> valueMapper;
     private final RetentionPolicy retentionPolicy;
     @Nullable
     private final List<AnnotationValue<?>> stereotypes;
+    @Nullable
+    private final AnnotationDefaultValuesProvider defaultValuesProvider;
 
     /**
      * @param annotationName The annotation name
@@ -105,7 +108,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this(annotationName, values, null, retentionPolicy, stereotypes);
     }
 
-
     /**
      * @param annotationName The annotation name
      * @param values         The values
@@ -115,6 +117,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues) {
         this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
+    }
+
+    /**
+     * @param annotationName        The annotation name
+     * @param values                The values
+     * @param defaultValuesProvider The default values provider
+     * @since 4.3.0
+     */
+    @UsedByGeneratedCode
+    @Internal
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, AnnotationDefaultValuesProvider defaultValuesProvider) {
+        this(annotationName, values, null, RetentionPolicy.RUNTIME, null, defaultValuesProvider);
     }
 
     /**
@@ -137,7 +151,29 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param stereotypes     The stereotypes of the annotation
      */
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
+    public AnnotationValue(String annotationName,
+                           Map<CharSequence, Object> values,
+                           Map<CharSequence, Object> defaultValues,
+                           RetentionPolicy retentionPolicy,
+                           List<AnnotationValue<?>> stereotypes) {
+        this(annotationName, values, defaultValues, retentionPolicy, stereotypes, null);
+    }
+
+    /**
+     * @param annotationName        The annotation name
+     * @param values                The values
+     * @param defaultValues         The default values
+     * @param retentionPolicy       The retention policy
+     * @param stereotypes           The stereotypes of the annotation
+     * @param defaultValuesProvider The defaults values provider
+     */
+    @Internal
+    public AnnotationValue(String annotationName,
+                           Map<CharSequence, Object> values,
+                           Map<CharSequence, Object> defaultValues,
+                           RetentionPolicy retentionPolicy,
+                           List<AnnotationValue<?>> stereotypes,
+                           AnnotationDefaultValuesProvider defaultValuesProvider) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
@@ -145,6 +181,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.valueMapper = null;
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
         this.stereotypes = stereotypes;
+        this.defaultValuesProvider = defaultValuesProvider;
     }
 
     /**
@@ -169,6 +206,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.valueMapper = null;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = null;
+        this.defaultValuesProvider = null;
     }
 
     /**
@@ -190,6 +228,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = target.stereotypes;
+        this.defaultValuesProvider = null;
     }
 
     /**
@@ -233,6 +272,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Nullable
     public Map<CharSequence, Object> getDefaultValues() {
+        if (defaultValues == null && defaultValuesProvider != null) {
+            defaultValues = defaultValuesProvider.provide(annotationName);
+        }
         return defaultValues;
     }
 
@@ -1113,8 +1155,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (result.isPresent()) {
             return result;
         }
-        if (defaultValues != null) {
-            Object dv = defaultValues.get(member.toString());
+        Map<CharSequence, Object> defaults = getDefaultValues();
+        if (defaults != null) {
+            Object dv = defaults.get(member.toString());
             if (dv != null) {
                 return ConversionService.SHARED.convert(dv, conversionContext);
             }

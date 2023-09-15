@@ -1,12 +1,4 @@
 pluginManagement {
-    plugins {
-//        id 'io.micronaut.application' version getProperty("micronautGradlePluginVersion")
-//        id 'io.micronaut.library' version getProperty("micronautGradlePluginVersion")
-        id "org.jetbrains.kotlin.jvm" version getProperty("kotlinVersion")
-        id "org.jetbrains.kotlin.kapt" version getProperty("kotlinVersion")
-        id "org.jetbrains.kotlin.plugin.allopen" version getProperty("kotlinVersion")
-        id "org.jetbrains.kotlin.plugin.jpa" version getProperty("kotlinVersion")
-    }
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -82,6 +74,7 @@ include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
+include "test-suite-logback-graalvm"
 include "test-utils"
 
 // benchmarks

@@ -72,7 +72,8 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         // JsonMapper is immutable, so we don't need safe publication here
         JsonMapper objectCodec = this.objectCodec;
         if (objectCodec == null) {
-            this.objectCodec = objectCodec = objectCodecProvider.get();
+            objectCodec = objectCodecProvider.get();
+            this.objectCodec = objectCodec;
         }
         return objectCodec;
     }

@@ -1,3 +1,10 @@
+== 4.2.0
+
+=== Kotlin base version updated to 1.9.10
+
+Kotlin has been updated to 1.9.10, which may cause issues when compiling or linking to Kotlin libraries.
+
+
 == 4.1.0
 
 Support for <<beanMappers, Bean Mappers>> and <<introspection, introspection Builders>>.

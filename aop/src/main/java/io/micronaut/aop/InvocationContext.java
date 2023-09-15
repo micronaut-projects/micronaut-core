@@ -23,8 +23,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentValue;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.MutableArgumentValue;
+import io.micronaut.core.util.CollectionUtils;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -117,7 +117,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
     default @NonNull Map<String, Object> getParameterValueMap() {
         Argument<?>[] arguments = getArguments();
         Object[] parameterValues = getParameterValues();
-        Map<String, Object> valueMap = new LinkedHashMap<>(arguments.length);
+        Map<String, Object> valueMap = CollectionUtils.newLinkedHashMap(arguments.length);
         for (int i = 0; i < parameterValues.length; i++) {
             Object parameterValue = parameterValues[i];
             Argument arg = arguments[i];

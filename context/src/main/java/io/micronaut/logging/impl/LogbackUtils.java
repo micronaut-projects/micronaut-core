@@ -17,7 +17,6 @@ package io.micronaut.logging.impl;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.Configurator;
-import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
@@ -100,7 +99,9 @@ public final class LogbackUtils {
             URL resource = resourceSupplier.get();
             if (resource != null) {
                 try {
-                    new ContextInitializer(context).configureByResource(resource);
+                    DefaultJoranConfigurator defaultConfigurator = new DefaultJoranConfigurator();
+                    defaultConfigurator.setContext(context);
+                    defaultConfigurator.configureByResource(resource);
                 } catch (JoranException e) {
                     throw new LoggingSystemException("Error while refreshing Logback", e);
                 }
