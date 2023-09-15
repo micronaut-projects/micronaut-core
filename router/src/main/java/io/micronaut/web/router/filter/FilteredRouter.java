@@ -158,8 +158,18 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
+        return router.findStatusRoute(originatingClass, statusCode, request);
+    }
+
+    @Override
     public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
         return router.findStatusRoute(status, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(int statusCode, HttpRequest<?> request) {
+        return router.findStatusRoute(statusCode, request);
     }
 
     @NonNull

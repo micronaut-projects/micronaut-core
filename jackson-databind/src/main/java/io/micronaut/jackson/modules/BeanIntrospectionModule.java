@@ -15,12 +15,14 @@
  */
 package io.micronaut.jackson.modules;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -34,6 +36,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyMetadata;
 import com.fasterxml.jackson.databind.PropertyName;
@@ -62,10 +65,12 @@ import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.AnyGetterWriter;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
+import com.fasterxml.jackson.databind.ser.std.MapSerializer;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
@@ -186,20 +191,6 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
-    private AnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
-        return new VirtualAnnotatedMember(
-            typeResolutionContext,
-            beanClass,
-            name,
-            javaType
-        ) {
-            @Override
-            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
-            }
-        };
-    }
-
     // copied from VirtualBeanPropertyWriter
     private static boolean suppressNulls(JsonInclude.Value inclusion) {
         if (inclusion == null) {
@@ -292,6 +283,20 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
     }
 
+    private static class IntrospectionVirtualAnnotatedMember extends VirtualAnnotatedMember {
+        private final AnnotationMetadata annotationMetadata;
+
+        public IntrospectionVirtualAnnotatedMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
+            super(typeResolutionContext, beanClass, name, javaType);
+            this.annotationMetadata = annotationMetadata;
+        }
+
+        @Override
+        public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
+            return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
+        }
+    }
+
     /**
      * Modifies bean serialization.
      */
@@ -331,29 +336,64 @@ public class BeanIntrospectionModule extends SimpleModule {
                     TypeResolutionContext typeResolutionContext = new TypeResolutionContext.Empty(config.getTypeFactory());
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> bp : beanProperties) {
-                        if (bp.hasAnnotation(JsonIgnore.class)) {
+                        if (bp.hasAnnotation(JsonIgnore.class) || bp.hasAnnotation(JsonValue.class)) {
                             continue;
                         }
                         UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) bp;
                         final String propertyName = getName(config, namingStrategy, beanProperty);
-                        BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
-                            createVirtualMember(
+                        JsonSerializer<?> serializerFromAnnotation = findSerializerFromAnnotation(beanProperty, JsonSerialize.class);
+                        if (bp.hasAnnotation(JsonAnyGetter.class)) {
+                            AnnotatedMember virtualMember = new IntrospectionVirtualAnnotatedMember(
                                 typeResolutionContext,
                                 beanProperty.getDeclaringType(),
                                 propertyName,
                                 newType(beanProperty.asArgument(), config.getTypeFactory()),
                                 beanProperty
-                            ),
-                            config,
-                            propertyName,
-                            beanProperty,
-                            config.getTypeFactory(),
-                            findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
-                            // would be nice to add the TypeSerializer here too, but we don't have access to the
-                            // SerializerFactory for findPropertyTypeSerializer
-                        );
+                            ) {
+                                @Override
+                                public Object getValue(Object pojo) throws IllegalArgumentException {
+                                    return beanProperty.get(pojo);
+                                }
+                            };
+                            JavaType anyType = newType(beanProperty.asArgument(), config.getTypeFactory());
+                            if (serializerFromAnnotation == null) {
+                                serializerFromAnnotation = MapSerializer.construct(/* ignored props*/ (Set<String>) null,
+                                    anyType, config.isEnabled(MapperFeature.USE_STATIC_TYPING),
+                                    null, null, null, /*filterId*/ null);
+                            }
+                            newBuilder.setAnyGetter(new AnyGetterWriter(
+                                new com.fasterxml.jackson.databind.BeanProperty.Std(
+                                    new PropertyName(bp.getName()),
+                                    anyType.getContentType(),
+                                    null,
+                                    virtualMember,
+                                    PropertyMetadata.STD_OPTIONAL
+                                ),
+                                virtualMember,
+                                serializerFromAnnotation
+                            ));
+                        } else {
+                            // normal property
 
-                        newProperties.add(writer);
+                            BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
+                                new IntrospectionVirtualAnnotatedMember(
+                                    typeResolutionContext,
+                                    beanProperty.getDeclaringType(),
+                                    propertyName,
+                                    newType(beanProperty.asArgument(), config.getTypeFactory()),
+                                    beanProperty
+                                ),
+                                config,
+                                propertyName,
+                                beanProperty,
+                                config.getTypeFactory(),
+                                serializerFromAnnotation
+                                // would be nice to add the TypeSerializer here too, but we don't have access to the
+                                // SerializerFactory for findPropertyTypeSerializer
+                            );
+
+                            newProperties.add(writer);
+                        }
                     }
 
                     newBuilder.setProperties(newProperties);
@@ -533,7 +573,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                                     @Override
                                     public AnnotatedMember getMember() {
-                                        return createVirtualMember(beanDesc.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
+                                        return new IntrospectionVirtualAnnotatedMember(beanDesc.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
                                     }
 
                                     @Override
@@ -789,7 +829,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public AnnotatedMember getMember() {
-            return createVirtualMember(
+            return new IntrospectionVirtualAnnotatedMember(
                 typeResolutionContext,
                 beanProperty.getDeclaringType(),
                 _propName.getSimpleName(),

@@ -345,7 +345,7 @@ public final class RouteExecutor {
         return errorRoute;
     }
 
-    RouteMatch<Object> findStatusRoute(HttpRequest<?> incomingRequest, HttpStatus status, RouteInfo<?> finalRoute) {
+    RouteMatch<Object> findStatusRoute(HttpRequest<?> incomingRequest, int status, RouteInfo<?> finalRoute) {
         Class<?> declaringType = finalRoute.getDeclaringType();
         // handle re-mapping of errors
         RouteMatch<Object> statusRoute = null;

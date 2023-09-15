@@ -677,7 +677,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      */
     final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
-        private final HttpStatus status;
+        private final int statusCode;
         private final Class<?> originatingClass;
 
         /**
@@ -698,14 +698,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public DefaultStatusRoute(Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
-            this.status = status;
+            this.statusCode = status.getCode();
         }
 
         @Override
         public StatusRouteInfo<Object, Object> toRouteInfo() {
             return new DefaultStatusRouteInfo<>(
                     originatingClass,
-                    status,
+                    statusCode,
                     targetMethod,
                     bodyArgumentName,
                     bodyArgument,
@@ -725,7 +725,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public HttpStatus status() {
-            return status;
+            return HttpStatus.valueOf(statusCode);
+        }
+
+        @Override
+        public int statusCode() {
+            return statusCode;
         }
 
         @Override
@@ -748,13 +753,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return (StatusRoute) super.where(condition);
         }
 
-        /**
-         * @return The {@link io.micronaut.http.HttpStatus}
-         */
-        public HttpStatus getStatus() {
-            return status;
-        }
-
         @Override
         public boolean equals(Object o) {
             if (this == o) {
@@ -766,13 +764,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (!super.equals(o)) {
                 return false;
             }
-            return status == that.status &&
+            return statusCode == that.statusCode &&
                     Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(super.hashCode(), status, originatingClass);
+            return ObjectUtils.hash(super.hashCode(), statusCode, originatingClass);
         }
     }
 

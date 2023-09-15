@@ -86,6 +86,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final int arrayDimensions;
+
+    @Nullable
+    // Not null means raw type definition: "List myMethod()"
+    // Null value means a class definition: "class List<T> {}"
+    final List<? extends TypeMirror> typeArguments;
+
     private final boolean isTypeVariable;
     private List<PropertyElement> beanProperties;
     private String simpleName;
@@ -105,10 +111,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private ClassElement theType;
     @Nullable
     private AnnotationMetadata annotationMetadata;
-    @Nullable
-    // Not null means raw type definition: "List myMethod()"
-    // Null value means a class definition: "class List<T> {}"
-    final List<? extends TypeMirror> typeArguments;
 
     /**
      * @param nativeType                The native type

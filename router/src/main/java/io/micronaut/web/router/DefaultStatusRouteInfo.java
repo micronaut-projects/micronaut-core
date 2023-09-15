@@ -43,11 +43,11 @@ import java.util.function.Predicate;
 public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements StatusRouteInfo<T, R> {
 
     private final Class<?> originatingType;
-    private final HttpStatus status;
+    private final int statusCode;
     private final ConversionService conversionService;
 
     public DefaultStatusRouteInfo(Class<?> originatingType,
-                                  HttpStatus status,
+                                  int statusCode,
                                   MethodExecutionHandle<T, R> targetMethod,
                                   @Nullable
                                   String bodyArgumentName,
@@ -60,7 +60,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
                                   MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, true, true, predicates, messageBodyHandlerRegistry);
         this.originatingType = originatingType;
-        this.status = status;
+        this.statusCode = statusCode;
         this.conversionService = conversionService;
     }
 
@@ -71,17 +71,22 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
 
     @Override
     public HttpStatus status() {
-        return status;
+        return HttpStatus.valueOf(statusCode);
+    }
+
+    @Override
+    public int statusCode() {
+        return statusCode;
     }
 
     @Override
     public HttpStatus findStatus(HttpStatus defaultStatus) {
-        return super.findStatus(status);
+        return super.findStatus(status());
     }
 
     @Override
     public Optional<RouteMatch<R>> match(Class<?> originatingClass, HttpStatus status) {
-        if (originatingClass == this.originatingType && this.status == status) {
+        if (originatingClass == this.originatingType && this.statusCode == status.getCode()) {
             return Optional.of(new StatusRouteMatch<>(this, conversionService));
         }
         return Optional.empty();
@@ -89,7 +94,23 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
 
     @Override
     public Optional<RouteMatch<R>> match(HttpStatus status) {
-        if (this.originatingType == null && this.status == status) {
+        if (this.originatingType == null && this.statusCode == status.getCode()) {
+            return Optional.of(new StatusRouteMatch<>(this, conversionService));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<RouteMatch<R>> match(int statusCode) {
+        if (this.originatingType == null && this.statusCode == statusCode) {
+            return Optional.of(new StatusRouteMatch<>(this, conversionService));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<RouteMatch<R>> match(Class<?> originatingClass, int statusCode) {
+        if (originatingClass == this.originatingType && this.statusCode == statusCode) {
             return Optional.of(new StatusRouteMatch<>(this, conversionService));
         }
         return Optional.empty();
@@ -97,7 +118,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
 
     @Override
     public int hashCode() {
-        return ObjectUtils.hash(super.hashCode(), status, originatingType);
+        return ObjectUtils.hash(super.hashCode(), statusCode, originatingType);
     }
 
     @Override
@@ -111,18 +132,17 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
         if (!super.equals(o)) {
             return false;
         }
-        return status == that.status &&
+        return statusCode == that.statusCode &&
                 Objects.equals(originatingType, that.originatingType);
     }
 
     @Override
     public String toString() {
-        return new StringBuilder().append(' ')
-                .append(status)
-                .append(" -> ")
-                .append(getTargetMethod().getDeclaringType().getSimpleName())
-                .append('#')
-                .append(getTargetMethod())
-                .toString();
+        return " " +
+            statusCode +
+            " -> " +
+            getTargetMethod().getDeclaringType().getSimpleName() +
+            '#' +
+            getTargetMethod();
     }
 }
