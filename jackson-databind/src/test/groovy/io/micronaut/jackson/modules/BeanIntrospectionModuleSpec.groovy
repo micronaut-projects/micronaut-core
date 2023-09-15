@@ -354,6 +354,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "test that introspected serialization works with @JsonAnyGetter"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
         JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
@@ -373,6 +374,9 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         cleanup:
         ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
     }
 
     void "test that introspected serialization of errors works"() {
