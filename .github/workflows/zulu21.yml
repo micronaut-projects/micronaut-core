@@ -2,6 +2,10 @@ name: Zulu Java 21 CI
 on:
   schedule:
     - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
+  pull_request:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
   workflow_dispatch:
 jobs:
   build:
