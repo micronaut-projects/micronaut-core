@@ -83,6 +83,7 @@ include "test-suite-groovy"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
+include "test-suite-netty-ssl-graalvm"
 include "test-utils"
 
 // benchmarks
