@@ -21,12 +21,14 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.inject.writer.GeneratedSourceFile;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Element;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,6 +55,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
+    private final Map<String, Optional<GeneratedSourceFile>> generatedSourceFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
 
     /**
@@ -154,16 +157,38 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT, nativeOriginatingElements)));
     }
 
+    @Override
+    public Optional<GeneratedSourceFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
+        Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
+        var path = packageName.replace('.', File.separatorChar) + File.separator + fileNameWithoutExtension + ".java";
+        return generatedSourceFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedSourceFileObject(packageName, fileNameWithoutExtension, nativeOriginatingElements)));
+    }
+
     /**
      * Class to handle generated files by the annotation processor.
      */
     class GeneratedFileObject implements GeneratedFile {
 
+        private final String packageName;
+        private final String fileName;
         private final String path;
         private final StandardLocation classOutput;
         private final Element[] originatingElements;
         private FileObject inputObject;
         private FileObject outputObject;
+
+        /**
+         * @param packageName The package of the generated source file
+         * @param fileName  The name of the source file, without extension
+         * @param originatingElements the originating elements
+         */
+        GeneratedFileObject(String packageName, String fileName, Element... originatingElements) {
+            this.path = packageName.replace('.', File.separatorChar);
+            this.packageName = packageName;
+            this.fileName = fileName;
+            this.classOutput = StandardLocation.SOURCE_OUTPUT;
+            this.originatingElements = originatingElements;
+        }
 
         /**
          * @param path                The path for the generated file
@@ -173,6 +198,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             this.path = path;
             this.classOutput = StandardLocation.CLASS_OUTPUT;
             this.originatingElements = originatingElements;
+            this.packageName = null;
+            this.fileName = null;
         }
 
         /**
@@ -184,6 +211,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             this.path = path;
             this.classOutput = location;
             this.originatingElements = originatingElements;
+            this.packageName = null;
+            this.fileName = null;
         }
 
         @Override
@@ -250,9 +279,32 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private FileObject getOutputObject() throws IOException {
             if (outputObject == null) {
-                outputObject = filer.createResource(classOutput, "", path, originatingElements);
+                if (packageName != null && fileName != null) {
+                    outputObject = filer.createSourceFile(
+                        packageName + "." + fileName,
+                        originatingElements
+                    );
+                } else {
+                    outputObject = filer.createResource(classOutput, "", path, originatingElements);
+                }
             }
             return outputObject;
+        }
+    }
+
+    class GeneratedSourceFileObject extends GeneratedFileObject implements GeneratedSourceFile {
+
+        GeneratedSourceFileObject(String packageName, String fileName, Element... originatingElements) {
+            super(packageName, fileName, originatingElements);
+        }
+
+        @Override
+        public void visitLanguage(Language language, ThrowingConsumer<? super Writer> consumer) throws IOException {
+            if (language == Language.JAVA) {
+                try (var writer = openWriter()) {
+                    consumer.accept(writer);
+                }
+            }
         }
     }
 

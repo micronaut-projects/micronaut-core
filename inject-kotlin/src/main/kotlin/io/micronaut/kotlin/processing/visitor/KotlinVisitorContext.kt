@@ -34,6 +34,7 @@ import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.GeneratedFile
+import io.micronaut.inject.writer.GeneratedSourceFile
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
@@ -164,6 +165,10 @@ internal open class KotlinVisitorContext(
         return outputVisitor.visitGeneratedFile(path, *originatingElements)
     }
 
+    override fun visitGeneratedSourceFile(packageName: String, fileNameWithoutExtension: String, vararg originatingElements: Element): Optional<GeneratedSourceFile> {
+        return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, *originatingElements)
+    }
+
     override fun finish() {
         outputVisitor.finish()
     }
@@ -244,7 +249,7 @@ internal open class KotlinVisitorContext(
         }
     }
 
-    class KspGeneratedFile(
+    open class KspGeneratedFile(
         private val environment: SymbolProcessorEnvironment,
         private val elements : MutableList<String>,
         private val dependencies : Dependencies
@@ -285,5 +290,19 @@ internal open class KotlinVisitorContext(
             return OutputStreamWriter(openOutputStream())
         }
 
+    }
+
+    class KspGeneratedSourceFile(
+        environment: SymbolProcessorEnvironment,
+        elements: MutableList<String>,
+        dependencies: Dependencies
+    ) : KspGeneratedFile(environment, elements, dependencies), GeneratedSourceFile {
+
+        @Throws(IOException::class)
+        override fun visitLanguage(language: GeneratedSourceFile.Language, consumer: GeneratedSourceFile.ThrowingConsumer<in Writer?>) {
+            if (language == GeneratedSourceFile.Language.KOTLIN) {
+                openWriter().use { writer -> consumer.accept(writer) }
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ import com.google.devtools.ksp.symbol.KSFile
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
+import io.micronaut.inject.writer.GeneratedSourceFile
 import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.File
@@ -61,7 +62,13 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
 
     override fun visitGeneratedFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         val elements = path.split(File.separator).toMutableList()
-        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
+        return Optional.of(KotlinVisitorContext.KspGeneratedSourceFile(environment, elements, getNativeElements(originatingElements)))
+    }
+
+    override fun visitGeneratedSourceFile(packageName: String, fileNameWithoutExtension: String, vararg originatingElements: Element): Optional<GeneratedSourceFile> {
+        val elements = packageName.split('.').toMutableList()
+        elements.add("${fileNameWithoutExtension}.kt")
+        return Optional.of(KotlinVisitorContext.KspGeneratedSourceFile(environment, elements, getNativeElements(originatingElements)))
     }
 
     private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {

@@ -38,12 +38,13 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.inject.writer.GeneratedSourceFile;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -314,6 +315,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         return outputVisitor.visitGeneratedFile(path, originatingElements);
+    }
+
+    @Override
+    public Optional<GeneratedSourceFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
+        return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
     }
 
     @Override
