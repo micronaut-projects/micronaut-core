@@ -26,6 +26,8 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -51,6 +53,8 @@ import java.util.stream.Collectors;
 @Singleton
 @Requires(beans = HealthEndpoint.class)
 public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultHealthAggregator.class);
 
     private final ApplicationConfiguration applicationConfiguration;
 
@@ -112,9 +116,21 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
      * @return The aggregated details for the results
      */
     protected Object aggregateDetails(List<HealthResult> results) {
-        Map<String, Object> details = CollectionUtils.newHashMap(results.size());
-        results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails(), HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)));
-        return details;
+        Map<String, Object> aggregatedDetails = CollectionUtils.newHashMap(results.size());
+        results.forEach(r -> {
+            var name = r.getName();
+            var details = r.getDetails();
+            var status = r.getStatus();
+            aggregatedDetails.put(name, buildResult(status, details, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS));
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Health monitor check for {} with status {}", name, status);
+            }
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Health result for {} with details {}", name, details != null ? details : "{}");
+            }
+        });
+
+        return aggregatedDetails;
     }
 
     /**

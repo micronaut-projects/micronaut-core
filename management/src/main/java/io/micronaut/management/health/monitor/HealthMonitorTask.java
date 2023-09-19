@@ -105,7 +105,11 @@ public class HealthMonitorTask {
             public void onNext(HealthResult healthResult) {
                 HealthStatus status = healthResult.getStatus();
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor check with status {}", status);
+                    LOG.debug("Health monitor check for {} with status {}", healthResult.getName(), status);
+                }
+                if (LOG.isTraceEnabled()) {
+                    var detail = healthResult.getDetails();
+                    LOG.trace("Health monitor check for {} with details {}", healthResult.getName(), detail != null ? detail : "{}");
                 }
                 currentHealthStatus.update(status);
             }
