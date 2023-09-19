@@ -24,8 +24,8 @@ import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -51,6 +51,12 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+
+    /**
+     * @return The visitor context's language.
+     * @since 4.2.0
+     */
+    Language getLanguage();
 
     /**
      * Gets the element factory for this visitor context.
@@ -309,4 +315,26 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
     }
 
+    /**
+     * The languages that are supported in source code generation.
+     * Not all visitors may support all languages.
+     *
+     * @since 4.2.0
+     */
+    enum Language {
+        JAVA("Java"),
+        GROOVY("Groovy"),
+        KOTLIN("Kotlin");
+
+        private final String displayName;
+
+        Language(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
 }
