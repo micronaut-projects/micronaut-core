@@ -32,7 +32,7 @@ import java.util.Map;
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class EncodingTest {
+class EncodingTest {
     private static final String SPEC_NAME = "EncodingTest";
 
     @Test
