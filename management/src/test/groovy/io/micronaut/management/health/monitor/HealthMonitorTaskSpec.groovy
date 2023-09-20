@@ -9,6 +9,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.server.EmbeddedServer
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import static java.util.Collections.sort
 
@@ -31,37 +32,37 @@ class HealthMonitorTaskSpec extends Specification {
                 'endpoints.health.sensitive': false
         ])
 
+        PollingConditions conditions = new PollingConditions(timeout: 7)
         HealthMonitorTask monitorTask = embeddedServer.applicationContext.getBean(HealthMonitorTask)
         monitorTask.monitor()
-        // FIXME how do I get the reactive internals of the monitor() method to emit their log statements
-        //    so I can assert them below?
 
         then:
-        sort(appender.events)
-
-        // these checks will break if we add log statements to HealthMonitorTask
-        switch (logLevel) {
-            case Level.INFO:
-                assert appender.events.isEmpty()
-                break
-            case Level.DEBUG:
-                assert appender.events.size() == 6
-                assert appender.events[0] == 'Starting health monitor check'
-                assert appender.events[1] == 'Health monitor result for compositeDiscoveryClient(): status UP'
-                assert appender.events[2] == 'Health monitor result for diskSpace: status UP'
-                assert appender.events[3] == 'Health monitor result for liveness: status UP'
-                assert appender.events[4] == 'Health monitor result for readiness: status UP'
-                assert appender.events[5] == 'Health monitor result for service: status UP'
-                break
-            case Level.TRACE:
-                assert appender.events.size() == 6
-                assert appender.events[0] == 'Starting health monitor check'
-                assert appender.events[1].contains('Health monitor result for compositeDiscoveryClient(): status UP, details {')
-                assert appender.events[2].contains('Health monitor result for diskSpace: status UP, details {')
-                assert appender.events[3] == 'Health monitor result for liveness: status UP, details {}'
-                assert appender.events[4] == 'Health monitor result for readiness: status UP, details {}'
-                assert appender.events[5] == 'Health monitor result for service: status UP, details {}'
-                break
+        // these checks will break if we add/change log statements to HealthMonitorTask
+        conditions.eventually {
+            sort(appender.events)
+            switch (logLevel) {
+                case Level.INFO:
+                    assert appender.events.isEmpty()
+                    break
+                case Level.DEBUG:
+                    assert appender.events.size() == 6
+                    assert appender.events[0] == 'Health monitor result for compositeDiscoveryClient(): status UP'
+                    assert appender.events[1] == 'Health monitor result for diskSpace: status UP'
+                    assert appender.events[2] == 'Health monitor result for liveness: status UP'
+                    assert appender.events[3] == 'Health monitor result for readiness: status UP'
+                    assert appender.events[4] == 'Health monitor result for service: status UP'
+                    assert appender.events[5] == 'Starting health monitor check'
+                    break
+                case Level.TRACE:
+                    assert appender.events.size() == 6
+                    assert appender.events[0].contains('Health monitor result for compositeDiscoveryClient(): status UP, details {')
+                    assert appender.events[1].contains('Health monitor result for diskSpace: status UP, details {')
+                    assert appender.events[2] == 'Health monitor result for liveness: status UP, details {}'
+                    assert appender.events[3] == 'Health monitor result for readiness: status UP, details {}'
+                    assert appender.events[4] == 'Health monitor result for service: status UP, details {}'
+                    assert appender.events[5] == 'Starting health monitor check'
+                    break
+            }
         }
 
         cleanup:
