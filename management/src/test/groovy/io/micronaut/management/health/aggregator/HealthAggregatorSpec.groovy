@@ -18,7 +18,7 @@ class HealthAggregatorSpec extends Specification {
     void "test that only log statements for level #logLevel are emitted"(Level logLevel) {
         given:
         MemoryAppender appender = new MemoryAppender()
-        Logger l = (Logger) LoggerFactory.getLogger(DefaultHealthAggregator.class.name)
+        Logger l = (Logger) LoggerFactory.getLogger(DefaultHealthAggregator)
         l.setLevel(logLevel)
         l.addAppender(appender)
 
@@ -38,27 +38,30 @@ class HealthAggregatorSpec extends Specification {
         sort(appender.events)
 
         // these checks will break if we add log statements to DefaultHealthAggregator
-
-        appender.events.isEmpty() == (logLevel == Level.INFO)
-
-        if (logLevel in [Level.DEBUG, Level.TRACE]) {
-            appender.events[0] == 'Health result for compositeDiscoveryClient(): status UP'
-            appender.events[1] == 'Health result for diskSpace: status UP'
-            appender.events[2] == 'Health result for jdbc: status UP'
-            appender.events[3] == 'Health result for jdbc:h2:mem:oneDb: status UP'
-            appender.events[4] == 'Health result for liveness: status UP'
-            appender.events[5] == 'Health result for readiness: status UP'
-            appender.events[6] == 'Health result for service: status UP'
-        }
-
-        if (logLevel == Level.TRACE) {
-            appender.events[0].contains('Health result for compositeDiscoveryClient(): status UP, details {')
-            appender.events[1].contains('Health result for diskSpace: status UP, details {')
-            appender.events[2].contains('Health result for jdbc: status UP, details {')
-            appender.events[3].contains('Health result for jdbc:h2:mem:oneDb: status UP, details {')
-            appender.events[4] == 'Health result for liveness: status UP, details {}'
-            appender.events[5] == 'Health result for readiness: status UP, details {}'
-            appender.events[6] == 'Health result for service: status UP, details {}'
+        switch (logLevel) {
+            case Level.INFO:
+                assert appender.events.isEmpty()
+                break
+            case Level.DEBUG:
+                assert appender.events.size() == 7
+                assert appender.events[0] == 'Health result for compositeDiscoveryClient(): status UP'
+                assert appender.events[1] == 'Health result for diskSpace: status UP'
+                assert appender.events[2] == 'Health result for jdbc: status UP'
+                assert appender.events[3] == 'Health result for jdbc:h2:mem:oneDb: status UP'
+                assert appender.events[4] == 'Health result for liveness: status UP'
+                assert appender.events[5] == 'Health result for readiness: status UP'
+                assert appender.events[6] == 'Health result for service: status UP'
+                break
+            case Level.TRACE:
+                assert appender.events.size() == 7
+                assert appender.events[0].contains('Health result for compositeDiscoveryClient(): status UP, details {')
+                assert appender.events[1].contains('Health result for diskSpace: status UP, details {')
+                assert appender.events[2].contains('Health result for jdbc: status UP, details {')
+                assert appender.events[3].contains('Health result for jdbc:h2:mem:oneDb: status UP, details {')
+                assert appender.events[4] == 'Health result for liveness: status UP, details {}'
+                assert appender.events[5] == 'Health result for readiness: status UP, details {}'
+                assert appender.events[6] == 'Health result for service: status UP, details {}'
+                break
         }
 
         cleanup:
