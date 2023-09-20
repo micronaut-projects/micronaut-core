@@ -33,11 +33,13 @@ class HealthMonitorTaskSpec extends Specification {
 
         HealthMonitorTask monitorTask = embeddedServer.applicationContext.getBean(HealthMonitorTask)
         monitorTask.monitor()
+        // FIXME how do I get the reactive internals of the monitor() method to emit their log statements
+        //    so I can assert them below?
 
         then:
         sort(appender.events)
 
-        // these checks will break if we add log statements to DefaultHealthAggregator
+        // these checks will break if we add log statements to HealthMonitorTask
         switch (logLevel) {
             case Level.INFO:
                 assert appender.events.isEmpty()
