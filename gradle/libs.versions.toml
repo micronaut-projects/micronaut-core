@@ -32,9 +32,12 @@ junit-platform="1.9.3"
 logback = "1.4.11"
 logbook-netty = "2.16.0"
 log4j = "2.20.0"
+micronaut = "4.1.1" # This version is a *platform* version used in benchmarks only
+micronaut-aot = "2.0.1"
 micronaut-aws = "4.0.4"
 micronaut-groovy = "4.0.1"
 micronaut-session = "4.0.0"
+micronaut-serde = "2.2.4"
 micronaut-sql = "5.0.0-M7"
 micronaut-test = "4.0.2"
 micronaut-validation = "4.0.0-M9"
@@ -83,6 +86,7 @@ test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-v
 test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
+test-boms-micronaut-serde = { module = "io.micronaut.serde:micronaut-serde", version.ref = "micronaut-serde" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -214,6 +218,10 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
+# This is only present so that the "micronaut" version is updated by renovatebot
+micronaut-platform = { module = "io.micronaut.platform:micronaut-platform", version.ref = "micronaut"}
+
+micronaut-aot-bom = { module = "io.micronaut.aot:micronaut-aot-bom", version.ref = "micronaut-aot" }
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
@@ -225,6 +233,10 @@ micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", vers
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
+
+micronaut-serde-processor = { module = "io.micronaut.serde:micronaut-serde-processor", version.ref = "micronaut-serde" }
+micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
+
 mysql-driver = { module = "mysql:mysql-connector-java" }
 
 neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-java-driver" }

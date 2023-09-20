@@ -1,0 +1,7 @@
+plugins {
+    id("io.micronaut.build.internal.convention-benchmark")
+}
+
+application {
+    mainClass = "io.micronaut.http.bench.Application"
+}

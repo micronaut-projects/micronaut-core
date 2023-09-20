@@ -3,6 +3,7 @@ import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
 
 plugins {
     id "io.micronaut.build.internal.common"
+    id "io.micronaut.build.internal.substitutions"
 }
 
 micronautBuild {
@@ -60,20 +61,6 @@ tasks.withType(GroovyCompile).configureEach {
 tasks.withType(Jar).configureEach {
     reproducibleFileOrder = true
     preserveFileTimestamps = false
-}
-
-configurations.all {
-    resolutionStrategy.dependencySubstitution {
-        rootProject.subprojects.each {
-            if (!it.name.startsWith('test-')) {
-                if (it.name.contains('bom')) {
-                    substitute platform(module("io.micronaut:micronaut-${it.name}")) using platform(project(":${it.name}")) because "we want to test with what we're building"
-                } else {
-                    substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
-                }
-            }
-        }
-    }
 }
 
 dependencies {
