@@ -123,10 +123,9 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
             var status = r.getStatus();
             aggregatedDetails.put(name, buildResult(status, details, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS));
             if (LOG.isTraceEnabled()) {
-                LOG.trace("Health monitor check for {} with status {}", name, status);
-                LOG.trace("Health result for {} with details {}", name, details != null ? details : "{}");
+                LOG.trace("Health result for {}: status {}, details {}", name, status, details != null ? details : "{}");
             } else if (LOG.isDebugEnabled()) {
-                LOG.debug("Health monitor check for {} with status {}", name, status);
+                LOG.debug("Health result for {}: status {}", name, status);
             }
         });
 

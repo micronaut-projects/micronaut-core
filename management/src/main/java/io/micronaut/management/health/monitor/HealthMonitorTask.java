@@ -107,10 +107,9 @@ public class HealthMonitorTask {
                 var name = healthResult.getName();
                 if (LOG.isTraceEnabled()) {
                     var detail = healthResult.getDetails();
-                    LOG.trace("Health monitor check for {} with status {}", name, status);
-                    LOG.trace("Health monitor check for {} with details {}", name, detail != null ? detail : "{}");
+                    LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
                 } else if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor check for {} with status {}", name, status);
+                    LOG.debug("Health monitor result for {}: status {}", name, status);
                 }
                 currentHealthStatus.update(status);
             }

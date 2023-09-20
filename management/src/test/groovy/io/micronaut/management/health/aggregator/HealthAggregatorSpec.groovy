@@ -28,7 +28,6 @@ class HealthAggregatorSpec extends Specification {
                 'spec.name': 'HealthAggregatorSpec',
                 'micronaut.application.name': 'foo',
                 'endpoints.health.sensitive': false,
-                'micronaut.http.client.read-timeout': '6000 sec',
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
@@ -43,23 +42,23 @@ class HealthAggregatorSpec extends Specification {
         appender.events.isEmpty() == (logLevel == Level.INFO)
 
         if (logLevel in [Level.DEBUG, Level.TRACE]) {
-            appender.events[0].contains('Health monitor check for compositeDiscoveryClient() with status')
-            appender.events[1].contains('Health monitor check for diskSpace with status')
-            appender.events[2].contains('Health monitor check for jdbc with status')
-            appender.events[3].contains('Health monitor check for jdbc:h2:mem:oneDb with status')
-            appender.events[4].contains('Health monitor check for liveness with status')
-            appender.events[5].contains('Health monitor check for readiness with status')
-            appender.events[6].contains('Health monitor check for service with status')
+            appender.events[0] == 'Health result for compositeDiscoveryClient(): status UP'
+            appender.events[1] == 'Health result for diskSpace: status UP'
+            appender.events[2] == 'Health result for jdbc: status UP'
+            appender.events[3] == 'Health result for jdbc:h2:mem:oneDb: status UP'
+            appender.events[4] == 'Health result for liveness: status UP'
+            appender.events[5] == 'Health result for readiness: status UP'
+            appender.events[6] == 'Health result for service: status UP'
         }
 
         if (logLevel == Level.TRACE) {
-            appender.events[7].contains('Health result for compositeDiscoveryClient() with details')
-            appender.events[8].contains('Health result for diskSpace with details')
-            appender.events[9].contains('Health result for jdbc with details')
-            appender.events[10].contains('Health result for jdbc:h2:mem:oneDb with details')
-            appender.events[11] == 'Health result for liveness with details {}'
-            appender.events[12] == 'Health result for readiness with details {}'
-            appender.events[13] == 'Health result for service with details {}'
+            appender.events[0].contains('Health result for compositeDiscoveryClient(): status UP, details {')
+            appender.events[1].contains('Health result for diskSpace: status UP, details {')
+            appender.events[2].contains('Health result for jdbc: status UP, details {')
+            appender.events[3].contains('Health result for jdbc:h2:mem:oneDb: status UP, details {')
+            appender.events[4] == 'Health result for liveness: status UP, details {}'
+            appender.events[5] == 'Health result for readiness: status UP, details {}'
+            appender.events[6] == 'Health result for service: status UP, details {}'
         }
 
         cleanup:
