@@ -104,12 +104,13 @@ public class HealthMonitorTask {
             @Override
             public void onNext(HealthResult healthResult) {
                 HealthStatus status = healthResult.getStatus();
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor check for {} with status {}", healthResult.getName(), status);
-                }
+                var name = healthResult.getName();
                 if (LOG.isTraceEnabled()) {
                     var detail = healthResult.getDetails();
-                    LOG.trace("Health monitor check for {} with details {}", healthResult.getName(), detail != null ? detail : "{}");
+                    LOG.trace("Health monitor check for {} with status {}", name, status);
+                    LOG.trace("Health monitor check for {} with details {}", name, detail != null ? detail : "{}");
+                } else if (LOG.isDebugEnabled()) {
+                    LOG.debug("Health monitor check for {} with status {}", name, status);
                 }
                 currentHealthStatus.update(status);
             }
