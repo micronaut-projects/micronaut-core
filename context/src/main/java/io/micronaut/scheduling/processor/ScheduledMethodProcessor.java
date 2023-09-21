@@ -51,6 +51,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import io.micronaut.inject.qualifiers.ExactTypeQualifier;
 
 /**
  * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
@@ -91,6 +92,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         if (!(beanContext instanceof ApplicationContext)) {
+            return;
+        }
+        Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
+        if (!beanContext.containsBean(beanType, ExactTypeQualifier.INSTANCE)) {
             return;
         }
 
