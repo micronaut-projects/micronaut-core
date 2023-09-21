@@ -88,7 +88,7 @@ public class HealthMonitorTask {
 
         Flux.merge(resultPublishers)
             .collectList()
-            .doOnError((e) -> {
+            .doOnError(e -> {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Health monitor check failed with exception: {}", e.getMessage(), e);
                 }
