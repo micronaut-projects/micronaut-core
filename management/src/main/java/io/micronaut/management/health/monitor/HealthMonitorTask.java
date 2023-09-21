@@ -27,8 +27,6 @@ import io.micronaut.scheduling.annotation.Scheduled;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -82,55 +80,29 @@ public class HealthMonitorTask {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");
         }
-        List<Publisher<HealthResult>> healthResults = healthIndicators
+        List<Publisher<HealthResult>> resultPublishers = healthIndicators
             .stream()
             .map(HealthIndicator::getResult)
             .collect(Collectors.toList());
 
-        Flux<HealthResult> reactiveSequence = Flux
-            .merge(healthResults)
-            .filter(healthResult -> {
-                    HealthStatus status = healthResult.getStatus();
-                    return status.equals(HealthStatus.DOWN) || !status.getOperational().orElse(true);
-                }
-            );
-
-        reactiveSequence.next().subscribe(new Subscriber<HealthResult>() {
-            @Override
-            public void onSubscribe(Subscription s) {
-
-            }
-
-            @Override
-            public void onNext(HealthResult healthResult) {
-                HealthStatus status = healthResult.getStatus();
-                var name = healthResult.getName();
-                if (LOG.isTraceEnabled()) {
-                    var detail = healthResult.getDetails();
-                    LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
-                } else if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor result for {}: status {}", name, status);
-                }
-                currentHealthStatus.update(status);
-            }
-
-            @Override
-            public void onError(Throwable e) {
+        Flux
+            .merge(resultPublishers)
+            .collectList()
+            .doOnError((e) -> {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Health monitor check failed with exception: " + e.getMessage(), e);
                 }
-
                 currentHealthStatus.update(HealthStatus.DOWN.describe("Error occurred running health check: " + e.getMessage()));
-            }
-
-            @Override
-            public void onComplete() {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor check passed.");
+            })
+            .subscribe(healthResults -> {
+                java.util.Optional<HealthResult> firstDown = healthResults.stream().filter(r -> r.getStatus().equals(io.micronaut.health.HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
+                    .findFirst();
+                if (firstDown.isPresent()) {
+                    currentHealthStatus.update(firstDown.get().getStatus());
+                } else {
+                    currentHealthStatus.update(HealthStatus.UP);
                 }
+            });
 
-                currentHealthStatus.update(HealthStatus.UP);
-            }
-        });
     }
 }
