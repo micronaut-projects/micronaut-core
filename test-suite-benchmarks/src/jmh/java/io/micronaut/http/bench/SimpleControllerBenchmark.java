@@ -16,56 +16,42 @@
 package io.micronaut.http.bench;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.runtime.Micronaut;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.infra.Blackhole;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.InputStream;
+import java.util.concurrent.TimeUnit;
 
+@State(Scope.Thread)
 public class SimpleControllerBenchmark {
-    @State(Scope.Benchmark)
-    public static class BenchmarkState {
-        private HttpClient client;
-        private URI uri;
-        private ApplicationContext context;
-        private HttpRequest listPersons;
+    // run this benchmark with:
+    // ./gradlew :test-suite-benchmarks:optimizedJmhJar && java -jar test-suite-benchmarks/build/libs/test-suite-benchmarks-jmh-all-*-SNAPSHOT.jar
 
-        @Setup
-        public void setup() {
-            context = Micronaut.run(BenchmarkState.class);
-            uri = context.getBean(EmbeddedServer.class).getContextURI();
-            client = HttpClient.newBuilder()
-                .build();
-            listPersons = HttpRequest.newBuilder()
-                .GET()
-                .uri(uri)
-                .build();
-        }
-
-        @TearDown
-        public void shutdown() {
-            context.close();
-        }
-
-    }
+    ApplicationContext ctx;
 
     @Benchmark
-    public void getSomeJson(Blackhole blackhole, BenchmarkState app) throws IOException, InterruptedException {
-        var response = app.client.send(app.listPersons, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == HttpStatus.OK.getCode()) {
-            blackhole.consume(
-                response.body()
-            );
+    @BenchmarkMode(Mode.SingleShotTime)
+    @OutputTimeUnit(TimeUnit.MILLISECONDS)
+    @Fork(20)
+    public byte[] getSomeJson() throws IOException {
+        ctx = Micronaut.run(SimpleControllerBenchmark.class);
+        try (InputStream s = ctx.getBean(EmbeddedServer.class).getURL().openStream()) {
+            return s.readAllBytes();
         }
+    }
+
+    @TearDown
+    public void shutdown() {
+        // not part of the measurement
+        ctx.close();
     }
 }
