@@ -117,6 +117,17 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         headers.get("foo") == null
     }
 
+    void "empty header value"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when:
+        headers.add("foo", "")
+
+        then:
+        headers.get("foo") == ""
+    }
+
     void "cannot add invalid or insecure header names"() {
         given:
         CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
