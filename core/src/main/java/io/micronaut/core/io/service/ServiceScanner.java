@@ -128,7 +128,7 @@ final class ServiceScanner<S> {
 
         if (isWebSphereClassLoader()) {
             // Special case WebSphere classloader
-            // https://github.com/micronaut-projects/micronaut-core/issues/....
+            // https://github.com/micronaut-projects/micronaut-core/issues/9905
             return path + "/";
         }
 
