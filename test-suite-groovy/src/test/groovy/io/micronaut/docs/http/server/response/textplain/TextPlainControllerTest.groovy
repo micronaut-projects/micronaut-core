@@ -7,7 +7,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
 
-@Property(name = "spec.name", value = "TextPlainControllerTest")
+@Property(name = 'spec.name', value = 'TextPlainControllerTest')
 @MicronautTest
 class TextPlainControllerTest extends Specification {
 
@@ -15,7 +15,7 @@ class TextPlainControllerTest extends Specification {
     @Inject
     HttpClient httpClient
 
-    void "testtext plain responses for non String types for endpoint #endpoint"(String endpoint, String expectedResult) {
+    void "test text plain responses for non String types for endpoint #endpoint"(String endpoint, String expectedResult) {
         when:
         String result = httpClient.toBlocking().retrieve(endpoint)
 
@@ -23,12 +23,12 @@ class TextPlainControllerTest extends Specification {
         result == expectedResult
 
         where:
-        endpoint            |   expectedResult
-        "/boolean"          |   "true"
-        "/boolean/mono"     |   "true"
-        "/boolean/flux"     |   "true"
-        "/bigdecimal"       |   BigDecimal.valueOf(Long.MAX_VALUE).toString()
-        "/date"             |   new Calendar.Builder().setDate(2023,7,4).build().toString()
-        "/person"           |   new Person("Dean Wette", 65).toString()
+        endpoint        |   expectedResult
+        '/boolean'      |   'true'
+        '/boolean/mono' |   'true'
+        '/boolean/flux' |   'true'
+        '/bigdecimal'   |   BigDecimal.valueOf(Long.MAX_VALUE).toString()
+        '/date'         |   new Calendar.Builder().setDate(2023,7,4).build().toString()
+        '/person'       |   new Person('Dean Wette', 65).toString()
     }
 }

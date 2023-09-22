@@ -12,7 +12,7 @@ import java.util.*
 
 @Property(name = "spec.name", value = "TextPlainControllerTest")
 @MicronautTest
-class TextPlainControllerTest {
+internal class TextPlainControllerTest {
 
     @Inject
     @field:Client("/txt")
@@ -20,37 +20,36 @@ class TextPlainControllerTest {
 
     @Test
     fun textPlainBoolean() {
-        val result = httpClient.toBlocking().retrieve("/boolean")
-        Assertions.assertEquals("true", result)
+        asserTextResult("/boolean", "true")
     }
 
     @Test
     fun textPlainMonoBoolean() {
-        val result = httpClient.toBlocking().retrieve("/boolean/mono")
-        Assertions.assertEquals("true", result)
+        asserTextResult("/boolean/mono", "true")
     }
 
     @Test
     fun textPlainFluxBoolean() {
-        val result = httpClient.toBlocking().retrieve("/boolean/flux")
-        Assertions.assertEquals("true", result)
+        asserTextResult("/boolean/flux", "true")
     }
 
     @Test
     fun textPlainBigDecimal() {
-        val result = httpClient.toBlocking().retrieve("/bigdecimal")
-        Assertions.assertEquals(BigDecimal.valueOf(Long.MAX_VALUE).toString(), result)
+        asserTextResult("/bigdecimal", BigDecimal.valueOf(Long.MAX_VALUE).toString())
     }
 
     @Test
     fun textPlainDate() {
-        val result = httpClient.toBlocking().retrieve("/date")
-        Assertions.assertEquals(Calendar.Builder().setDate(2023, 7, 4).build().toString(), result)
+        asserTextResult("/date", Calendar.Builder().setDate(2023, 7, 4).build().toString())
     }
 
     @Test
     fun textPlainPerson() {
-        val result = httpClient.toBlocking().retrieve("/person")
-        Assertions.assertEquals(Person("Dean Wette", 65).toString(), result)
+        asserTextResult("/person", Person("Dean Wette", 65).toString())
+    }
+
+    private fun asserTextResult(url: String, expectedResult: String) {
+        val result = httpClient.toBlocking().retrieve(url)
+        Assertions.assertEquals(expectedResult, result)
     }
 }

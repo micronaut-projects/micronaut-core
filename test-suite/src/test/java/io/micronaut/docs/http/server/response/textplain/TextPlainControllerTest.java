@@ -6,14 +6,15 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 
 import java.math.BigDecimal;
 import java.util.Calendar;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 @Property(name = "spec.name", value = "TextPlainControllerTest")
 @MicronautTest
-public class TextPlainControllerTest {
+class TextPlainControllerTest {
 
     @Client("/txt")
     @Inject
@@ -21,43 +22,37 @@ public class TextPlainControllerTest {
 
     @Test
     void textPlainBoolean() {
-        final String result = httpClient.toBlocking().retrieve("/boolean");
-
-        Assertions.assertEquals("true", result);
+        asserTextResult("/boolean", "true");
     }
 
     @Test
     void textPlainMonoBoolean() {
-        final String result = httpClient.toBlocking().retrieve("/boolean/mono");
-
-        Assertions.assertEquals("true", result);
+        asserTextResult("/boolean/mono", "true");
     }
 
     @Test
     void textPlainFluxBoolean() {
-        final String result = httpClient.toBlocking().retrieve("/boolean/flux");
-
-        Assertions.assertEquals("true", result);
+        asserTextResult("/boolean/flux", "true");
     }
 
     @Test
     void textPlainBigDecimal() {
-        final String result = httpClient.toBlocking().retrieve("/bigdecimal");
-
-        Assertions.assertEquals(BigDecimal.valueOf(Long.MAX_VALUE).toString(), result);
+        asserTextResult("/bigdecimal", BigDecimal.valueOf(Long.MAX_VALUE).toString());
     }
 
     @Test
     void textPlainDate() {
-        final String result = httpClient.toBlocking().retrieve("/date");
-
-        Assertions.assertEquals(new Calendar.Builder().setDate(2023,7,4).build().toString(), result);
+        asserTextResult("/date", new Calendar.Builder().setDate(2023,7,4).build().toString());
     }
 
     @Test
     void textPlainPerson() {
-        final String result = httpClient.toBlocking().retrieve("/person");
+        asserTextResult("/person", new Person("Dean Wette", 65).toString());
+    }
 
-        Assertions.assertEquals(new Person("Dean Wette", 65).toString(), result);
+    private void asserTextResult(String url, String expectedResult) {
+        final String result = httpClient.toBlocking().retrieve(url);
+        assertEquals(expectedResult, result);
+
     }
 }
