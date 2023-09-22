@@ -72,6 +72,16 @@ public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R>
     }
 
     @Override
+    default boolean isAbstract(){
+        return getTarget().isAbstract();
+    }
+
+    @Override
+    default boolean isSuspend(){
+        return getTarget().isSuspend();
+    }
+
+    @Override
     default R invoke(T instance, Object... arguments) {
         return getTarget().invoke(instance, arguments);
     }
