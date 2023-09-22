@@ -25,13 +25,45 @@ import spock.lang.PendingFeature
 
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
 
+    void "test executable and aop"() {
+        given:
+        BeanDefinition definition = buildInterceptedBeanDefinition('test.Test$ExecutableController','''\
+package test
+
+import io.micronaut.aop.interceptors.Mutating
+import io.micronaut.context.annotation.Executable
+import io.micronaut.inject.annotation.*
+import io.micronaut.inject.executable.StartupExecutable
+import io.micronaut.retry.annotation.Retryable
+import io.micronaut.scheduling.annotation.Scheduled
+
+class Test {
+    @jakarta.inject.Singleton
+    static class ExecutableController {
+        String foo
+
+        @Scheduled(fixedDelay = "10ms")
+        @Retryable
+         String round(String foo) {
+            return foo
+        }
+    }
+}
+
+''')
+        expect:
+        definition != null
+        definition.executableMethods.size() == 1
+        definition.requiresMethodProcessing()
+    }
+
     void "test executable at class level"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
 package test
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.Executable
+import io.micronaut.inject.annotation.*
 
 @jakarta.inject.Singleton
 @Executable
@@ -39,12 +71,12 @@ class ExecutableController {
     String foo
 
     @Executable
-    public int round(float num) {
-        return Math.round(num);
+     int round(float num) {
+        return Math.round(num)
     }
 
     @Executable
-    public int sum(int a, int b) {
+     int sum(int a, int b) {
         return doSum()
     }
 
@@ -64,19 +96,19 @@ class ExecutableController {
         BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
 package test
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.Executable
+import io.micronaut.inject.annotation.*
 
 @jakarta.inject.Singleton
 @Executable
 class ExecutableController {
     String foo
 
-    public int round(float num) {
-        return Math.round(num);
+    int round(float num) {
+        return Math.round(num)
     }
 
-    public int sum(int a, int b) {
+    int sum(int a, int b) {
         return doSum()
     }
 
@@ -94,18 +126,18 @@ class ExecutableController {
     void "test executable on stereotype"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import io.micronaut.http.annotation.Get
 
 @jakarta.inject.Singleton
 class ExecutableController {
 
     @Get("/round")
-    public int round(float num) {
-        return Math.round(num);
+     int round(float num) {
+        return Math.round(num)
     }
 }
 ''')
@@ -117,17 +149,17 @@ class ExecutableController {
     void "test executable method return types"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableBean1','''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
 
 @jakarta.inject.Singleton
 @Executable
 class ExecutableBean1 {
 
-    public int round(float num) {
-        return Math.round(num);
+    int round(float num) {
+        return Math.round(num)
     }
 }
 ''')
@@ -140,16 +172,16 @@ class ExecutableBean1 {
     void "bean definition should not be created for class with only executable methods"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
 
 class MyBean {
 
     @Executable
-    public int round(float num) {
-        return Math.round(num);
+     int round(float num) {
+        return Math.round(num)
     }
 }
 
@@ -196,40 +228,40 @@ class MyBean  {
     void "test how annotations are preserved"() {
         given:
             BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import jakarta.validation.Valid;
-import java.util.List;
-import io.micronaut.inject.executable.Book;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import jakarta.validation.Valid
+import java.util.List
+import io.micronaut.inject.executable.Book
 
 @jakarta.inject.Singleton
 class MyBean {
 
     @Executable
-    public void saveAll(@Valid List<Book> books) {
+     void saveAll(@Valid List<Book> books) {
     }
 
     @Executable
-    public <T extends Book> void saveAll2(@Valid List<? extends T> book) {
+     <T extends Book> void saveAll2(@Valid List<? extends T> book) {
     }
 
     @Executable
-    public <T extends Book> void saveAll3(@Valid List<T> book) {
+     <T extends Book> void saveAll3(@Valid List<T> book) {
     }
 
     @Executable
-    public void save2(@Valid Book book) {
+     void save2(@Valid Book book) {
     }
 
     @Executable
-    public <T extends Book> void save3(@Valid T book) {
+     <T extends Book> void save3(@Valid T book) {
     }
 
     @Executable
-    public Book get() {
-        return null;
+     Book get() {
+        return null
     }
 }
 
@@ -308,57 +340,57 @@ class MyBean {
     void "test how the type annotations from the type are preserved 2"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import java.util.List;
-import io.micronaut.inject.executable.Book;
-import io.micronaut.inject.executable.TypeUseRuntimeAnn;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import java.util.List
+import io.micronaut.inject.executable.Book
+import io.micronaut.inject.executable.TypeUseRuntimeAnn
 
 @jakarta.inject.Singleton
 class MyBean {
 
     @Executable
-    public void saveAll(List<@TypeUseRuntimeAnn Book> books) {
+     void saveAll(List<@TypeUseRuntimeAnn Book> books) {
     }
 
     @Executable
-    public <@TypeUseRuntimeAnn T extends Book> void saveAll2(List<? extends T> book) {
+     <@TypeUseRuntimeAnn T extends Book> void saveAll2(List<? extends T> book) {
     }
 
     @Executable
-    public <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
+     <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
     }
 
     @Executable
-    public <T extends Book> void saveAll4(List<@TypeUseRuntimeAnn ? extends T> book) {
+     <T extends Book> void saveAll4(List<@TypeUseRuntimeAnn ? extends T> book) {
     }
 
     @Executable
-    public <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
+     <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
     }
 
     @Executable
-    public void save2(@TypeUseRuntimeAnn Book book) {
+     void save2(@TypeUseRuntimeAnn Book book) {
     }
 
     @Executable
-    public <@TypeUseRuntimeAnn T extends Book> void save3(T book) {
+     <@TypeUseRuntimeAnn T extends Book> void save3(T book) {
     }
 
     @Executable
-    public <T extends @TypeUseRuntimeAnn Book> void save4(T book) {
+     <T extends @TypeUseRuntimeAnn Book> void save4(T book) {
     }
 
     @Executable
-    public <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
+     <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
     }
 
     @TypeUseRuntimeAnn
     @Executable
-    public Book get() {
-        return null;
+     Book get() {
+        return null
     }
 }
 
@@ -428,19 +460,19 @@ class MyBean {
     void "test how the type annotations from the type are preserved - not working case"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import java.util.List;
-import io.micronaut.inject.executable.Book;
-import io.micronaut.inject.executable.TypeUseRuntimeAnn;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import java.util.List
+import io.micronaut.inject.executable.Book
+import io.micronaut.inject.executable.TypeUseRuntimeAnn
 
 @jakarta.inject.Singleton
 class MyBean {
 
     @Executable
-    public <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
+     <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
     }
 }
 
@@ -456,21 +488,21 @@ class MyBean {
     void "test how the type annotations are preserved on a method"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import java.util.List;
-import io.micronaut.inject.executable.Book;
-import io.micronaut.inject.executable.TypeUseRuntimeAnn;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import java.util.List
+import io.micronaut.inject.executable.Book
+import io.micronaut.inject.executable.TypeUseRuntimeAnn
 
 @jakarta.inject.Singleton
 class MyBean {
 
     @TypeUseRuntimeAnn
     @Executable
-    public Book get() {
-        return null;
+     Book get() {
+        return null
     }
 }
 
@@ -487,23 +519,23 @@ class MyBean {
     void "test how the type annotations from the type are preserved 3"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
-package test;
+package test
 
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import java.util.List;
-import io.micronaut.inject.executable.Book;
-import io.micronaut.inject.executable.TypeUseRuntimeAnn;
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import java.util.List
+import io.micronaut.inject.executable.Book
+import io.micronaut.inject.executable.TypeUseRuntimeAnn
 
 @jakarta.inject.Singleton
 class MyBean {
 
     @Executable
-    public <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
+     <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
     }
 
     @Executable
-    public <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
+     <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
     }
 
 }
@@ -524,7 +556,7 @@ class MyBean {
 
     void validateBookArgument(Argument argument) {
         // The argument should only have type annotations
-        def am = argument.getAnnotationMetadata();
+        def am = argument.getAnnotationMetadata()
         assert am.hasAnnotation(TypeUseRuntimeAnn.class)
         assert !am.hasAnnotation(MyEntity.class)
         assert !am.hasAnnotation(Introspected.class)

@@ -51,7 +51,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import io.micronaut.inject.qualifiers.ExactTypeQualifier;
 
 /**
  * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
@@ -94,11 +93,6 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         if (!(beanContext instanceof ApplicationContext)) {
             return;
         }
-        Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
-        if (!beanContext.containsBean(beanType, ExactTypeQualifier.INSTANCE)) {
-            return;
-        }
-
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
