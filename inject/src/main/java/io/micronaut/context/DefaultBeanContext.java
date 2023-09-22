@@ -1751,7 +1751,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
             beanDefinitionReferences = new ArrayList<>(300);
             definitions.collectAll(beanDefinitionReferences, BeanDefinitionReference::isPresent);
-            beanDefinitionReferences.removeIf(Objects::isNull);
         }
         return beanDefinitionReferences;
     }
