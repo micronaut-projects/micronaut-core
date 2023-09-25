@@ -60,6 +60,7 @@ public class IOUtils {
     private static final String SCHEME_FILE = "file";
     private static final String SCHEME_JAR = "jar";
     private static final String SCHEME_ZIP = "zip";
+    private static final String SCHEME_WSJAR = "wsjar";
 
     private static final String COLON = ":";
 
@@ -125,7 +126,7 @@ public class IOUtils {
                             IOExceptionBiFunction<List<Closeable>, String, Path> loadNestedJarUriFunction) throws IOException {
         String scheme = uri.getScheme();
         try {
-            if (SCHEME_JAR.equals(scheme) || SCHEME_ZIP.equals(scheme)) {
+            if (SCHEME_JAR.equals(scheme) || SCHEME_ZIP.equals(scheme) || SCHEME_WSJAR.equals(scheme)) {
                 // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
                 // Basically ignores anything after the !/ if it exists, and uses the part
                 // before as the jar path to extract.

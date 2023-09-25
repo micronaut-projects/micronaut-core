@@ -119,12 +119,28 @@ final class ServiceScanner<S> {
         return typeNames;
     }
 
+    private boolean isWebSphereClassLoader() {
+        return classLoader.getClass().getName().startsWith("com.ibm.ws.classloader");
+    }
+
+    private String buildResourceSearchPath() {
+        String path = "META-INF/micronaut/" + serviceName;
+
+        if (isWebSphereClassLoader()) {
+            // Special case WebSphere classloader
+            // https://github.com/micronaut-projects/micronaut-core/issues/9905
+            return path + "/";
+        }
+
+        return path;
+    }
+
     private Enumeration<URL> findStandardServiceConfigs() throws IOException {
         return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
     }
 
     private void findMicronautMetaServiceConfigs(BiConsumer<URI, String> consumer) throws IOException, URISyntaxException {
-        final String path = "META-INF/micronaut/" + serviceName;
+        String path = buildResourceSearchPath();
         final Enumeration<URL> micronautResources = classLoader.getResources(path);
         Set<URI> uniqueURIs = new LinkedHashSet<>();
         while (micronautResources.hasMoreElements()) {
