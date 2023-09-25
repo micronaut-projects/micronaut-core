@@ -1,0 +1,109 @@
+import me.champeau.jmh.JmhBytecodeGeneratorTask
+
+plugins {
+    id("io.micronaut.application")
+    id("io.micronaut.aot")
+    id("com.github.johnrengelman.shadow")
+    id("me.champeau.jmh")
+    id("io.micronaut.build.internal.substitutions")
+}
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    mainClass = "io.micronaut.http.bench.Application"
+}
+
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("io.micronaut.http.bench.*")
+    }
+
+    aot {
+        version = libs.versions.micronaut.aot
+        optimizeServiceLoading = true
+        convertYamlToJava = false
+        precomputeOperations = true
+        cacheEnvironment = true
+        optimizeClassLoading = true
+        deduceEnvironment = true
+        optimizeNetty = true
+        replaceLogbackXml = true
+    }
+}
+
+dependencies {
+    annotationProcessor(libs.micronaut.serde.processor)
+    implementation(libs.micronaut.serde.jackson)
+    runtimeOnly(libs.logback.classic)
+}
+
+jmh {
+    includeTests = false
+}
+
+def optimizedJmhJar = tasks.register("optimizedJmhJar", Jar) {
+    group = "jmh"
+    description = "Generates a JMH benchmark jar using the Micronaut AOT optimized jar"
+    archiveAppendix = 'jmh-all'
+    manifest {
+        attributes 'Main-Class': 'org.openjdk.jmh.Main'
+    }
+    from(configurations.jmh.incoming.artifacts.resolvedArtifacts.map {
+        it.collect { artifact -> zipTree(artifact.file )}
+    })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(tasks.named("optimizedJitJarAll", Jar).map { zipTree(it.archiveFile.get().asFile)})
+    from(sourceSets.jmh.output)
+    def bytecodeGen = tasks.named("jmhRunBytecodeGenerator", JmhBytecodeGeneratorTask)
+    from(tasks.named("jmhCompileGeneratedClasses", JavaCompile))
+    from(bytecodeGen.map {
+        it.generatedResourcesDir
+    })
+    // For build reproducibility
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+graalvmNative {
+    toolchainDetection = false
+    metadataRepository {
+        enabled = true
+    }
+    binaries {
+        all {
+            resources.autodetect()
+        }
+    }
+    binaries {
+        jmhAot {
+            classpath.from(optimizedJmhJar)
+            mainClass = 'org.openjdk.jmh.Main'
+            // We're using a fat jar, so we copy the configuration from the main binary in order
+            // to include configuration for the embedded jars
+            configurationFileDirectories.from(graalvmNative.binaries.main.configurationFileDirectories)
+        }
+    }
+}
+
+tasks.withType(me.champeau.jmh.JMHTask).configureEach {
+    doFirst {
+        throw new UnsupportedOperationException(
+                """
+                   Running benchmarks directly from Gradle is not supported.
+                   You can run java -jar ${it.jarArchive.get().asFile}
+                """.stripIndent()
+        )
+    }
+}
+
+tasks.named("nativeJmhAotCompile") {
+    doFirst {
+        println graalvmNative.binaries.jmhAot.configurationFileDirectories.files
+    }
+}
