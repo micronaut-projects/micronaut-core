@@ -3293,9 +3293,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (beanDefinitionReference.isProxiedBean()) {
                 beanDefinitionProducer.referenceEnabled = false;
                 BeanDefinitionProducer proxyBeanProducer = new BeanDefinitionProducer(beanDefinitionReference);
-                if (beanDefinitionReference.requiresMethodProcessing()) {
-                    processedBeans.add(proxyBeanProducer);
-                }
                 // retain only if proxy target otherwise the target is never used
                 if (beanDefinitionReference.isProxyTarget()) {
                     proxyTargetBeans.add(proxyBeanProducer);
