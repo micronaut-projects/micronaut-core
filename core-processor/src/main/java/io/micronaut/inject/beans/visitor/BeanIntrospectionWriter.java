@@ -171,6 +171,13 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
+     * @return The name of the class that the introspection will write.
+     */
+    public String getIntrospectionName() {
+        return introspectionName;
+    }
+
+    /**
      * @return The constructor.
      */
     @Nullable
