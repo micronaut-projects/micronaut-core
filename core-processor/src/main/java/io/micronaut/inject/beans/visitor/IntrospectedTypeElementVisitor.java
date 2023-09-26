@@ -317,7 +317,18 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 } else if (primaryConstructor != null) {
                     builderWriter.visitConstructor(primaryConstructor);
                 } else {
-                    context.fail("No accessible constructor found for builder: " + builderType.getName(), classToBuild);
+                    // try find builder method
+                    MethodElement methodElement = classToBuild.getEnclosedElement(
+                        ElementQuery.ALL_METHODS
+                            .onlyStatic()
+                            .onlyAccessible(ClassElement.of(builderWriter.getBeanType().getClassName()))
+                            .filter(m -> m.getGenericReturnType().isAssignable(builderType) && !m.hasParameters())
+                    ).orElse(null);
+                    if (methodElement == null) {
+                        context.fail("No accessible constructor found for builder: " + builderType.getName(), classToBuild);
+                    } else {
+                        builderWriter.visitConstructor(methodElement);
+                    }
                 }
 
                 builderWriter.visitBeanMethod(creatorMethodElement);
