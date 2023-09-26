@@ -147,4 +147,18 @@ class BeanIntrospectionBuilderSpec extends Specification {
         result.name == "Fred"
         result.age == 20
     }
+
+    void 'test build type with builder that has protected constructor and different target package'() {
+        given:
+        def introspection = BeanIntrospection.getIntrospection(TestBuildMe8)
+        def builder = introspection.builder()
+        def result = builder.with("name", "Fred").with("age", 20).build()
+
+
+        expect:
+        introspection.hasBuilder()
+        introspection.isBuildable()
+        result.name == "Fred"
+        result.age == 20
+    }
 }
