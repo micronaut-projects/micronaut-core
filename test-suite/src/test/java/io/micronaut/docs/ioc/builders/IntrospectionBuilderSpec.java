@@ -4,7 +4,6 @@ import io.micronaut.core.beans.BeanIntrospection;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IntrospectionBuilderSpec {
     @Test
@@ -20,6 +19,20 @@ class IntrospectionBuilderSpec {
         assertEquals(
             Person.builder().name("Fred").age(25).build(),
             person
+        );
+    }
+
+    @Test
+    void testSuperBuilder() {
+        BeanIntrospection<SubBuilder> introspection = BeanIntrospection.getIntrospection(SubBuilder.class);
+        BeanIntrospection.Builder<SubBuilder> builder = introspection.builder();
+        SubBuilder sub = builder
+            .with("foo", "fizz")
+            .with("bar", "buzz")
+            .build();
+        assertEquals(
+            new SubBuilder.Builder().bar("buzz").foo("fizz").build(),
+            sub
         );
     }
 }
