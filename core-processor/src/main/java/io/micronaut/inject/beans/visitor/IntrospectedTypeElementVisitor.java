@@ -336,7 +336,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     .onlyAccessible(classToBuild)
                     .onlyInstance()
                     .named(n -> Arrays.stream(writePrefixes).anyMatch(n::startsWith))
-                    .filter(m -> m.getGenericReturnType().getName().equals(builderType.getName()) && m.getParameters().length <= 1);
+                    .filter(m ->
+                        builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
+                    );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);
                 writers.put(builderWriter.getBeanType().getClassName(), builderWriter);

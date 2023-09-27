@@ -1,4 +1,4 @@
-package io.micronaut.docs.ioc.builders;
+package io.micronaut.inject.visitor.beans.builder;
 
 import io.micronaut.core.annotation.Introspected;
 
@@ -19,7 +19,7 @@ public class SubBuilder extends SuperBuilder {
     public String toString() {
         return "SubBuilder{" +
             "foo='" + foo + '\'' +
-            ",bar='" + bar + '\'' +
+            ", bar='" + bar + '\'' +
             '}';
     }
 
