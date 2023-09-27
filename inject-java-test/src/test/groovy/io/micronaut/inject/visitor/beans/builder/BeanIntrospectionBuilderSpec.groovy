@@ -2,7 +2,10 @@ package io.micronaut.inject.visitor.beans.builder
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.exceptions.IntrospectionException
+import org.junit.jupiter.api.Test
 import spock.lang.Specification
+
+import static org.junit.jupiter.api.Assertions.assertEquals
 
 class BeanIntrospectionBuilderSpec extends Specification {
 
@@ -160,5 +163,18 @@ class BeanIntrospectionBuilderSpec extends Specification {
         introspection.isBuildable()
         result.name == "Fred"
         result.age == 20
+    }
+
+    void "test super builder"() {
+        given:
+        BeanIntrospection<SubBuilder> introspection = BeanIntrospection.getIntrospection(SubBuilder.class)
+        BeanIntrospection.Builder<SubBuilder> builder = introspection.builder()
+        SubBuilder sub = builder
+                .with("foo", "fizz")
+                .with("bar", "buzz")
+                .build()
+
+        expect:
+        sub.toString() == new SubBuilder.Builder().bar("buzz").foo("fizz").build().toString()
     }
 }
