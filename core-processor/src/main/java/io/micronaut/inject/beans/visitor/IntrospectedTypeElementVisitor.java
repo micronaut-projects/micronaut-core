@@ -312,12 +312,21 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     builderMetadata,
                     context
                 );
+                ClassElement callingType = ClassElement.of(builderWriter.getIntrospectionName());
                 if (defaultConstructor != null) {
-                    builderWriter.visitDefaultConstructor(defaultConstructor);
+                    if (defaultConstructor.isAccessible(callingType)) {
+                        builderWriter.visitDefaultConstructor(defaultConstructor);
+                    } else {
+                        findBuilderMethodOrFail(classToBuild, context, builderType, callingType, builderWriter);
+                    }
                 } else if (primaryConstructor != null) {
-                    builderWriter.visitConstructor(primaryConstructor);
+                    if (primaryConstructor.isAccessible(callingType)) {
+                        builderWriter.visitDefaultConstructor(primaryConstructor);
+                    } else {
+                        findBuilderMethodOrFail(classToBuild, context, builderType, callingType, builderWriter);
+                    }
                 } else {
-                    context.fail("No accessible constructor found for builder: " + builderType.getName(), classToBuild);
+                    findBuilderMethodOrFail(classToBuild, context, builderType, callingType, builderWriter);
                 }
 
                 builderWriter.visitBeanMethod(creatorMethodElement);
@@ -327,13 +336,30 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     .onlyAccessible(classToBuild)
                     .onlyInstance()
                     .named(n -> Arrays.stream(writePrefixes).anyMatch(n::startsWith))
-                    .filter(m -> m.getGenericReturnType().getName().equals(builderType.getName()) && m.getParameters().length <= 1);
+                    .filter(m ->
+                        builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
+                    );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);
                 writers.put(builderWriter.getBeanType().getClassName(), builderWriter);
             } else {
                 context.fail("No build method found in builder: " + builderType.getName(), classToBuild);
             }
+        }
+    }
+
+    private static void findBuilderMethodOrFail(ClassElement classToBuild, VisitorContext context, ClassElement builderType, ClassElement callingType, BeanIntrospectionWriter builderWriter) {
+        // try find builder method
+        MethodElement methodElement = classToBuild.getEnclosedElement(
+            ElementQuery.ALL_METHODS
+                .onlyStatic()
+                .onlyAccessible(callingType)
+                .filter(m -> m.getGenericReturnType().isAssignable(builderType) && !m.hasParameters())
+        ).orElse(null);
+        if (methodElement == null) {
+            context.fail("No accessible constructor or builder() method found for builder: " + builderType.getName(), classToBuild);
+        } else {
+            builderWriter.visitConstructor(methodElement);
         }
     }
 

@@ -39,6 +39,7 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -210,11 +211,11 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
 
         @Override
         public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-            return read0(byteBuffer);
+            return read0(byteBuffer, getCharset(mediaType));
         }
 
-        private String read0(ByteBuffer<?> byteBuffer) {
-            String s = byteBuffer.toString(applicationConfiguration.getDefaultCharset());
+        private String read0(ByteBuffer<?> byteBuffer, Charset charset) {
+            String s = byteBuffer.toString(charset);
             if (byteBuffer instanceof ReferenceCounted rc) {
                 rc.release();
             }
@@ -224,7 +225,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         @Override
         public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
             try {
-                return new String(inputStream.readAllBytes(), applicationConfiguration.getDefaultCharset());
+                return new String(inputStream.readAllBytes(), getCharset(mediaType));
             } catch (IOException e) {
                 throw new CodecException("Failed to read InputStream", e);
             }
@@ -234,7 +235,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
             try {
-                outputStream.write(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
+                outputStream.write(object.toString().getBytes(getCharset(mediaType)));
             } catch (IOException e) {
                 throw new CodecException("Failed to write OutputStream", e);
             }
@@ -243,12 +244,16 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         @Override
         public ByteBuffer<?> writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
-            return bufferFactory.wrap(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
+            return bufferFactory.wrap(object.toString().getBytes(getCharset(mediaType)));
         }
 
         @Override
         public Publisher<Object> readChunked(Argument<Object> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-            return Flux.from(input).map(this::read0);
+            return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType)));
+        }
+
+        private Charset getCharset(MediaType mediaType) {
+            return mediaType.getCharset().orElseGet(applicationConfiguration::getDefaultCharset);
         }
     }
 

@@ -442,7 +442,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                         throw new IntrospectionException("No build method found in builder: " + builderClass.getName());
                     } else {
                         BeanMethod<Object, Object>[] builderMethods = beanMethods.stream()
-                            .filter(m -> m.getReturnType().getType().equals(builderIntrospection.getBeanType()))
+                            .filter(m ->
+                                m.getReturnType().getType().isAssignableFrom(builderIntrospection.getBeanType())
+                            )
                             .toArray(BeanMethod[]::new);
 
                         @NonNull Argument<?>[] arguments = Arrays.stream(builderMethods)

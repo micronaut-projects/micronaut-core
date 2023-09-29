@@ -93,7 +93,6 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         if (!(beanContext instanceof ApplicationContext)) {
             return;
         }
-
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
