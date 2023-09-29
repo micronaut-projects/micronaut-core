@@ -225,7 +225,8 @@ abstract class PoolResizer {
     }
 
     final void addPendingRequest(PoolSink<ConnectionManager.PoolHandle> sink) {
-        if (pendingRequests.size() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
+        int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
+        if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
             sink.tryEmitError(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
             return;
         }

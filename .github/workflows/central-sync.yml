@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/wrapper-validation-action@v1

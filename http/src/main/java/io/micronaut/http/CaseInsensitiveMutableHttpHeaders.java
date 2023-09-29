@@ -193,6 +193,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
         //  HTAB           = %x09 ; horizontal tab
         //  See: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
         //  And: https://datatracker.ietf.org/doc/html/rfc5234#appendix-B.1
+        if (value.isEmpty()) {
+            return -1;
+        }
         int b = value.charAt(0);
         if (b < 0x21 || b == 0x7F) {
             return 0;
