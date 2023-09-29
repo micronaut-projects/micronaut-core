@@ -543,5 +543,80 @@ class DefaultConnectionPool implements ConnectionPool {
         testPropBean.builder.build().getMaxConcurrency() == 123
     }
 
+    void "test configuration builder with both getters and setters and no prefixes"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+package cpbtest11
 
+import io.micronaut.context.annotation.*
+
+@ConfigurationProperties("pool")
+final class PoolConfig {
+
+    @ConfigurationBuilder(prefixes = [""])
+    public ConnectionPool.Builder builder = DefaultConnectionPool.builder()
+
+}
+
+interface ConnectionPool {
+
+    interface Builder {
+        Integer maxConcurrency()
+        Builder maxConcurrency(Integer maxConcurrency)
+        ConnectionPool build()
+    }
+
+    int getMaxConcurrency()
+}
+
+class DefaultConnectionPool implements ConnectionPool {
+    private final int maxConcurrency
+
+    DefaultConnectionPool(int maxConcurrency) {
+        this.maxConcurrency = maxConcurrency
+    }
+
+    static ConnectionPool.Builder builder() {
+        return new DefaultBuilder()
+    }
+
+    @Override
+    int getMaxConcurrency() {
+        return maxConcurrency
+    }
+
+    private static class DefaultBuilder implements ConnectionPool.Builder {
+
+        private int maxConcurrency
+
+        private DefaultBuilder() {
+        }
+
+        @Override
+        ConnectionPool.Builder maxConcurrency(Integer maxConcurrency) {
+            this.maxConcurrency = maxConcurrency
+            return this
+        }
+
+        @Override
+        Integer maxConcurrency() {
+            return maxConcurrency
+        }
+
+        ConnectionPool build() {
+            return new DefaultConnectionPool(maxConcurrency)
+        }
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        testPropBean.builder.build().getMaxConcurrency() == 123
+    }
 }

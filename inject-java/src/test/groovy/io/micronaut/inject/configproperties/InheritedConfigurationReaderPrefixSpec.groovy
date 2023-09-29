@@ -21,12 +21,12 @@ import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractTypeElementSpec {
 
-    void "property path is broken because alias is pointing to another alias"() {
+    void "property path is inherited because the alias for prefix was not specified without base prefix"() {
         given:
             BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
-@TestEndpoint1("simple")
+@TestEndpoint1()
 class MyBean  {
     String myValue;
 
@@ -72,15 +72,15 @@ class MyBean  {
             beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
             def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
             metadata.hasAnnotation(Property)
-            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+            metadata.getValue(Property, "name", String).get() == 'simple.my-value'
     }
 
-    void "property path is broken because alias is pointing to another alias 2"() {
+    void "property path is inherited because the alias for prefix was not specified"() {
         given:
             BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
-@TestEndpoint3("simple")
+@TestEndpoint3()
 class MyBean  {
     String myValue;
 
@@ -99,7 +99,7 @@ class MyBean  {
             beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
             def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
             metadata.hasAnnotation(Property)
-            metadata.getValue(Property, "name", String).get() == 'endpoints.simple.my-value'
+            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
     }
 
     void "property path is overriding the existing one"() {
