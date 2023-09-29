@@ -13,5 +13,5 @@ dependencies {
 
     implementation "org.tomlj:tomlj:1.1.0"
     implementation "me.champeau.gradle:japicmp-gradle-plugin:0.4.2"
-    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.26"
+    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.27"
 }
