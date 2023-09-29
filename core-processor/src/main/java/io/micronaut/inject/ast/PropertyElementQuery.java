@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.context.annotation.BeanProperties;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -26,10 +24,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -67,8 +63,6 @@ public final class PropertyElementQuery {
      */
     public static @NonNull PropertyElementQuery of(@NonNull AnnotationMetadata annotationMetadata) {
         PropertyElementQuery conf = new PropertyElementQuery();
-        Set<String> includes = new HashSet<>();
-        Set<String> excludes = new HashSet<>();
 
         AnnotationValue<BeanProperties> annotation = annotationMetadata.getAnnotation(BeanProperties.class);
         if (annotation != null) {
@@ -84,21 +78,11 @@ public final class PropertyElementQuery {
             annotation.booleanValue(BeanProperties.MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS)
                 .ifPresent(conf::allowSetterWithMultipleArgs);
 
-            includes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.MEMBER_INCLUDES)));
-            excludes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.MEMBER_EXCLUDES)));
+            conf.includes(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_INCLUDES)));
+            conf.excludes(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_EXCLUDES)));
 
             conf.excludedAnnotations(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS)));
         }
-
-        // TODO: investigate why aliases aren't propagated
-        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.MEMBER_INCLUDES)));
-        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.MEMBER_EXCLUDES)));
-
-        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.MEMBER_INCLUDES)));
-        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.MEMBER_EXCLUDES)));
-
-        conf.includes(includes);
-        conf.excludes(excludes);
 
         String[] readPrefixes = annotationMetadata.stringValues(AccessorsStyle.class, "readPrefixes");
         if (ArrayUtils.isNotEmpty(readPrefixes)) {

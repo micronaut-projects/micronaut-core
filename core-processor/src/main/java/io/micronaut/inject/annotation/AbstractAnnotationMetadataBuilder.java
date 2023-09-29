@@ -1064,7 +1064,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (!introducedAliasForAnnotations.isEmpty()) {
             newAnn = newAnn.withAnnotationValue(
                     newAnn.getAnnotationValue().mutate()
-                            .stereotypes(
+                            .stereotypesPrepend(
                                     introducedAliasForAnnotations.stream()
                                             .flatMap(a -> processAnnotation(context, a))
                                             .<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue)

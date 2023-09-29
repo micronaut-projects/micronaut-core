@@ -178,6 +178,22 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
+     * Adds stereotypes of the annotation at the beginning.
+     *
+     * @param newStereotypes The stereotypes
+     * @return This builder
+     * @since 4.1.9
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> stereotypesPrepend(@NonNull Collection<AnnotationValue<?>> newStereotypes) {
+        if (stereotypes == null) {
+            stereotypes = new ArrayList<>(10);
+        }
+        stereotypes.addAll(0, newStereotypes);
+        return this;
+    }
+
+    /**
      * Replaces stereotypes of the annotation.
      *
      * @param newStereotypes The stereotypes
