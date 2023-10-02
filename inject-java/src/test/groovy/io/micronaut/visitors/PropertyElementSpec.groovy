@@ -278,19 +278,15 @@ class Parameters {
 
         def beanProperty = parameter.type.beanProperties.get(0)
         beanProperty.type.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
         beanProperty.field.get().type.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
         beanProperty.readMethod.get().returnType.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
         beanProperty.writeMethod.get().parameters[0].type.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
     }
@@ -358,15 +354,12 @@ class Parameters {
 
         def beanProperty = parameter.type.beanProperties.get(0)
         beanProperty.type.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
         beanProperty.field.get().type.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
         beanProperty.field.get().genericType.annotationNames.sort() == [
-                'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
     }

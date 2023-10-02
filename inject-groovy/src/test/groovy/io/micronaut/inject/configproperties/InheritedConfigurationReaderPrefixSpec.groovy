@@ -21,12 +21,12 @@ import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {
 
-    void "property path is inherited because the alias for prefix was not specified without base prefix"() {
+    void "property path is broken because alias is pointing to another alias"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
-@TestEndpoint1()
+@TestEndpoint1("simple")
 class MyBean  {
     String myValue
 }
@@ -34,10 +34,11 @@ class MyBean  {
 """)
 
         expect:
+        // NOTE: This is unsupported scenario, this test is only for tracking the current output.
         beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
         def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
         metadata.hasAnnotation(Property)
-        metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+        metadata.getValue(Property, "name", String).get() == 'simple.my-value'
     }
 
     void "property path is overriding the existing one without base prefix"() {
@@ -59,12 +60,12 @@ class MyBean  {
         metadata.getValue(Property, "name", String).get() == 'simple.my-value'
     }
 
-    void "property path is inherited because the alias for prefix was not specified"() {
+    void "property path is broken because alias is pointing to another alias 2"() {
         given:
             BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
-@TestEndpoint3()
+@TestEndpoint3("simple")
 class MyBean  {
     String myValue
 }
@@ -72,10 +73,11 @@ class MyBean  {
 """)
 
         expect:
+            // NOTE: This is unsupported scenario, this test is only for tracking the current output.
             beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
             def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
             metadata.hasAnnotation(Property)
-            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+            metadata.getValue(Property, "name", String).get() == 'endpoints.simple.my-value'
     }
 
     void "property path is overriding the existing one"() {
