@@ -928,7 +928,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         } else {
             Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType);
             defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues, new HashMap<>());
-            if (defaultValues != null) {
+            if (defaultValues != null && !defaultValues.isEmpty()) {
+                // Don't cache empty values is it can be invalid annotation type provided by KSP or Groovy
                 // Add the default for any retention type annotation
                 ANNOTATION_DEFAULTS.put(annotationName, new LinkedHashMap<>(defaultValues));
             } else {
@@ -1097,10 +1098,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         if (!stereotypesProvided) {
             // The annotation doesn't have the stereotypes set manually
-            stereotypes = CollectionUtils.concat(
-                stereotypes,
-                extractStereotypes(context, processedAnnotation)
-            );
+            // In this case `stereotypes` are aliases
+            List<ProcessedAnnotation> extractedStereotypes = extractStereotypes(context, processedAnnotation);
+            stereotypes = Stream.concat(
+                // Some implementation like KSP and Groovy cannot extract proper compiler annotation type from an annotation name (@AliasFor(annotationName))
+                // That prevents us to properly extract the annotation defaults
+                // To fix it for the aliases we will try to set the annotation type and the defaults from the stereotype of the same annotation if present
+                stereotypes.stream().map(annotation -> {
+                    for (ProcessedAnnotation extractedStereotype : extractedStereotypes) {
+                        if (extractedStereotype.getAnnotationValue().getAnnotationName().equals(annotation.getAnnotationValue().getAnnotationName())) {
+                            return annotation
+                                .withAnnotationType(extractedStereotype.annotationType)
+                                .mutateAnnotationValue(builder -> builder.defaultValues(extractedStereotype.annotationValue.getDefaultValues()));
+                        }
+                    }
+                    return annotation;
+                }),
+                extractedStereotypes.stream()
+            ).toList();
         }
         List<ProcessedAnnotation> addedStereotypes = getAddedStereotypes(context, processedAnnotation.annotationType);
         if (!addedStereotypes.isEmpty()) {
@@ -1113,12 +1128,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
-        if (processedAnnotation.annotationType != null && processedAnnotation.getAnnotationValue().getDefaultValues() == null) {
+        if (processedAnnotation.getAnnotationValue().getDefaultValues() != null) {
+            return processedAnnotation;
+        }
+        if (processedAnnotation.annotationType != null) {
             Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(
                     processedAnnotation.getAnnotationValue().getAnnotationName(),
                     processedAnnotation.annotationType
             );
             processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(annotationDefaults));
+        } else {
+            processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(Collections.emptyMap()));
         }
         return processedAnnotation;
     }
@@ -1554,7 +1574,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return modify(annotationMetadata, metadata -> {
             addAnnotations(
                     metadata,
-                    Stream.of(toProcessedAnnotation(annotationValue)),
+                    Stream.of(toProcessedAnnotation(annotationValue)).map(this::addDefaults),
                     true,
                     false
             );
@@ -1708,6 +1728,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         public ProcessedAnnotation withAnnotationValue(AnnotationValue<?> annotationValue) {
+            return new ProcessedAnnotation(annotationType, annotationValue);
+        }
+
+        public ProcessedAnnotation withAnnotationType(T annotationType) {
             return new ProcessedAnnotation(annotationType, annotationValue);
         }
 
