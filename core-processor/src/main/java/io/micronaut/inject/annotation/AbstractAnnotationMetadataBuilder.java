@@ -1048,17 +1048,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationValue.getAnnotationName()) || context.isProcessed(annotationValue)) {
             return Stream.empty();
         }
-        // Check if the annotation has the stereotypes set manually
+        // Add annotation default values
+        processedAnnotation = addDefaults(processedAnnotation);
+        // Check if the annotation has the stereotypes set manually, before adding alias stereotypes
         boolean stereotypesProvided = annotationValue.getStereotypes() != null;
         // First we need to process aliases, those contribute stereotypes with higher priority
         processedAnnotation = processAliases(context, processedAnnotation);
 
         // The next invocation will invoke current method recursively till the stereotypes are processed.
         // That will build an annotation value tree with annotations and it's stereotypes.
-        ProcessedAnnotation annotationWithStereotypes = addStereotypes(context, processedAnnotation, stereotypesProvided);
+        processedAnnotation = addStereotypes(context, processedAnnotation, stereotypesProvided);
         // Next step is transforming, starting from the stereotypes moving up in the hierarchy.
-        return transform(context, annotationWithStereotypes)
-                .flatMap(this::flattenRepeatable);
+        return transform(context, processedAnnotation)
+                .flatMap(this::flattenRepeatable)
+                .map(this::addDefaults);
     }
 
     @NonNull
@@ -1084,33 +1087,40 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private ProcessedAnnotation addStereotypes(@NonNull ProcessingContext context,
                                                @NonNull ProcessedAnnotation processedAnnotation,
                                                boolean stereotypesProvided) {
-        AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
-        if (processedAnnotation.annotationType != null && annotationValue.getDefaultValues() == null) {
-            Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(
-                    annotationValue.getAnnotationName(),
-                    processedAnnotation.annotationType
-            );
-            processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(annotationDefaults));
-        }
-        List<ProcessedAnnotation> stereotypes;
-        if (stereotypesProvided) {
-            // The annotation has the stereotypes set manually
-            // Let's flatten repeatable
-            stereotypes = annotationValue.getStereotypes().stream()
+        List<ProcessedAnnotation> stereotypes = Collections.emptyList();
+        if (processedAnnotation.getAnnotationValue().getStereotypes() != null) {
+            stereotypes = processedAnnotation.getAnnotationValue().getStereotypes().stream()
                 .map(this::toProcessedAnnotation)
                 .flatMap(this::flattenRepeatable)
+                .map(this::addDefaults)
                 .toList();
-        } else {
-            stereotypes = extractStereotypes(context, processedAnnotation);
+        }
+        if (!stereotypesProvided) {
+            // The annotation doesn't have the stereotypes set manually
+            stereotypes = CollectionUtils.concat(
+                stereotypes,
+                extractStereotypes(context, processedAnnotation)
+            );
         }
         List<ProcessedAnnotation> addedStereotypes = getAddedStereotypes(context, processedAnnotation.annotationType);
         if (!addedStereotypes.isEmpty()) {
             stereotypes = CollectionUtils.concat(stereotypes, addedStereotypes);
         }
-
-        return processedAnnotation.withStereotypes(
-                stereotypes
+        List<ProcessedAnnotation> finalStereotypes = stereotypes;
+        return processedAnnotation.mutateAnnotationValue(builder ->
+            builder.replaceStereotypes(finalStereotypes.stream().<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue).toList())
         );
+    }
+
+    private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
+        if (processedAnnotation.annotationType != null && processedAnnotation.getAnnotationValue().getDefaultValues() == null) {
+            Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(
+                    processedAnnotation.getAnnotationValue().getAnnotationName(),
+                    processedAnnotation.annotationType
+            );
+            processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(annotationDefaults));
+        }
+        return processedAnnotation;
     }
 
     @NonNull
@@ -1123,13 +1133,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             // The annotation is not on the classpath
             // We set an empty collection to mark that stereotypes are processed
             return Collections.emptyList();
-        } else if (annotationValue.getDefaultValues() == null) {
-            Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(
-                    annotationValue.getAnnotationName(),
-                    processedAnnotation.annotationType
-            );
-            processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(annotationDefaults));
         }
+
         List<? extends A> nativeStereotypes = getAnnotationsForType(processedAnnotation.annotationType);
         if (nativeStereotypes.isEmpty()) {
             // We set an empty collection to mark that stereotypes are processed
@@ -1242,6 +1247,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         Map<CharSequence, Object> annotationDefaults = annotationValue.getDefaultValues();
         if (annotationDefaults != null) {
             mutableAnnotationMetadata.addDefaultAnnotationValues(annotationName, annotationDefaults, annotationValue.getRetentionPolicy());
+        } else {
+            throw new IllegalStateException("Annotation should contain default values and an empty list " + annotationValue.getAnnotationName());
         }
 
         T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
@@ -1404,7 +1411,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         AnnotationRemapper annotationRemapper = remappers.next();
         ProcessingContext newContext = context.withProcessedVisitor(annotationRemapper.getClass());
-        return annotationRemapper.remap(annotationValue, context.visitorContext).stream().flatMap(newAnnotationValue -> {
+        List<AnnotationValue<?>> annotationValues = annotationRemapper.remap(annotationValue, context.visitorContext);
+        return annotationValues.stream().flatMap(newAnnotationValue -> {
             if (newAnnotationValue == annotationValue) {
                 // Value didn't change, continue with other remappers
                 return remapAnnotation(newContext, processedAnnotation, annotationValue, remappers);
@@ -1439,7 +1447,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         AnnotationTransformer<K> annotationTransformer = transformers.next();
         ProcessingContext newContext = context.withProcessedVisitor(annotationTransformer.getClass());
-        return annotationTransformer.transform(annotationValue, context.visitorContext).stream().flatMap(newAnnotationValue -> {
+        List<AnnotationValue<?>> transform = annotationTransformer.transform(annotationValue, context.visitorContext);
+        return transform.stream().flatMap(newAnnotationValue -> {
             if (newAnnotationValue == annotationValue) {
                 // Value didn't change, continue with other transformers
                 return transformAnnotation(newContext, processedAnnotation, annotationValue, transformers);
@@ -1704,14 +1713,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         public ProcessedAnnotation mutateAnnotationValue(Function<AnnotationValueBuilder<?>, AnnotationValueBuilder<?>> fn) {
             return new ProcessedAnnotation(annotationType, fn.apply(annotationValue.mutate()).build());
-        }
-
-        public ProcessedAnnotation withStereotypes(List<ProcessedAnnotation> stereotypes) {
-            return new ProcessedAnnotation(annotationType,
-                    annotationValue.mutate()
-                            .stereotypes(stereotypes.stream().<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue).toList())
-                            .build()
-            );
         }
 
         @Nullable

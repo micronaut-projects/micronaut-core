@@ -66,6 +66,7 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
@@ -401,7 +402,7 @@ public final class AnnotationMetadataSupport {
      * @param defaultValues The default values
      */
     static void registerDefaultValues(String annotation, Map<CharSequence, Object> defaultValues) {
-        if (StringUtils.isNotEmpty(annotation)) {
+        if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
             ANNOTATION_DEFAULTS.put(annotation, defaultValues);
         }
     }
