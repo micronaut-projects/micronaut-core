@@ -49,6 +49,7 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
         MediaType.APPLICATION_HAL_JSON_TYPE,
         MediaType.APPLICATION_JSON_GITHUB_TYPE,
         MediaType.APPLICATION_JSON_FEED_TYPE,
+        MediaType.APPLICATION_JSON_PATCH_TYPE,
         MediaType.APPLICATION_JSON_PROBLEM_TYPE
     );
 

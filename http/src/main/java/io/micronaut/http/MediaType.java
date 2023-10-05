@@ -183,6 +183,18 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_JSON_FEED_TYPE = new MediaType(MediaType.APPLICATION_JSON_FEED);
 
     /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6902/">JSON Patch</a>
+     * JSON Patch: application/json-patch+json.
+     */
+    public static final String APPLICATION_JSON_PATCH = "application/json-patch+json";
+
+    /**
+     * JSON Patch: application/json-patch+json.
+     */
+    public static final MediaType APPLICATION_JSON_PATCH_TYPE = new MediaType(MediaType.APPLICATION_JSON_PATCH);
+
+
+    /**
      * JSON Feed: application/problem+json.
      */
     public static final String APPLICATION_JSON_PROBLEM = "application/problem+json";
@@ -571,6 +583,8 @@ public class MediaType implements CharSequence {
                 return APPLICATION_JSON_FEED_TYPE;
             case APPLICATION_JSON_GITHUB:
                 return APPLICATION_JSON_GITHUB_TYPE;
+            case APPLICATION_JSON_PATCH:
+                return APPLICATION_JSON_PATCH_TYPE;
             case APPLICATION_JSON_PROBLEM:
                 return APPLICATION_JSON_PROBLEM_TYPE;
             case APPLICATION_YAML:
