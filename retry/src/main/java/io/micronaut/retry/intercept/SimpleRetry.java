@@ -26,6 +26,8 @@ import java.util.OptionalDouble;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.lang.StrictMath.pow;
+
 /**
  * A context object for {@link io.micronaut.retry.annotation.Retryable} operations.
  *
@@ -170,8 +172,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     @Internal
     public long nextDelay() {
         double multiplier = getMultiplier().orElse(1.0);
-        int current = attemptNumber.get() + 1;
-        long delay = (long) (getDelay().toMillis() * multiplier) * current;
+        long delay = (long) ((getDelay().toMillis()) * pow(multiplier, attemptNumber.get() - 1));
         overallDelay.addAndGet(delay);
         return delay;
     }
