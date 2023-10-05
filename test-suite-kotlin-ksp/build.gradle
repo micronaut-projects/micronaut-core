@@ -80,6 +80,10 @@ configurations.testRuntimeClasspath {
     }
 }
 
+//kotlin {
+//    kotlinDaemonJvmArgs = ["-Xdebug","-Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=y"]
+//}
+
 tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "17"
 }

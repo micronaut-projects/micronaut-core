@@ -210,6 +210,23 @@ class Test {
         metadata.getValue(ConfigurationReader, String).get() == 'test'
     }
 
+    void "test alias for has correct value for aliased member with default value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@MyStereotypeWithDefaultValue("test")
+class Test {
+}
+''')
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(ConfigurationReader)
+        metadata.getValue(ConfigurationReader, String).get() == 'test'
+    }
+
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\

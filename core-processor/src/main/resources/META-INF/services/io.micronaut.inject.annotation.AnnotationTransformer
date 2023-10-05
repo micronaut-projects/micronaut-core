@@ -9,7 +9,6 @@ io.micronaut.inject.annotation.internal.JavaxNullableTransformer
 io.micronaut.inject.annotation.internal.JavaxNonnullTransformer
 io.micronaut.inject.beans.visitor.IntrospectedToBeanPropertiesTransformer
 io.micronaut.inject.annotation.internal.AndroidxNullableTransformer
-io.micronaut.inject.annotation.internal.JakartaNullableTransformer
 io.micronaut.inject.annotation.internal.JdtNullableTransformer
 io.micronaut.inject.annotation.internal.JspecifyNullableTransformer
 io.micronaut.inject.annotation.internal.ReactivexNullableTransformer
