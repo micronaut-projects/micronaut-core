@@ -18,41 +18,40 @@ class TextPlainController {
     @Get('/boolean')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String bool() {
-        return Boolean.TRUE.toString() // <2>
+        Boolean.TRUE.toString() // <2>
     }
 
     @Get('/boolean/mono')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     @SingleResult
     Publisher<String> monoBool() {
-        return Mono.just(Boolean.TRUE.toString()) // <2>
+        Mono.just(Boolean.TRUE.toString()) // <2>
     }
 
     @Get('/boolean/flux')
     @Produces(MediaType.TEXT_PLAIN)
     @SingleResult
     Publisher<String> fluxBool() {
-        return Flux.just(Boolean.TRUE.toString())
+        Flux.just(Boolean.TRUE.toString())
     }
 
     @Get('/bigdecimal')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String bigDecimal() {
-        return BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
+        BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
     }
-
 //tag::method[]
     @Get('/date')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String date() {
-        return new Calendar.Builder().setDate(2023,7,4).build().toString() // <2>
+        new Calendar.Builder().setDate(2023,7,4).build().toString() // <2>
     }
 //end::method[]
 
     @Get('/person')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String person() {
-        return new Person('Dean Wette', 65).toString() // <2>
+        new Person('Dean Wette', 65).toString() // <2>
     }
 //tag::classclosing[]
 }
