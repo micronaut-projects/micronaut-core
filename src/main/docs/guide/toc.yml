@@ -106,6 +106,7 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding
+  plainTextResponses: Plain Text Responses
   datavalidation:
     title: Data Validation
     validationGroups: Validation Groups
