@@ -1,4 +1,3 @@
-== Text Binding
 
 Micronaut Framework supports "text/plain" Content-Type as a way of binding to plain text. However, `text/plain` messages are more restrictive about allowed types, compared to Micronaut 3.x. To return plain text responses for answers other than strings, manually call the object `toString()` method.
 snippet::io.micronaut.docs.http.server.response.textplain.TextPlainController[tags="classopening,method,classclosing", title="HTTP Response with text/plain Content-Type"]
