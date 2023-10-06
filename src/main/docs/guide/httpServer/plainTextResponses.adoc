@@ -7,5 +7,5 @@ snippet::io.micronaut.docs.http.server.response.textplain.TextPlainController[ta
 <1> The Controller endpoint specifies `text/plain` as the Content-Type.
 <2> The endpoint returns type `String`, and the implementation converts the data to a string explicitly using the `toString()` method.
 
-NOTE: For Micronaut Framework 3.x any type was allowed. For writing, the object was converted using `toString`, and for reading, the object was converted using `ConversionService`. This is not permitted anymore for Micronaut Framework 4.x, except for some restricted types. The recommended approach is to move to `application/json` as the content type. `toString` is not a stable serialization format, JSON is more reliable. Alternatively, set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the old – but not recommended – behavior.
+NOTE: For Micronaut Framework 3.x any type was allowed. For writing, the object was converted using `toString`, and for reading, the object was converted using `ConversionService`. This is not permitted anymore for Micronaut Framework 4.x, except for some restricted types. Alternatively, set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the old – but not recommended – behavior.
 
