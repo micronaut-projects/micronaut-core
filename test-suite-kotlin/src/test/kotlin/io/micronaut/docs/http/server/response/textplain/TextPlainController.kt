@@ -14,10 +14,11 @@ import java.util.*
 import kotlin.Long
 import kotlin.String
 
-// tag::class[]
 @Requires(property = "spec.name", value = "TextPlainControllerTest")
+//tag::classopening[]
 @Controller("/txt")
 class TextPlainController {
+//end::classopening[]
     @Get("/boolean")
     @Produces(MediaType.TEXT_PLAIN) // <1>
     fun bool(): String {
@@ -44,16 +45,19 @@ class TextPlainController {
         return BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
     }
 
+//tag::method[]
     @Get("/date")
     @Produces(MediaType.TEXT_PLAIN) // <1>
     fun date(): String {
         return Calendar.Builder().setDate(2023, 7, 4).build().toString() // <2>
     }
 
+//end::method[]
     @Get("/person")
     @Produces(MediaType.TEXT_PLAIN) // <1>
     fun person(): String {
         return Person("Dean Wette", 65).toString() // <2>
     }
+//tag::classclosing[]
 }
-// end::class[]
+//end::classclosing[]

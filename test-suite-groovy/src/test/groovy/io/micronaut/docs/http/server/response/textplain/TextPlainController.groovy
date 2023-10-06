@@ -11,10 +11,10 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 @Requires(property = 'spec.name', value = 'TextPlainControllerTest')
-// tag::class[]
+//tag::classopening[]
 @Controller('/txt')
 class TextPlainController {
-
+//end::classopening[]
     @Get('/boolean')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String bool() {
@@ -41,16 +41,19 @@ class TextPlainController {
         return BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
     }
 
+//tag::method[]
     @Get('/date')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String date() {
         return new Calendar.Builder().setDate(2023,7,4).build().toString() // <2>
     }
+//end::method[]
 
     @Get('/person')
     @Produces(MediaType.TEXT_PLAIN) // <1>
     String person() {
         return new Person('Dean Wette', 65).toString() // <2>
     }
+//tag::classclosing[]
 }
-// end::class[]
+//end::classclosing[]
