@@ -21,43 +21,31 @@ class TextPlainController {
 //end::classopening[]
     @Get("/boolean")
     @Produces(MediaType.TEXT_PLAIN) // <1>
-    fun bool(): String {
-        return true.toString() // <2>
-    }
+    fun bool(): String = true.toString() // <2>
 
     @Get("/boolean/mono")
     @Produces(MediaType.TEXT_PLAIN) // <1>
     @SingleResult
-    fun monoBool(): Publisher<String> {
-        return Mono.just(true.toString()) // <2>
-    }
+    fun monoBool(): Publisher<String> = Mono.just(true.toString()) // <2>
 
     @Get("/boolean/flux")
     @Produces(MediaType.TEXT_PLAIN) // <1>
     @SingleResult
-    fun fluxBool(): Publisher<String> {
-        return Flux.just(true.toString()) // <2>
-    }
+    fun fluxBool(): Publisher<String> = Flux.just(true.toString()) // <2>
 
     @Get("/bigdecimal")
     @Produces(MediaType.TEXT_PLAIN) // <1>
-    fun bigDecimal(): String {
-        return BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
-    }
+    fun bigDecimal(): String = BigDecimal.valueOf(Long.MAX_VALUE).toString() // <2>
 
 //tag::method[]
     @Get("/date")
     @Produces(MediaType.TEXT_PLAIN) // <1>
-    fun date(): String {
-        return Calendar.Builder().setDate(2023, 7, 4).build().toString() // <2>
-    }
-
+    fun date(): String = Calendar.Builder().setDate(2023, 7, 4).build().toString() // <2>
 //end::method[]
     @Get("/person")
     @Produces(MediaType.TEXT_PLAIN) // <1>
-    fun person(): String {
-        return Person("Dean Wette", 65).toString() // <2>
-    }
+    fun person(): String = Person("Dean Wette", 65).toString() // <2>
 //tag::classclosing[]
 }
 //end::classclosing[]
+
