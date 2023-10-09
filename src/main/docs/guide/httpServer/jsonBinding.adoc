@@ -152,4 +152,3 @@ jackson:
     useBigIntegerForInts: true
     useBigDecimalForFloats: true
 ----
-

@@ -255,6 +255,55 @@ class Test {
         test.baz == null //deprecated properties not settable
     }
 
+    void "test with setters without arguments and do not allow zero args"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.lang.Deprecated;
+
+@ConfigurationProperties("test")
+class MyProperties {
+
+    @ConfigurationBuilder
+    Test test = new Test();
+
+
+}
+
+class Test {
+    private Boolean foo;
+    private Boolean bar;
+
+    public void setFoo() { this.foo = true;}
+    public Boolean getFoo() { return this.foo; }
+
+    public void setBar(Boolean bar) { this.bar = bar;}
+    public Boolean getBar() { return this.bar; }
+}
+''')
+
+        when:
+        InstantiatableBeanDefinition factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'test.foo':'true',
+                'test.bar':'true',
+        )
+        def bean = factory.instantiate(applicationContext)
+
+        then:
+        bean != null
+        bean.test != null
+
+        when:
+        def test = bean.test
+
+        then:
+        test.foo == null
+        test.bar == true
+    }
+
     void "test different inject types for config properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''

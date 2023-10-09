@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -28,8 +29,11 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -73,7 +77,15 @@ public class HeadersTest {
                     .header(HttpHeaders.ETAG, "B"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
-                .body("2")
+                    .assertResponse(response -> {
+                        Optional<String> eTagsOptional = response.getBody(String.class);
+                        assertTrue(eTagsOptional.isPresent());
+                        String json = eTagsOptional.get();
+                        assertTrue(
+                            json.equals("{\"headers\":[\"A\",\"B\"]}") ||
+                                json.equals("{\"headers\":[\"A,B\"]}")
+                        );
+                    })
                 .build()));
     }
 
@@ -90,9 +102,13 @@ public class HeadersTest {
             return "{\"status\":\"" + foo + foo2 + "\"}";
         }
 
-        @Get(value = "/receive-multiple-headers", processes = MediaType.TEXT_PLAIN)
-        String receiveMultipleHeaders(HttpRequest<?> request) {
-            return String.valueOf(request.getHeaders().getAll(HttpHeaders.ETAG).size());
+        @Get(value = "/receive-multiple-headers")
+        ETags receiveMultipleHeaders(HttpRequest<?> request) {
+            return new ETags(request.getHeaders().getAll(HttpHeaders.ETAG));
         }
+    }
+
+    @Introspected
+    record ETags(List<String> headers) {
     }
 }

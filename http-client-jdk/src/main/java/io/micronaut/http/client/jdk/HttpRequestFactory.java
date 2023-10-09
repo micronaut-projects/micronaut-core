@@ -27,8 +27,12 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpRequest;
+import java.nio.charset.Charset;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Utility class to create {@link HttpRequest.Builder} from a Micronaut HTTP Request.
@@ -75,6 +79,8 @@ public final class HttpRequestFactory {
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence) {
                     return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                } else if (bodyValue instanceof Map<?, ?> mapBody) {
+                    return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
                 } else {
                     throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
                 }
@@ -108,6 +114,15 @@ public final class HttpRequestFactory {
             }
         }
         return HttpRequest.BodyPublishers.noBody();
+    }
+
+    private static String encodeBody(Map<?, ?> mapBody, Charset characterEncoding) {
+        return mapBody
+            .entrySet()
+            .stream()
+            .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+            .map(entry -> URLEncoder.encode(entry.getKey().toString(), characterEncoding) + "=" + URLEncoder.encode(entry.getValue().toString(), characterEncoding))
+            .collect(Collectors.joining("&"));
     }
 
     private static UnsupportedOperationException unsupportedBodyType(Class<?> clazz, String contentType) {
