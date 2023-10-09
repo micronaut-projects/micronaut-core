@@ -57,6 +57,7 @@ import java.io.OutputStream;
     MediaType.APPLICATION_HAL_JSON,
     MediaType.APPLICATION_JSON_GITHUB,
     MediaType.APPLICATION_JSON_FEED,
+    MediaType.APPLICATION_JSON_PATCH,
     MediaType.APPLICATION_JSON_PROBLEM
 })
 @Consumes({
@@ -65,6 +66,7 @@ import java.io.OutputStream;
     MediaType.APPLICATION_HAL_JSON,
     MediaType.APPLICATION_JSON_GITHUB,
     MediaType.APPLICATION_JSON_FEED,
+    MediaType.APPLICATION_JSON_PATCH,
     MediaType.APPLICATION_JSON_PROBLEM
 })
 @BootstrapContextCompatible

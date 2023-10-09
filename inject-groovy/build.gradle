@@ -20,6 +20,7 @@ dependencies {
     testRuntimeOnly libs.jakarta.el
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
+    testImplementation project(":retry")
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-test-utils")
     testImplementation project(":inject-groovy-test")

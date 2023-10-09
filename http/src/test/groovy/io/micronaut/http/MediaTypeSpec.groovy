@@ -33,6 +33,7 @@ class MediaTypeSpec extends Specification {
         MediaType.of('application/vnd.github+json') == MediaType.APPLICATION_JSON_GITHUB_TYPE
         MediaType.of('application/feed+json') == MediaType.APPLICATION_JSON_FEED_TYPE
         MediaType.of('application/problem+json') == MediaType.APPLICATION_JSON_PROBLEM_TYPE
+        MediaType.of('application/json-patch+json') == MediaType.APPLICATION_JSON_PATCH_TYPE
     }
 
     void "test media type"() {

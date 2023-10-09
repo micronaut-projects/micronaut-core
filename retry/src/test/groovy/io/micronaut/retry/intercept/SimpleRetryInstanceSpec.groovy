@@ -76,7 +76,7 @@ class SimpleRetryInstanceSpec extends Specification {
 
         then:
         retryContext.currentAttempt() == 1
-        retryContext.nextDelay() == 4000
+        retryContext.nextDelay() == 1000
 
 
         when:
@@ -85,7 +85,7 @@ class SimpleRetryInstanceSpec extends Specification {
         then:
 
         retryContext.currentAttempt() == 2
-        retryContext.nextDelay() == 6000
+        retryContext.nextDelay() == 2000
 
         when:
         !retryContext.canRetry(r)
@@ -93,7 +93,7 @@ class SimpleRetryInstanceSpec extends Specification {
         then:
 
         retryContext.currentAttempt() == 3
-        retryContext.nextDelay() == 8000
+        retryContext.nextDelay() == 4000
     }
 
     void "test retry context next delay is exponential with max delay"() {
@@ -101,7 +101,7 @@ class SimpleRetryInstanceSpec extends Specification {
         given:
         SimpleRetry retryContext = new SimpleRetry(
                 3,
-                1,
+                2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 Duration.of(3, ChronoUnit.SECONDS),
                 RuntimeException.class
@@ -113,15 +113,15 @@ class SimpleRetryInstanceSpec extends Specification {
 
         then:
         canRetry
-        retryContext.nextDelay() == 2000
+        retryContext.nextDelay() == 1000
 
 
         when:
-        retryContext.canRetry(r)
+        canRetry = retryContext.canRetry(r)
 
         then:
         canRetry
-        retryContext.nextDelay() == 3000
+        retryContext.nextDelay() == 2000
 
         when:
         canRetry = retryContext.canRetry(r)
