@@ -78,13 +78,12 @@ public class HeadersTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                     .assertResponse(response -> {
-                        Optional<ETags> eTagsOptional = response.getBody(ETags.class);
+                        Optional<String> eTagsOptional = response.getBody(String.class);
                         assertTrue(eTagsOptional.isPresent());
-                        List<String> headers = eTagsOptional.get().headers;
-                        assertNotNull(headers);
+                        String json = eTagsOptional.get();
                         assertTrue(
-                            (headers.size() == 2 && headers.contains("A") && headers.contains("B")) ||
-                                (headers.size() == 1 && headers.contains("A,B"))
+                            json.equals("{\"headers\":[\"A\",\"B\"]}") ||
+                                json.equals("{\"headers\":[\"A,B\"]}")
                         );
                     })
                 .build()));
