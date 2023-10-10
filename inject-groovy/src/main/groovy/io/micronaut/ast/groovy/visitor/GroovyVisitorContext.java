@@ -103,6 +103,11 @@ public class GroovyVisitorContext implements VisitorContext {
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
 
+    @Override
+    public Language getLanguage() {
+        return Language.GROOVY;
+    }
+
     @NonNull
     @Override
     public Iterable<URL> getClasspathResources(@NonNull String path) {
@@ -273,6 +278,11 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
         return outputVisitor.visitGeneratedFile(path, originatingElements);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
+        return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
     }
 
     @Override
