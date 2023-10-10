@@ -193,7 +193,6 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType APPLICATION_JSON_PATCH_TYPE = new MediaType(MediaType.APPLICATION_JSON_PATCH);
 
-
     /**
      * JSON Feed: application/problem+json.
      */
