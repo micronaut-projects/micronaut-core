@@ -78,6 +78,8 @@ internal open class KotlinVisitorContext(
         }
     }
 
+    override fun getLanguage() = VisitorContext.Language.KOTLIN
+
     override fun <T : Any?> get(
         name: CharSequence?,
         conversionContext: ArgumentConversionContext<T>?
@@ -177,6 +179,10 @@ internal open class KotlinVisitorContext(
         return outputVisitor.visitGeneratedFile(path, *originatingElements)
     }
 
+    override fun visitGeneratedSourceFile(packageName: String, fileNameWithoutExtension: String, vararg originatingElements: Element): Optional<GeneratedFile> {
+        return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, *originatingElements)
+    }
+
     override fun finish() {
         outputVisitor.finish()
     }
@@ -262,7 +268,7 @@ internal open class KotlinVisitorContext(
         }
     }
 
-    class KspGeneratedFile(
+    open class KspGeneratedFile(
         environment: SymbolProcessorEnvironment,
         elements: MutableList<String>,
         dependencies: Dependencies
@@ -316,4 +322,5 @@ internal open class KotlinVisitorContext(
         }
 
     }
+
 }
