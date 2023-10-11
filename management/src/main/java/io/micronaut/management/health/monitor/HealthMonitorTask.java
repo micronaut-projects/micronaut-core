@@ -95,16 +95,18 @@ public class HealthMonitorTask {
                 currentHealthStatus.update(HealthStatus.DOWN.describe("Error occurred running health check: " + e.getMessage()));
             })
             .subscribe(healthResults -> {
-                healthResults.forEach(healthResult -> {
-                    var status = healthResult.getStatus();
-                    var name = healthResult.getName();
-                    if (LOG.isTraceEnabled()) {
-                        var detail = healthResult.getDetails();
-                        LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
-                    } else if (LOG.isDebugEnabled()) {
-                        LOG.debug("Health monitor result for {}: status {}", name, status);
-                    }
-                });
+                if (LOG.isTraceEnabled() || LOG.isDebugEnabled()) {
+                    healthResults.forEach(healthResult -> {
+                        var status = healthResult.getStatus();
+                        var name = healthResult.getName();
+                        if (LOG.isTraceEnabled()) {
+                            var detail = healthResult.getDetails();
+                            LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
+                        } else if (LOG.isDebugEnabled()) {
+                            LOG.debug("Health monitor result for {}: status {}", name, status);
+                        }
+                    });
+                }
                 Optional<HealthResult> firstDown = healthResults.stream()
                     .filter(r -> r.getStatus().equals(HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
                     .findFirst();
