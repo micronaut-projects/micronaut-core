@@ -136,6 +136,19 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
     }
 
     @Override
+    public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                classesDir
+            );
+            return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
+        }
+
+        return Optional.empty();
+    }
+
+    @Override
     public void finish() {
         // no-op
     }
