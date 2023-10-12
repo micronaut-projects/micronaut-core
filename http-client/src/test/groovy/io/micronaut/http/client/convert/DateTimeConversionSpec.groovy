@@ -27,20 +27,35 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.validation.constraints.NotNull
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 class DateTimeConversionSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     void "test offset date time conversion"() {
         given:
         TimeController controller = embeddedServer.getApplicationContext().getBean(TimeController)
         TimeClient client = embeddedServer.getApplicationContext().getBean(TimeClient)
 
-        def now = controller.target
-        def result = OffsetDateTime.parse(client.time(now))
+        def now = controller.targetOffset
+        def result = OffsetDateTime.parse(client.offsetDateTime(now))
+
+        expect:
+        result == now
+    }
+
+    void "test local date time conversion"() {
+        given:
+        TimeController controller = embeddedServer.getApplicationContext().getBean(TimeController)
+        TimeClient client = embeddedServer.getApplicationContext().getBean(TimeClient)
+
+        def now = controller.targetLocal
+        def result = LocalDateTime.parse(client.localDateTime(now))
 
         expect:
         result == now
@@ -48,7 +63,10 @@ class DateTimeConversionSpec extends Specification {
 
     static interface TimeApi {
         @Get(uri = "/offset", processes = MediaType.TEXT_PLAIN)
-        String time(@NotNull @QueryValue OffsetDateTime time)
+        String offsetDateTime(@NotNull @QueryValue OffsetDateTime time)
+
+        @Get(uri = "/local", processes = MediaType.TEXT_PLAIN)
+        String localDateTime(@NotNull @QueryValue LocalDateTime time)
     }
 
     @Client("/convert/time")
@@ -56,11 +74,19 @@ class DateTimeConversionSpec extends Specification {
 
     @Controller("/convert/time")
     static class TimeController implements TimeApi {
-        def target = OffsetDateTime.parse("2007-12-03T10:15:30+01:00")
+        def targetOffset = OffsetDateTime.parse("2007-12-03T10:15:30+01:00")
+        def targetLocal = targetOffset.toLocalDateTime()
+
         @Override
-        String time(OffsetDateTime time) {
-            assert target == time
+        String offsetDateTime(OffsetDateTime time) {
+            assert targetOffset == time
             return time.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        }
+
+        @Override
+        String localDateTime(@NotNull @QueryValue LocalDateTime time) {
+            assert targetLocal == time
+            return time.format(DateTimeFormatter.ISO_DATE_TIME)
         }
     }
 
