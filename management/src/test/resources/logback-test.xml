@@ -15,6 +15,9 @@
         <appender-ref ref="JSON"/>
     </logger>
 
+    <logger name="io.micronaut.management.health.aggregator.DefaultHealthAggregator" level="TRACE"/>
+    <logger name="io.micronaut.management.health.monitor.HealthMonitorTask" level="TRACE"/>
+
     <logger name="no-level">
         <appender-ref ref="STDOUT"/>
     </logger>
