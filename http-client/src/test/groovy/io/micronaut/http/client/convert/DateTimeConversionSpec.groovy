@@ -33,9 +33,7 @@ import java.time.format.DateTimeFormatter
 
 class DateTimeConversionSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     void "test offset date time conversion"() {
         given:
