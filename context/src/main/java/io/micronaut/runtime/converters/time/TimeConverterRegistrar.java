@@ -24,19 +24,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.MonthDay;
-import java.time.OffsetDateTime;
-import java.time.OffsetTime;
-import java.time.Period;
-import java.time.Year;
-import java.time.YearMonth;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAccessor;
@@ -134,16 +122,16 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
         // CharSequence -> Duration
         conversionService.addConverter(
-            CharSequence.class,
-            Duration.class,
-            (object, targetType, context) -> durationConverter.apply(object, context)
+                CharSequence.class,
+                Duration.class,
+                (object, targetType, context) -> durationConverter.apply(object, context)
         );
 
         // CharSequence -> TemporalAmount
         conversionService.addConverter(
-            CharSequence.class,
-            TemporalAmount.class,
-            (object, targetType, context) -> durationConverter.apply(object, context).map(TemporalAmount.class::cast)
+                CharSequence.class,
+                TemporalAmount.class,
+                (object, targetType, context) -> durationConverter.apply(object, context).map(TemporalAmount.class::cast)
         );
 
         // TemporalAccessor -> CharSequence
@@ -160,6 +148,27 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 TemporalAccessor.class,
                 CharSequence.class,
                 temporalConverter
+        );
+
+        /*
+         * There's a not-a-bug <a href="https://bugs.openjdk.org/browse/JDK-8069324">JDK-8069324</a>
+         * which unexpectedly fail because offset is mandatory for RFC_1123
+         * To work around this we use special converter for LocalDateTime treating it as UTC timezone
+         */
+        final TypeConverter<LocalDateTime, CharSequence> localDateTimeConverter = (object, targetType, context) -> {
+            try {
+                DateTimeFormatter formatter = resolveFormatter(context);
+                // Treat missing zone as UTC
+                return Optional.of(formatter.format(object.atOffset(ZoneOffset.UTC)));
+            } catch (DateTimeParseException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        };
+        conversionService.addConverter(
+                LocalDateTime.class,
+                CharSequence.class,
+                localDateTimeConverter
         );
 
         addTemporalStringConverter(conversionService, Instant.class, DateTimeFormatter.ISO_INSTANT, Instant::from);
@@ -220,7 +229,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
         Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
         return format
-            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-            .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 }
