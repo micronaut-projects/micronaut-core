@@ -34,6 +34,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @Experimental
+@Executable(processOnStartup = true)
 public @interface Mapper {
 
     /**
@@ -60,9 +61,11 @@ public @interface Mapper {
         String MEMBER_DEFAULT_VALUE = "defaultValue";
 
         /**
+         * The property name to map to. When not specified assume the root bean is being mapped to.
+         *
          * @return name of the property to map to.
          */
-        String to();
+        String to() default "";
 
         /**
          * Specifies the name of the property to map from. Can be an expression.
