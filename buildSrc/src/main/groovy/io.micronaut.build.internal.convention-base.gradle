@@ -39,6 +39,9 @@ tasks.withType(Test).configureEach {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         jvmArgs "--enable-preview"
     }
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+    })
 }
 
 tasks.withType(JavaCompile).configureEach {
