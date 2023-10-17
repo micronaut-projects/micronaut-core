@@ -19,5 +19,8 @@ dependencies {
 
 tasks.named("compileKotlin") {
     kotlinOptions.jvmTarget = "17"
-    kotlinOptions.languageVersion = "1.7"
+}
+
+tasks.named("compileTestKotlin") {
+    kotlinOptions.jvmTarget = "17"
 }

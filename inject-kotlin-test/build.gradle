@@ -34,6 +34,12 @@ tasks.named("compileKotlin") {
     }
 }
 
+tasks.named("compileTestKotlin") {
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
 tasks.named("compileGroovy") {
     // this allows groovy to access kotlin classes.
     dependsOn tasks.getByPath('compileKotlin')

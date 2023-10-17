@@ -8,10 +8,15 @@ plugins {
 micronautBuild {
     enableBom = false
     enableProcessing = false
+    javaVersion = JavaVersion.current().majorVersion.toInteger()
 }
 
 repositories {
     mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
 }
 
 configurations.all {
