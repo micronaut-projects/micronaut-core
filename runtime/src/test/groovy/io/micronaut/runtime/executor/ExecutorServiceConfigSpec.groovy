@@ -33,7 +33,7 @@ class ExecutorServiceConfigSpec extends Specification {
         def configs = ctx.getBeansOfType(ExecutorConfiguration)
 
         then:
-        configs.name ==~ ['one', 'two', 'io', 'scheduled'] + (System.getProperty("java.version").startsWith("17") ? [] : ['virtual'])
+        configs.name ==~ ['one', 'two', 'io', 'scheduled'] + (Runtime.version().feature() == 17 ? [] : ['virtual'])
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
@@ -135,7 +135,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
         then:
         executorServices.size() == expectedExecutorCount
-        moreConfigs.name ==~ ['one', 'two', 'io', 'scheduled'] + (System.getProperty("java.version").startsWith("17") ? [] : ['virtual'])
+        moreConfigs.name ==~ ['one', 'two', 'io', 'scheduled'] + (Runtime.version().feature() == 17 ? [] : ['virtual'])
         configs.size() == 2
 
         when:
@@ -187,7 +187,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
         then:
         executorServices.size() == expectedExecutorCount - 1
-        moreConfigs.name ==~ ['two', 'io', 'scheduled'] + (System.getProperty("java.version").startsWith("17") ? [] : ['virtual'])
+        moreConfigs.name ==~ ['two', 'io', 'scheduled'] + (Runtime.version().feature() == 17 ? [] : ['virtual'])
         configs.size() == 2
 
         where:

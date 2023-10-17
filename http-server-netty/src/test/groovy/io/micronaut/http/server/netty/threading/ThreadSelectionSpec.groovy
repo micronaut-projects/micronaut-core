@@ -39,7 +39,7 @@ class ThreadSelectionSpec extends Specification {
     static final String LOOP = "default-nioEventLoopGroup"
 
     private String jdkSwitch(String java17, String other) {
-        System.getProperty("java.version").startsWith("17") ? java17 : other
+        Runtime.version().feature() == 17 ? java17 : other
     }
 
     void "test thread selection strategy #strategy"() {
@@ -57,11 +57,11 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy                 | blocking               | nonBlocking              | scheduleBlocking
-        ThreadSelection.AUTO     | jdkSwitch(IO, VIRTUAL) | LOOP                     | IO
-        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(LOOP, VIRTUAL) | IO
-        ThreadSelection.IO       | IO                     | IO                       | IO
-        ThreadSelection.MANUAL   | LOOP                   | LOOP                     | IO
+        strategy                 | blocking               | nonBlocking            | scheduleBlocking
+        ThreadSelection.AUTO     | jdkSwitch(IO, VIRTUAL) | LOOP                   | IO
+        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL) | IO
+        ThreadSelection.IO       | IO                     | IO                     | IO
+        ThreadSelection.MANUAL   | LOOP                   | LOOP                   | IO
     }
 
     void "test thread selection strategy for reactive types #strategy"() {
@@ -80,14 +80,14 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy                 | reactive               | blockingReactive         | scheduleSse | scheduleReactive
-        ThreadSelection.AUTO     | LOOP                   | jdkSwitch(IO, VIRTUAL)   | IO          | IO
-        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(LOOP, VIRTUAL) | IO          | IO
-        ThreadSelection.IO       | IO                     | IO                       | IO          | IO
-        ThreadSelection.MANUAL   | LOOP                   | LOOP                     | IO          | IO
+        strategy                 | reactive               | blockingReactive       | scheduleSse | scheduleReactive
+        ThreadSelection.AUTO     | LOOP                   | jdkSwitch(IO, VIRTUAL) | IO          | IO
+        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL) | IO          | IO
+        ThreadSelection.IO       | IO                     | IO                     | IO          | IO
+        ThreadSelection.MANUAL   | LOOP                   | LOOP                   | IO          | IO
     }
 
-    void "test thread selection for exception handlers"() {
+    void "test thread selection for exception handlers #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
@@ -113,7 +113,7 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"                     | "handler: $IO"
     }
 
-    void "test thread selection for error route"() {
+    void "test thread selection for error route #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
@@ -129,11 +129,11 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy                 | controller          | handler
-        ThreadSelection.AUTO     | "controller: $IO"   | "handler: $IO"
-        ThreadSelection.BLOCKING | "controller: $IO"   | "handler: $IO"
-        ThreadSelection.IO       | "controller: $IO"   | "handler: $IO"
-        ThreadSelection.MANUAL   | "controller: $LOOP" | "handler: $LOOP"
+        strategy                 | controller                              | handler
+        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
+        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
+        ThreadSelection.IO       | "controller: $IO"                       | "handler: $IO"
+        ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"
     }
 
     void "test injecting an executor service does not inject the Netty event loop"() {
