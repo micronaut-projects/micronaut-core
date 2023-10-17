@@ -348,5 +348,20 @@
     "type": "io.micronaut.core.graal.AutomaticFeatureUtils",
     "member": "Constructor io.micronaut.core.graal.AutomaticFeatureUtils()",
     "reason": "Was deprecated"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda1",
+    "member": "Constructor io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda1(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Under Java 21 the constructor is absent"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda2",
+    "member": "Constructor io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda2(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Under Java 21 the constructor is absent"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda3",
+    "member": "Constructor io.micronaut.ast.groovy.TypeElementVisitorTransform$ElementVisitor$_visitNativeProperty_lambda3(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Under Java 21 the constructor is absent"
   }
 ]
