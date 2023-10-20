@@ -53,7 +53,7 @@ class MyBean {
         def lines = e.message.readLines().collect { it.trim() }
         lines[0] == 'No bean of type [test.MyBean] exists. The following matching beans are disabled by bean requirements:'
         lines[1] == '* Bean of type [test.MyBean] is disabled because:'
-        lines[2] == '- Java major version [17] must be at least 800'
+        lines[2] == "- Java major version [${Runtime.version().feature()}] must be at least 800"
 
         cleanup:
         context.close()

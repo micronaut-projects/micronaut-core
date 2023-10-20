@@ -1,7 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
     id "org.jetbrains.kotlin.jvm"
-    id("com.google.devtools.ksp")
+    id "org.jetbrains.kotlin.kapt"
 }
 
 dependencies {
@@ -58,7 +58,9 @@ dependencies {
 
 // Kotlin
 dependencies {
-    kspTest projects.injectKotlin
+    kapt project(':inject-java')
+    kaptTest project(':inject-java')
+
     compileOnly libs.managed.kotlin.stdlib.jdk8
     compileOnly libs.managed.kotlinx.coroutines.core
 
