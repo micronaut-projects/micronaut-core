@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.io.service;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanInfo;
@@ -78,6 +79,8 @@ final class ServiceLoaderFeature implements Feature {
                             try {
                                 beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
                             } catch (Exception e) {
+                                // not loadable at runtime either, remove it
+                                i.remove();
                                 continue;
                             }
                             Class<?> beanType = beanInfo.getBeanType();
@@ -90,6 +93,12 @@ final class ServiceLoaderFeature implements Feature {
                                     }
                                     if (value.contains("beans")) {
                                         ArrayUtils.concat(classNames, value.stringValues("beans"));
+                                    }
+                                    if (value.contains("condition")) {
+                                        Object o = value.getValues().get("condition");
+                                        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+                                            annotationClassValue.getType().ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+                                        }
                                     }
                                     for (String className : classNames) {
                                         if (access.findClassByName(className) == null) {
