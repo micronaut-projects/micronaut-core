@@ -207,7 +207,7 @@ public final class JsonCounter {
 
         if (state == State.AFTER_UNWRAP_ARRAY) {
             // top-level array consumed. reject further data
-            skipWs(buf, i, end);
+            i = skipWs(buf, i, end);
             if (i < end) {
                 throw new JsonSyntaxException("Superfluous data after top-level array in streaming mode");
             }
