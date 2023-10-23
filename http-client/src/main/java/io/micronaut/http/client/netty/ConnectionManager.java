@@ -611,6 +611,7 @@ public class ConnectionManager {
                 ch.close();
             }
         });
+        Pool.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
         ch.pipeline().addLast(multiplexHandler);
         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
             @Override
@@ -618,7 +619,7 @@ public class ConnectionManager {
                 if (msg instanceof Http2SettingsFrame) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    pool.new Http2ConnectionHolder(ch, connectionCustomizer).init();
+                    connectionHolder.init();
                     return;
                 } else {
                     log.warn("Premature frame: {}", msg.getClass());
@@ -641,6 +642,7 @@ public class ConnectionManager {
                     return;
                 }
                 if (msg instanceof Http2GoAwayFrame goAway) {
+                    connectionHolder.windDownConnection();
                     if (log.isDebugEnabled()) {
                         // include the debug content, but at most 64 bytes for safety
                         byte[] debug = new byte[Math.min(64, goAway.content().readableBytes())];
