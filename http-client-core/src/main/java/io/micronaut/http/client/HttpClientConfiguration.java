@@ -101,6 +101,12 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
+    /**
+     * The default value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
+
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -161,7 +167,7 @@ public abstract class HttpClientConfiguration {
 
     private LogLevel logLevel;
 
-    private boolean allowBlockEventLoop = false;
+    private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
 
     /**
      * Default constructor.
@@ -752,6 +758,8 @@ public abstract class HttpClientConfiguration {
      * this is off (the default), any calls that block an event loop will throw an error. Such
      * calls are almost always a mistake that can lead to hard-to-debug transient issues such as
      * read timeouts. Only enable this setting if you are sure you won't hit such a bug.
+     * <br>
+     * Default value: {@value DEFAULT_ALLOW_BLOCK_EVENT_LOOP}
      *
      * @param allowBlockEventLoop {@code true} if blocking an event loop should be allowed
      */
