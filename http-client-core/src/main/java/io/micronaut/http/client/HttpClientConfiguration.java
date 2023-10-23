@@ -735,10 +735,26 @@ public abstract class HttpClientConfiguration {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
     }
 
+    /**
+     * Whether to allow blocking a netty event loop with a call to {@link BlockingHttpClient}. When
+     * this is off (the default), any calls that block an event loop will throw an error. Such
+     * calls are almost always a mistake that can lead to hard-to-debug transient issues such as
+     * read timeouts. Only enable this setting if you are sure you won't hit such a bug.
+     *
+     * @return {@code true} if blocking an event loop should be allowed
+     */
     public boolean isAllowBlockEventLoop() {
         return allowBlockEventLoop;
     }
 
+    /**
+     * Whether to allow blocking a netty event loop with a call to {@link BlockingHttpClient}. When
+     * this is off (the default), any calls that block an event loop will throw an error. Such
+     * calls are almost always a mistake that can lead to hard-to-debug transient issues such as
+     * read timeouts. Only enable this setting if you are sure you won't hit such a bug.
+     *
+     * @param allowBlockEventLoop {@code true} if blocking an event loop should be allowed
+     */
     public void setAllowBlockEventLoop(boolean allowBlockEventLoop) {
         this.allowBlockEventLoop = allowBlockEventLoop;
     }
