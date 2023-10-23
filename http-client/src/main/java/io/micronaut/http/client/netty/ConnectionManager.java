@@ -1368,7 +1368,7 @@ public class ConnectionManager {
 
             @Override
             boolean tryEarmarkForRequest() {
-                return !windDownConnection && incrementWithLimit(liveRequests, configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
+                return channel.isActive() && !windDownConnection && incrementWithLimit(liveRequests, configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
             }
 
             @Override
