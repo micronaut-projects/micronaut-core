@@ -27,6 +27,7 @@ import io.micronaut.http.server.cors.CorsUtil;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
+import static io.micronaut.http.server.cors.CorsFilter.CORS_FILTER_ORDER;
 
 /**
  * This Filter intercepts HTTP OPTIONS requests which are not CORS Preflight requests.
@@ -64,5 +65,10 @@ public class OptionsFilter implements Ordered {
             .forEach(allow -> mutableHttpResponse.header(HttpHeaders.ALLOW, allow));
         mutableHttpResponse.header(HttpHeaders.ALLOW, HttpMethod.OPTIONS.toString());
         return mutableHttpResponse;
+    }
+
+    @Override
+    public int getOrder() {
+        return CORS_FILTER_ORDER + 10;
     }
 }

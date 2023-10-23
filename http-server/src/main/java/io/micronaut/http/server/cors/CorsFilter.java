@@ -72,6 +72,7 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 public class CorsFilter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
+    public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
@@ -213,7 +214,7 @@ public class CorsFilter implements Ordered {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.METRICS.after();
+        return CORS_FILTER_ORDER;
     }
 
     @NonNull
