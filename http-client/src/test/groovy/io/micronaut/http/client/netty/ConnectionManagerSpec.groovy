@@ -45,8 +45,10 @@ import io.netty.handler.codec.http.LastHttpContent
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
+import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameStream
@@ -962,6 +964,38 @@ class ConnectionManagerSpec extends Specification {
         def r2 = conn2.testExchangeRequest(client)
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 goaway'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                // the GOAWAY doesnt actually close the connection yet, so in order to make a second one, we need to
+                // increase this setting
+                'micronaut.http.client.pool.max-concurrent-http2-connections': 2,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+
+        def future = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.testExchangeResponse(future)
+
+        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.INTERNAL_ERROR, Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        conn1.advance()
+
+        // after goaway, new requests should use a new connection
+        def future2 = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+        conn2.testExchangeResponse(future2)
 
         cleanup:
         client.close()
