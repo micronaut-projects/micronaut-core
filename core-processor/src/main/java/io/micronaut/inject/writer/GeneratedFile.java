@@ -96,4 +96,25 @@ public interface GeneratedFile {
      */
     Writer openWriter() throws IOException;
 
+    /**
+     * Writes the context to the file.
+     * @param consumer the code generating block
+     * @throws IOException in case of I/O error
+     * @since 4.2.0
+     */
+    default void write(ThrowingConsumer<? super Writer> consumer) throws IOException {
+        try (Writer writer = openWriter()) {
+            consumer.accept(writer);
+        }
+    }
+
+    /**
+     * A consumer which may throw an IOException.
+     * @param <T> the type of the consumed element
+     * @since 4.2.0
+     */
+    @FunctionalInterface
+    interface ThrowingConsumer<T> {
+        void accept(T t) throws IOException;
+    }
 }

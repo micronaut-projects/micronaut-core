@@ -5,6 +5,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.convert.ConversionService
+import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -13,6 +15,39 @@ import spock.lang.Specification
 class MapperAnnotationSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared Test testBean = context.getBean(Test)
+    @Shared ConversionService conversionService = context.getBean(ConversionService)
+
+    void "test convert from nested"() {
+        given:
+        CreateCommand cmd = new CreateCommand(new CreateRobot("foo", "bar", 10), 123)
+
+        when:
+        SimpleRobotEntity result = testBean.toEntity(cmd)
+
+        then:
+        result.id == 'foo'
+        result.companyId == 'bar'
+        result.parts == 10
+        result.token == "123"
+
+        when:"exercise caching"
+        result = testBean.toEntity(cmd)
+
+        then:
+        result.id == 'foo'
+        result.companyId == 'bar'
+        result.parts == 10
+        result.token == "123"
+
+        when:"conversion"
+        result = conversionService.convertRequired(cmd, SimpleRobotEntity)
+
+        then:
+        result.id == 'foo'
+        result.companyId == 'bar'
+        result.parts == 10
+        result.token == "123"
+    }
 
     void testMapConstructorWithMap() {
         given:
@@ -116,6 +151,9 @@ abstract class Test {
 
     @Mapper abstract SimpleRobotEntity toEntity(Map<String, Object> map)
 
+
+    @Mapper.Mapping(from = "#{cmd.createRobot}") abstract SimpleRobotEntity toEntity(CreateCommand cmd)
+
     @Mapper.Mapping(to = "id", from = "#{map.get('companyId')}")
     @Mapper abstract SimpleRobotEntity toEntityTransform(Map<String, Object> map)
 
@@ -146,6 +184,17 @@ final class CreateRobot {
         this.id = id
         this.companyId = companyId
         this.parts = parts
+    }
+}
+
+@Introspected
+final class CreateCommand {
+    final CreateRobot createRobot
+    final int token
+
+    CreateCommand(CreateRobot createRobot, int token) {
+        this.createRobot = createRobot
+        this.token = token
     }
 }
 

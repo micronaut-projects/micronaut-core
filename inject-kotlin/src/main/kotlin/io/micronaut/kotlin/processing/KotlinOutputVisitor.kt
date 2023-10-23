@@ -63,6 +63,12 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
         return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
     }
 
+    override fun visitGeneratedSourceFile(packageName: String, fileNameWithoutExtension: String, vararg originatingElements: Element): Optional<GeneratedFile> {
+        val elements = packageName.split('.').toMutableList()
+        elements.add("${fileNameWithoutExtension}.kt")
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
+    }
+
     private fun normalizePath(path: String) = path.replace("\\\\", "/").split("/").toMutableList()
 
     private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {

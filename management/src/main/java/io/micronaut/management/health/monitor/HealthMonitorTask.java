@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -85,17 +86,29 @@ public class HealthMonitorTask {
             .map(HealthIndicator::getResult)
             .collect(Collectors.toList());
 
-        Flux
-            .merge(resultPublishers)
+        Flux.merge(resultPublishers)
             .collectList()
-            .doOnError((e) -> {
+            .doOnError(e -> {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Health monitor check failed with exception: " + e.getMessage(), e);
+                    LOG.error("Health monitor check failed with exception: {}", e.getMessage(), e);
                 }
                 currentHealthStatus.update(HealthStatus.DOWN.describe("Error occurred running health check: " + e.getMessage()));
             })
             .subscribe(healthResults -> {
-                java.util.Optional<HealthResult> firstDown = healthResults.stream().filter(r -> r.getStatus().equals(io.micronaut.health.HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
+                if (LOG.isTraceEnabled() || LOG.isDebugEnabled()) {
+                    healthResults.forEach(healthResult -> {
+                        var status = healthResult.getStatus();
+                        var name = healthResult.getName();
+                        if (LOG.isTraceEnabled()) {
+                            var detail = healthResult.getDetails();
+                            LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
+                        } else if (LOG.isDebugEnabled()) {
+                            LOG.debug("Health monitor result for {}: status {}", name, status);
+                        }
+                    });
+                }
+                Optional<HealthResult> firstDown = healthResults.stream()
+                    .filter(r -> r.getStatus().equals(HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
                     .findFirst();
                 if (firstDown.isPresent()) {
                     currentHealthStatus.update(firstDown.get().getStatus());
@@ -103,6 +116,5 @@ public class HealthMonitorTask {
                     currentHealthStatus.update(HealthStatus.UP);
                 }
             });
-
     }
 }

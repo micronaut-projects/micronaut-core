@@ -135,6 +135,19 @@ public interface ClassWriterOutputVisitor {
     Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements);
 
     /**
+     * Visit a source file that will be generated within the generated sources directory.
+     *
+     * @param packageName The package for the source file
+     * @param fileNameWithoutExtension the name of the source file, without extension (determined automatically)
+     * @param originatingElements  the originating elements
+     * @return The file if it was possible to create it
+     * @since 4.2.0
+     */
+    default Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
+        return Optional.empty();
+    }
+
+    /**
      * Finish writing and flush any service entries to disk.
      */
     void finish();

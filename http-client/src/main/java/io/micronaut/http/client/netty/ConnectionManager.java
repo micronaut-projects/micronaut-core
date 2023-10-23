@@ -247,7 +247,7 @@ public class ConnectionManager {
             }
         } else {
             if (threadFactory != null) {
-                group = new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
+                group = new NioEventLoopGroup(NettyThreadFactory.getDefaultEventLoopThreads(), threadFactory);
             } else {
 
                 group = new NioEventLoopGroup();

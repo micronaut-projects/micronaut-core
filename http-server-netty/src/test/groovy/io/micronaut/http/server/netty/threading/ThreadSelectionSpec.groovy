@@ -29,16 +29,19 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
 import reactor.core.publisher.Mono
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import java.util.concurrent.ExecutorService
 
 class ThreadSelectionSpec extends Specification {
 
     static final String IO = "io-executor-thread-"
+    static final String VIRTUAL = "virtual-executor"
     static final String LOOP = "default-nioEventLoopGroup"
 
-    @Unroll
+    private String jdkSwitch(String java17, String other) {
+        Runtime.version().feature() == 17 ? java17 : other
+    }
+
     void "test thread selection strategy #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
@@ -54,13 +57,13 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               | blocking | nonBlocking | scheduleBlocking
-        ThreadSelection.AUTO   | IO       | LOOP        | IO
-        ThreadSelection.IO     | IO       | IO          | IO
-        ThreadSelection.MANUAL | LOOP     | LOOP        | IO
+        strategy                 | blocking               | nonBlocking            | scheduleBlocking
+        ThreadSelection.AUTO     | jdkSwitch(IO, VIRTUAL) | LOOP                   | IO
+        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL) | IO
+        ThreadSelection.IO       | IO                     | IO                     | IO
+        ThreadSelection.MANUAL   | LOOP                   | LOOP                   | IO
     }
 
-    @Unroll
     void "test thread selection strategy for reactive types #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
@@ -77,13 +80,14 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               |  reactive | blockingReactive | scheduleSse | scheduleReactive
-        ThreadSelection.AUTO   |  LOOP     | IO               | IO          | IO
-        ThreadSelection.IO     |  IO       | IO               | IO          | IO
-        ThreadSelection.MANUAL |  LOOP     | LOOP             | IO          | IO
+        strategy                 | reactive               | blockingReactive       | scheduleSse | scheduleReactive
+        ThreadSelection.AUTO     | LOOP                   | jdkSwitch(IO, VIRTUAL) | IO          | IO
+        ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL) | IO          | IO
+        ThreadSelection.IO       | IO                     | IO                     | IO          | IO
+        ThreadSelection.MANUAL   | LOOP                   | LOOP                   | IO          | IO
     }
 
-    void "test thread selection for exception handlers"() {
+    void "test thread selection for exception handlers #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
@@ -102,13 +106,14 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               |  controller          | handler          | scheduledHandler
-        ThreadSelection.AUTO   |  "controller: $IO"   | "handler: $IO"   | "handler: $IO"
-        ThreadSelection.IO     |  "controller: $IO"   | "handler: $IO"   | "handler: $IO"
-        ThreadSelection.MANUAL |  "controller: $LOOP" | "handler: $LOOP" | "handler: $IO"
+        strategy                 | controller                              | handler                              | scheduledHandler
+        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: $IO"
+        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: $IO"
+        ThreadSelection.IO       | "controller: $IO"                       | "handler: $IO"                       | "handler: $IO"
+        ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"                     | "handler: $IO"
     }
 
-    void "test thread selection for error route"() {
+    void "test thread selection for error route #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
@@ -124,10 +129,11 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               |  controller          | handler
-        ThreadSelection.AUTO   |  "controller: $IO"   | "handler: $IO"
-        ThreadSelection.IO     |  "controller: $IO"   | "handler: $IO"
-        ThreadSelection.MANUAL |  "controller: $LOOP" | "handler: $LOOP"
+        strategy                 | controller                              | handler
+        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
+        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
+        ThreadSelection.IO       | "controller: $IO"                       | "handler: $IO"
+        ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"
     }
 
     void "test injecting an executor service does not inject the Netty event loop"() {
@@ -232,10 +238,10 @@ class ThreadSelectionSpec extends Specification {
         @ExecuteOn(TaskExecutors.IO)
         @Get(uri = "/scheduleSse", produces = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> scheduleSse() {
-            return Flux.<Event<String>>create(emitter -> {
-                        emitter.next( Event.of("thread: ${Thread.currentThread().name}".toString()))
-                        emitter.complete()
-                    }, FluxSink.OverflowStrategy.BUFFER)
+            return Flux.<Event<String>> create(emitter -> {
+                emitter.next(Event.of("thread: ${Thread.currentThread().name}".toString()))
+                emitter.complete()
+            }, FluxSink.OverflowStrategy.BUFFER)
         }
 
         @Get("/exception")
@@ -265,8 +271,8 @@ class ThreadSelectionSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flux.create(emitter -> {
-                    emitter.next("Good")
-                    emitter.complete()
+                emitter.next("Good")
+                emitter.complete()
             }, FluxSink.OverflowStrategy.LATEST).switchMap({ String it ->
                 return chain.proceed(request)
             })

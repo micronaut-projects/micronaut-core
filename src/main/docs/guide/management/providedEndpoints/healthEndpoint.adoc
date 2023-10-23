@@ -81,6 +81,36 @@ The default health aggregator returns an overall status calculated based on the 
 
 The "worst" status is returned as the overall status. A non-operational status is selected over an operational status. A higher severity is selected over a lower severity.
 
+The api:management.health.aggregator.DefaultHealthAggregator[] also emits log statements for health indicator status and details. To log this information use `Level.DEBUG` for just health indicator status or use Level.TRACE for both status and details. For example:
+
+[source,xml]
+----
+<logger name="io.micronaut.management.health.aggregator.DefaultHealthAggregator" level="trace" /> // <1>
+----
+<1> Use `level="debug"` for health indicator status, use `level="trace"` to add health indicator details
+
+== Health Monitor Task
+
+A continuous health monitor that updates the api:health.CurrentHealthStatus[] in a background thread can be enabled when using api:runtime.server.EmbeddedServer[] with the following application configuration:
+
+[configuration]
+----
+micronaut:
+  application:
+    name: foo
+  health:
+    monitor:
+      enabled: true
+----
+- Both configuration properties are required to enable the monitor background task.
+
+Similarly to `DefaultHealthAggregator` it also emits log statements for health indicator status and details. To log this use the following logger configuration:
+
+[source,xml]
+----
+<logger name="io.micronaut.management.health.monitor.HealthMonitorTask" level="trace" />
+----
+
 == Provided Indicators
 
 All the Micronaut framework provided health indicators are exposed on /health and /health/readiness endpoints.
