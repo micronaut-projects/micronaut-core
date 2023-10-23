@@ -161,6 +161,8 @@ public abstract class HttpClientConfiguration {
 
     private LogLevel logLevel;
 
+    private boolean allowBlockEventLoop = false;
+
     /**
      * Default constructor.
      */
@@ -731,6 +733,14 @@ public abstract class HttpClientConfiguration {
      */
     public void setAlpnModes(@NonNull List<String> alpnModes) {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
+    }
+
+    public boolean isAllowBlockEventLoop() {
+        return allowBlockEventLoop;
+    }
+
+    public void setAllowBlockEventLoop(boolean allowBlockEventLoop) {
+        this.allowBlockEventLoop = allowBlockEventLoop;
     }
 
     /**
