@@ -80,7 +80,7 @@ class EmbeddedTestUtil {
 
                         def sqf = sourceQueueFutures
                         sourceQueueFutures = new ArrayList<>()
-                        for (ChannelPromise promise : sourceQueueFutures) {
+                        for (ChannelPromise promise : sqf) {
                             promise.trySuccess()
                         }
 
