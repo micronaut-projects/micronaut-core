@@ -547,14 +547,14 @@ public class DefaultHttpClient implements
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
                 if (!configuration.isAllowBlockEventLoop() && Thread.currentThread() instanceof FastThreadLocalThread) {
-                    throw new HttpClientException(
-                        "You are trying to run a BlockingHttpClient operation on a netty event " +
-                            "loop thread. This is a common cause for bugs: Event loops should " +
-                            "never be blocked. You can either mark your controller as " +
-                            "@ExecuteOn(TaskExecutors.BLOCKING), or use the reactive HTTP client " +
-                            "to resolve this bug. There is also a configuration option to " +
-                            "disable this check if you are certain a blocking operation is fine " +
-                            "here.");
+                    throw new HttpClientException("""
+                        You are trying to run a BlockingHttpClient operation on a netty event \
+                        loop thread. This is a common cause for bugs: Event loops should \
+                        never be blocked. You can either mark your controller as \
+                        @ExecuteOn(TaskExecutors.BLOCKING), or use the reactive HTTP client \
+                        to resolve this bug. There is also a configuration option to \
+                        disable this check if you are certain a blocking operation is fine \
+                        here.""");
                 }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
                 Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType, blockHint));
