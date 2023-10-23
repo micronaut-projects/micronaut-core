@@ -60,6 +60,7 @@ import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
@@ -109,6 +110,7 @@ import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -636,6 +638,16 @@ public class ConnectionManager {
             public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                 if (msg instanceof Http2SettingsAckFrame) {
                     // this is fine
+                    return;
+                }
+                if (msg instanceof Http2GoAwayFrame goAway) {
+                    if (log.isDebugEnabled()) {
+                        // include the debug content, but at most 64 bytes for safety
+                        byte[] debug = new byte[Math.min(64, goAway.content().readableBytes())];
+                        goAway.content().readBytes(debug);
+                        log.debug("Server sent GOAWAY frame. errorCode={} base64(content)={}", goAway.errorCode(), Base64.getEncoder().encodeToString(debug));
+                    }
+                    goAway.release();
                     return;
                 }
 
