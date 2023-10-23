@@ -45,8 +45,10 @@ import io.netty.handler.codec.http.LastHttpContent
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
+import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameStream
@@ -962,6 +964,28 @@ class ConnectionManagerSpec extends Specification {
         def r2 = conn2.testExchangeRequest(client)
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 goaway'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        def future = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(future)
+
+        conn.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.INTERNAL_ERROR, Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        conn.advance()
 
         cleanup:
         client.close()

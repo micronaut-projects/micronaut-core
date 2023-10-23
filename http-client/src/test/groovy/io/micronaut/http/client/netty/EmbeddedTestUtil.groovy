@@ -32,7 +32,7 @@ class EmbeddedTestUtil {
         final EmbeddedChannel source
         final EmbeddedChannel dest
         CompositeByteBuf sourceQueue
-        final List<ChannelPromise> sourceQueueFutures = new ArrayList<>();
+        List<ChannelPromise> sourceQueueFutures = new ArrayList<>();
         final Queue<ByteBuf> destQueue = new ArrayDeque<>()
         boolean readPending
 
@@ -78,10 +78,11 @@ class EmbeddedTestUtil {
                         ByteBuf packet = sourceQueue
                         sourceQueue = null
 
+                        def sqf = sourceQueueFutures
+                        sourceQueueFutures = new ArrayList<>()
                         for (ChannelPromise promise : sourceQueueFutures) {
                             promise.trySuccess()
                         }
-                        sourceQueueFutures.clear()
 
                         if (readPending || dest.config().isAutoRead()) {
                             dest.eventLoop().execute(() -> forwardNow(packet))
