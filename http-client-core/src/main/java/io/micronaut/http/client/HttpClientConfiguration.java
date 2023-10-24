@@ -118,7 +118,7 @@ public abstract class HttpClientConfiguration {
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
-    private Duration connectionPoolIdleTimeout = Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
+    private Duration connectionPoolIdleTimeout = DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS == 0 ? null : Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
 
     private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
