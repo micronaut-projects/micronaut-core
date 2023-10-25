@@ -27,8 +27,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
