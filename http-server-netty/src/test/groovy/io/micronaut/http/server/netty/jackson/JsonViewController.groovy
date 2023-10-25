@@ -87,7 +87,7 @@ class JsonViewController {
         throw new Failure1()
     }
 
-    //@JsonView(Views.Public)
+    @JsonView(Views.Public)
     @Get("/failing-with-route")
     TestModel failingWithRoute() {
         throw new Failure2()
