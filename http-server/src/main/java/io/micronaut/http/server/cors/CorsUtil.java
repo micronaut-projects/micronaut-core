@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -29,7 +30,11 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CorsUtil {
+@Internal
+public final class CorsUtil {
+    private CorsUtil() {
+
+    }
 
     /**
      * @param request The {@link HttpRequest} object
