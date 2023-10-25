@@ -1280,6 +1280,9 @@ public class ConnectionManager {
             @Override
             void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive()) {
+                    // make sure the request isn't dispatched to this connection again
+                    windDownConnection();
+
                     returnPendingRequest(sink);
                     return;
                 }
@@ -1384,6 +1387,9 @@ public class ConnectionManager {
             @Override
             void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive() || windDownConnection) {
+                    // make sure the request isn't dispatched to this connection again
+                    windDownConnection();
+
                     returnPendingRequest(sink);
                     return;
                 }

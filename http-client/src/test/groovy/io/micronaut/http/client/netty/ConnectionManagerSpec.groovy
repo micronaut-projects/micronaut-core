@@ -68,6 +68,8 @@ import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
 import io.netty.util.concurrent.GenericFutureListener
 import jakarta.inject.Singleton
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.function.Executable
 import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -76,6 +78,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -119,6 +122,8 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(future)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -138,6 +143,8 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testStreamingResponse(r1)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -152,6 +159,8 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn)
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -335,6 +344,9 @@ class ConnectionManagerSpec extends Specification {
         f1.get().status() == HttpStatus.OK
         f2.get().status() == HttpStatus.OK
 
+        // the same connection is reused for all requests
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -356,6 +368,8 @@ class ConnectionManagerSpec extends Specification {
         Queue<String> responseData = conn.testStreamingRequest(client)
         conn.testStreamingResponse(responseData)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -374,6 +388,8 @@ class ConnectionManagerSpec extends Specification {
         conn1.testExchangeResponse(conn1.testExchangeRequest(client))
         client.connectionManager().refresh()
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -520,6 +536,8 @@ class ConnectionManagerSpec extends Specification {
         def e = thrown ExecutionException
         e.cause instanceof ReadTimeoutException
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -561,6 +579,8 @@ class ConnectionManagerSpec extends Specification {
         def e = thrown ExecutionException
         e.cause instanceof ReadTimeoutException
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -595,6 +615,8 @@ class ConnectionManagerSpec extends Specification {
         assert !future.isDone()
         conn.testExchangeResponse(future)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -618,6 +640,8 @@ class ConnectionManagerSpec extends Specification {
 
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -647,6 +671,8 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -671,6 +697,8 @@ class ConnectionManagerSpec extends Specification {
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -939,6 +967,8 @@ class ConnectionManagerSpec extends Specification {
         def r2 = conn2.testExchangeRequest(client)
         conn2.testExchangeResponse(r2, "close")
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -965,6 +995,8 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -972,10 +1004,7 @@ class ConnectionManagerSpec extends Specification {
 
     def 'http2 goaway'() {
         def ctx = ApplicationContext.run([
-                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-                // the GOAWAY doesnt actually close the connection yet, so in order to make a second one, we need to
-                // increase this setting
-                'micronaut.http.client.pool.max-concurrent-http2-connections': 2,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates'  : true
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -997,9 +1026,64 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(future2)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
+    }
+
+    def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.read-timeout': '5s'
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn, conn2)
+
+        // The channel inactive event is scheduled to be fired in the event loop
+        // after the channel is already inactive. If code running in the event loop
+        // relies on the event being received to finish, it will block forever.
+
+        // first request
+        def future = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        // this closes the channel, but doesn't fire channel inactive
+        conn.clientChannel.unsafe().closeForcibly()
+
+        // second request
+        Executable executable = () -> {
+            // this would block forever before the fix
+            def future2 = conn2.testExchangeRequest(client)
+            // this will fire channel inactive
+            conn.clientChannel.close()
+            conn2.exchangeSettings()
+            conn2.testExchangeResponse(future2)
+        };
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10), executable);
+
+        // first request times out as channel was closed
+        when:
+        future.get()
+        then:
+        def e = thrown ExecutionException
+        e.cause instanceof ReadTimeoutException
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    void assertPoolConnections(DefaultHttpClient client, int count) {
+        assert client.connectionManager.getChannels().size() == count
+        client.connectionManager.getChannels().forEach { assert it.isActive() }
     }
 
     static class EmbeddedTestConnectionBase {
@@ -1217,6 +1301,7 @@ class ConnectionManagerSpec extends Specification {
             respondOk(request.stream())
             advance()
 
+            assert future.isDone()
             def response = future.get()
             assert response.status() == HttpStatus.OK
         }
