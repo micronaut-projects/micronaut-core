@@ -349,7 +349,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     *
+     * Set to true to dispatch OPTIONS requests. Default value ({@value #DEFAULT_DISPATCH_OPTIONS_REQUESTS}.
      * @return Whether OPTIONS requests should be dispatched.
      * @since 4.2.0
      */
@@ -526,7 +526,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     /**
      *
-     * @param dispatchOptionsRequests  Set to true to dispatch OPTIONS requests. Default value ({@value #DEFAULT_DISPATCH_OPTIONS_REQUESTS}
+     * @param dispatchOptionsRequests Set to true to dispatch OPTIONS requests.
      * @since 4.2.0
      */
     public void setDispatchOptionsRequests(boolean dispatchOptionsRequests) {
