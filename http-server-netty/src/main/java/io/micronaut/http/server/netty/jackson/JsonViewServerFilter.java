@@ -84,7 +84,10 @@ public class JsonViewServerFilter implements Ordered {
         if (routeInfo != null) {
             final Optional<Class<?>> viewClass = routeInfo.findAnnotation(JsonView.class)
                 .flatMap(AnnotationValue::classValue);
-            if (viewClass.isPresent()) {
+            if (viewClass.isPresent() &&
+                // if this is an error response, the response body does not come from the controller
+                response.getAttribute(HttpAttributes.EXCEPTION).isEmpty()) {
+
                 final Optional<?> optionalBody = response.getBody();
                 if (optionalBody.isPresent()) {
                     Object body = optionalBody.get();

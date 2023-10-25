@@ -17,10 +17,13 @@ package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.annotation.JsonView
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.hateoas.JsonError
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
@@ -77,4 +80,24 @@ class JsonViewController {
         assert model.password == null
         return HttpResponse.ok(model)
     }
+
+    @JsonView(Views.Public)
+    @Get("/failing")
+    TestModel failing() {
+        throw new Failure1()
+    }
+
+    //@JsonView(Views.Public)
+    @Get("/failing-with-route")
+    TestModel failingWithRoute() {
+        throw new Failure2()
+    }
+
+    @Error
+    HttpResponse<JsonError> errorRoute(Failure2 f) {
+        return HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new JsonError("failure2"));
+    }
+
+    static class Failure1 extends Exception {}
+    static class Failure2 extends Exception {}
 }
