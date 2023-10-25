@@ -26,6 +26,8 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.server.cors.CorsUtil;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.RouteMatch;
+
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 import static io.micronaut.http.server.cors.CorsFilter.CORS_FILTER_ORDER;
 
@@ -56,11 +58,14 @@ public final class OptionsFilter implements Ordered {
     @RequestFilter
     @Nullable
     @Internal
-    public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
+    public HttpResponse<?> filterRequest(HttpRequest<?> request) {
         if (request.getMethod() != HttpMethod.OPTIONS) {
             return null; // proceed
         }
         if (CorsUtil.isPreflightRequest(request)) {
+            return null; // proceed
+        }
+        if (hasOptionsRouteMatch(request)) {
             return null; // proceed
         }
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(HttpStatus.NO_CONTENT);
@@ -70,6 +75,15 @@ public final class OptionsFilter implements Ordered {
             .forEach(allow -> mutableHttpResponse.header(HttpHeaders.ALLOW, allow));
         mutableHttpResponse.header(HttpHeaders.ALLOW, HttpMethod.OPTIONS.toString());
         return mutableHttpResponse;
+    }
+
+    private boolean hasOptionsRouteMatch(HttpRequest<?> request) {
+        return request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).map(routeMatch -> {
+            if (routeMatch instanceof UriRouteMatch<?, ?> uriRouteMatch) {
+                return uriRouteMatch.getHttpMethod() == HttpMethod.OPTIONS;
+            }
+            return true;
+        }).orElse(false);
     }
 
     @Override

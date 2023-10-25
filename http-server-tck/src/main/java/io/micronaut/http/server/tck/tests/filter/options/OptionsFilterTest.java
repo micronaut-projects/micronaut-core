@@ -21,10 +21,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Status;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -61,6 +58,15 @@ public class OptionsFilterTest {
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .build()));
+    }
+
+    @Test
+    public void optionsRoute() throws IOException {
+        assertion(HttpRequest.OPTIONS("/options/route"),
+                (server, request) ->
+                        AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                                .status(HttpStatus.I_AM_A_TEAPOT)
+                                .build()));
     }
 
     @Test
@@ -111,5 +117,11 @@ public class OptionsFilterTest {
         @Status(HttpStatus.CREATED)
         public void fooPost(String id) {
         }
+
+        @Options("/options/route")
+        @Status(HttpStatus.I_AM_A_TEAPOT)
+        public void optionsRoute() {
+        }
+
     }
 }
