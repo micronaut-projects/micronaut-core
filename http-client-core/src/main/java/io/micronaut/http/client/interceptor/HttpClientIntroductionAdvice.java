@@ -242,7 +242,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 for (Argument bodyArgument : bodyArguments) {
                     String argumentName = bodyArgument.getName();
                     MutableArgumentValue<?> value = parameters.get(argumentName);
-                    bodyMap.put(argumentName, value.getValue());
+                    if (bodyArgument.getAnnotationMetadata().hasStereotype(Format.class)) {
+                        conversionService.convert(value.getValue(), ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
+                            .ifPresent(v -> bodyMap.put(argumentName, v));
+                    } else {
+                        bodyMap.put(argumentName, value.getValue());
+                    }
                 }
                 body = bodyMap;
                 request.body(body);
