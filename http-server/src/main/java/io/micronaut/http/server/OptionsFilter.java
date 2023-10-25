@@ -37,7 +37,8 @@ import static io.micronaut.http.server.cors.CorsFilter.CORS_FILTER_ORDER;
  */
 @Requires(property = OptionsFilter.PREFIX, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ServerFilter(MATCH_ALL_PATTERN)
-public class OptionsFilter implements Ordered {
+@Internal
+public final class OptionsFilter implements Ordered {
 
     @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = HttpServerConfiguration.PREFIX + ".dispatch-options-requests";
