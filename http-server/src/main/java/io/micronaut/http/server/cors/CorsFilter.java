@@ -74,8 +74,7 @@ public class CorsFilter implements Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-
-
+    
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
     @Nullable
