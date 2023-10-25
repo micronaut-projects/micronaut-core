@@ -35,9 +35,13 @@ import static io.micronaut.http.server.cors.CorsFilter.CORS_FILTER_ORDER;
  * @author Sergio del Amo
  * @since 4.2.0
  */
-@Requires(property = "micronaut.server.dispatch-options-requests", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@Requires(property = OptionsFilter.PREFIX, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ServerFilter(MATCH_ALL_PATTERN)
 public class OptionsFilter implements Ordered {
+
+    @SuppressWarnings("WeakerAccess")
+    public static final String PREFIX = HttpServerConfiguration.PREFIX + ".dispatch-options-requests";
+
     private final Router router;
 
     /**
