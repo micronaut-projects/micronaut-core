@@ -49,7 +49,7 @@ public class ErrorHandlerFluxTest {
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-exception"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.I_AM_A_TEAPOT)
                 .body("Your request is erroneous: Cannot process request.")
                 .build()));
     }
@@ -59,13 +59,17 @@ public class ErrorHandlerFluxTest {
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-single-exception"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.I_AM_A_TEAPOT)
                 .body("Your request is erroneous: Cannot process request.")
                 .build()));
     }
 
     @Test
     void testErrorHandlerWithFluxChunkedSignaledImmediateError() throws IOException {
+        //NOTE - This demonstrates the current behavior of the error handler not getting invoked
+        //when writing a chunked response, even if the error is signaled before any data to be
+        //written to the response body. It would be ideal if in this case the error handler could
+        //still be invoked with the exception from the error signal.
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-chunked-immediate-error"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
@@ -89,7 +93,7 @@ public class ErrorHandlerFluxTest {
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-single-error"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.I_AM_A_TEAPOT)
                 .body("Your request is erroneous: Cannot process request.")
                 .build()));
     }
@@ -134,7 +138,7 @@ public class ErrorHandlerFluxTest {
         @Error(global = true)
         public HttpResponse<String> handleMyTestException(HttpRequest<?> request, MyTestException exception) {
             var error = "Your request is erroneous: " + exception.getMessage();
-            return HttpResponse.<String>status(HttpStatus.BAD_REQUEST, "Bad request")
+            return HttpResponse.<String>status(HttpStatus.I_AM_A_TEAPOT, "Bad request")
                 .body(error);
         }
 
