@@ -46,7 +46,7 @@ class OptionsRequestAttributesSpec extends Specification {
 
         then:
         noExceptionThrown()
-        response.status == HttpStatus.NO_CONTENT
+        response.status == HttpStatus.OK
         response.getHeaders().getAll(HttpHeaders.ALLOW)
         3 == response.getHeaders().getAll(HttpHeaders.ALLOW).size()
         response.getHeaders().getAll(HttpHeaders.ALLOW).contains('GET')

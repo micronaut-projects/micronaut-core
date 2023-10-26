@@ -83,7 +83,7 @@ public class OptionsFilterTest {
         assertion(HttpRequest.OPTIONS("/foo/bar"),
             (server, request) ->
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.NO_CONTENT)
+                    .status(HttpStatus.OK)
                         .assertResponse(httpResponse -> {
                             assertNotNull(httpResponse.getHeaders().get(HttpHeaders.ALLOW));
                             assertNotNull(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW));

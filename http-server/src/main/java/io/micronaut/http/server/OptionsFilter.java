@@ -68,7 +68,7 @@ public final class OptionsFilter implements Ordered {
         if (hasOptionsRouteMatch(request)) {
             return null; // proceed
         }
-        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(HttpStatus.NO_CONTENT);
+        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(HttpStatus.OK);
         router.findAny(request.getUri().toString(), request)
             .map(UriRouteMatch::getHttpMethod)
             .map(HttpMethod::toString)
