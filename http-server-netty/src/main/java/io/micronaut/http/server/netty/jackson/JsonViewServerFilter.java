@@ -86,7 +86,7 @@ public class JsonViewServerFilter implements Ordered {
                 .flatMap(AnnotationValue::classValue);
             if (viewClass.isPresent() &&
                 // if this is an error response, the response body does not come from the controller
-                !response.getAttributes().contains(HttpAttributes.EXCEPTION)) {
+                !response.getAttributes().contains(HttpAttributes.EXCEPTION.toString())) {
 
                 final Optional<?> optionalBody = response.getBody();
                 if (optionalBody.isPresent()) {
