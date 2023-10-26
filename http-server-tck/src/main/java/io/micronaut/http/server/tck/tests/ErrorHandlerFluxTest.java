@@ -117,7 +117,7 @@ public class ErrorHandlerFluxTest {
         }
 
         @Error(global = true)
-        public HttpResponse<String> entityNotFoundHandler(HttpRequest<?> request, MyTestException exception) {
+        public HttpResponse<String> handleMyTestException(HttpRequest<?> request, MyTestException exception) {
             var error = "Your request is erroneous: " + exception.getMessage();
             return HttpResponse.<String>status(HttpStatus.BAD_REQUEST, "Bad request")
                 .body(error);
