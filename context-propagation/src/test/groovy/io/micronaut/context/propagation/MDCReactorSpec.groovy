@@ -17,6 +17,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Patch
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
@@ -55,7 +56,13 @@ class MDCReactorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URL)
+    HttpClient client
+
+    def setup() {
+        def config = new DefaultHttpClientConfiguration()
+        config.setReadTimeout(Duration.ofMinutes(5))
+        client = HttpClient.create(embeddedServer.URL, config)
+    }
 
     void "test MDC propagates"() {
         expect:
