@@ -8,7 +8,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Assertions;
@@ -65,7 +65,7 @@ public class ErrorHandlerFluxTest {
             HttpRequest.GET("/errors/flux-chunked-delayed-error"),
             (server, request) -> {
                 Executable e = () -> server.exchange(request);
-                Assertions.assertThrows(ResponseClosedException.class, e);
+                Assertions.assertThrows(HttpClientException.class, e);
             });
     }
 
