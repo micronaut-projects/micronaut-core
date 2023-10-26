@@ -17,6 +17,8 @@ package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -30,7 +32,6 @@ import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,27 +42,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "checkstyle:MissingJavadocType",
         "checkstyle:DesignForExtension"
 })
-public class FormsSubmissionsWithListsTest {
-    private static final String SPEC_NAME = "FormsSubmissionsWithListsTest";
+public class FormsInputNumberOptionalTest {
+    private static final String SPEC_NAME = "FormsInputNumberOptionalTest";
 
     @Test
-    public void formWithListOfOneItem() throws IOException {
-        String body = "question=en+que+trabajas&usersId=1";
-        String expectedJson = "{\"question\":\"en que trabajas\",\"usersId\":[1]}";
+    public void formSubmissionOptionalInputTypeNumber() throws IOException {
+        String body = "title=Building+Microservices&pages=100";
+        String expectedJson = "{\"title\":\"Building Microservices\",\"pages\":100}";
         assertWithBody(body, expectedJson);
-    }
 
-    @Test
-    public void formWithListOfMoreThanOne() throws IOException {
-        String body = "question=en+que+trabajas&usersId=1&usersId=2";
-        String expectedJson = "{\"question\":\"en que trabajas\",\"usersId\":[1,2]}";
+        body = "title=Building+Microservices&pages=";
+        expectedJson = "{\"title\":\"Building Microservices\"}";
         assertWithBody(body, expectedJson);
     }
 
     private static void assertWithBody(String body, String expectedJson) throws IOException {
         TestScenario.builder()
                 .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/questions/save", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .request(HttpRequest.POST("/book/save", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
                 .assertion((server, request) ->
                         AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                                 .status(HttpStatus.OK)
@@ -74,19 +72,18 @@ public class FormsSubmissionsWithListsTest {
                 .run();
     }
 
-    @Controller("/questions")
     @Requires(property = "spec.name", value = SPEC_NAME)
-    public static class QuestionController {
+    @Controller("/book")
+    static class SaveController {
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Post("/save")
-        QuestionSave save(@Body QuestionSave questionSave) {
-            return questionSave;
+        Book save(@Body Book book) {
+            return book;
         }
     }
 
     @Introspected
-    public record QuestionSave(String question,
-                               List<Long> usersId) {
+    record Book(@NonNull String title, @Nullable Integer pages) {
     }
 
 }
