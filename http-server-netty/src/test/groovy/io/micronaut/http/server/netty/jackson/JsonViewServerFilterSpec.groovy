@@ -138,10 +138,10 @@ class JsonViewServerFilterSpec extends Specification {
         f.response.getBody(JsonError).get().message == "Internal Server Error"
 
         when:
-        client.toBlocking().exchange(HttpRequest.GET('/jsonview/failing-with-route'), TestModel)
+        client.toBlocking().exchange(HttpRequest.GET('/jsonview/failing-with-route'))
 
         then:
-        def e = thrown HttpClientResponseException
+        HttpClientResponseException e = thrown()
         e.response.getBody(JsonError).get().message == "failure2"
     }
 }
