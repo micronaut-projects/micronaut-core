@@ -1,7 +1,7 @@
 package io.micronaut.docs.server.endpoint
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -9,8 +9,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-
-import org.junit.Assert.fail
+import org.junit.jupiter.api.Assertions.fail
 import reactor.core.publisher.Flux
 
 class MessageEndpointSpec: StringSpec() {

@@ -23,19 +23,19 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class MessageEndpointSpec {
+class MessageEndpointSpec {
 
     @Test
-    public void testReadMessageEndpoint() {
+    void testReadMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
@@ -50,7 +50,7 @@ public class MessageEndpointSpec {
     }
 
     @Test
-    public void testWriteMessageEndpoint() {
+    void testWriteMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
@@ -73,7 +73,7 @@ public class MessageEndpointSpec {
     }
 
     @Test
-    public void testDeleteMessageEndpoint() {
+    void testDeleteMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());

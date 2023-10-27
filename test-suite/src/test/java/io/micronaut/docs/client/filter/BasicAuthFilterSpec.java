@@ -20,16 +20,16 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class BasicAuthFilterSpec {
+class BasicAuthFilterSpec {
 
     @Test
-    public void testTheFilterIsApplied() {
+    void testTheFilterIsApplied() {
         try (final EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "BasicAuthFilterSpec"))) {
 
             ApplicationContext applicationContext = server.getApplicationContext();

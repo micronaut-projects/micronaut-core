@@ -19,18 +19,18 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 
 import static io.micronaut.docs.config.env.DataSourceFactory.DataSource;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class EachBeanTest {
+class EachBeanTest {
 
     @Test
-    public void testEachBean() {
+    void testEachBean() {
         // tag::config[]
         ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
                 "test",

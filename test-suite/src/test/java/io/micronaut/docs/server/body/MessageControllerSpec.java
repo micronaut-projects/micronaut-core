@@ -20,27 +20,27 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class MessageControllerSpec {
+class MessageControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -50,7 +50,7 @@ public class MessageControllerSpec {
     }
 
     @Test
-    public void testEchoResponse() {
+    void testEchoResponse() {
         String body = "My Text";
         String response = client.toBlocking().retrieve(
                 HttpRequest.POST("/receive/echo", body)
@@ -60,7 +60,7 @@ public class MessageControllerSpec {
     }
 
     @Test
-    public void testEchoReactiveResponse() {
+    void testEchoReactiveResponse() {
         String body = "My Text";
         String response = client.toBlocking().retrieve(
                 HttpRequest.POST("/receive/echo-publisher", body)

@@ -13,14 +13,14 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert.*
+import jakarta.annotation.PostConstruct
+import jakarta.inject.Inject
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
-import jakarta.annotation.PostConstruct
-import jakarta.inject.Inject
 
 class RefreshEventSpec {
 

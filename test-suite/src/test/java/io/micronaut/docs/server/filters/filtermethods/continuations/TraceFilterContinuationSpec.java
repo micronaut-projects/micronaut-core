@@ -22,16 +22,17 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class TraceFilterContinuationSpec {
+class TraceFilterContinuationSpec {
+
     @Test
-    public void testTraceFilterWithContinuations() {
+    void testTraceFilterWithContinuations() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", HelloControllerSpec.class.getSimpleName());
         map.put("spec.filter", "TraceFilterContinuation");

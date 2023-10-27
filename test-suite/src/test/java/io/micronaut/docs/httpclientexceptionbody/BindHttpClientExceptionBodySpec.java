@@ -23,9 +23,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,13 +36,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class BindHttpClientExceptionBodySpec {
+class BindHttpClientExceptionBodySpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", BindHttpClientExceptionBodySpec.class.getSimpleName());
         map.put("spec.lang", "java");
@@ -51,8 +51,8 @@ public class BindHttpClientExceptionBodySpec {
         client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if (server != null) {
             server.stop();
         }
@@ -63,7 +63,7 @@ public class BindHttpClientExceptionBodySpec {
 
     //tag::test[]
     @Test
-    public void afterAnHttpClientExceptionTheResponseBodyCanBeBoundToAPOJO() {
+    void afterAnHttpClientExceptionTheResponseBodyCanBeBoundToAPOJO() {
         try {
             client.toBlocking().exchange(HttpRequest.GET("/books/1680502395"),
                     Argument.of(Book.class), // <1>
@@ -81,7 +81,7 @@ public class BindHttpClientExceptionBodySpec {
     //end::test[]
 
     @Test
-    public void testExceptionBindingErrorResponse() {
+    void testExceptionBindingErrorResponse() {
         try {
             client.toBlocking().exchange(HttpRequest.GET("/books/1680502395"),
                     Argument.of(Book.class), // <1>
@@ -96,7 +96,7 @@ public class BindHttpClientExceptionBodySpec {
     }
 
     @Test
-    public void verifyBindErrorIsThrown() {
+    void verifyBindErrorIsThrown() {
         try {
             client.toBlocking().exchange(HttpRequest.GET("/books/1491950358"),
                     Argument.of(Book.class),

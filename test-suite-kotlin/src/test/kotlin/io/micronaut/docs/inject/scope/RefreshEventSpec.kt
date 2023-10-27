@@ -13,14 +13,14 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert.*
+import jakarta.annotation.PostConstruct
+import jakarta.inject.Inject
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
-import jakarta.annotation.PostConstruct
-import jakarta.inject.Inject
 
 class RefreshEventSpec {
 
@@ -29,7 +29,11 @@ class RefreshEventSpec {
 
     @BeforeEach
     fun setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to RefreshEventSpec::class.simpleName), Environment.TEST)
+        embeddedServer = ApplicationContext.run(
+            EmbeddedServer::class.java,
+            mapOf("spec.name" to RefreshEventSpec::class.simpleName),
+            Environment.TEST
+        )
         client = HttpClient.create(embeddedServer.url)
     }
 
@@ -52,8 +56,9 @@ class RefreshEventSpec {
         val response = evictForecast()
 
         assertEquals(
-                // tag::evictResponse[]
-                "{\"msg\":\"OK\"}", response)// end::evictResponse[]
+            // tag::evictResponse[]
+            "{\"msg\":\"OK\"}", response
+        )// end::evictResponse[]
 
         val thirdResponse = fetchForecast()
 
@@ -66,10 +71,12 @@ class RefreshEventSpec {
     }
 
     fun evictForecast(): String {
-        return client.toBlocking().retrieve(HttpRequest.POST(
+        return client.toBlocking().retrieve(
+            HttpRequest.POST(
                 "/weather/evict",
                 emptyMap<String, String>()
-        ))
+            )
+        )
     }
 
     //tag::weatherService[]
@@ -90,7 +97,10 @@ class RefreshEventSpec {
 
     @Requires(property = "spec.name", value = "RefreshEventSpec")
     @Controller("/weather")
-    open class WeatherController(@Inject private val weatherService: WeatherService, @Inject private val applicationContext: ApplicationContext) {
+    open class WeatherController(
+        @Inject private val weatherService: WeatherService,
+        @Inject private val applicationContext: ApplicationContext
+    ) {
 
         @Get(value = "/forecast")
         fun index(): MutableHttpResponse<Map<String, String?>>? {

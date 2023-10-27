@@ -2,7 +2,7 @@ package io.micronaut.docs.config.converters
 
 import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
-import org.junit.Assert.assertEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import java.time.LocalDate
 
 //tag::configSpec[]
@@ -26,7 +26,7 @@ class MyConfigurationPropertiesSpec : AnnotationSpec() {
 
     @AfterEach
     fun teardown() {
-        ctx?.close()
+        ctx.close()
     }
     //end::runContext[]
 

@@ -3,8 +3,8 @@ package io.micronaut.docs.context.env
 import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class EnvironmentSpec :  StringSpec({
 

@@ -8,10 +8,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import static io.micronaut.docs.config.env.DataSourceFactory.DataSource
-import static org.junit.Assert.assertEquals
 
 class EachBeanTest extends Specification {
-    
+
     @AutoCleanup
     @Shared
     // tag::config[]
@@ -28,8 +27,11 @@ class EachBeanTest extends Specification {
         // tag::beans[]
         when:
         Collection<DataSource> beansOfType = applicationContext.getBeansOfType(DataSource)
-        assertEquals(2, beansOfType.size()) // <1>
 
+        then:
+        beansOfType.size() == 2 // <1>
+
+        when:
         DataSource firstConfig = applicationContext.getBean(
                 DataSource,
                 Qualifiers.byName("one") // <2>

@@ -1,9 +1,9 @@
 package io.micronaut.docs.server.uris
 
 import io.micronaut.http.uri.UriMatchTemplate
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
 class UriTemplateTest {
 

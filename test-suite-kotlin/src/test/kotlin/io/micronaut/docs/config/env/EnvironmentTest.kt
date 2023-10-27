@@ -2,13 +2,9 @@ package io.micronaut.docs.config.env
 
 import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.util.CollectionUtils
-import org.junit.Test
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.jupiter.api.Assertions
 
 class EnvironmentTest: AnnotationSpec(){
 
@@ -18,8 +14,8 @@ class EnvironmentTest: AnnotationSpec(){
         val applicationContext = ApplicationContext.run("test", "android")
         val environment = applicationContext.environment
 
-        assertTrue(environment.activeNames.contains("test"))
-        assertTrue(environment.activeNames.contains("android"))
+        Assertions.assertTrue(environment.activeNames.contains("test"))
+        Assertions.assertTrue(environment.activeNames.contains("android"))
         // end::env[]
         applicationContext.close()
     }
@@ -38,9 +34,9 @@ class EnvironmentTest: AnnotationSpec(){
                 "test", "android")
         val environment = applicationContext.environment
 
-        assertEquals(
-                "foo",
-                environment.getProperty("micronaut.server.host", String::class.java).orElse("localhost")
+        Assertions.assertEquals(
+            "foo",
+            environment.getProperty("micronaut.server.host", String::class.java).orElse("localhost")
         )
         // end::envProps[]
         applicationContext.close()

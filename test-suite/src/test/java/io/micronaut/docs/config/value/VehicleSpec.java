@@ -19,16 +19,16 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicleWithConfiguration() {
+    void testStartVehicleWithConfiguration() {
         // tag::start[]
         ApplicationContext applicationContext = new DefaultApplicationContext("test");
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
@@ -44,7 +44,7 @@ public class VehicleSpec {
     }
 
     @Test
-    public void testStartVehicleWithoutConfiguration() {
+    void testStartVehicleWithoutConfiguration() {
         // tag::start[]
         ApplicationContext applicationContext = new DefaultApplicationContext("test");
         applicationContext.start();

@@ -22,30 +22,30 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class EmailControllerSpec {
+class EmailControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "datavalidationpogo"));
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if (server != null) {
             server.stop();
         }
@@ -56,7 +56,7 @@ public class EmailControllerSpec {
 
     //tag::pojovalidated[]
     @Test
-    public void testPojoValidation() {
+    void testPojoValidation() {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> {
             Email email = new Email();
             email.subject = "Hi";

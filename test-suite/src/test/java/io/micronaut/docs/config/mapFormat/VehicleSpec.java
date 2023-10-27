@@ -16,17 +16,17 @@
 package io.micronaut.docs.config.mapFormat;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         Map<String, Object> map = new LinkedHashMap<>(2);
         map.put("my.engine.cylinders", "8");

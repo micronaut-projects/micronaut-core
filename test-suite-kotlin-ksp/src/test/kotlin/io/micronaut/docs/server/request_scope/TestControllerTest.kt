@@ -5,7 +5,6 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.Test
 
 @Property(name = "spec.name", value = "TestControllerTest")
@@ -25,15 +24,17 @@ internal class TestControllerTest(
     fun `should clear request scope in subsequent request`() {
         val responseWithoutInput = client.toBlocking().exchange("/testEndpoint", DemoObject::class.java)
         assertEquals(200, responseWithoutInput.status.code)
-        assertEquals("defaultText", responseWithoutInput.body()!!.text )
+        assertEquals("defaultText", responseWithoutInput.body()!!.text)
 
-        val responseWithInputAsResult = client.toBlocking().exchange("/testEndpoint?text=inputText", DemoObject::class.java)
+        val responseWithInputAsResult =
+            client.toBlocking().exchange("/testEndpoint?text=inputText", DemoObject::class.java)
         assertEquals(200, responseWithInputAsResult.status.code)
-        assertEquals("inputText", responseWithInputAsResult.body()!!.text )
+        assertEquals("inputText", responseWithInputAsResult.body()!!.text)
 
-        val responseWithoutInputAfterCallWithInput = client.toBlocking().exchange("/testEndpoint", DemoObject::class.java)
+        val responseWithoutInputAfterCallWithInput =
+            client.toBlocking().exchange("/testEndpoint", DemoObject::class.java)
         assertEquals(200, responseWithoutInputAfterCallWithInput.status.code)
         // this should be again defaultText, but the request context is not cleared and thus this assert fails
-        assertEquals("defaultText", responseWithoutInputAfterCallWithInput.body()!!.text )
+        assertEquals("defaultText", responseWithoutInputAfterCallWithInput.body()!!.text)
     }
 }

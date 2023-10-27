@@ -5,9 +5,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.docs.config.env.DataSourceFactory.DataSource
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import java.net.URISyntaxException
 
 class EachBeanTest : AnnotationSpec() {

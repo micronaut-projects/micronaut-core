@@ -3,22 +3,21 @@ package io.micronaut.docs.sse
 import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-
-class HeadlineControllerSpec: StringSpec() {
+class HeadlineControllerSpec : StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+        ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     init {
         // tag::streamingClient[]
         "test client annotations streaming" {
             val headlineClient = embeddedServer
-                    .applicationContext
-                    .getBean(HeadlineClient::class.java)
+                .applicationContext
+                .getBean(HeadlineClient::class.java)
 
             val headline = headlineClient.streamHeadlines().blockFirst()
 

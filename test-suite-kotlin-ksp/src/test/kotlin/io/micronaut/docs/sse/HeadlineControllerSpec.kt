@@ -3,9 +3,8 @@ package io.micronaut.docs.sse
 import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
-
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class HeadlineControllerSpec: StringSpec() {
 

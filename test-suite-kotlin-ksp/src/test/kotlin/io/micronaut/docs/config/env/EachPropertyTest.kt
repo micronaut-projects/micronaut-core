@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.Assert.assertEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.stream.Collectors
