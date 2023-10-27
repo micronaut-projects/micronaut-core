@@ -3,13 +3,11 @@ plugins {
     id "io.micronaut.build.internal.convention-base"
 }
 
-configurations {
-    all {
-        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-            String group = details.requested.group
-            if (group == 'org.ow2.asm') {
-                details.useVersion(libs.versions.asm.get())
-            }
+configurations.configureEach {
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        String group = details.requested.group
+        if (group == 'org.ow2.asm') {
+            details.useVersion(libs.versions.asm.get())
         }
     }
 }

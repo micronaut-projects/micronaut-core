@@ -5,7 +5,7 @@ plugins {
 }
 
 tasks.named("htmlSanityCheck") {
-    sourceDir = new File("${rootProject.buildDir}/docs/guide/")
+    sourceDir = file("${rootProject.layout.buildDirectory.asFile.get()}/docs/guide/")
     sourceDocuments = fileTree(sourceDir) {
         include "index.html"
     }
