@@ -24,7 +24,6 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
-import reactor.core.publisher.Flux;
 
 import java.util.Date;
 import java.util.HashMap;

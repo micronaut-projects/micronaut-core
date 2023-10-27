@@ -22,7 +22,6 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 /**
  * @author graemerocher

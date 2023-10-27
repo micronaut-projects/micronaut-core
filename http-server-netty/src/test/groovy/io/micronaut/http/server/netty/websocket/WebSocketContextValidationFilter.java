@@ -9,7 +9,6 @@ import io.micronaut.http.filter.FilterChain;
 import io.micronaut.http.filter.HttpFilter;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.reactivestreams.Publisher;
 

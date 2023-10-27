@@ -17,7 +17,6 @@ package io.micronaut.inject.beans;
 
 import io.micronaut.aop.proxytarget.Mutating;
 import io.micronaut.context.annotation.Context;
-import io.micronaut.scheduling.annotation.Async;
 
 @Context
 public class ContextScopedInterceptedBean {

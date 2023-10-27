@@ -20,7 +20,6 @@ import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.Test;
-import spock.lang.Specification;
 
 import java.util.LinkedHashMap;
 

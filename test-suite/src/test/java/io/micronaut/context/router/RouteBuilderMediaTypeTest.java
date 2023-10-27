@@ -1,6 +1,5 @@
 package io.micronaut.context.router;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Executable;
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @Property(name = "micronaut.http.client.follow-redirects", value = StringUtils.FALSE)
 @Property(name = "spec.name", value = "RouteBuilderMediaTypeSpec")

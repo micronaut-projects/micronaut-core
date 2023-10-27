@@ -16,12 +16,10 @@
 package io.micronaut.http.client.docs.binding;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.hamcrest.CoreMatchers;
 import org.junit.Rule;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
