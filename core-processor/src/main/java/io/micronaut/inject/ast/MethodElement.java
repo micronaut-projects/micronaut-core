@@ -252,6 +252,7 @@ public interface MethodElement extends MemberElement {
      * @param simple If simple type names are to be used
      * @return The method description
      */
+    @Override
     default @NonNull String getDescription(boolean simple) {
         String typeString = simple ? getReturnType().getSimpleName() : getReturnType().getName();
         String args = Arrays.stream(getParameters()).map(arg -> simple ? arg.getType().getSimpleName() : arg.getType().getName() + " " + arg.getName()).collect(Collectors.joining(","));

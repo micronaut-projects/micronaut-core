@@ -210,6 +210,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The array size threshold to use when using Jackson for data binding
      */
+    @Override
     public int getArraySizeThreshold() {
         return arraySizeThreshold;
     }
@@ -227,6 +228,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @return True if _embedded.errors should always be serialized as list.
      */
+    @Override
     public boolean isAlwaysSerializeErrorsAsList() {
         return alwaysSerializeErrorsAsList;
     }

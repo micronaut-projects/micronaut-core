@@ -161,14 +161,17 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     @Override
     public Collection<V> values() {
         return new AbstractCollection<V>() {
+            @Override
             public Iterator<V> iterator() {
                 return new Iterator<V>() {
                     private int index = 0;
 
+                    @Override
                     public boolean hasNext() {
                         return index < values.length;
                     }
 
+                    @Override
                     public V next() {
                         if (hasNext()) {
                             V v = (V) values[index];
@@ -178,24 +181,29 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
                         throw new NoSuchElementException();
                     }
 
+                    @Override
                     public void remove() {
                         throw new UnsupportedOperationException();
                     }
                 };
             }
 
+            @Override
             public int size() {
                 return ImmutableSortedStringsArrayMap.this.size();
             }
 
+            @Override
             public boolean isEmpty() {
                 return ImmutableSortedStringsArrayMap.this.isEmpty();
             }
 
+            @Override
             public void clear() {
                 ImmutableSortedStringsArrayMap.this.clear();
             }
 
+            @Override
             public boolean contains(Object v) {
                 return ImmutableSortedStringsArrayMap.this.containsValue(v);
             }

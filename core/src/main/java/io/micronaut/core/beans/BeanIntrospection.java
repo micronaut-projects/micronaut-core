@@ -126,6 +126,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      *
      * @return The bean type
      */
+    @Override
     @NonNull Class<T> getBeanType();
 
     /**
