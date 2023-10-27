@@ -24,10 +24,12 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
 
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.MonthDay;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
@@ -39,6 +41,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalQuery;
@@ -150,8 +153,16 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
                 DateTimeFormatter formatter = resolveFormatter(context);
+                if (formatter.equals(DateTimeFormatter.RFC_1123_DATE_TIME) && !object.isSupported(ChronoField.OFFSET_SECONDS)) {
+                    // RFC 1123 is our default output but requires a zone, which LDT/LT don't support. Fall back on ISO 8601.
+                    if (object instanceof LocalDateTime) {
+                        return Optional.of(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(object));
+                    } else if (object instanceof LocalTime) {
+                        return Optional.of(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(object));
+                    }
+                }
                 return Optional.of(formatter.format(object));
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeException e) {
                 context.reject(object, e);
                 return Optional.empty();
             }
@@ -160,27 +171,6 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 TemporalAccessor.class,
                 CharSequence.class,
                 temporalConverter
-        );
-
-        /*
-         * There's a not-a-bug <a href="https://bugs.openjdk.org/browse/JDK-8069324">JDK-8069324</a>
-         * which unexpectedly fail because offset is mandatory for RFC_1123
-         * To work around this we use special converter for LocalDateTime treating it as UTC timezone
-         */
-        final TypeConverter<LocalDateTime, CharSequence> localDateTimeConverter = (object, targetType, context) -> {
-            try {
-                DateTimeFormatter formatter = resolveFormatter(context);
-                // Treat missing zone as UTC
-                return Optional.of(formatter.format(object.atOffset(ZoneOffset.UTC)));
-            } catch (DateTimeParseException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        };
-        conversionService.addConverter(
-            LocalDateTime.class,
-            CharSequence.class,
-            localDateTimeConverter
         );
 
         addTemporalStringConverter(conversionService, Instant.class, DateTimeFormatter.ISO_INSTANT, Instant::from);
