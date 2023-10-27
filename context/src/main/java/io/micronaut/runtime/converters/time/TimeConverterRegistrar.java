@@ -29,7 +29,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.MonthDay;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
@@ -154,10 +153,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             try {
                 DateTimeFormatter formatter = resolveFormatter(context);
                 if (formatter.equals(DateTimeFormatter.RFC_1123_DATE_TIME) && !object.isSupported(ChronoField.OFFSET_SECONDS)) {
-                    // RFC 1123 is our default output but requires a zone, which LDT/LT don't support. Fall back on ISO 8601.
+                    // RFC 1123 is our default output but requires a zone, which LDT doesn't support. Fall back on ISO 8601.
                     if (object instanceof LocalDateTime) {
-                        return Optional.of(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(object));
-                    } else if (object instanceof LocalTime) {
                         return Optional.of(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(object));
                     }
                 }
