@@ -77,7 +77,7 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
     /**
      * Deletes the underlying storage for a file item, including deleting any associated temporary disk file.
      *
-     * @return A {@link Publisher} that outputs whether the delete was successful
+     * @return A {@link Publisher} that outputs whether to delete was successful
      */
     Publisher<Boolean> delete();
 

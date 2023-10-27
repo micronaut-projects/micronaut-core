@@ -69,7 +69,7 @@ snippet::io.micronaut.docs.server.binding.BookmarkController[tags="imports,class
 
 == Binding from Multiple Bindable values
 
-Instead of binding just query values, it is also possible to bind any Bindable value to a POJO (e.g. to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to a single POJO). This can be achieved with the `@RequestBean` annotation and a custom Bean class with fields with Bindable annotations, or fields that can be bound by type (e.g. `HttpRequest`, `BasicAuth`, `Authentication`, etc.).
+Instead of binding just query values, it is also possible to bind any Bindable value to a POJO (e.g. to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to a single POJO). This can be achieved with the `@RequestBean` annotation and a custom Bean class with fields with Bindable annotations, or fields that can be bound by type (e.g. `HttpRequest`, `BasicAuth`, `Authentication`, etc).
 
 For example:
 
@@ -96,7 +96,7 @@ The handling of nullability deserves special mention. Consider for example the f
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header2",indent=0]
 
-In this case, if the HTTP header `Content-Type` is not present in the request, the route is considered invalid, since it cannot be satisfied, and a HTTP 400 `BAD REQUEST` is returned.
+In this case, if the HTTP header `Content-Type` is not present in the request, the route is considered invalid, since it cannot be satisfied, and an HTTP 400 `BAD REQUEST` is returned.
 
 To make the `Content-Type` header optional, you can instead write:
 

@@ -10,7 +10,7 @@ double injectedValue;
 
 Expressions can be defined whenever an annotation member accepts a string or an array of strings.
 
-NOTE: Expressions are currently not supported for "type use" annotations (annotations that declare `ElementType.TYPE_USE`).
+NOTE: Expressions are currently not supported for "type use" annotations (that declare `ElementType.TYPE_USE`).
 
 .Evaluated Expression in array
 [source,java]

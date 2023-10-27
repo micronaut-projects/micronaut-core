@@ -66,7 +66,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
 
     @Override
     public final void finish() {
-        // for Java we only write out service entries for the Eclipse compiler because
+        // for Java, we only write out service entries for the Eclipse compiler because
         // for javac we support incremental compilation via ServiceDescriptionProcessor
         // this approach doesn't work in Eclipse.
         // see https://bugs.eclipse.org/bugs/show_bug.cgi?id=567116

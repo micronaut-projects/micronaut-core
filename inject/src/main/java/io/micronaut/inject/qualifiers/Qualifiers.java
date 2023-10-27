@@ -53,7 +53,7 @@ public class Qualifiers {
      * the first matching instance will be returned.</p>
      *
      * @param <T> The generic type
-     * @return The any qualifier.
+     * @return Any qualifier.
      * @see Any
      * @since 3.0.0
      */

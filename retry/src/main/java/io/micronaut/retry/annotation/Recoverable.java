@@ -45,7 +45,7 @@ public @interface Recoverable {
      * Used to specify the API to lookup fallbacks for. This is useful in cases
      * where the fallback is not a direct subclass of the implementation.
      *
-     * @return The API to lookup a fallback for
+     * @return The API to look up a fallback for
      * @since 2.0.0
      * @see Fallback
      */

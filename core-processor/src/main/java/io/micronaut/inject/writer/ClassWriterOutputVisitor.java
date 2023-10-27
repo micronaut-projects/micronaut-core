@@ -93,7 +93,7 @@ public interface ClassWriterOutputVisitor {
     void visitServiceDescriptor(String type, String classname, Element originatingElement);
 
     /**
-     * Visit a file within the META-INF directory of the classes directory.
+     * Visit a file within the META-INF directory of the 'classes' directory.
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
@@ -106,7 +106,7 @@ public interface ClassWriterOutputVisitor {
     }
 
     /**
-     * Visit a file within the META-INF directory of the classes directory.
+     * Visit a file within the META-INF directory of the 'classes' directory.
      *
      * @param path The path to the file
      * @param originatingElements The originating elements
@@ -115,7 +115,7 @@ public interface ClassWriterOutputVisitor {
     Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements);
 
     /**
-     * Visit a file that will be generated within the generated sources directory.
+     * Visit a file that will be generated within the generated 'sources' directory.
      *
      * @param path The path
      * @return The file if it was possible to create it
@@ -125,7 +125,7 @@ public interface ClassWriterOutputVisitor {
     Optional<GeneratedFile> visitGeneratedFile(String path);
 
     /**
-     * Visit a file that will be generated within the generated sources directory.
+     * Visit a file that will be generated within the generated 'sources' directory.
      *
      * @param path The path
      * @param originatingElements  the originating elements
@@ -135,7 +135,7 @@ public interface ClassWriterOutputVisitor {
     Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements);
 
     /**
-     * Visit a source file that will be generated within the generated sources directory.
+     * Visit a source file that will be generated within the generated 'sources' directory.
      *
      * @param packageName The package for the source file
      * @param fileNameWithoutExtension the name of the source file, without extension (determined automatically)
