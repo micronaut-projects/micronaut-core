@@ -129,15 +129,14 @@ interface X {
 
 abstract class Y : X {
 
-    override fun test(){
+    override fun test() {
     }
-
 }
 
 @Singleton
 class Z : Y() {
 
-    override fun test(){
+    override fun test() {
     }
 }
 """)

@@ -36,21 +36,21 @@ public class PrimarySpec {
 
     private static HttpClient client;
 
-
     @BeforeClass
-    public static void setup(){
+    public static void setup() {
         embeddedServer = ApplicationContext.run(EmbeddedServer.class, new HashMap<String, Object>() {{
             put("spec.name", "primaryspec");
             put("spec.lang", "java");
         }}, Environment.TEST);
         client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
     }
+
     @AfterClass
-    public static void teardown(){
-        if(client != null){
+    public static void teardown() {
+        if (client != null) {
             client.close();
         }
-        if(embeddedServer != null){
+        if (embeddedServer != null) {
             embeddedServer.close();
         }
     }

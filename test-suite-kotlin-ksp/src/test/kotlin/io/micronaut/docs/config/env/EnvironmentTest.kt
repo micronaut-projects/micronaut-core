@@ -10,7 +10,7 @@ import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 
-class EnvironmentTest: AnnotationSpec(){
+class EnvironmentTest : AnnotationSpec() {
 
     @Test
     fun testRunEnvironment() {

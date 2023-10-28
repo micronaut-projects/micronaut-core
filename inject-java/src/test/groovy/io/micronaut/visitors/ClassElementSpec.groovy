@@ -1337,7 +1337,6 @@ enum Test {
     }
 
     @Issue("https://github.com/eclipse-ee4j/cdi-tck/blob/master/lang-model/src/main/java/org/jboss/cdi/lang/model/tck/InheritedMethods.java")
-    @Requires({ jvm.isJava9Compatible() })
     // private static Since Java 9
     void "test inherited methods using ElementQuery"() {
         given:

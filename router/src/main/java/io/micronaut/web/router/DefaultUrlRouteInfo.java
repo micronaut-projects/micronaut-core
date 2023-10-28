@@ -54,6 +54,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final ExecutorSelector executorSelector;
     private boolean noExecutor;
 
+    @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
                                UriMatchTemplate uriMatchTemplate,
                                Charset defaultCharset,

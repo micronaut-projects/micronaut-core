@@ -19,7 +19,7 @@ import spock.lang.Timeout
 import java.time.Duration
 import java.util.function.Supplier
 
-@Requires({ jvm.current.isJava11Compatible() }) // java.net.http.HttpClient
+// java.net.http.HttpClient
 class ConcurrentFormTransferSpec extends Specification {
     private Class<?> loadClass(String clientName) {
         getClass().classLoader.loadClass(clientName)

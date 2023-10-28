@@ -781,7 +781,7 @@ import jakarta.inject.*
 @Bean(typed = [Runnable::class])
 class Test: Runnable {
 
-    override fun run(){
+    override fun run() {
     }
 }
 

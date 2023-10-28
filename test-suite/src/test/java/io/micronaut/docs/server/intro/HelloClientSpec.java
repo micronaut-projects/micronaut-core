@@ -29,13 +29,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Property(name = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @MicronautTest // <1>
-public class HelloClientSpec  {
+public class HelloClientSpec {
 
     @Inject
     HelloClient client; // <2>
 
     @Test
-    public void testHelloWorldResponse(){
+    public void testHelloWorldResponse() {
         assertEquals("Hello World", Mono.from(client.hello()).block());// <3>
     }
 }

@@ -51,7 +51,7 @@ class ReadTimeoutSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run(
-            "micronaut.http.client.readTimeout":'3s',
+            "micronaut.http.client.readTimeout": '3s',
             'spec.name': 'ReadTimeoutSpec'
     )
 
@@ -76,9 +76,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'10s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'micronaut.http.client.read-timeout': '10s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -89,14 +89,14 @@ class ReadTimeoutSpec extends Specification {
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
 
-        when:"issue a whole bunch of requests"
+        when: "issue a whole bunch of requests"
         AtomicInteger integer = new AtomicInteger(0)
         def results = (1..50).collect() { // larger than available connections
-            CompletableFuture.supplyAsync({->
+            CompletableFuture.supplyAsync({ ->
                 client.toBlocking().retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String)
             })
 
-        }.collect({ it.get()})
+        }.collect({ it.get() })
 
         then:"Every result is correct"
         results.size() == 50
@@ -112,9 +112,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'10s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'micronaut.http.client.read-timeout': '10s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -146,9 +146,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'10s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'micronaut.http.client.read-timeout': '10s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -178,9 +178,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'3s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'micronaut.http.client.read-timeout': '3s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -211,9 +211,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'3s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'micronaut.http.client.read-timeout': '3s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -227,11 +227,11 @@ class ReadTimeoutSpec extends Specification {
 
         when:"issue a whole bunch of requests"
         def results = (1..25).collect() { // larger than available connections
-            CompletableFuture.supplyAsync({->
+            CompletableFuture.supplyAsync({ ->
                 client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
             })
 
-        }.collect({ it.get()})
+        }.collect({ it.get() })
 
         then:"Every result is correct"
         results.size() == 25
@@ -247,9 +247,9 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'1s',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':1
+                'micronaut.http.client.read-timeout': '1s',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 1
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
         when:
@@ -276,10 +276,10 @@ class ReadTimeoutSpec extends Specification {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'spec.name': 'ReadTimeoutSpec',
-                'my.port':embeddedServer.getPort(),
-                'micronaut.http.client.read-timeout':'1ms',
-                'micronaut.http.client.pool.enabled':true,
-                'micronaut.http.client.pool.max-connections':10
+                'my.port': embeddedServer.getPort(),
+                'micronaut.http.client.read-timeout': '1ms',
+                'micronaut.http.client.pool.enabled': true,
+                'micronaut.http.client.pool.max-connections': 10
         )
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -290,7 +290,8 @@ class ReadTimeoutSpec extends Specification {
         }.each {
             try {
                 it.join()
-            } catch (Throwable e){ }
+            } catch (Throwable e) {
+            }
         }
 
         def clients = clientContext.getBean(DefaultNettyHttpClientRegistry).unbalancedClients
@@ -320,8 +321,8 @@ class ReadTimeoutSpec extends Specification {
         given:
 
         ApplicationContext clientContext = ApplicationContext.run([
-                'spec.name': 'ReadTimeoutSpec',
-                'micronaut.http.client.read-timeout':'-1s'])
+                'spec.name'                         : 'ReadTimeoutSpec',
+                'micronaut.http.client.read-timeout': '-1s'])
         def server = clientContext.getBean(EmbeddedServer).start()
         HttpClient client = clientContext.createBean(HttpClient, server.getURL())
         when:

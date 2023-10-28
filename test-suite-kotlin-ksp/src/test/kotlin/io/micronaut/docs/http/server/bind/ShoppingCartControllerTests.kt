@@ -12,7 +12,7 @@ import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.jupiter.api.Assertions
 
-class ShoppingCartControllerTest: StringSpec(){
+class ShoppingCartControllerTest: StringSpec() {
 
     val embeddedServer = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java)

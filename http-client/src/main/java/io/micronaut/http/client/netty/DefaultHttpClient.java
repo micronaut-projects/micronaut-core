@@ -407,7 +407,6 @@ public class DefaultHttpClient implements
         this((URI) null, new DefaultHttpClientConfiguration());
     }
 
-
     /**
      * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
