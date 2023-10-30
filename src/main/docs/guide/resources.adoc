@@ -1,0 +1,9 @@
+Micronaut Framework provides support for loading resources from files into memory, rooted at the api:core.io.ResourceLoader[] API. Two built-in implementations include api:core.io.file.DefaultFileSystemResourceLoader[] and api:core.io.scan.DefaultClassPathResourceLoader[].
+
+A convenience class api:core.io.ResourceResolver[] is provided that leverages both of these  implementations. The following example illustrates using the API to read a text file from the classpath.
+
+snippet::io.micronaut.docs.resources.MyResourceLoader[tags="class",indent=0,title="ResourceResolver Example"]
+
+<1> Injects an instance of `ResourceResolver`
+<2> Uses the `ResourceResolver` API to get a `URL` to a file in the classpath, if it exists.
+<3> api:core.io.IOUtils[] provides further support for I/O operations, in this case reading the file contents into a String.
