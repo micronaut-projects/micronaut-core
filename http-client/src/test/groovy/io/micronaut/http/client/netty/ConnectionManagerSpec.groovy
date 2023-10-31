@@ -28,6 +28,7 @@ import io.netty.channel.ChannelId
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.ChannelPromise
+import io.netty.channel.EventLoop
 import io.netty.channel.ServerChannel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
@@ -95,7 +96,22 @@ class ConnectionManagerSpec extends Specification {
             protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
                 try {
                     def connection = connections[i++]
-                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer)
+                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
+                        def loop
+
+                        @Override
+                        EventLoop eventLoop() {
+                            if (loop == null) {
+                                loop = new DelegateEventLoop(super.eventLoop()) {
+                                    @Override
+                                    boolean inEventLoop() {
+                                        return connection.inEventLoop
+                                    }
+                                }
+                            }
+                            return loop
+                        }
+                    }
                     def promise = connection.clientChannel.newPromise()
                     promise.setSuccess()
                     return promise
@@ -1081,6 +1097,51 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'timeout before dispatch0'(boolean http2) {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.read-timeout': '1s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn
+        if (http2) {
+            conn = new EmbeddedTestConnectionHttp2()
+            conn.setupHttp2Tls()
+        } else {
+            conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+        }
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        if (http2) {
+            conn.exchangeSettings()
+        }
+        conn.testExchangeResponse(r1)
+        conn.clientChannel.unfreezeTime()
+        // trigger timeout
+        TimeUnit.SECONDS.sleep(2)
+
+        // second request
+        // this triggers the dispatch0 logic to be delayed with execute
+        conn.inEventLoop = false
+        def future = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.inEventLoop = true
+        conn.clientChannel.runScheduledPendingTasks()
+        conn.advance()
+        conn.testExchangeResponse(future)
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        http2 << [false, true]
+    }
+
     void assertPoolConnections(DefaultHttpClient client, int count) {
         assert client.connectionManager.getChannels().size() == count
         client.connectionManager.getChannels().forEach { assert it.isActive() }
@@ -1097,6 +1158,7 @@ class ConnectionManagerSpec extends Specification {
                 EmbeddedTestUtil.connect(serverChannel, ch)
             }
         }
+        boolean inEventLoop = true
 
         EmbeddedTestConnectionBase() {
             serverChannel = new EmbeddedServerChannel(new DummyChannelId('server'))
