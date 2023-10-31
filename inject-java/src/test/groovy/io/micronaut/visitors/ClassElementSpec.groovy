@@ -2936,6 +2936,24 @@ class MyBean {
             type.hasAnnotation(Valid)
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/10042')
+    void "private record"() {
+        given:
+        def outerElement = buildClassElement("""
+package test;
+
+class Outer {
+    private record Rec(String foo) {
+
+    }
+}
+""")
+        def recordElement = outerElement.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get()
+
+        expect:
+        recordElement.getPrimaryConstructor().isEmpty()
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
