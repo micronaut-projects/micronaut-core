@@ -24,6 +24,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
 
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalQuery;
@@ -150,8 +152,14 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
                 DateTimeFormatter formatter = resolveFormatter(context);
+                if (formatter.equals(DateTimeFormatter.RFC_1123_DATE_TIME) && !object.isSupported(ChronoField.OFFSET_SECONDS)) {
+                    // RFC 1123 is our default output but requires a zone, which LDT doesn't support. Fall back on ISO 8601.
+                    if (object instanceof LocalDateTime) {
+                        return Optional.of(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(object));
+                    }
+                }
                 return Optional.of(formatter.format(object));
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeException e) {
                 context.reject(object, e);
                 return Optional.empty();
             }
