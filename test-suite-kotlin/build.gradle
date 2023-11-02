@@ -82,10 +82,6 @@ configurations.testRuntimeClasspath {
     }
 }
 
-tasks.named("compileTestKotlin") {
-    kotlinOptions.jvmTarget = "17"
-}
-
 tasks.named("test") {
     useJUnitPlatform()
 }

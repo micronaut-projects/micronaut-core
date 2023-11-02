@@ -57,7 +57,11 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	/** Generate metadata for Java 1.8 reflection on method parameters */
 	var javaParameters: Boolean = false
 
-	/** Use the IR backend */
+    /**
+     * Use the IR backend
+     *
+     * @deprecated Removed in 1.9.20
+     */
 	var useIR: Boolean = false
 
 	/** Use the old JVM backend */
@@ -267,7 +271,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 		args.jvmTarget = jvmTarget
 		args.javaParameters = javaParameters
-		args.useIR = useIR
 		args.useOldBackend = useOldBackend
 
 		if(javaModulePath != null)
