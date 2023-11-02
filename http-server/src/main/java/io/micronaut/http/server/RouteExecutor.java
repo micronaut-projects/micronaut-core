@@ -757,7 +757,7 @@ public final class RouteExecutor {
                 }
                 bufferWritten = true;
                 bufferedFirstValue = null;
-                subscriber.request(Long.MAX_VALUE);
+                bodySink.onRequest(subscriber::request);
             }
         }
 
