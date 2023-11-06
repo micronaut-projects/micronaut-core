@@ -3,6 +3,8 @@ package io.micronaut.http.server.netty.configuration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.NettyEmbeddedServer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
@@ -13,7 +15,9 @@ import io.netty.channel.ChannelInitializer
 import io.netty.channel.epoll.Epoll
 import io.netty.channel.epoll.EpollDomainSocketChannel
 import io.netty.channel.epoll.EpollEventLoopGroup
+import io.netty.channel.epoll.EpollServerSocketChannel
 import io.netty.channel.unix.DomainSocketAddress
+import io.netty.channel.unix.Socket
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
@@ -212,5 +216,34 @@ class ListenerConfigurationSpec extends Specification {
 
         where:
         abstract_ << [true, false]
+    }
+
+    @IgnoreIf({ !Epoll.isAvailable() })
+    def 'attach to existing fd'() {
+        given:
+        // set up a server fd like systemd does
+        def initCh = new EpollServerSocketChannel()
+        def sock = (Socket) initCh.fd()
+        sock.bind(new InetSocketAddress("127.0.0.1", 0))
+        sock.listen(0)
+
+        def server = (NettyEmbeddedServer) ApplicationContext.run(
+                EmbeddedServer,
+                [
+                        'micronaut.netty.event-loops.default.prefer-native-transport': true,
+                        'micronaut.netty.event-loops.parent.prefer-native-transport': true,
+                        'micronaut.server.netty.listeners.a.bind': false,
+                        'micronaut.server.netty.listeners.a.fd': sock.intValue(),
+                ])
+        def client = server.applicationContext.createBean(HttpClient, "http://localhost:" + sock.localAddress().port).toBlocking()
+
+        when:
+        client.retrieve("/")
+        then:
+        thrown HttpClientResponseException
+
+        cleanup:
+        client.close()
+        server.close()
     }
 }

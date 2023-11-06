@@ -194,6 +194,18 @@ public interface NettyEmbeddedServices {
     }
 
     /**
+     * Gets the domain server socket channel instance.
+     * @param type The channel type to return
+     * @param workerConfig The worker config
+     * @param fd The pre-defined file descriptor
+     * @return The channel
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, int fd) {
+        throw new UnsupportedOperationException("File descriptor channels not supported");
+    }
+
+    /**
      * Get an event publisher for the server for the given type.
      * @param eventClass The event publisher
      * @param <E> The event generic type

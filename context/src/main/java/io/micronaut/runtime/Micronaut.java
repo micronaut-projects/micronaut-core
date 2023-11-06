@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -90,7 +89,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URI uri = embeddedServer.getContextURI();
+                                Object uri;
+                                try {
+                                    uri = embeddedServer.getContextURI();
+                                } catch (UnsupportedOperationException e) {
+                                    uri = "<URI display not available: " + e.getMessage() + ">";
+                                }
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
