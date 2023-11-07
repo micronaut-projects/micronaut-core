@@ -1034,7 +1034,8 @@ class ConnectionManagerSpec extends Specification {
         conn1.exchangeSettings()
         conn1.testExchangeResponse(future)
 
-        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.INTERNAL_ERROR, Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        // use NO_ERROR so that netty doesn't close the channel
+        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR, Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
         conn1.advance()
 
         // after goaway, new requests should use a new connection
