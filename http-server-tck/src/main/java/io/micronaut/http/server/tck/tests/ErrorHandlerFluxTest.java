@@ -83,7 +83,7 @@ public class ErrorHandlerFluxTest {
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-chunked-delayed-error"),
             (server, request) -> {
-                Executable e = () -> server.exchange(request);
+                Executable e = () -> server.exchange(request, String[].class);
                 Assertions.assertThrows(HttpClientException.class, e);
             });
     }
