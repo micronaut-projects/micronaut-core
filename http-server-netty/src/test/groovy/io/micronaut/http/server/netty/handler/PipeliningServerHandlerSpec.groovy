@@ -21,6 +21,7 @@ import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
+import io.netty.handler.codec.http.LastHttpContent
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import spock.lang.Issue
@@ -288,6 +289,45 @@ class PipeliningServerHandlerSpec extends Specification {
 
         where:
         completeOnCancel << [true, false]
+    }
+
+    def 'empty streaming response while in queue'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<HttpContent>onBackpressureBuffer()
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            int i = 0
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                if (i++ == 0) {
+                    outboundAccess.writeStreamed(resp, sink.asFlux())
+                } else {
+                    outboundAccess.writeStreamed(resp, Flux.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        then:
+        ch.readOutbound() == null
+
+        when:
+        sink.tryEmitComplete()
+        then:
+        ch.readOutbound() == resp
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == resp
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == null
     }
 
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {

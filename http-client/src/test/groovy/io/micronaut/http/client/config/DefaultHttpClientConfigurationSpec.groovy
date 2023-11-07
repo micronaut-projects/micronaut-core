@@ -18,6 +18,7 @@ package io.micronaut.http.client.config
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClientConfiguration
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -119,5 +120,13 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         proxyOne.address().port == 8080
 
         config.resolveProxy(false, "b", 80) == Proxy.NO_PROXY
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/pull/10013')
+    void "default connection pool idle timeout"() {
+        given:
+        def cfg = new DefaultHttpClientConfiguration()
+        expect:
+        cfg.connectionPoolIdleTimeout.isEmpty()
     }
 }

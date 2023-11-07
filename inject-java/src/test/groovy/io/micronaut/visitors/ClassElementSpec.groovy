@@ -3270,11 +3270,29 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
+        def method = ce.findMethod("findById").get()
         then:
-            method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
-            method.getParameters()[0].getType().getAnnotationNames().isEmpty()
-            method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+        method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
+        method.getParameters()[0].getType().getAnnotationNames().isEmpty()
+        method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/10042')
+    void "private record"() {
+        given:
+        def outerElement = buildClassElement("""
+package test;
+
+class Outer {
+    private record Rec(String foo) {
+
+    }
+}
+""")
+        def recordElement = outerElement.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get()
+
+        expect:
+        recordElement.getPrimaryConstructor().isEmpty()
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

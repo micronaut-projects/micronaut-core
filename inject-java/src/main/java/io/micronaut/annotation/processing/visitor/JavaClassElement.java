@@ -614,7 +614,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     return Optional.of(constructor);
                 }
             }
-            return Optional.of(constructors.get(constructors.size() - 1));
+            if (constructors.isEmpty()) {
+                // constructor not accessible
+                return Optional.empty();
+            } else {
+                return Optional.of(constructors.get(constructors.size() - 1));
+            }
         }
         return ArrayableClassElement.super.getPrimaryConstructor();
     }
@@ -842,7 +847,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     (ExecutableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
-                case CLASS, ENUM -> {
+                case CLASS, ENUM, RECORD, INTERFACE, ANNOTATION_TYPE -> {
                     if (isSource) {
                         yield elementFactory.newSourceClassElement(
                             (TypeElement) nativeType,
@@ -880,7 +885,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             } else if (elementType == ConstructorElement.class) {
                 return EnumSet.of(ElementKind.CONSTRUCTOR);
             } else if (elementType == ClassElement.class) {
-                return EnumSet.of(ElementKind.CLASS, ElementKind.ENUM);
+                return EnumSet.of(ElementKind.CLASS, ElementKind.ENUM, ElementKind.RECORD, ElementKind.INTERFACE, ElementKind.ANNOTATION_TYPE);
             }
             throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
         }

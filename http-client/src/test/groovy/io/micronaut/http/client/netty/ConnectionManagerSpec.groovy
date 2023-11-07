@@ -28,6 +28,7 @@ import io.netty.channel.ChannelId
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.ChannelPromise
+import io.netty.channel.EventLoop
 import io.netty.channel.ServerChannel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
@@ -45,8 +46,10 @@ import io.netty.handler.codec.http.LastHttpContent
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
+import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameStream
@@ -66,6 +69,8 @@ import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
 import io.netty.util.concurrent.GenericFutureListener
 import jakarta.inject.Singleton
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.function.Executable
 import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -74,6 +79,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -90,7 +96,22 @@ class ConnectionManagerSpec extends Specification {
             protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
                 try {
                     def connection = connections[i++]
-                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer)
+                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
+                        def loop
+
+                        @Override
+                        EventLoop eventLoop() {
+                            if (loop == null) {
+                                loop = new DelegateEventLoop(super.eventLoop()) {
+                                    @Override
+                                    boolean inEventLoop() {
+                                        return connection.inEventLoop
+                                    }
+                                }
+                            }
+                            return loop
+                        }
+                    }
                     def promise = connection.clientChannel.newPromise()
                     promise.setSuccess()
                     return promise
@@ -117,6 +138,8 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(future)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -136,6 +159,8 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testStreamingResponse(r1)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -150,6 +175,8 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn)
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -333,6 +360,9 @@ class ConnectionManagerSpec extends Specification {
         f1.get().status() == HttpStatus.OK
         f2.get().status() == HttpStatus.OK
 
+        // the same connection is reused for all requests
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -354,6 +384,8 @@ class ConnectionManagerSpec extends Specification {
         Queue<String> responseData = conn.testStreamingRequest(client)
         conn.testStreamingResponse(responseData)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -372,6 +404,8 @@ class ConnectionManagerSpec extends Specification {
         conn1.testExchangeResponse(conn1.testExchangeRequest(client))
         client.connectionManager().refresh()
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -518,6 +552,8 @@ class ConnectionManagerSpec extends Specification {
         def e = thrown ExecutionException
         e.cause instanceof ReadTimeoutException
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -559,6 +595,8 @@ class ConnectionManagerSpec extends Specification {
         def e = thrown ExecutionException
         e.cause instanceof ReadTimeoutException
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -593,6 +631,8 @@ class ConnectionManagerSpec extends Specification {
         assert !future.isDone()
         conn.testExchangeResponse(future)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -616,6 +656,8 @@ class ConnectionManagerSpec extends Specification {
 
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -645,6 +687,8 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
 
+        assertPoolConnections(client, 1)
+
         cleanup:
         client.close()
         ctx.close()
@@ -669,6 +713,8 @@ class ConnectionManagerSpec extends Specification {
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -937,6 +983,8 @@ class ConnectionManagerSpec extends Specification {
         def r2 = conn2.testExchangeRequest(client)
         conn2.testExchangeResponse(r2, "close")
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
@@ -963,9 +1011,140 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(r2)
 
+        assertPoolConnections(client, 0)
+
         cleanup:
         client.close()
         ctx.close()
+    }
+
+    def 'http2 goaway'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates'  : true
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+
+        def future = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.testExchangeResponse(future)
+
+        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.INTERNAL_ERROR, Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        conn1.advance()
+
+        // after goaway, new requests should use a new connection
+        def future2 = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+        conn2.testExchangeResponse(future2)
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.read-timeout': '5s'
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn, conn2)
+
+        // The channel inactive event is scheduled to be fired in the event loop
+        // after the channel is already inactive. If code running in the event loop
+        // relies on the event being received to finish, it will block forever.
+
+        // first request
+        def future = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        // this closes the channel, but doesn't fire channel inactive
+        conn.clientChannel.unsafe().closeForcibly()
+
+        // second request
+        Executable executable = () -> {
+            // this would block forever before the fix
+            def future2 = conn2.testExchangeRequest(client)
+            // this will fire channel inactive
+            conn.clientChannel.close()
+            conn2.exchangeSettings()
+            conn2.testExchangeResponse(future2)
+        };
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10), executable);
+
+        // first request times out as channel was closed
+        when:
+        future.get()
+        then:
+        def e = thrown ExecutionException
+        e.cause instanceof ReadTimeoutException
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'timeout before dispatch0'(boolean http2) {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.read-timeout': '1s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn
+        if (http2) {
+            conn = new EmbeddedTestConnectionHttp2()
+            conn.setupHttp2Tls()
+        } else {
+            conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+        }
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        if (http2) {
+            conn.exchangeSettings()
+        }
+        conn.testExchangeResponse(r1)
+        conn.clientChannel.unfreezeTime()
+        // trigger timeout
+        TimeUnit.SECONDS.sleep(2)
+
+        // second request
+        // this triggers the dispatch0 logic to be delayed with execute
+        conn.inEventLoop = false
+        def future = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.inEventLoop = true
+        conn.clientChannel.runScheduledPendingTasks()
+        conn.advance()
+        conn.testExchangeResponse(future)
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        http2 << [false, true]
+    }
+
+    void assertPoolConnections(DefaultHttpClient client, int count) {
+        assert client.connectionManager.getChannels().size() == count
+        client.connectionManager.getChannels().forEach { assert it.isActive() }
     }
 
     static class EmbeddedTestConnectionBase {
@@ -979,6 +1158,7 @@ class ConnectionManagerSpec extends Specification {
                 EmbeddedTestUtil.connect(serverChannel, ch)
             }
         }
+        boolean inEventLoop = true
 
         EmbeddedTestConnectionBase() {
             serverChannel = new EmbeddedServerChannel(new DummyChannelId('server'))
@@ -1183,6 +1363,7 @@ class ConnectionManagerSpec extends Specification {
             respondOk(request.stream())
             advance()
 
+            assert future.isDone()
             def response = future.get()
             assert response.status() == HttpStatus.OK
         }
