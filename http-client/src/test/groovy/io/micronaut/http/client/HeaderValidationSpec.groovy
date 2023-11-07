@@ -19,10 +19,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class HeaderValidationSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer, ["spec.name": HeaderValidationSpec.simpleName])
+    @Shared @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            "spec.name": HeaderValidationSpec.simpleName
+    ])
 
-    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
 
     void "test hello"() {
         HttpRequest<String> request = HttpRequest.GET("/hello");

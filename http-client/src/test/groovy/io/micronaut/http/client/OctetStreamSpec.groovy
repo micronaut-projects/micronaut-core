@@ -24,8 +24,10 @@ class OctetStreamSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.max-request-size': '10KB',
-                                                                            'spec.name': 'OctetStreamSpec',])
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'micronaut.server.max-request-size': '10KB',
+            'spec.name'                        : 'OctetStreamSpec',
+    ])
 
     @Shared
     UploadClient client = embeddedServer.applicationContext.getBean(UploadClient)
@@ -55,7 +57,7 @@ class OctetStreamSpec extends Specification {
         def data = new String("xyz" * 500).bytes
 
         expect:
-        new String(Flux.from(client.byteArrayFlowable(Flux.just(data))).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b)}).block(), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
+        new String(Flux.from(client.byteArrayFlowable(Flux.just(data))).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b) }).block(), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
     }
 
     // TODO: Investigate why this fails on JDK 11
@@ -67,7 +69,7 @@ class OctetStreamSpec extends Specification {
         when:
         new String(Flux.from(client.byteArrayFlowable(Flux.just(data))).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b) }).block(), StandardCharsets.UTF_8)
 
-        then:"Cannot compute ahead of time the content length so use the received amount, also streamed responses that fail in the middle result in connection reset exception"
+        then: "Cannot compute ahead of time the content length so use the received amount, also streamed responses that fail in the middle result in connection reset exception"
         thrown(RuntimeException)
     }
 
