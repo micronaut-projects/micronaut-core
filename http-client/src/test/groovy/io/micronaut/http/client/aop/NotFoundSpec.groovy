@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.aop
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
@@ -32,7 +33,9 @@ import spock.lang.Specification
 
 class NotFoundSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            "spec.name": 'NotFoundSpec',
+    ])
 
     void "test 404 handling with Flowable"() {
         given:
@@ -56,6 +59,7 @@ class NotFoundSpec extends Specification {
     }
 
     @Client('/not-found')
+    @Requires(property = 'spec.name', value = 'NotFoundSpec')
     static interface InventoryClient {
         @Get('/maybe/{isbn}')
         @Consumes(MediaType.TEXT_PLAIN)
@@ -67,6 +71,7 @@ class NotFoundSpec extends Specification {
     }
 
     @Controller(value = "/not-found", produces = MediaType.TEXT_PLAIN)
+    @Requires(property = 'spec.name', value = 'NotFoundSpec')
     static class InventoryController {
         Map<String, Boolean> stock = [
                 '1234': true

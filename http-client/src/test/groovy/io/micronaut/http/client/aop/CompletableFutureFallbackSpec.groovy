@@ -16,13 +16,13 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
@@ -34,20 +34,16 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class CompletableFutureFallbackSpec extends Specification {
 
-    @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name':'CompletableFutureFallbackSpec',
+    ])
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    BookClient client = server.applicationContext.getBean(BookClient)
 
     void "test that fallbacks are called for CompletableFuture responses"() {
-        given:
-        BookClient client = context.getBean(BookClient)
-
         when:
-        Book book = client.get(99)
-                .get()
+        Book book = client.get(99).get()
         List<Book> books = client.list().get()
 
         then:
@@ -94,10 +90,12 @@ class CompletableFutureFallbackSpec extends Specification {
 
     @Client('/future/fallback/books')
     @Recoverable
+    @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
     static interface BookClient extends BookApi {
     }
 
     @Fallback
+    @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
     static class BookFallback implements BookApi {
 
         @Override
@@ -127,6 +125,7 @@ class CompletableFutureFallbackSpec extends Specification {
     }
 
     @Controller("/future/fallback/books")
+    @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
