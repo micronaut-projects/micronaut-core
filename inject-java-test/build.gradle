@@ -11,9 +11,6 @@ dependencies {
     api(libs.spock) {
         exclude module:'groovy-all'
     }
-    if (!JavaVersion.current().isJava9Compatible()) {
-        api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
     api libs.jetbrains.annotations
 
     testAnnotationProcessor project(":inject-java")

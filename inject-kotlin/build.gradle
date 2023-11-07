@@ -16,9 +16,6 @@ dependencies {
     api project(":core-processor")
 
     implementation(libs.managed.ksp.api)
-    if (!JavaVersion.current().isJava9Compatible()) {
-        api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
     kspTest(project)
     kspTest platform(libs.test.boms.micronaut.validation)
     kspTest (libs.micronaut.validation.processor) {
