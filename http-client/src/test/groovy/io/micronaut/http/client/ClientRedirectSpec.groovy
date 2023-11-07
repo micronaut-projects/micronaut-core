@@ -22,48 +22,35 @@ import spock.lang.Specification
 
 class ClientRedirectSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer, [
-                    'spec.name': 'ClientRedirectSpec',
-            ])
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ClientRedirectSpec',
+    ])
+
+    @Shared
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test - client: full uri, direct"() {
-        given:
-        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/direct', String)
 
         then:
         response.status() == HttpStatus.OK
         response.body() == "It works!"
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test - client: full uri, redirect: absolute - follows correctly"() {
-        given:
-        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect', String)
 
         then: "Micronaut Client follows the redirect to /test/direct"
         response.status() == HttpStatus.OK
         response.body() == "It works!"
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
-        given:
-        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
 
@@ -71,9 +58,6 @@ class ClientRedirectSpec extends Specification {
         noExceptionThrown()
         response.status() == HttpStatus.OK
         response.body() == "It works!"
-
-        cleanup:
-        client.close()
     }
 
     void "test - client: relative uri, direct"() {
@@ -99,7 +83,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -125,7 +108,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -152,13 +134,12 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
     void "test the host header is correct for redirect"() {
+        given:
         EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true, 'spec.name': 'ClientRedirectSpec'])
-        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         String result = client.toBlocking().retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header"))
