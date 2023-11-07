@@ -1476,8 +1476,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         public boolean isBind() {
             return bind;
         }
-
-
         /**
          * Whether the server should bind to the socket. {@code true} by default. If set to
          * {@code false}, the socket must already be bound and listening.
