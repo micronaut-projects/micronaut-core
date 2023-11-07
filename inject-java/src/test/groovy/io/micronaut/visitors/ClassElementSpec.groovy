@@ -2938,6 +2938,24 @@ class MyBean {
             type.hasAnnotation(Valid)
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/10042')
+    void "private record"() {
+        given:
+        def outerElement = buildClassElement("""
+package test;
+
+class Outer {
+    private record Rec(String foo) {
+
+    }
+}
+""")
+        def recordElement = outerElement.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get()
+
+        expect:
+        recordElement.getPrimaryConstructor().isEmpty()
+    }
+
     void "test interface with type with not inherited generic annotations and conflicting method"() {
         ClassElement ce = buildClassElement('''
 package test;

@@ -590,7 +590,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 return false;
             }
             ClientKey clientKey = (ClientKey) o;
-            return httpVersion == clientKey.httpVersion &&
+            return Objects.equals(httpVersion, clientKey.httpVersion) &&
                     Objects.equals(clientId, clientKey.clientId) &&
                     Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
                     Objects.equals(path, clientKey.path) &&
