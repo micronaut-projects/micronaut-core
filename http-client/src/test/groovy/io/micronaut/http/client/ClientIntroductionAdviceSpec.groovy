@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
@@ -27,56 +12,51 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 class ClientIntroductionAdviceSpec extends Specification {
 
+    @Shared
+    @AutoCleanup
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ClientIntroductionAdviceSpec',
+    ])
+
     void "test implement HTTP client"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
-        MyClient myService = embeddedServer.applicationContext.getBean(MyClient)
+        MyClient myService = server.applicationContext.getBean(MyClient)
 
         expect:
         myService.index() == 'success'
-
-        cleanup:
-        embeddedServer.close()
     }
 
     void "service id appears in exceptions"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
-        embeddedServer.applicationContext.registerSingleton(new TestServiceInstanceList(embeddedServer.getURI()))
-
-        PolicyClient myService = embeddedServer.applicationContext.getBean(PolicyClient)
+        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        PolicyClient myService = server.applicationContext.getBean(PolicyClient)
 
         when:
         myService.failure()
+
         then:
         def e = thrown(HttpClientResponseException)
         e.serviceId == 'test-service'
         e.message == "Client 'test-service': Bad Request"
-
-        cleanup:
-        embeddedServer.close()
     }
 
     void "test multiple clients with the same id and different paths"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         expect:
         server.applicationContext.getBean(PolicyClient).index() == 'policy'
         server.applicationContext.getBean(OfferClient).index() == 'offer'
-
-        cleanup:
-        server.close()
     }
 
     void "test a client with a body and header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         when:
@@ -84,47 +64,30 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         then:
         client.post('abc', 'bar') == 'abc header=bar'
-
-        cleanup:
-        server.close()
     }
 
     void "test a client that auto encodes basic auth header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         when:
-        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec', 'server-port': server.port])
         BasicAuthHeaderAutoEncodingClient client = server.applicationContext.getBean(BasicAuthHeaderAutoEncodingClient)
 
         then:
         client.post('abc', new BasicAuth("username", "password")) == 'abc basic-auth-header=Basic dXNlcm5hbWU6cGFzc3dvcmQ='
-
-        cleanup:
-        server.close()
     }
 
     void "test non body params have preference for uri templates"() {
-        given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
-
         when:
         LocalOfferClient client = server.applicationContext.getBean(LocalOfferClient)
 
         then:
         client.putTest("abc", new MyObject(code: "def")) == "abc"
-
-        cleanup:
-        server.close()
     }
 
     void "test basic auth"() {
-        given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
-        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec', 'server-port': server.port])
-
         when:
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec', 'server-port': server.port])
         BasicAuthClient client = ctx.getBean(BasicAuthClient)
 
         then:
@@ -132,46 +95,34 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         cleanup:
         ctx.close()
-        server.close()
     }
 
     void "test execution of a default method"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         DefaultMethodClient myService = server.applicationContext.getBean(DefaultMethodClient)
 
         expect:
         myService.defaultMethod() == 'success from default method mutated'
-
-        cleanup:
-        server.close()
     }
 
     void "test execution of a default method 2"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         DefaultMethodClient2 myService = server.applicationContext.getBean(DefaultMethodClient2)
+
         expect:
         myService.index("ZZZ") == 'success ZZZ XYZ from default method'
         myService.defaultMethod() == 'success from default method mutated'
         myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
-
-        cleanup:
-        server.close()
     }
 
     void "test execution of a default method 3"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
         DefaultMethodClient3 myService = server.applicationContext.getBean(DefaultMethodClient3)
 
         expect:
         myService.index("ZZZ") == 'success ZZZ XYZ from default method'
         myService.defaultMethod() == 'success from default method mutated'
         myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
-
-        cleanup:
-        server.close()
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
