@@ -325,6 +325,7 @@ final class ServiceScanner<S> {
             }
         }
 
+        @Override
         public void collect(Collection<S> values) {
             for (ServiceInstanceLoader task : tasks) {
                 task.join();
@@ -357,6 +358,7 @@ final class ServiceScanner<S> {
             }
         }
 
+        @Override
         public void collect(Collection<S> values) {
             if (throwable != null) {
                 throw new SoftServiceLoader.ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);

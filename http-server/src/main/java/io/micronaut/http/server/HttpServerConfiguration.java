@@ -864,6 +864,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return The fixed locale
          */
+        @Override
         @NonNull
         public Optional<Locale> getFixed() {
             return Optional.ofNullable(fixed);
