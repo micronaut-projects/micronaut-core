@@ -1,10 +1,6 @@
 package io.micronaut.http.client.convert
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -20,6 +16,7 @@ class TypeConverterWithMethodReferenceSpec extends Specification {
     ])
 
     @Shared
+    @AutoCleanup
     HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test type converters can be used with method references"() {
@@ -30,20 +27,5 @@ class TypeConverterWithMethodReferenceSpec extends Specification {
         then:
         foo.value == 'val'
         bar.value == 'val'
-    }
-
-    @Controller("/convert")
-    @Requires(property = "spec.name", value = 'TypeConverterWithMethodReferenceSpec')
-    static class FooBarController {
-
-        @Get("/foo/{foo}")
-        Foo foo(@PathVariable(name = "foo") Foo foo) {
-            return foo;
-        }
-
-        @Get("/bar/{bar}")
-        Bar bar(@PathVariable(name = "bar") Bar bar) {
-            return bar;
-        }
     }
 }

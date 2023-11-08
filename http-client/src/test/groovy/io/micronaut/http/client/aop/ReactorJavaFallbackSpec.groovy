@@ -11,6 +11,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 import io.micronaut.core.async.annotation.SingleResult
 
@@ -19,15 +20,14 @@ import io.micronaut.core.async.annotation.SingleResult
  * @since 1.0
  */
 class ReactorJavaFallbackSpec extends Specification{
-
+    @Shared
     @AutoCleanup
-    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'ReactorJavaFallbackSpec'
-    ])
-
-    BookClient client = server.applicationContext.getBean(BookClient)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReactorJavaFallbackSpec'])
 
     void "test that fallbacks are called for RxJava responses"() {
+        given:
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
+
         when:
         Book book = Mono.from(client.get(99)).block()
         List<Book> books = Mono.from(client.list()).block()

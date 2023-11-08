@@ -40,10 +40,10 @@ class StreamSpec extends Specification {
             'spec.name': 'StreamSpec'
     ])
 
-    @Shared
-    StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
-
     void "test that the server can return a header value to us"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         HttpResponse<String> response = myClient.echoWithHeaders(2, "Hello!")
 
@@ -54,6 +54,9 @@ class StreamSpec extends Specification {
     }
 
     void "test that the server can return a header value to us with a single"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         HttpResponse<String> response = myClient.echoWithHeadersSingle( "Hello!")
 
@@ -65,7 +68,8 @@ class StreamSpec extends Specification {
 
     void "test send and receive parameter"() {
         given:
-        int n = 800 // This can be as high as 806596 - if any higher, it will overflow the default aggregator buffer size
+        int n = 800// This can be as high as 806596 - if any higher, it will overflow the default aggregator buffer size
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         String result = myClient.echoAsString(n, "Hello, World!")
@@ -77,6 +81,7 @@ class StreamSpec extends Specification {
     void "test receive client using ByteBuffer"() {
         given:
         int n = 42376 // This may be higher than 806596, but the test takes forever, then.
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         Flux<ByteBuffer> reactiveSequence = myClient.echoAsByteBuffers(n, "Hello, World!")
@@ -92,6 +97,9 @@ class StreamSpec extends Specification {
     }
 
     void "test that the client is unable to convert bytes to elephants"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         Flux.from(myClient.echoAsElephant(42, "Hello, big grey animal!")).blockFirst()
 
@@ -102,6 +110,8 @@ class StreamSpec extends Specification {
     }
 
     void "JSON is still just text (variation #n)"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJson(n) == '{"key":"value"}'
 
@@ -112,21 +122,31 @@ class StreamSpec extends Specification {
     @PendingFeature
     void "JSON is still just text (variation 3)"() {
         // variation 3 uses ByteBuf, which is not supported anymore by RouteInfo.isResponseBodyJsonFormattable
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJson(3) == '{"key":"value"}'
     }
 
     void "JSON can still be streamed using reactive sequence as container"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJsonCollection() == '[{"x":1},{"x":2}]'
     }
 
     void "JSON stream can still be streamed using reactive sequence as container"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         expect:
         myClient.someJsonStreamCollection() == '{"x":1}{"x":2}'
     }
 
     void "JSON error can still be streamed using reactive sequence as container"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         myClient.someJsonErrorCollection()
 
@@ -136,6 +156,9 @@ class StreamSpec extends Specification {
     }
 
     void "JSON stream error can still be streamed using reactive sequence as container"() {
+        given:
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         myClient.someJsonStreamErrorCollection()
 
@@ -241,5 +264,8 @@ class StreamSpec extends Specification {
         private static ByteBuf byteBuf(String s) {
             Unpooled.wrappedBuffer(s.getBytes(StandardCharsets.UTF_8))
         }
+
     }
+
 }
+

@@ -62,6 +62,7 @@ class ReadTimeoutSpec extends Specification {
     @AutoCleanup
     HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
+
     void "test read timeout setting"() {
         when:
         client.toBlocking().retrieve(HttpRequest.GET('/timeout'), String)
@@ -100,6 +101,7 @@ class ReadTimeoutSpec extends Specification {
         then:"Every result is correct"
         results.size() == 50
         results.every() { it == result }
+
 
         cleanup:
         client.close()
