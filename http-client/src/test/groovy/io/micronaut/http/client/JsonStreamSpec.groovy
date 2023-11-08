@@ -54,18 +54,15 @@ class JsonStreamSpec  extends Specification {
     ])
 
     @Shared
-    @AutoCleanup
-    ApplicationContext context = embeddedServer.applicationContext
+    BookClient bookClient = embeddedServer.applicationContext.getBean(BookClient)
 
     @Shared
-    BookClient bookClient = context.getBean(BookClient)
+    @AutoCleanup
+    StreamingHttpClient client = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.URL)
 
     static Semaphore signal
 
     void "test read JSON stream demand all"() {
-        given:
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
-
         when:
         List<Map> jsonObjects = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
@@ -83,9 +80,6 @@ class JsonStreamSpec  extends Specification {
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1864')
     void "test read JSON stream raw data and demand all"() {
-        given:
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
-
         when:
         List<Chunk> jsonObjects = Flux.from(client.jsonStream(
                 HttpRequest.POST('/jsonstream/books/raw', '''
@@ -105,9 +99,6 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "test read JSON stream demand all POJO"() {
-        given:
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
-
         when:
         List<Book> jsonObjects = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
@@ -121,9 +112,6 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "test read JSON stream demand one"() {
-        given:
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
-
         when:
         Flux stream = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
@@ -163,8 +151,8 @@ class JsonStreamSpec  extends Specification {
 
     void "we can stream books to the server"() {
         given:
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
         signal = new Semaphore(1)
+
         when:
         // Funny request flow which required the server to release the semaphore so we can keep sending stuff
         Flux stream = Flux.from(client.jsonStream(HttpRequest.POST(
@@ -191,6 +179,7 @@ class JsonStreamSpec  extends Specification {
     void "we can use a generated client to stream books to the server"() {
         given:
         signal = new Semaphore(1)
+
         when:
         Mono<LibraryStats> result = Mono.from(bookClient.count(
                 Mono.fromCallable {
@@ -198,6 +187,7 @@ class JsonStreamSpec  extends Specification {
                     new Book(title: "Micronaut for dummies, volume 2")
                 }
                 .repeat(6)))
+
         then:
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
     }
@@ -255,6 +245,5 @@ class JsonStreamSpec  extends Specification {
     static class Chunk {
         String type
     }
-
 }
 

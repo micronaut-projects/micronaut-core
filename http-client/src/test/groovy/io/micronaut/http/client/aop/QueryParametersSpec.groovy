@@ -1,21 +1,7 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.exceptions.IntrospectionException
 import io.micronaut.http.HttpRequest
@@ -31,7 +17,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import jakarta.annotation.Nullable
 
@@ -39,7 +24,9 @@ class QueryParametersSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'QueryParametersSpec',
+    ])
 
     @Shared
     ItunesClient client = embeddedServer.getApplicationContext().getBean(ItunesClient)
@@ -54,7 +41,6 @@ class QueryParametersSpec extends Specification {
         client.searchTwo("Riverside").albums.size() == 2
     }
 
-    @Unroll
     void "test client mappping URL parameters appended through a Map (served through #flavour)"() {
         expect:
         client.searchExplodedMap(flavour, [term: "Riverside"]).albums.size() == 2
@@ -74,7 +60,6 @@ class QueryParametersSpec extends Specification {
         map.containsValue(null)
     }
 
-    @Unroll
     void "test client mappping multiple URL parameters appended through a Map (served through #flavour)"() {
         expect:
         client.searchExplodedMap(flavour, [term: ["Tool", 'Agnes Obel']]).albums.size() == 4
@@ -82,7 +67,6 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "list", "map" ]
     }
 
-    @Unroll
     void "test client mappping URL parameters appended through a List (served through #flavour)"() {
         expect:
         client.searchExplodedList(flavour, ["Tool", 'Riverside']).albums.size() == 3
@@ -90,7 +74,6 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "list", "map" ]
     }
 
-    @Unroll
     void "test client mappping URL parameters through singleton list (served through #flavour)"() {
         expect:
         client.searchExplodedList(flavour, ["Tool"]).albums.size() == 1
@@ -98,7 +81,6 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "singlePojo", "list", "map" ]
     }
 
-    @Unroll
     void "test client mappping URL parameters appended through a POJO (served through #flavour)"() {
         expect:
         client.searchExplodedSinglePojo(flavour, new SearchParams(term: "Agnes Obel")).albums.size() == 3
@@ -106,7 +88,6 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "singlePojo", "list", "map" ]
     }
 
-    @Unroll
     void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
         when:
         client.searchExplodedPojo("list", new SearchParamsAsList(term: ["Tool", "Agnes Obel"]))
@@ -115,7 +96,6 @@ class QueryParametersSpec extends Specification {
         thrown(IntrospectionException)
     }
 
-    @Unroll
     void "test client mappping URL parameters appended through an introspected POJO with a list"() {
         expect:
         client.searchExplodedIntrospectedPojo(flavour, new IntrospectedSearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
@@ -194,6 +174,7 @@ class QueryParametersSpec extends Specification {
     }
 
     @Controller('/itunes')
+    @Requires(property = 'spec.name', value = 'QueryParametersSpec')
     static class ItunesController {
 
         Map<String, List<String>> artists = [
@@ -274,6 +255,7 @@ class QueryParametersSpec extends Specification {
 
 
     @Client("/itunes")
+    @Requires(property = 'spec.name', value = 'QueryParametersSpec')
     static interface ItunesClient {
 
         @Get("/search?limit=25&media=music&entity=album&term={term}")

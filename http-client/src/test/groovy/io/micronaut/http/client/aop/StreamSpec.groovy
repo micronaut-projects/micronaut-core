@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
@@ -38,7 +23,6 @@ import spock.lang.AutoCleanup
 import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import jakarta.annotation.Nullable
 import java.nio.charset.StandardCharsets
@@ -56,13 +40,9 @@ class StreamSpec extends Specification {
             'spec.name': 'StreamSpec'
     ])
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = embeddedServer.applicationContext
-
     void "test that the server can return a header value to us"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         HttpResponse<String> response = myClient.echoWithHeaders(2, "Hello!")
@@ -75,7 +55,7 @@ class StreamSpec extends Specification {
 
     void "test that the server can return a header value to us with a single"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         HttpResponse<String> response = myClient.echoWithHeadersSingle( "Hello!")
@@ -89,7 +69,7 @@ class StreamSpec extends Specification {
     void "test send and receive parameter"() {
         given:
         int n = 800// This can be as high as 806596 - if any higher, it will overflow the default aggregator buffer size
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         String result = myClient.echoAsString(n, "Hello, World!")
@@ -101,7 +81,8 @@ class StreamSpec extends Specification {
     void "test receive client using ByteBuffer"() {
         given:
         int n = 42376 // This may be higher than 806596, but the test takes forever, then.
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
+
         when:
         Flux<ByteBuffer> reactiveSequence = myClient.echoAsByteBuffers(n, "Hello, World!")
         int sum = 0
@@ -117,7 +98,7 @@ class StreamSpec extends Specification {
 
     void "test that the client is unable to convert bytes to elephants"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         Flux.from(myClient.echoAsElephant(42, "Hello, big grey animal!")).blockFirst()
@@ -128,12 +109,12 @@ class StreamSpec extends Specification {
                 'ByteBuffer to class io.micronaut.http.client.aop.StreamSpec$Elephant is registered'
     }
 
-    @Unroll
     void "JSON is still just text (variation #n)"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJson(n) == '{"key":"value"}'
+
         where:
         n << [1, 2]
     }
@@ -142,21 +123,21 @@ class StreamSpec extends Specification {
     void "JSON is still just text (variation 3)"() {
         // variation 3 uses ByteBuf, which is not supported anymore by RouteInfo.isResponseBodyJsonFormattable
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJson(3) == '{"key":"value"}'
     }
 
     void "JSON can still be streamed using reactive sequence as container"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
         expect:
         myClient.someJsonCollection() == '[{"x":1},{"x":2}]'
     }
 
     void "JSON stream can still be streamed using reactive sequence as container"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         expect:
         myClient.someJsonStreamCollection() == '{"x":1}{"x":2}'
@@ -164,7 +145,7 @@ class StreamSpec extends Specification {
 
     void "JSON error can still be streamed using reactive sequence as container"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         myClient.someJsonErrorCollection()
@@ -176,7 +157,7 @@ class StreamSpec extends Specification {
 
     void "JSON stream error can still be streamed using reactive sequence as container"() {
         given:
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        StreamEchoClient myClient = embeddedServer.applicationContext.getBean(StreamEchoClient)
 
         when:
         myClient.someJsonStreamErrorCollection()
@@ -287,3 +268,4 @@ class StreamSpec extends Specification {
     }
 
 }
+

@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.aop.Mutating;
 
 @Client("/aop")
+@Requires(property = "spec.name", value = "ClientIntroductionAdviceSpec")
 public abstract class DefaultMethodClient3 implements IDefaultMethodClient {
 
     @Get(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
@@ -30,5 +32,4 @@ public abstract class DefaultMethodClient3 implements IDefaultMethodClient {
     public String defaultMethod2(String zzz) {
         return index(zzz) + " 2";
     }
-
 }

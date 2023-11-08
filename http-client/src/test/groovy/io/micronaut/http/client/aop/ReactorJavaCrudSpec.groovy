@@ -1,20 +1,6 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client.aop
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
@@ -41,15 +27,14 @@ class ReactorJavaCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name':'ReactorJavaCrudSpec',
+    ])
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    BookClient client = server.applicationContext.getBean(BookClient)
 
     void "test it is possible to implement CRUD operations with Reactor"() {
-        given:
-        BookClient client = context.getBean(BookClient)
-
         when:
         Book book = Mono.from(client.get(99))
                 .onErrorResume(t -> { Mono.empty()})
@@ -108,9 +93,6 @@ class ReactorJavaCrudSpec extends Specification {
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2905')
     void "test maybe of number"() {
-        given:
-        BookClient client = context.getBean(BookClient)
-
         expect:
         Mono.from(client.getPrice("good")).block() == 10
         Mono.from(client.getPrice("empty")).onErrorResume(throwable -> {
@@ -122,10 +104,12 @@ class ReactorJavaCrudSpec extends Specification {
     }
 
     @Client('/rxjava/books')
+    @Requires(property = 'spec.name', value = 'ReactorJavaCrudSpec')
     static interface BookClient extends BookApi, PriceApi {
     }
 
     @Controller("/rxjava/books")
+    @Requires(property = 'spec.name', value = 'ReactorJavaCrudSpec')
     static class BookController implements BookApi, PriceApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
