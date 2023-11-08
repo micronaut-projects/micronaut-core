@@ -302,6 +302,11 @@ public class DefaultNettyEmbeddedServerFactory
         return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
+    @Override
+    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, int fd) {
+        return eventLoopGroupFactory.channelInstance(type, workerConfig, fd);
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <E> ApplicationEventPublisher<E> getEventPublisher(Class<E> eventClass) {

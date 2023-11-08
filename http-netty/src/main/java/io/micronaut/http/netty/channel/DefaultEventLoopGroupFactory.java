@@ -153,6 +153,11 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         return getFactory(configuration).channelInstance(type, configuration);
     }
 
+    @Override
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, int fd) {
+        return getFactory(configuration).channelInstance(type, configuration, fd);
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {

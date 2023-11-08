@@ -43,3 +43,48 @@ micronaut:
 - `unixListener` is a listener name, and can be an arbitrary value
 
 NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`
+
+== systemd socket activation support
+
+When using the epoll transport, the HTTP server can be configured to use an existing file descriptor. With this feature, you can use socket created by systemd and passed to the micronaut process:
+
+[configuration]
+----
+micronaut:
+  netty:
+    event-loops:
+      # use epoll
+      parent:
+        prefer-native-transport: true
+      default:
+        prefer-native-transport: true
+    listeners:
+      systemd:
+        fd: 3 # systemd passes the server socket as fd 3
+        bind: false # do not bind again, systemd already did this
+----
+
+Example `app.service` file:
+
+----
+[Unit]
+Description=Micronaut HTTP server with socket activation
+After=network.target app.socket
+Requires=app.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/java -jar /app.jar
+----
+
+Example `app.socket` file:
+
+----
+[Socket]
+ListenStream=127.0.0.1:8080
+
+[Install]
+WantedBy=sockets.target
+----
+
+Now your Micronaut application can be started by a client connecting to `http://127.0.0.1:8080`.

@@ -223,6 +223,19 @@ public interface EventLoopGroupFactory {
     }
 
     /**
+     * Returns the channel instance.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @param fd The pre-defined file descriptor
+     * @return A channel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
+        throw new UnsupportedOperationException("This transport does not support creating channels from file descriptors. Please use kqueue or epoll.");
+    }
+
+    /**
      * Returns the client channel class.
      *
      * @param configuration The configuration

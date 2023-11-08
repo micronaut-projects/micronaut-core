@@ -61,7 +61,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
+import io.netty.channel.unix.ServerDomainSocketChannel;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -510,21 +512,32 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         logBind(cfg);
 
         try {
+            Integer fd = cfg.getFd();
             ChannelFuture future;
             Listener listener;
             if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
                 listener = new UdpListener(cfg);
                 Bootstrap listenerBootstrap = udpBootstrap.clone()
                     .handler(listener)
-                    .channelFactory(() -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig));
+                    .channelFactory(() -> {
+                        if (fd != null) {
+                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig, fd);
+                        } else {
+                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig);
+                        }
+                    });
                 int port = cfg.getPort();
                 if (port == -1) {
                     port = 0;
                 }
-                if (cfg.getHost() == null) {
-                    future = listenerBootstrap.bind(port);
+                if (cfg.isBind()) {
+                    if (cfg.getHost() == null) {
+                        future = listenerBootstrap.bind(port);
+                    } else {
+                        future = listenerBootstrap.bind(cfg.getHost(), port);
+                    }
                 } else {
-                    future = listenerBootstrap.bind(cfg.getHost(), port);
+                    future = listenerBootstrap.register();
                 }
             } else {
                 listener = new Listener(cfg);
@@ -540,20 +553,40 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     .childHandler(listener);
                 switch (cfg.getFamily()) {
                     case TCP:
-                        listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig));
+                        listenerBootstrap.channelFactory(() -> {
+                            if (fd != null) {
+                                return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, fd);
+                            } else {
+                                return nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig);
+                            }
+                        });
                         int port = cfg.getPort();
                         if (port == -1) {
                             port = 0;
                         }
-                        if (cfg.getHost() == null) {
-                            future = listenerBootstrap.bind(port);
+                        if (cfg.isBind()) {
+                            if (cfg.getHost() == null) {
+                                future = listenerBootstrap.bind(port);
+                            } else {
+                                future = listenerBootstrap.bind(cfg.getHost(), port);
+                            }
                         } else {
-                            future = listenerBootstrap.bind(cfg.getHost(), port);
+                            future = listenerBootstrap.register();
                         }
                         break;
                     case UNIX:
-                        listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getDomainServerChannelInstance(workerConfig));
-                        future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
+                        listenerBootstrap.channelFactory(() -> {
+                            if (fd != null) {
+                                return (ServerDomainSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig, fd);
+                            } else {
+                                return nettyEmbeddedServices.getDomainServerChannelInstance(workerConfig);
+                            }
+                        });
+                        if (cfg.isBind()) {
+                            future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
+                        } else {
+                            future = listenerBootstrap.register();
+                        }
                         break;
                     default:
                         throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());

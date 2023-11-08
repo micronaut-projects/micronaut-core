@@ -1324,6 +1324,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private int port;
         private String path;
         private boolean exposeDefaultRoutes = true;
+        private Integer fd = null;
+        private boolean bind = true;
 
         /**
          * Create a TCP listener configuration.
@@ -1443,6 +1445,45 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Internal
         public void setExposeDefaultRoutes(boolean exposeDefaultRoutes) {
             this.exposeDefaultRoutes = exposeDefaultRoutes;
+        }
+
+        /**
+         * The fixed file descriptor for this listener, or {@code null} if a new file descriptor
+         * should be opened (the default).
+         *
+         * @return The file descriptor
+         */
+        public Integer getFd() {
+            return fd;
+        }
+
+        /**
+         * The fixed file descriptor for this listener, or {@code null} if a new file descriptor
+         * should be opened (the default).
+         *
+         * @param fd The file descriptor
+         */
+        public void setFd(Integer fd) {
+            this.fd = fd;
+        }
+
+        /**
+         * Whether the server should bind to the socket. {@code true} by default. If set to
+         * {@code false}, the socket must already be bound and listening.
+         *
+         * @return Whether to bind to the socket
+         */
+        public boolean isBind() {
+            return bind;
+        }
+        /**
+         * Whether the server should bind to the socket. {@code true} by default. If set to
+         * {@code false}, the socket must already be bound and listening.
+         *
+         * @param bind Whether to bind to the socket
+         */
+        public void setBind(boolean bind) {
+            this.bind = bind;
         }
 
         /**

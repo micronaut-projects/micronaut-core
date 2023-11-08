@@ -152,4 +152,14 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
             case DATAGRAM_SOCKET -> new EpollDatagramChannel();
         };
     }
+
+    @Override
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, int fd) {
+        return switch (type) {
+            case SERVER_SOCKET -> new EpollServerSocketChannel(fd);
+            case CLIENT_SOCKET -> new EpollSocketChannel(fd);
+            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel(fd);
+            case DATAGRAM_SOCKET -> new EpollDatagramChannel(fd);
+        };
+    }
 }
