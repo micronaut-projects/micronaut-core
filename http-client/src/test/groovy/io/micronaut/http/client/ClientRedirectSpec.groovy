@@ -29,6 +29,7 @@ class ClientRedirectSpec extends Specification {
     ])
 
     @Shared
+    @AutoCleanup
     HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test - client: full uri, direct"() {

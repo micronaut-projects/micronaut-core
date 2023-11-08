@@ -13,10 +13,12 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 class ClientIntroductionAdviceSpec extends Specification {
 
+    @Shared
     @AutoCleanup
     EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'ClientIntroductionAdviceSpec',
