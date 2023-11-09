@@ -15,9 +15,8 @@
  */
 package io.micronaut.docs.server.upload
 
-import io.micronaut.core.async.annotation.SingleResult
-
 // tag::class[]
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post

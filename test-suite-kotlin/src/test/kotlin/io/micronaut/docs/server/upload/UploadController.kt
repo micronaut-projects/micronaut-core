@@ -74,4 +74,4 @@ class UploadController {
 
 // tag::endclass[]
 }
-// end::endclass]
+// end::endclass[]
