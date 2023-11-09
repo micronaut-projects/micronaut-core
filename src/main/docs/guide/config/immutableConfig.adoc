@@ -1,4 +1,6 @@
-Since 1.3, Micronaut framework supports the definition of immutable configuration.
+Since 1.3, Micronaut framework supports the definition of immutable configuration. To enable mutable configuration, add the following dependency on Micronaut Context:
+
+dependency::micronaut-context[]
 
 There are two ways to define immutable configuration. The preferred way is to define an interface annotated with ann:context.annotation.ConfigurationProperties[]. For example:
 

@@ -1,4 +1,6 @@
-The Micronaut framework supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API publishes events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to events that Micronaut publishes and supports custom events created by users.
+The Micronaut framework supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API publishes events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to events that Micronaut publishes and supports custom events created by users. To enable context events, add the following dependency on Micronaut Context:
+
+dependency::micronaut-context[]
 
 === Publishing Events
 
