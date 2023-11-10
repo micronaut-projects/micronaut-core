@@ -87,7 +87,7 @@ snippet::io.micronaut.docs.config.property.Engine[tags="imports,class",indent=0,
 
 NOTE: Because it is not possible to define a default value with `@Property`, if the value doesn't exist or cannot be converted to the required type, bean instantiation will fail.
 
-The above instead injects the value of the `my.url` property resolved from application configuration. If the property cannot be found in configuration, an exception is thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
+The above instead injects the value of the `my.engine.cylinders` property resolved from application configuration. If the property cannot be found in configuration, an exception is thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
 
 You can also use this feature to resolve sub maps. For example, consider the following configuration:
 

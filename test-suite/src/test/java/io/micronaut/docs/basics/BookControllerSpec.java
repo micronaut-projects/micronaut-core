@@ -21,38 +21,38 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 
 import static io.micronaut.http.HttpRequest.POST;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class BookControllerSpec {
+class BookControllerSpec {
 
     private EmbeddedServer embeddedServer;
     private HttpClient client;
 
-    @Before
-    public void setup() {
+    @BeforeEach
+    void setup() {
         embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         client = embeddedServer.getApplicationContext().createBean(
                 HttpClient.class,
                 embeddedServer.getURL());
     }
 
-    @After
-    public void cleanup() {
+    @AfterEach
+    void cleanup() {
         embeddedServer.stop();
         client.stop();
     }
 
     @Test
-    public void testPostWithURITemplate() {
+    void testPostWithURITemplate() {
         // tag::posturitemplate[]
         Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
@@ -70,7 +70,7 @@ public class BookControllerSpec {
     }
 
     @Test
-    public void testPostFormData() {
+    void testPostFormData() {
         // tag::postform[]
         Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))

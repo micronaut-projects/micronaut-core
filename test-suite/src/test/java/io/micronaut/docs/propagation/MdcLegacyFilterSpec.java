@@ -23,18 +23,18 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
 import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class MdcLegacyFilterSpec {
+class MdcLegacyFilterSpec {
 
     @Test
-    public void testFilterSpec() {
+    void testFilterSpec() {
         try (EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Map.of("mdc.example.legacy.filter.enabled", true))) {
             try (HttpClient client = HttpClient.create(embeddedServer.getURL())) {
 

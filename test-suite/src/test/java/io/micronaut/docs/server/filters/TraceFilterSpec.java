@@ -22,20 +22,22 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class TraceFilterSpec {
+class TraceFilterSpec {
+
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", HelloControllerSpec.class.getSimpleName());
         map.put("spec.filter", "TraceFilter");
@@ -47,18 +49,18 @@ public class TraceFilterSpec {
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
+    @AfterAll
+    static void stopServer() {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
 
     @Test
-    public void testTraceFilter() {
+    void testTraceFilter() {
         HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/hello"));
 
         assertEquals("true", response.getHeaders().get("X-Trace-Enabled"));

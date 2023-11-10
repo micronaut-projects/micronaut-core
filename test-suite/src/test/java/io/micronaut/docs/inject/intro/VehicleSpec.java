@@ -16,13 +16,14 @@
 package io.micronaut.docs.inject.intro;
 
 import io.micronaut.context.BeanContext;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
+
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         final BeanContext context = BeanContext.run();
         Vehicle vehicle = context.getBean(Vehicle.class);

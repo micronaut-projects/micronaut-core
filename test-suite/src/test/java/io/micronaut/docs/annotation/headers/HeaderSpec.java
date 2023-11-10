@@ -18,30 +18,32 @@ package io.micronaut.docs.annotation.headers;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.docs.annotation.Pet;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.Map;
 
-public class HeaderSpec {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+class HeaderSpec {
 
     @Test
-    public void testSenderHeaders() throws Exception {
+    void testSenderHeaders() {
 
         Map<String, Object> config = Collections.singletonMap(
                 "pet.client.id", "11"
         );
 
-        try(EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, config)) {
+        try (EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, config)) {
             PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
             Pet pet = Mono.from(client.get("Fred")).block();
 
-            Assert.assertNotNull(pet);
+            assertNotNull(pet);
 
-            Assert.assertEquals(11, pet.getAge());
+            assertEquals(11, pet.getAge());
         }
 
     }

@@ -23,16 +23,16 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class MdcServiceSpec {
+class MdcServiceSpec {
 
     @Test
-    public void testFilterSpec() {
+    void testFilterSpec() {
         try (EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Map.of("mdc.example.service.enabled", true))) {
             try (HttpClient client = HttpClient.create(embeddedServer.getURL())) {
                 HttpRequest<Object> request = HttpRequest

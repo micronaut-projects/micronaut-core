@@ -18,14 +18,16 @@ package io.micronaut.docs.config.itfce;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.util.CollectionUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
                 "my.engine.cylinders", "8",
@@ -41,7 +43,7 @@ public class VehicleSpec {
     }
 
     @Test
-    public void testStartWithInvalidValue() {
+    void testStartWithInvalidValue() {
         ApplicationContext applicationContext = null;
         try {
             applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
@@ -56,9 +58,7 @@ public class VehicleSpec {
                 applicationContext.close();
             }
 
-            assertTrue(
-                    e.getMessage().contains("EngineConfig.getCylinders - must be greater than or equal to 1")
-            );
+            assertTrue(e.getMessage().contains("EngineConfig.getCylinders - must be greater than or equal to 1"));
 
         }
     }

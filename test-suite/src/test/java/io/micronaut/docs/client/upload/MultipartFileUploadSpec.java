@@ -20,20 +20,18 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.client.HttpClient;
-
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
 
 // tag::multipartBodyImports[]
@@ -46,22 +44,22 @@ import reactor.core.publisher.Flux;
 // end::controllerImports[]
 
 // tag::class[]
-public class MultipartFileUploadSpec {
+class MultipartFileUploadSpec {
 // end::class[]
 
     private static ApplicationContext context;
     private static EmbeddedServer embeddedServer;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         context = ApplicationContext.run();
         embeddedServer = context.getBean(EmbeddedServer.class).start();
         client = context.createBean(HttpClient.class, embeddedServer.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if (embeddedServer != null) {
             embeddedServer.stop();
         }
@@ -71,7 +69,7 @@ public class MultipartFileUploadSpec {
     }
 
     @Test
-    public void testMultipartFileRequestByteArray() throws IOException {
+    void testMultipartFileRequestByteArray() throws IOException {
         // tag::file[]
         String toWrite = "test file";
         File file = File.createTempFile("data", ".txt");
@@ -106,7 +104,7 @@ public class MultipartFileUploadSpec {
     }
 
     @Test
-    public void testMultipartFileRequestByteArrayWithContentType() {
+    void testMultipartFileRequestByteArrayWithContentType() {
         // tag::multipartBodyBytes[]
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("data", "sample.txt", MediaType.TEXT_PLAIN_TYPE, "test content".getBytes())
@@ -126,7 +124,7 @@ public class MultipartFileUploadSpec {
     }
 
     @Test
-    public void  testMultipartFileRequestByteArrayWithoutContentType() throws IOException {
+    void testMultipartFileRequestByteArrayWithoutContentType() throws IOException {
         String toWrite = "test file";
         File file = File.createTempFile("data", ".txt");
         FileWriter writer = new FileWriter(file);
