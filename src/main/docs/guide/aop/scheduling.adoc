@@ -6,6 +6,8 @@ The api:scheduling.annotation.Scheduled[] annotation can be added to any method 
 
 dependency::micronaut-context[]
 
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
+
 NOTE: Remember that the scope of a bean impacts behaviour. A `@Singleton` bean shares state (the fields of the instance) each time the scheduled method is executed, while for a `@Prototype` bean a new instance is created for each execution.
 
 === Scheduling at a Fixed Rate
