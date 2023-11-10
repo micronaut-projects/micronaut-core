@@ -16,13 +16,13 @@
 package io.micronaut.docs.server.upload;
 
 // tag::class[]
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import io.micronaut.core.async.annotation.SingleResult;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -35,7 +35,7 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN;
 
 @Controller("/upload")
 public class UploadController {
-// end:class[]
+// end::class[]
 
     // tag::file[]
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
