@@ -2,7 +2,7 @@ Like Spring and Grails, the Micronaut framework features a api:scheduling.annota
 
 == Using the @Scheduled Annotation
 
-The api:scheduling.annotation.Scheduled[] annotation can be added to any method of a bean, and you should set one of the `fixedRate`, `fixedDelay`, or `cron` members. To enable scheduling, add the following dependency on Micronaut Context:
+The api:scheduling.annotation.Scheduled[] annotation can be added to any method of a bean, and you should set one of the `fixedRate`, `fixedDelay`, or `cron` members. Scheduling requires the Micronaut Context dependency:
 
 dependency::micronaut-context[]
 
