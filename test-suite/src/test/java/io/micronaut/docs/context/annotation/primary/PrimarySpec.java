@@ -50,7 +50,7 @@ class PrimarySpec {
         if(client != null){
             client.close();
         }
-        if(embeddedServer != null){
+        if (embeddedServer != null) {
             embeddedServer.close();
         }
     }

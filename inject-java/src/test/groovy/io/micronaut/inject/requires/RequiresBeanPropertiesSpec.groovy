@@ -666,7 +666,6 @@ class AccessorStyleBean {
         context.close()
     }
 
-    @IgnoreIf({ !jvm.isJava14Compatible() })
     void "test requires record properties"() {
         given:
         ApplicationContext context = buildContext('test.RecordDependantBean', '''

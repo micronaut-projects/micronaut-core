@@ -6,7 +6,8 @@ import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 
-class EnvironmentTest: AnnotationSpec() {
+class EnvironmentTest : AnnotationSpec() {
+
 
     @Test
     fun testRunEnvironment() {

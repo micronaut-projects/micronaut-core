@@ -13,7 +13,7 @@ public class TestBeanFactoryDefiningVisitor implements TypeElementVisitor<Protot
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (element.hasAnnotation(Prototype.class)){
+        if (element.hasAnnotation(Prototype.class)) {
 
             context.getClassElement(TestBeanProducer.class)
                     .ifPresent((producer) -> {

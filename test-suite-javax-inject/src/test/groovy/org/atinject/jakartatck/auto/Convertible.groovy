@@ -182,8 +182,8 @@ class Convertible implements Car {
 
     static class Tests extends Specification {
 
-        private final BeanContext context = new DefaultBeanContext(){{
-            start()
+        private final BeanContext context = new DefaultBeanContext() {{
+                start()
         }}
         private final Convertible car = context.getBean(Convertible)
         private final Cupholder cupholder = car.cupholder

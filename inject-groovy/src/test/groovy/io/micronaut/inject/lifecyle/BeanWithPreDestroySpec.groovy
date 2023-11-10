@@ -126,7 +126,7 @@ class FooFactory {
             private boolean running = true
 
             @Override
-            boolean isRunning(){
+            boolean isRunning() {
                 return running
             }
 
