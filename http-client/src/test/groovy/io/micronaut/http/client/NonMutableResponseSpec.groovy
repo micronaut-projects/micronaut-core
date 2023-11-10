@@ -1,18 +1,21 @@
 package io.micronaut.http.client
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
 import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {
@@ -60,6 +63,7 @@ class NonMutableResponseSpec extends Specification {
         ResponseClient responseClient
 
         @Get('/test/non-mutable')
+        @ExecuteOn(TaskExecutors.BLOCKING)
         HttpResponse<String> go() {
             responseClient.go()
         }

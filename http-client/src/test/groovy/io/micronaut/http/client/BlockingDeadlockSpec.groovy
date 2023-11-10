@@ -11,11 +11,12 @@ import spock.lang.Specification
 import java.util.concurrent.ExecutionException
 
 class BlockingDeadlockSpec extends Specification {
-
     @Shared
     @AutoCleanup
     ApplicationContext ctx = ApplicationContext.run([
-            'micronaut.netty.event-loops.default.num-threads': 1
+            'micronaut.netty.event-loops.default.num-threads': 1,
+            // need to disable overzealous "normal" blocking detection to expose this deadlock
+            'micronaut.http.client.allow-block-event-loop': true
     ])
 
     @Shared
@@ -34,7 +35,7 @@ class BlockingDeadlockSpec extends Specification {
         }).get()
 
         then:
-        def e = thrown ExecutionException
+        ExecutionException e = thrown()
         e.cause instanceof HttpClientException
         e.cause.message.contains("deadlock")
     }
@@ -46,7 +47,7 @@ class BlockingDeadlockSpec extends Specification {
         }).get()
 
         then:
-        def e = thrown ExecutionException
+        ExecutionException e = thrown()
         e.cause instanceof HttpClientException
         e.cause.message.contains("deadlock")
     }

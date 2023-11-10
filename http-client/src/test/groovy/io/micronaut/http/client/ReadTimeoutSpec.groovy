@@ -28,6 +28,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.netty.DefaultNettyHttpClientRegistry
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.netty.channel.pool.AbstractChannelPoolMap
 import io.netty.channel.pool.FixedChannelPool
 import jakarta.inject.Inject
@@ -349,6 +351,7 @@ class ReadTimeoutSpec extends Specification {
         }
 
         @Get(value = "/client", produces = MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.BLOCKING)
         String test() {
             return testClient.get()
         }
