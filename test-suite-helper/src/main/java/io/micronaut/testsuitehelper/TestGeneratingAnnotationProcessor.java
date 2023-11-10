@@ -81,7 +81,7 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
     }
 
     private String determineOutputPath() throws IOException {
-        // go write a file so as to figure out where we're running
+        // go write a file to figure out where we're running
         final FileObject resource = processingEnv
             .getFiler()
             .createResource(StandardLocation.CLASS_OUTPUT, "", "tmp" + System.currentTimeMillis(), (Element[]) null);
