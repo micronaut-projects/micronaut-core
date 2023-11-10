@@ -4,8 +4,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.HttpClientRegistry
+import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
 import io.netty.channel.Channel
 import io.netty.util.AttributeKey
@@ -75,6 +79,26 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
         !customizer.duplicate
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/9999")
+    def 'same client with protocol customizations'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'DefaultNettyHttpClientRegistrySpec',
+                'micronaut.http.services.test-client2.url': 'https://micronaut.io'
+        ])
+        def registry = ctx.getBean(HttpClientRegistry)
+        def introspection = BeanIntrospector.SHARED.findIntrospection(DeclarativeClient2).get()
+
+        when:
+        def client1 = registry.getClient(introspection)
+        def client2 = registry.getClient(introspection)
+        then:
+        client1 == client2
+
+        cleanup:
+        ctx.close()
+    }
+
     @Requires(property = 'spec.name', value = 'DefaultNettyHttpClientRegistrySpec')
     @Client('test-client')
     static interface DeclarativeClient {
@@ -123,5 +147,11 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
         @Inject
         @Client('test-client')
         HttpClient client;
+    }
+
+    @Requires(property = 'spec.name', value = 'DefaultNettyHttpClientRegistrySpec')
+    @Introspected
+    @Client(value = 'test-client2', alpnModes = ["h2"], plaintextMode = HttpVersionSelection.PlaintextMode.HTTP_1)
+    static interface DeclarativeClient2 {
     }
 }

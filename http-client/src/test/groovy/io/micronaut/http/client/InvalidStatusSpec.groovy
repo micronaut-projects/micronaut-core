@@ -6,20 +6,21 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 class InvalidStatusSpec extends Specification {
 
-    void "test receiving an invalid status code"(int status) {
-        given:
-        ApplicationContext context = ApplicationContext.run([
-                'spec.name': 'InvalidStatusSpec',
-                'micronaut.http.client.exception-on-error-status': false
-        ])
-        EmbeddedServer server = context.getBean(EmbeddedServer)
-        server.start()
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, server.URL)
+    @AutoCleanup
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'InvalidStatusSpec',
+            'micronaut.http.client.exception-on-error-status': false
+    ])
 
+    @AutoCleanup
+    StreamingHttpClient client = server.applicationContext.createBean(StreamingHttpClient, server.URL)
+
+    void "test receiving an invalid status code"(int status) {
         when:
         def response = client.toBlocking().exchange("/invalid-status/$status", String, String)
 
@@ -31,11 +32,6 @@ class InvalidStatusSpec extends Specification {
         then:
         def ex = thrown(IllegalArgumentException)
         ex.message == "Invalid HTTP status code: $status"
-
-        cleanup:
-        client.close()
-        server.stop()
-        context.close()
 
         where:
         status << [290, 700]
