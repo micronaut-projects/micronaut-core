@@ -167,7 +167,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeStartArray() throws IOException {
+    public void writeStartArray() {
         structureStack.push(new ArrayBuilder());
     }
 
