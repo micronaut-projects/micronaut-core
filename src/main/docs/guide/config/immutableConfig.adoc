@@ -1,4 +1,4 @@
-Since 1.3, Micronaut framework supports the definition of immutable configuration. To enable mutable configuration, add the following dependency on Micronaut Context:
+Since 1.3, Micronaut framework supports the definition of immutable configuration. Immutable configuration with an interface requires the Micronaut Context dependency.
 
 dependency::micronaut-context[]
 
