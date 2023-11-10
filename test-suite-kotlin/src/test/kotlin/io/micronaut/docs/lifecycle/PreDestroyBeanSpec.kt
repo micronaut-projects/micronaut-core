@@ -1,13 +1,10 @@
 package io.micronaut.docs.lifecycle
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.BeanContext
-import org.junit.Test
 
-import org.junit.Assert.assertTrue
-
-class PreDestroyBeanSpec: StringSpec() {
+class PreDestroyBeanSpec : StringSpec() {
 
     init {
         "test bean closing on context close" {

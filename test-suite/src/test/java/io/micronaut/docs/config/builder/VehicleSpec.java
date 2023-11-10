@@ -16,17 +16,17 @@
 package io.micronaut.docs.config.builder;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         Map<String, Object> properties = new HashMap<>();
         properties.put("my.engine.cylinders"             ,"4");

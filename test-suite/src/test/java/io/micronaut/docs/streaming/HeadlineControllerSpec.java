@@ -18,7 +18,7 @@ package io.micronaut.docs.streaming;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
@@ -28,15 +28,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.http.HttpRequest.GET;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class HeadlineControllerSpec {
+class HeadlineControllerSpec {
 
     // tag::streamingClient[]
     @Test
-    public void testClientAnnotationStreaming() {
+    void testClientAnnotationStreaming() {
         try(EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class)) {
             HeadlineClient headlineClient = embeddedServer
                                                 .getApplicationContext()
@@ -53,7 +53,7 @@ public class HeadlineControllerSpec {
     // end::streamingClient[]
 
     @Test
-    public void testStreamingClient() {
+    void testStreamingClient() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         StreamingHttpClient client = embeddedServer.getApplicationContext().createBean(
                 StreamingHttpClient.class, embeddedServer.getURL());
@@ -62,7 +62,7 @@ public class HeadlineControllerSpec {
         Flux<Headline> headlineStream = Flux.from(client.jsonStream(
                 GET("/streaming/headlines"), Headline.class)); // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>(); // <2>
-        headlineStream.subscribe(new Subscriber<Headline>() {
+        headlineStream.subscribe(new Subscriber<>() {
             @Override
             public void onSubscribe(Subscription s) {
                 s.request(1); // <3>

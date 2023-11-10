@@ -16,18 +16,18 @@
 package io.micronaut.docs.factories.nullable;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class EngineSpec {
+class EngineSpec {
 
     @Test
-    public void testEngineNull() {
+    void testEngineNull() {
         Map<String, Object> configuration = new HashMap<>();
         configuration.put("engines.subaru.cylinders", 4);
         configuration.put("engines.ford.cylinders", 8);
@@ -37,8 +37,8 @@ public class EngineSpec {
 
         Collection<Engine> engines = applicationContext.getBeansOfType(Engine.class);
 
-        assertEquals("There are 2 engines", 2, engines.size());
+        assertEquals(engines.size(), 2, "There are 2 engines");
         int totalCylinders = engines.stream().mapToInt(Engine::getCylinders).sum();
-        assertEquals("Subaru + Lamborghini equals 16 cylinders", 16, totalCylinders);
+        assertEquals(totalCylinders, 16, "Subaru + Lamborghini equals 16 cylinders");
     }
 }

@@ -16,25 +16,25 @@
 package io.micronaut.docs.config.converters;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 //tag::configSpec[]
-public class MyConfigurationPropertiesSpec {
+class MyConfigurationPropertiesSpec {
 
     //tag::runContext[]
     private static ApplicationContext ctx;
 
-    @BeforeClass
-    public static void setupCtx() {
+    @BeforeAll
+    static void setupCtx() {
         ctx = ApplicationContext.run(
-                new LinkedHashMap<String, Object>() {{
+                new LinkedHashMap<>() {{
                     put("myapp.updatedAt", // <1>
                             new LinkedHashMap<String, Integer>() {{
                                 put("day", 28);
@@ -46,8 +46,8 @@ public class MyConfigurationPropertiesSpec {
         );
     }
 
-    @AfterClass
-    public static void teardownCtx() {
+    @AfterAll
+    static void teardownCtx() {
         if(ctx != null) {
             ctx.stop();
         }
@@ -55,7 +55,7 @@ public class MyConfigurationPropertiesSpec {
     //end::runContext[]
 
     @Test
-    public void testConvertDateFromMap() {
+    void testConvertDateFromMap() {
         MyConfigurationProperties props = ctx.getBean(MyConfigurationProperties.class);
 
         LocalDate expectedDate = LocalDate.of(1982, 10, 28);
