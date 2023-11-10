@@ -31,7 +31,7 @@ spotless {
 }
 
 def versionInfo = tasks.register("micronautVersionInfo", WriteProperties) {
-    destinationFile = file("${layout.buildDirectory.asFile.get()}/resources/version/micronaut-version.properties")
+    destinationFile = layout.buildDirectory.file("resources/version/micronaut-version.properties")
     property 'micronaut.version', projectVersion
 }
 tasks.named("processResources") {
