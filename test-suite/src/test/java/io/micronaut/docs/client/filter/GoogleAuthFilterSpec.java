@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import jakarta.inject.Inject;
-import reactor.core.publisher.Flux;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -21,16 +21,15 @@ import io.micronaut.context.DefaultBeanContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Provider;
-
 import org.atinject.jakartatck.auto.accessories.Cupholder;
 import org.atinject.jakartatck.auto.accessories.SpareTire;
-import org.atinject.jakartatck.auto.DriversSeat;
-import org.atinject.jakartatck.auto.accessories.RoundThing;
-import org.junit.Ignore;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class Convertible implements Car {
 

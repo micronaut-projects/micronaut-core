@@ -97,7 +97,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
@@ -107,7 +107,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * Send the given message to the remote peer asynchronously.
      *
      * @param message The message
-     *  @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     *  @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
@@ -117,7 +117,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * Send the given message to the remote peer synchronously.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      */
     default void sendSync(Object message, MediaType mediaType) {
         try {

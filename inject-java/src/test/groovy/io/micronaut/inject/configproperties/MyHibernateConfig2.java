@@ -17,7 +17,6 @@ package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.MapFormat;
-import io.micronaut.core.naming.conventions.StringConvention;
 
 import java.util.Map;
 

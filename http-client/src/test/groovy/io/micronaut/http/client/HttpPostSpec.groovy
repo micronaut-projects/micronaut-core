@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -30,6 +31,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -42,6 +44,8 @@ import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * @author Graeme Rocher
@@ -411,6 +415,17 @@ class HttpPostSpec extends Specification {
         res.getBody(String).get() == 'foo'
     }
 
+    void 'test format dates in form body with @Format'() {
+        given:
+        def client = this.postClient
+        LocalDate dt = LocalDate.of(2023, 9, 15)
+        Date d = Date.from(dt.atStartOfDay(ZoneId.systemDefault()).toInstant())
+
+        expect:
+        client.formatLocalDate(dt) == "2023/09/15"
+        client.formatDate(d) == "2023/09/15"
+    }
+
     @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Controller('/post')
     static class PostController {
@@ -529,6 +544,16 @@ class HttpPostSpec extends Specification {
         String redirectTargetPost() {
             return 'bar'
         }
+
+        @Post(uri = "/form/date", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        String formatDate(String date) {
+            return date
+        }
+
+        @Post(uri = "/form/dateTime", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        String formatLocalDate(String date) {
+            return date
+        }
     }
 
     @EqualsAndHashCode
@@ -557,5 +582,14 @@ class HttpPostSpec extends Specification {
 
         @Post("/multiple/mappings")
         String multipleMappings()
+
+        @Post("/form/date")
+        @Produces(MediaType.APPLICATION_FORM_URLENCODED)
+        String formatDate(@Format("yyyy/MM/dd") Date date)
+
+        @Post("/form/dateTime")
+        @Produces(MediaType.APPLICATION_FORM_URLENCODED)
+        String formatLocalDate(@Format("yyyy/MM/dd") LocalDate date)
+
     }
 }

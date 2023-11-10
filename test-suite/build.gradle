@@ -94,10 +94,7 @@ dependencies {
     testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.logbook.netty
     testImplementation libs.logback.classic
-
-    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation libs.bcpkix
-    }
+    testImplementation libs.bcpkix
 
     testImplementation libs.managed.reactor
 

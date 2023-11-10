@@ -21,18 +21,18 @@ import io.micronaut.function.client.FunctionClient;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Named;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 //end::rxImport[]
 
-public class LocalFunctionInvokeSpec {
+class LocalFunctionInvokeSpec {
 
     //tag::invokeLocalFunction[]
     @Test
-    public void testInvokingALocalFunction() {
+    void testInvokingALocalFunction() {
         Sum sum = new Sum();
         sum.setA(5);
         sum.setB(10);
@@ -50,7 +50,7 @@ public class LocalFunctionInvokeSpec {
 
     //tag::invokeRxLocalFunction[]
     @Test
-    public void testInvokingALocalFunctionReactive() {
+    void testInvokingALocalFunctionReactive() {
         Sum sum = new Sum();
         sum.setA(5);
         sum.setB(10);

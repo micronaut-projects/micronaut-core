@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,9 +56,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 	/** Generate metadata for Java 1.8 reflection on method parameters */
 	var javaParameters: Boolean = false
-
-	/** Use the IR backend */
-	var useIR: Boolean = false
 
 	/** Use the old JVM backend */
 	var useOldBackend: Boolean = false
@@ -267,7 +264,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 		args.jvmTarget = jvmTarget
 		args.javaParameters = javaParameters
-		args.useIR = useIR
 		args.useOldBackend = useOldBackend
 
 		if(javaModulePath != null)

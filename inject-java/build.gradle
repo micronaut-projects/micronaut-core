@@ -11,10 +11,6 @@ micronautBuild {
 dependencies {
     api project(":core-processor")
 
-    if (!JavaVersion.current().isJava9Compatible()) {
-        compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
-
     testImplementation project(":context")
     testImplementation project(':aop')
     testImplementation projects.injectJavaHelper
@@ -36,9 +32,6 @@ dependencies {
     testImplementation libs.compile.testing
     testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.groovy.json
-    if (!JavaVersion.current().isJava9Compatible()) {
-        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }

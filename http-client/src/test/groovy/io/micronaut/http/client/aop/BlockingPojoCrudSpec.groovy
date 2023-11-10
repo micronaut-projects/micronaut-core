@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.bind.BeanPropertyBinder
 import io.micronaut.http.annotation.*
@@ -34,7 +35,9 @@ class BlockingPojoCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run([
+            'spec.name':'BlockingPojoCrudSpec',
+    ])
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -84,10 +87,12 @@ class BlockingPojoCrudSpec extends Specification {
 
 
     @Client('/blocking/pojo/books')
+    @Requires(property = 'spec.name', value = 'BlockingPojoCrudSpec')
     static interface BookClient extends BookApi {
     }
 
     @Controller("/blocking/pojo/books")
+    @Requires(property = 'spec.name', value = 'BlockingPojoCrudSpec')
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

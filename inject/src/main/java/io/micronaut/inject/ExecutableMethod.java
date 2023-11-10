@@ -59,6 +59,7 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      * @param simple If simple type names are to be used
      * @return The method description
      */
+    @Override
     default String getDescription(boolean simple) {
         Argument<R> argument = getReturnType().asArgument();
         String typeString = argument.getTypeString(simple);

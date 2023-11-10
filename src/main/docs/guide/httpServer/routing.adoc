@@ -117,6 +117,19 @@ The previous example uses the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 NOTE: All the method annotations default to `/`.
 
+== @Options
+
+<<cors, CORS>> support handles OPTIONS preflight requests. However, if you want to dispatch OPTIONS requests without an Origin HTTP Header, you can enable it via:
+
+[configuration]
+----
+micronaut:
+  server:
+    dispatch-options-requests: true
+----
+
+
+
 == Multiple URIs
 
 Each of the routing annotations supports multiple URI templates. For each template, a route is created. This feature is useful for example to change the path of the API and leave the existing path as is for backwards compatibility. For example:

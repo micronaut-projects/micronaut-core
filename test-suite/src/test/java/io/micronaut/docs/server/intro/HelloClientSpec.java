@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Property;
 // tag::imports[]
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
-import io.micronaut.core.async.annotation.SingleResult;
 
 import jakarta.inject.Inject;
 import reactor.core.publisher.Mono;

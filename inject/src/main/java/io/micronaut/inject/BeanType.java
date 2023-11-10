@@ -55,6 +55,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      *
      * @return The underlying bean type
      */
+    @Override
     @NonNull Class<T> getBeanType();
 
     /**

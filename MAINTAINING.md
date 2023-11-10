@@ -102,14 +102,14 @@ The consequence of having both approaches in place is that we get multiple depen
 `micronaut-build` via our automation, and one or many (one per dependency) created by Renovate. When merging those, it
 is better to prefer the `micronaut-build` ones, if possible, for 2 reasons: a) they attempt to upgrade multiple dependencies
 in a single PR, which creates less noise in the Git history; b) Once you merge that, Renovate will react and automatically
-close its own PRs if the dependecy is up-to-date.
+close its own PRs if the dependency is up-to-date.
 
 When an upgrade to a new version arrives, we need to be careful when merging, so that we don't introduce an
 unnecessary upgrade burden on our users. Read the
 [Module Upgrade Strategy](https://github.com/micronaut-projects/micronaut-core/wiki/Module-Upgrade-Strategy) for more
 information.
 
-Note that if a new version arrives and we are not ready yet to do the upgrade, you need to
+Note that if a new version arrives, and we are not ready yet to do the upgrade, you need to
 [pin the old version](https://github.com/micronaut-projects/micronaut-build/#configuration-options), because otherwise,
 Renovate and our workflow will keep sending PRs. You should also create an issue to upgrade so that it's not forgotten.
 
@@ -162,7 +162,7 @@ First of all, all the repos have an automatic changelog generation mechanism: wh
 release notes will contain pull requests merged and issues closed since the last release.
 
 When the module is ready for a new release, check the generated release notes, and make changes if needed (for example,
-you can add an introduction paragraph highligting some items included in the release). If the version you are going to
+you can add an introduction paragraph highlighting some items included in the release). If the version you are going to
 publish is not a new patch version, but a new minor or major, update the release notes text to reflect the new version.
 If you are publishing a milestone or release candidate, check the pre-release checkbox.
 

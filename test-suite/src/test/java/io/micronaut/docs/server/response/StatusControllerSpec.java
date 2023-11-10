@@ -21,41 +21,40 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class StatusControllerSpec {
+class StatusControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "httpstatus"));
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
+    @AfterAll
+    static void stopServer() {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
 
     @Test
-    public void testStatus() {
+    void testStatus() {
         HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/status"), String.class);
         Optional<String> body = response.getBody();
 

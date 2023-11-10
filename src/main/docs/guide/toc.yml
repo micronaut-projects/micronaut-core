@@ -346,6 +346,8 @@ i18n:
   title: Internationalization
   bundle: Resource Bundles
   localizedMessageSource: Localized Message Source
+resources:
+  title: Resources
 appendix:
   title: Appendices
   architecture:

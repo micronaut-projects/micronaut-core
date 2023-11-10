@@ -40,6 +40,7 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
     /**
      * @return Was the binding requirement satisfied
      */
+    @Override
     default boolean isSatisfied() {
         return !isPending() && ArgumentBinder.BindingResult.super.isSatisfied();
     }
@@ -47,6 +48,7 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
     /**
      * @return Is the value present and satisfied
      */
+    @Override
     default boolean isPresentAndSatisfied() {
         return !isPending() && ArgumentBinder.BindingResult.super.isPresentAndSatisfied();
     }

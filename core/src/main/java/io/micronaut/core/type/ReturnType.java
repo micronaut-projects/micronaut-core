@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Models a return type of an {@link Executable} method in Micronaut.
+ * Models a return type of {@link Executable} method in Micronaut.
  *
  * @param <T> The concrete type
  * @author Graeme Rocher

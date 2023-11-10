@@ -18,7 +18,6 @@ package io.micronaut.http.client.docs.annotation;
 // tag::imports[]
 import io.micronaut.http.client.annotation.Client;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 // end::imports[]
 
 

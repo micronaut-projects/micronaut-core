@@ -42,12 +42,6 @@ tasks.named("test") {
     useJUnitPlatform()
 }
 
-def openGraalModules = [
-        "org.graalvm.nativeimage.builder/com.oracle.svm.core.jdk",
-        "org.graalvm.nativeimage.builder/com.oracle.svm.core.configure",
-        "org.graalvm.sdk/org.graalvm.nativeimage.impl"
-]
-
 graalvmNative {
     toolchainDetection = false
     metadataRepository {
@@ -56,9 +50,6 @@ graalvmNative {
     binaries {
         all {
             resources.autodetect()
-            openGraalModules.each { module ->
-                jvmArgs.add("--add-exports=" + module + "=ALL-UNNAMED")
-            }
         }
     }
 }

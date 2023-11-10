@@ -17,17 +17,17 @@ package io.micronaut.docs.context.env;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
-public class DefaultEnvironmentSpec {
+class DefaultEnvironmentSpec {
 
     // tag::disableEnvDeduction[]
     @Test
-    public void testDisableEnvironmentDeductionViaBuilder() {
+    void testDisableEnvironmentDeductionViaBuilder() {
         ApplicationContext ctx = ApplicationContext.builder()
                 .deduceEnvironment(false)
                 .properties(Collections.singletonMap("micronaut.server.port", -1))

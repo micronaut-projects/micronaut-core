@@ -243,7 +243,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *  @param packageName        The package name
      * @param className          The class name
-     * @param isInterface        Is the target of the advise an interface
+     * @param isInterface        Is the target of the advice an interface
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
@@ -265,7 +265,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *  @param packageName        The package name
      * @param className          The class name
-     * @param isInterface        Is the target of the advise an interface
+     * @param isInterface        Is the target of the advice an interface
      * @param implementInterface Whether the interface should be implemented. If false the {@code interfaceTypes} argument should contain at least one entry
      * @param originatingElement The originating elements
      * @param annotationMetadata The annotation metadata
