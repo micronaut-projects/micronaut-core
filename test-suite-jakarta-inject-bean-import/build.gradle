@@ -9,6 +9,5 @@ dependencies {
     testImplementation project(":graal")
     testImplementation project(":inject")
     testImplementation libs.jakarta.inject.tck
-    testImplementation libs.junit.vintage
     testImplementation project(":inject-java-test")
 }

@@ -202,7 +202,6 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
 junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engine", version.ref = "junit-platform" }
-junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
