@@ -1,8 +1,8 @@
 package io.micronaut.docs.config.converters
 
 import io.kotest.core.spec.style.AnnotationSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
-import org.junit.jupiter.api.Assertions.assertEquals
 import java.time.LocalDate
 
 //tag::configSpec[]
@@ -35,7 +35,7 @@ class MyConfigurationPropertiesSpec : AnnotationSpec() {
         val props = ctx.getBean(MyConfigurationProperties::class.java)
 
         val expectedDate = LocalDate.of(1982, 10, 28)
-        assertEquals(expectedDate, props.updatedAt)
+        expectedDate shouldBe props.updatedAt
     }
 }
 //end::configSpec[]

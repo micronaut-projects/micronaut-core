@@ -1,14 +1,13 @@
 package io.micronaut.docs.config.env
 
 import io.kotest.core.spec.style.AnnotationSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.jupiter.api.Assertions.assertEquals
 import java.net.URI
 import java.net.URISyntaxException
-import java.util.stream.Collectors
 
 class EachPropertyTest : AnnotationSpec() {
 
@@ -29,17 +28,14 @@ class EachPropertyTest : AnnotationSpec() {
 
         // tag::beans[]
         val beansOfType = applicationContext.getBeansOfType(DataSourceConfiguration::class.java)
-        assertEquals(2, beansOfType.size) // <1>
+        beansOfType.size shouldBe 2 // <1>
 
         val firstConfig = applicationContext.getBean(
             DataSourceConfiguration::class.java,
             Qualifiers.byName("one") // <2>
         )
 
-        assertEquals(
-            URI("jdbc:mysql://localhost/one"),
-            firstConfig.url
-        )
+        firstConfig.url shouldBe URI("jdbc:mysql://localhost/one")
         // end::beans[]
         applicationContext.close()
     }
@@ -58,15 +54,11 @@ class EachPropertyTest : AnnotationSpec() {
             )
         )
 
-        val beansOfType =
-            applicationContext.streamOfType(RateLimitsConfiguration::class.java).collect(Collectors.toList())
+        val beansOfType = applicationContext.streamOfType(RateLimitsConfiguration::class.java).toList()
 
-        assertEquals(
-            2,
-            beansOfType.size
-        )
-        assertEquals(1000, beansOfType[0].limit)
-        assertEquals(5000, beansOfType[1].limit)
+        beansOfType.size shouldBe 2
+        beansOfType[0].limit shouldBe 1000
+        beansOfType[1].limit shouldBe 5000
 
         applicationContext.close()
     }

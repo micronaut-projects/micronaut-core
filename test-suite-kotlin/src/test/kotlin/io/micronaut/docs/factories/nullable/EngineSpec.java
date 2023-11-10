@@ -37,8 +37,8 @@ class EngineSpec {
 
         Collection<Engine> engines = applicationContext.getBeansOfType(Engine.class);
 
-        assertEquals(2, engines.size(), "There are 2 engines");
+        assertEquals(engines.size(), 2, "There are 2 engines");
         int totalCylinders = engines.stream().mapToInt(Engine::getCylinders).sum();
-        assertEquals(16, totalCylinders, "Subaru + Lamborghini equals 16 cylinders");
+        assertEquals(totalCylinders, 16, "Subaru + Lamborghini equals 16 cylinders");
     }
 }

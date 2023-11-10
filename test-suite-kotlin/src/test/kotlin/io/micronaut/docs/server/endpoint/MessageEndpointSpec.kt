@@ -9,8 +9,8 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.jupiter.api.Assertions.fail
 import reactor.core.publisher.Flux
+import kotlin.test.fail
 
 class MessageEndpointSpec : StringSpec() {
 

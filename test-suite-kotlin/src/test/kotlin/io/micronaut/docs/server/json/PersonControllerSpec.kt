@@ -18,6 +18,7 @@ package io.micronaut.docs.server.json
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -26,8 +27,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Assertions.assertTrue
 import reactor.core.publisher.Flux
 
 class PersonControllerSpec : StringSpec() {
@@ -41,8 +40,8 @@ class PersonControllerSpec : StringSpec() {
     )
 
     init {
-        "test global error handler"() {
-            val e = Assertions.assertThrows(HttpClientResponseException::class.java) {
+        "test global error handler" {
+            val e = shouldThrow<HttpClientResponseException> {
                 Flux.from(client!!.exchange("/people/error", Map::class.java))
                     .blockFirst()
             }
@@ -52,7 +51,7 @@ class PersonControllerSpec : StringSpec() {
             response.body.get()["message"] shouldBe "Bad Things Happened: Something went wrong"
         }
 
-        "test save"() {
+        "test save" {
             var response = client.toBlocking().exchange(
                 HttpRequest.POST(
                     "/people",
@@ -71,7 +70,7 @@ class PersonControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
-        "test save reactive"() {
+        "test save reactive" {
             val response = client.toBlocking().exchange(
                 HttpRequest.POST(
                     "/people/saveReactive",
@@ -84,7 +83,7 @@ class PersonControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.CREATED
         }
 
-        "test save future"() {
+        "test save future" {
             val response = client!!.toBlocking().exchange(
                 HttpRequest.POST(
                     "/people/saveFuture",
@@ -97,7 +96,7 @@ class PersonControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.CREATED
         }
 
-        "test save args"() {
+        "test save args" {
             val response = client!!.toBlocking().exchange(
                 HttpRequest.POST(
                     "/people/saveWithArgs",
@@ -110,7 +109,7 @@ class PersonControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.CREATED
         }
 
-        "test person not found"() {
+        "test person not found" {
             val e = shouldThrow<HttpClientResponseException> {
                 Flux.from(client.exchange("/people/Sally", Map::class.java))
                     .blockFirst()
@@ -121,7 +120,7 @@ class PersonControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.NOT_FOUND
         }
 
-        "test save invalid json"() {
+        "test save invalid json" {
             val e = shouldThrow<HttpClientResponseException> {
                 client.toBlocking().exchange(
                     HttpRequest.POST("/people", "{\""),
@@ -131,10 +130,8 @@ class PersonControllerSpec : StringSpec() {
             }
             val response = e.response as HttpResponse<Map<*, *>>
 
-            assertTrue(
-                response.getBody(Map::class.java).get()["message"].toString()
-                    .startsWith("Invalid JSON: Unexpected end-of-input")
-            )
+            response.getBody(Map::class.java).get()["message"].toString()
+                .shouldStartWith("Invalid JSON: Unexpected end-of-input")
             response.status shouldBe HttpStatus.BAD_REQUEST
         }
     }

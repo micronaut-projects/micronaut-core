@@ -16,7 +16,6 @@
 package io.micronaut.docs.client.upload;
 
 // tag::imports[]
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;

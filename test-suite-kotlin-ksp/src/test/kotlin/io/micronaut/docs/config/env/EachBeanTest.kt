@@ -1,12 +1,12 @@
 package io.micronaut.docs.config.env
 
 import io.kotest.core.spec.style.AnnotationSpec
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.docs.config.env.DataSourceFactory.DataSource
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import java.net.URISyntaxException
 
 class EachBeanTest : AnnotationSpec() {
@@ -25,7 +25,7 @@ class EachBeanTest : AnnotationSpec() {
 
         // tag::beans[]
         val beansOfType = applicationContext.getBeansOfType(DataSource::class.java)
-        assertEquals(2, beansOfType.size) // <1>
+        beansOfType.size shouldBe 2 // <1>
 
         val firstConfig = applicationContext.getBean(
                 DataSource::class.java,
@@ -33,7 +33,7 @@ class EachBeanTest : AnnotationSpec() {
         )
         // end::beans[]
 
-        assertNotNull(firstConfig)
+        firstConfig.shouldNotBeNull()
 
         applicationContext.close()
     }
