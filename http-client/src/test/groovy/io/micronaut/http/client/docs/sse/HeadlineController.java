@@ -26,7 +26,6 @@ import reactor.core.publisher.FluxSink;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.TimeUnit;
 
 @Controller("/streaming/sse")
 public class HeadlineController {

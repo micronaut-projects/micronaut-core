@@ -21,7 +21,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.After;

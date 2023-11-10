@@ -1,7 +1,6 @@
 package io.micronaut.docs.inject.anninheritance;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.BeanDefinition;
 import org.junit.jupiter.api.Test;

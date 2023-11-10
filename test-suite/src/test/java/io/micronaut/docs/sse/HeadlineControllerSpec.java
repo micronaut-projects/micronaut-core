@@ -20,7 +20,6 @@ import io.micronaut.docs.streaming.Headline;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import static org.junit.Assert.assertNotNull;

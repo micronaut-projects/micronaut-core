@@ -21,8 +21,6 @@ import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultBeanContext;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 

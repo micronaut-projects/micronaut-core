@@ -16,7 +16,6 @@
 package io.micronaut.docs.factories;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

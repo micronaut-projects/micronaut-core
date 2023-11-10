@@ -16,7 +16,6 @@
 package io.micronaut.inject.factory.parameterizedfactory;
 
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 

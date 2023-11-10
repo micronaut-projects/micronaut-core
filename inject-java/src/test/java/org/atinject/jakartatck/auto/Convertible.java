@@ -25,9 +25,6 @@ import jakarta.inject.Provider;
 import org.atinject.jakartatck.auto.accessories.Cupholder;
 import org.atinject.jakartatck.auto.accessories.SpareTire;
 import org.atinject.jakartatck.auto.DriversSeat;
-import org.atinject.jakartatck.auto.accessories.RoundThing;
-import org.junit.Ignore;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

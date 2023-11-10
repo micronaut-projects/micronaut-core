@@ -16,7 +16,6 @@
 package io.micronaut.docs.config.mapFormat;
 
 import io.micronaut.context.ApplicationContext;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.Test;
 
 import java.util.LinkedHashMap;

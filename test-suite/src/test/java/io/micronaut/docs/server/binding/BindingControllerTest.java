@@ -17,12 +17,10 @@ package io.micronaut.docs.server.binding;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.cookie.Cookies;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;

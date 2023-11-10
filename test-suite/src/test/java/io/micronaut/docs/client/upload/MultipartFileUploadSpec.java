@@ -33,7 +33,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
 // end::imports[]
 

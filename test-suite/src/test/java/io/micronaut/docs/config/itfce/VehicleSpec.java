@@ -17,7 +17,6 @@ package io.micronaut.docs.config.itfce;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.core.util.CollectionUtils;
 import org.junit.Test;
 

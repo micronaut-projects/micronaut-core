@@ -1,7 +1,6 @@
 package io.micronaut.docs.config.env;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.PropertySource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

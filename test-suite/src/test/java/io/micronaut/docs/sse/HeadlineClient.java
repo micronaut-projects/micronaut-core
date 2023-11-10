@@ -20,7 +20,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
+
 import static io.micronaut.http.MediaType.TEXT_EVENT_STREAM;
 
 // tag::class[]

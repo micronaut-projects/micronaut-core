@@ -1,7 +1,6 @@
 package io.micronaut.inject.visitor.beans;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Introspected;
 
 @Introspected
