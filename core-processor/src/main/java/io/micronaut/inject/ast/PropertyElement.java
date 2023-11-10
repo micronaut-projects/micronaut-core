@@ -56,7 +56,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * Return true only if the property doesn't support modifying the value.
      *
-     * @return True if the property is write only.
+     * @return True if the property is writing only.
      * @since 4.0.0
      */
     default boolean isWriteOnly() {

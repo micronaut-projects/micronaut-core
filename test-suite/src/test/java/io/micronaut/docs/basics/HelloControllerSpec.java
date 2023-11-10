@@ -23,9 +23,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.Collections;
@@ -34,16 +34,16 @@ import java.util.Optional;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class HelloControllerSpec {
+class HelloControllerSpec {
 
     private EmbeddedServer embeddedServer;
     private HttpClient client;
 
-    @Before
-    public void setup() {
+    @BeforeEach
+    void setup() {
         embeddedServer = ApplicationContext.run(
                 EmbeddedServer.class,
                 Collections.singletonMap("spec.name", getClass().getSimpleName()));
@@ -52,14 +52,14 @@ public class HelloControllerSpec {
                 embeddedServer.getURL());
     }
 
-    @After
-    public void cleanup() {
+    @AfterEach
+    void cleanup() {
         embeddedServer.stop();
         client.stop();
     }
 
     @Test
-    public void testSimpleRetrieve() {
+    void testSimpleRetrieve() {
         // tag::simple[]
         String uri = UriBuilder.of("/hello/{name}")
                                .expand(Collections.singletonMap("name", "John"))
@@ -73,7 +73,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testRetrieveWithHeaders() {
+    void testRetrieveWithHeaders() {
         // tag::headers[]
         Flux<String> response = Flux.from(client.retrieve(
                 GET("/hello/John")
@@ -85,7 +85,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testRetrieveWithJSON() {
+    void testRetrieveWithJSON() {
         // tag::jsonmap[]
         Flux<Map> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Map.class
@@ -105,7 +105,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testRetrieveWithPOJO() {
+    void testRetrieveWithPOJO() {
         // tag::jsonpojo[]
         Flux<Message> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Message.class
@@ -116,7 +116,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testRetrieveWithPOJOResponse() {
+    void testRetrieveWithPOJOResponse() {
         // tag::pojoresponse[]
         Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 GET("/greet/John"), Message.class // <1>
@@ -133,7 +133,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testPostRequestWithString() {
+    void testPostRequestWithString() {
         // tag::poststring[]
         Flux<HttpResponse<String>> call = Flux.from(client.exchange(
                 POST("/hello", "Hello John") // <1>
@@ -153,7 +153,7 @@ public class HelloControllerSpec {
     }
 
     @Test
-    public void testPostRequestWithPOJO() {
+    void testPostRequestWithPOJO() {
         // tag::postpojo[]
         Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>

@@ -349,7 +349,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private static void findBuilderMethodOrFail(ClassElement classToBuild, VisitorContext context, ClassElement builderType, ClassElement callingType, BeanIntrospectionWriter builderWriter) {
-        // try find builder method
+        // try to find builder method
         MethodElement methodElement = classToBuild.getEnclosedElement(
             ElementQuery.ALL_METHODS
                 .onlyStatic()

@@ -22,31 +22,31 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class BindingControllerTest {
+class BindingControllerTest {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -56,7 +56,7 @@ public class BindingControllerTest {
     }
 
     @Test
-    public void testCookieBinding() {
+    void testCookieBinding() {
         String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieName").cookie(Cookie.of("myCookie", "cookie value")));
 
         assertNotNull(body);
@@ -70,7 +70,7 @@ public class BindingControllerTest {
 
 
     @Test
-    public void testCookiesBinding() {
+    void testCookiesBinding() {
 
         HashSet<Cookie> cookies = new HashSet<>();
         cookies.add(Cookie.of("myCookieA", "cookie A value"));
@@ -83,7 +83,7 @@ public class BindingControllerTest {
     }
 
     @Test
-    public void testHeaderBinding() {
+    void testHeaderBinding() {
         String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"));
 
         assertNotNull(body);
@@ -101,7 +101,7 @@ public class BindingControllerTest {
     }
 
     @Test
-    public void testHeaderDateBinding() {
+    void testHeaderDateBinding() {
         String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/date").header("date", "Tue, 3 Jun 2008 11:05:30 GMT"));
 
         assertNotNull(body);

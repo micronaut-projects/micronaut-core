@@ -24,19 +24,20 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class AlertsEndpointSpec {
+class AlertsEndpointSpec {
 
     @Test
-    public void testAddingAnAlert() {
+    void testAddingAnAlert() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
@@ -54,7 +55,7 @@ public class AlertsEndpointSpec {
     }
 
     @Test
-    public void testAddingAnAlertNotSensitive() {
+    void testAddingAnAlertNotSensitive() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         map.put("endpoints.alerts.add.sensitive", false);
@@ -63,24 +64,24 @@ public class AlertsEndpointSpec {
 
         try {
             HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
-            assertEquals(response.status(), HttpStatus.OK);
+            Assertions.assertEquals(response.status(), HttpStatus.OK);
         } catch (Exception e) {
-            fail("Wrong exception thrown");
+            Assertions.fail("Wrong exception thrown");
         }
 
         try {
             HttpResponse<List<String>> response = client.toBlocking().exchange(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING);
-            assertEquals(response.status(), HttpStatus.OK);
-            assertEquals(response.body().get(0), "First alert");
+            Assertions.assertEquals(response.status(), HttpStatus.OK);
+            Assertions.assertEquals(response.body().get(0), "First alert");
         } catch (Exception e) {
-            fail("Wrong exception thrown");
+            Assertions.fail("Wrong exception thrown");
         } finally {
             server.close();
         }
     }
 
     @Test
-    public void testClearingAlerts() {
+    void testClearingAlerts() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
@@ -91,7 +92,7 @@ public class AlertsEndpointSpec {
         } catch (HttpClientResponseException e) {
             assertEquals(401, e.getStatus().getCode());
         } catch (Exception e) {
-            fail("Wrong exception thrown");
+            Assertions.fail("Wrong exception thrown");
         } finally {
             server.close();
         }

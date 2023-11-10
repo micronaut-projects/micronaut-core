@@ -177,7 +177,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the meta data for the given element. If the element is a method the class metadata will be included.
+     * Build the metadata for the given element. If the element is a method the class metadata will be included.
      *
      * @param owningType       The owning type
      * @param methodElement    The method element
@@ -189,7 +189,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the meta data for the given element.
+     * Build the metadata for the given element.
      *
      * @param typeElement The element
      * @return The {@link AnnotationMetadata}
@@ -451,7 +451,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract void addError(@NonNull T originatingElement, @NonNull String error);
 
     /**
-     * Adds an warning.
+     * Adds a warning.
      *
      * @param originatingElement The originating element
      * @param warning            The warning
@@ -507,7 +507,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getAnnotationMemberName(T member);
 
     /**
-     * Obtain the name of the repeatable annotation if the annotation is is one.
+     * Obtain the name of the repeatable annotation if the annotation is one.
      *
      * @param annotationMirror The annotation mirror
      * @return Return the name or null
@@ -516,7 +516,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getRepeatableName(A annotationMirror);
 
     /**
-     * Obtain the name of the repeatable annotation if the annotation is is one.
+     * Obtain the name of the repeatable annotation if the annotation is one.
      *
      * @param annotationType The annotation mirror
      * @return Return the name or null

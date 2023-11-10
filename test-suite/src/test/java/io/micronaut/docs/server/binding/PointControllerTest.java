@@ -22,39 +22,40 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class PointControllerTest {
+class PointControllerTest {
+
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", "PointControllerTest"));
         client = server
             .getApplicationContext()
             .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
+    @AfterAll
+    static void stopServer() {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
 
     @Test
-    public void testJsonWithNoAtBodyEndpoint() {
+    void testJsonWithNoAtBodyEndpoint() {
         HttpRequest<String> httpRequest = HttpRequest
             .POST("/point/no-body-json", "{\"x\":10,\"y\":20}")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
@@ -64,7 +65,7 @@ public class PointControllerTest {
     }
 
     @Test
-    public void testFormWithNoAtBodyEndpoint() {
+    void testFormWithNoAtBodyEndpoint() {
         HttpRequest<String> httpRequest = HttpRequest
             .POST("/point/no-body-form", "x=10&y=20")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);

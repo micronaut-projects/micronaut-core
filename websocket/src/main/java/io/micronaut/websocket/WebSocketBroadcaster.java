@@ -39,7 +39,7 @@ public interface WebSocketBroadcaster {
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param filter The filter to apply
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
@@ -53,7 +53,7 @@ public interface WebSocketBroadcaster {
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
@@ -95,7 +95,7 @@ public interface WebSocketBroadcaster {
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param filter The filter
      * @param <T> The message type
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
@@ -137,7 +137,7 @@ public interface WebSocketBroadcaster {
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
@@ -149,7 +149,7 @@ public interface WebSocketBroadcaster {
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param filter The filter
      * @param <T> The message type
      */
@@ -189,7 +189,7 @@ public interface WebSocketBroadcaster {
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      *
      * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      */
     default <T> void broadcastSync(T message, MediaType mediaType) {

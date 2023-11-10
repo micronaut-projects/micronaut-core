@@ -18,16 +18,16 @@ package io.micronaut.docs.config.immutable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.core.util.CollectionUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
                 "my.engine.cylinders", "8",
@@ -43,7 +43,7 @@ public class VehicleSpec {
     }
 
     @Test
-    public void testStartWithInvalidValue() {
+    void testStartWithInvalidValue() {
         try (ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
                 "my.engine.cylinders", "-10",
                 "my.engine.crank-shaft.rod-length", "7.0"

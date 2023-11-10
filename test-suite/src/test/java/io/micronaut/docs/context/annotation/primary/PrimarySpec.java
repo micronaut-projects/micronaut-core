@@ -22,32 +22,32 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class PrimarySpec {
+class PrimarySpec {
 
     private static EmbeddedServer embeddedServer;
 
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer.class, new HashMap<String, Object>() {{
+    @BeforeAll
+    static void setup() {
+        embeddedServer = ApplicationContext.run(EmbeddedServer.class, new HashMap<>() {{
             put("spec.name", "primaryspec");
             put("spec.lang", "java");
         }}, Environment.TEST);
         client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
     }
 
-    @AfterClass
-    public static void teardown() {
-        if (client != null) {
+    @AfterAll
+    static void teardown() {
+        if(client != null){
             client.close();
         }
         if (embeddedServer != null) {
@@ -56,7 +56,7 @@ public class PrimarySpec {
     }
 
     @Test
-    public void testPrimaryAnnotatedBeanIsInjectedWhenMultipleOptionsExist() {
+    void testPrimaryAnnotatedBeanIsInjectedWhenMultipleOptionsExist() {
         assertEquals(embeddedServer.getApplicationContext().getBeansOfType(ColorPicker.class).size(), 2);
 
         HttpResponse<String> rsp = client.toBlocking().exchange(HttpRequest.GET("/testPrimary"), String.class);

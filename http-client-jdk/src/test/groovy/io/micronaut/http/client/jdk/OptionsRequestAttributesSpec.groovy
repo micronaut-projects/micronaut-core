@@ -2,8 +2,11 @@ package io.micronaut.http.client.jdk
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpAttributes
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
@@ -23,7 +26,7 @@ class OptionsRequestAttributesSpec extends Specification {
 
     def 'test OPTIONS requests attributes'() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'OptionsRequestAttributesSpec'])
-        def ctx = server.applicationContext
+        ApplicationContext ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
@@ -32,6 +35,32 @@ class OptionsRequestAttributesSpec extends Specification {
         then:
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
+
+        cleanup:
+        ctx.close()
+        server.close()
+    }
+
+    def 'test OPTIONS requests attributes with micronaut.server.dispatch-options-requests enabled'() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'OptionsRequestAttributesSpec', 'micronaut.server.dispatch-options-requests': StringUtils.TRUE])
+        ApplicationContext ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
+
+        when:
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.OPTIONS('/foo'), String)
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.getHeaders().getAll(HttpHeaders.ALLOW)
+        3 == response.getHeaders().getAll(HttpHeaders.ALLOW).size()
+        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('GET')
+        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('OPTIONS')
+        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('HEAD')
+
+        cleanup:
+        ctx.close()
+        server.close()
     }
 
     @Singleton

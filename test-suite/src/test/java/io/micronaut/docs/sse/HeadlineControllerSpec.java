@@ -19,17 +19,17 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.docs.streaming.Headline;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class HeadlineControllerSpec {
+class HeadlineControllerSpec {
 
     // tag::streamingClient[]
     @Test
-    public void testClientAnnotationStreaming() throws Exception {
+    void testClientAnnotationStreaming() {
         try( EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class) ) {
             HeadlineClient headlineClient = embeddedServer
                     .getApplicationContext()
@@ -37,8 +37,8 @@ public class HeadlineControllerSpec {
 
             Event<Headline> headline = Mono.from(headlineClient.streamHeadlines()).block();
 
-            assertNotNull( headline );
-            assertTrue( headline.getData().getText().startsWith("Latest Headline") );
+            assertNotNull(headline);
+            assertTrue(headline.getData().getText().startsWith("Latest Headline"));
         }
     }
     // end::streamingClient[]

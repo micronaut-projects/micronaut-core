@@ -17,13 +17,14 @@ package io.micronaut.docs.inject.qualifiers.named;
 
 import io.micronaut.context.BeanContext;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
+
     @Test
-    public void testStartVehicle() {
+    void testStartVehicle() {
         // tag::start[]
         final BeanContext context = BeanContext.run();
         Vehicle vehicle = context.getBean(Vehicle.class);
