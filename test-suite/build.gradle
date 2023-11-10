@@ -78,6 +78,7 @@ dependencies {
 
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.h2
+    testRuntimeOnly libs.junit.vintage
     testRuntimeOnly libs.logback.classic
     testRuntimeOnly libs.aws.java.sdk.lambda
 
