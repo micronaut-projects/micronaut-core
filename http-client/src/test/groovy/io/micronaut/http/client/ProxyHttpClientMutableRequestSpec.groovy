@@ -19,6 +19,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -26,18 +27,23 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
 
 class ProxyHttpClientMutableRequestSpec extends Specification {
 
+    @AutoCleanup
+    EmbeddedServer helloEmbeddedServer = ApplicationContext.run(EmbeddedServer.class, [
+            'spec.name': 'ProxyHttpClientMutableRequestSpec.hello',
+    ])
+
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, [
+            'spec.name': 'ProxyHttpClientMutableRequestSpec',
+            'proxies.hello.url': "http://localhost:${helloEmbeddedServer.getPort()}".toString(),
+    ])
+
+    @AutoCleanup
+    HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6073")
     void "ProxyHttpClient will mutate a request if necessary"() {
         given:
-        EmbeddedServer helloEmbeddedServer = ApplicationContext.run(EmbeddedServer.class, [
-                'spec.name': 'ProxyHttpClientMutableRequestSpec.hello',
-        ])
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, [
-                'spec.name': 'ProxyHttpClientMutableRequestSpec',
-                'proxies.hello.url': "http://localhost:${helloEmbeddedServer.getPort()}".toString(),
-        ])
-
-        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
         BlockingHttpClient client = httpClient.toBlocking()
 
         when:
@@ -62,12 +68,6 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
         result = client.retrieve(HttpRequest.GET('/hello/host-update').accept(MediaType.TEXT_PLAIN))
         then:
         result == "Host: foo"
-
-        cleanup:
-        helloEmbeddedServer.close()
-        client.close()
-        httpClient.close()
-        embeddedServer.close()
     }
 
     @Requires(property = 'spec.name', value = 'ProxyHttpClientMutableRequestSpec')

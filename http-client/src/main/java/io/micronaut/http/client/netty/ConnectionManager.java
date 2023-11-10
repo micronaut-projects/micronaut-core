@@ -60,6 +60,7 @@ import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
@@ -109,6 +110,7 @@ import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -609,6 +611,7 @@ public class ConnectionManager {
                 ch.close();
             }
         });
+        Pool.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
         ch.pipeline().addLast(multiplexHandler);
         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
             @Override
@@ -616,7 +619,7 @@ public class ConnectionManager {
                 if (msg instanceof Http2SettingsFrame) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    pool.new Http2ConnectionHolder(ch, connectionCustomizer).init();
+                    connectionHolder.init();
                     return;
                 } else {
                     log.warn("Premature frame: {}", msg.getClass());
@@ -636,6 +639,17 @@ public class ConnectionManager {
             public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                 if (msg instanceof Http2SettingsAckFrame) {
                     // this is fine
+                    return;
+                }
+                if (msg instanceof Http2GoAwayFrame goAway) {
+                    connectionHolder.windDownConnection();
+                    if (log.isDebugEnabled()) {
+                        // include the debug content, but at most 64 bytes for safety
+                        byte[] debug = new byte[Math.min(64, goAway.content().readableBytes())];
+                        goAway.content().readBytes(debug);
+                        log.debug("Server sent GOAWAY frame. errorCode={} base64(content)={}", goAway.errorCode(), Base64.getEncoder().encodeToString(debug));
+                    }
+                    goAway.release();
                     return;
                 }
 
@@ -1095,6 +1109,7 @@ public class ConnectionManager {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
                                 if (hasLiveRequests()) {
+                                    windDownConnection = true;
                                     fireReadTimeout(ctx);
                                     ctx.close();
                                 }
@@ -1109,6 +1124,7 @@ public class ConnectionManager {
                         @Override
                         protected void readTimedOut(ChannelHandlerContext ctx) {
                             if (!hasLiveRequests()) {
+                                windDownConnection = true;
                                 ctx.close();
                             }
                         }
@@ -1227,7 +1243,8 @@ public class ConnectionManager {
         }
 
         final class Http1ConnectionHolder extends ConnectionHolder {
-            private final AtomicBoolean hasLiveRequest = new AtomicBoolean(false);
+            private final AtomicBoolean earmarkedOrLive = new AtomicBoolean(false);
+            private volatile boolean hasLiveRequest = false;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
@@ -1250,12 +1267,12 @@ public class ConnectionManager {
 
             @Override
             boolean tryEarmarkForRequest() {
-                return !windDownConnection && hasLiveRequest.compareAndSet(false, true);
+                return !windDownConnection && earmarkedOrLive.compareAndSet(false, true);
             }
 
             @Override
             boolean hasLiveRequests() {
-                return hasLiveRequest.get();
+                return hasLiveRequest;
             }
 
             @Override
@@ -1266,9 +1283,13 @@ public class ConnectionManager {
             @Override
             void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive()) {
+                    // make sure the request isn't dispatched to this connection again
+                    windDownConnection();
+
                     returnPendingRequest(sink);
                     return;
                 }
+                hasLiveRequest = true;
                 PoolHandle ph = new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
 
@@ -1288,7 +1309,8 @@ public class ConnectionManager {
                             }
                         }
                         if (!windDownConnection) {
-                            hasLiveRequest.set(false);
+                            hasLiveRequest = false;
+                            earmarkedOrLive.set(false);
                             markConnectionAvailable();
                         } else {
                             channel.close();
@@ -1311,13 +1333,14 @@ public class ConnectionManager {
             private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
-                hasLiveRequest.set(false);
+                hasLiveRequest = false;
+                earmarkedOrLive.set(false);
             }
 
             @Override
             void windDownConnection() {
                 super.windDownConnection();
-                if (!hasLiveRequest.get()) {
+                if (!hasLiveRequest) {
                     channel.close();
                 }
             }
@@ -1330,6 +1353,7 @@ public class ConnectionManager {
         }
 
         class Http2ConnectionHolder extends ConnectionHolder {
+            private final AtomicInteger earmarkedOrLiveRequests = new AtomicInteger(0);
             private final AtomicInteger liveRequests = new AtomicInteger(0);
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
@@ -1354,7 +1378,7 @@ public class ConnectionManager {
 
             @Override
             boolean tryEarmarkForRequest() {
-                return !windDownConnection && incrementWithLimit(liveRequests, configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
+                return !windDownConnection && incrementWithLimit(earmarkedOrLiveRequests, configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
             }
 
             @Override
@@ -1370,9 +1394,13 @@ public class ConnectionManager {
             @Override
             void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive() || windDownConnection) {
+                    // make sure the request isn't dispatched to this connection again
+                    windDownConnection();
+
                     returnPendingRequest(sink);
                     return;
                 }
+                liveRequests.incrementAndGet();
                 withPropagation(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
@@ -1398,6 +1426,7 @@ public class ConnectionManager {
                                 super.release();
                                 streamChannel.close();
                                 int newCount = liveRequests.decrementAndGet();
+                                earmarkedOrLiveRequests.decrementAndGet();
                                 if (windDownConnection && newCount <= 0) {
                                     Http2ConnectionHolder.this.channel.close();
                                 } else {
@@ -1418,6 +1447,7 @@ public class ConnectionManager {
                         emitPoolHandle(sink, ph);
                     } else {
                         log.debug("Failed to open http2 stream", future.cause());
+                        liveRequests.decrementAndGet();
                         returnPendingRequest(sink);
                     }
                 });
@@ -1445,7 +1475,7 @@ public class ConnectionManager {
             private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
-                liveRequests.decrementAndGet();
+                earmarkedOrLiveRequests.decrementAndGet();
             }
 
             @Override

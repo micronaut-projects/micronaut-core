@@ -17,9 +17,14 @@ import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB',
-                                                                                                'spec.name': 'NonMutableResponseSpec'])
-    @Shared HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'micronaut.server.max-request-size': '10KB',
+            'spec.name'                        : 'NonMutableResponseSpec'
+    ])
+
+    @AutoCleanup
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test returning a non mutable response from a controller"() {
         expect:
@@ -51,7 +56,8 @@ class NonMutableResponseSpec extends Specification {
     @Controller
     static class ResponseController {
 
-        @Inject ResponseClient responseClient
+        @Inject
+        ResponseClient responseClient
 
         @Get('/test/non-mutable')
         HttpResponse<String> go() {

@@ -35,10 +35,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.ProviderNotFoundException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.slf4j.helpers.NOPLogger;
@@ -147,6 +149,15 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     }
                                 }
                                 Path pathObject = fileSystem.getPath(path);
+                                if (!Files.exists(pathObject) && uri.toString().contains("!/")) {
+                                    // Gracefully transform a URL: "jar:file:/{JAR_PATH}!/{PREFIX}!/{RESOURCE}" to path: "{PREFIX}/{RESOURCE}"
+                                    final String altPath = Arrays.stream(uri.toString().split("\\!\\/")).skip(1).collect(Collectors.joining("/"));
+                                    final Path altPathObject = fileSystem.getPath(altPath);
+                                    if (Files.exists(altPathObject) && !Files.isDirectory(pathObject)) {
+                                        // Use this path only if the resource exists at that location
+                                        pathObject = altPathObject;
+                                    }
+                                }
                                 if (Files.isDirectory(pathObject)) {
                                     return Optional.empty();
                                 }

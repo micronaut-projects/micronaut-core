@@ -1,6 +1,5 @@
 package io.micronaut.http.client
 
-
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
@@ -19,7 +18,6 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2971')
 @MicronautTest
@@ -52,46 +50,50 @@ class ClientTimeoutSpec extends Specification {
         capturer.stop()
         capturer.removeStandardStreamsListener(listener)
     }
-}
 
-class UndeliverableExceptionListener implements IStandardStreamsListener {
-    boolean undeliverable = false
+    static class UndeliverableExceptionListener implements IStandardStreamsListener {
 
-    @Override
-    void standardOut(String message) { }
+        boolean undeliverable = false
 
-    @Override
-    void standardErr(String message) {
-        undeliverable = undeliverable || message.contains('io.reactivex.exceptions.UndeliverableException')
+        @Override
+        void standardOut(String message) { }
+
+        @Override
+        void standardErr(String message) {
+            undeliverable = undeliverable || message.contains('io.reactivex.exceptions.UndeliverableException')
+        }
     }
-}
 
-@Requires(property = 'spec.name', value = 'ClientTimeoutSpec')
-@Controller('/')
-class TimeoutController {
-    @Inject
-    TimeoutClient client
+    @Requires(property = 'spec.name', value = 'ClientTimeoutSpec')
+    @Controller('/')
+    static class TimeoutController {
 
-    @Get
-    @SingleResult
-    Publisher<String> get() {
-        // Client will timeout in 2s (see TimeoutClientConfiguration below); we timeout the stream in 1s.
-        Mono.from(client.get()).timeout(Duration.ofSeconds(1))
+        @Inject
+        TimeoutClient client
+
+        @Get
+        @SingleResult
+        Publisher<String> get() {
+            // Client will timeout in 2s (see TimeoutClientConfiguration below); we timeout the stream in 1s.
+            Mono.from(client.get()).timeout(Duration.ofSeconds(1))
+        }
     }
-}
 
-@Requires(property = 'spec.name', value = 'ClientTimeoutSpec')
-@Requires(beans = TimeoutClientConfiguration)
-@Client(value = 'http://www.google.com:81/', configuration = TimeoutClientConfiguration)
-interface TimeoutClient {
-    @Get
-    Publisher<String> get();
-}
+    @Requires(property = 'spec.name', value = 'ClientTimeoutSpec')
+    @Requires(beans = TimeoutClientConfiguration)
+    @Client(value = 'http://www.google.com:81/', configuration = TimeoutClientConfiguration)
+    static interface TimeoutClient {
+        @Get
+        Publisher<String> get();
+    }
 
-@ConfigurationProperties(PREFIX)
-class TimeoutClientConfiguration extends DefaultHttpClientConfiguration {
-    @Override
-    Optional<Duration> getConnectTimeout() {
-        Optional.of(Duration.ofSeconds(2))
+    @ConfigurationProperties(PREFIX)
+    @Requires(property = 'spec.name', value = 'ClientTimeoutSpec')
+    static class TimeoutClientConfiguration extends DefaultHttpClientConfiguration {
+
+        @Override
+        Optional<Duration> getConnectTimeout() {
+            Optional.of(Duration.ofSeconds(2))
+        }
     }
 }

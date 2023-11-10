@@ -61,7 +61,6 @@ class HttpGetSpec extends Specification {
 
     @Inject
     @Client("/")
-    @AutoCleanup
     HttpClient client
 
     @Inject

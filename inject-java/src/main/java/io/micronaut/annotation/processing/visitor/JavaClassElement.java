@@ -299,23 +299,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
         if (isRecord()) {
             return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
-                this,
-                this::getRecordMethods,
-                this::getRecordFields,
-                true,
-                Collections.emptySet(),
-                methodElement -> Optional.empty(),
-                methodElement -> Optional.empty(),
-                this::mapToPropertyElement);
+                    this,
+                    this::getRecordMethods,
+                    this::getRecordFields,
+                    true,
+                    Collections.emptySet(),
+                    methodElement -> Optional.empty(),
+                    methodElement -> Optional.empty(),
+                    this::mapToPropertyElement);
         }
         Function<MethodElement, Optional<String>> customReaderPropertyNameResolver = methodElement -> Optional.empty();
         Function<MethodElement, Optional<String>> customWriterPropertyNameResolver = methodElement -> Optional.empty();
         if (isKotlinClass(getNativeType().element())) {
             Set<String> isProperties = getEnclosedElements(ElementQuery.ALL_METHODS)
-                .stream()
-                .map(io.micronaut.inject.ast.Element::getName)
-                .filter(method -> method.startsWith(PREFIX_IS))
-                .collect(Collectors.toSet());
+                    .stream()
+                    .map(io.micronaut.inject.ast.Element::getName)
+                    .filter(method -> method.startsWith(PREFIX_IS))
+                    .collect(Collectors.toSet());
             if (!isProperties.isEmpty()) {
                 customReaderPropertyNameResolver = methodElement -> {
                     String methodName = methodElement.getSimpleName();
@@ -336,29 +336,29 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
-            this,
-            () -> getEnclosedElements(ElementQuery.ALL_METHODS),
-            () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
-            false,
-            Collections.emptySet(),
-            customReaderPropertyNameResolver,
-            customWriterPropertyNameResolver,
-            this::mapToPropertyElement);
+                this,
+                () -> getEnclosedElements(ElementQuery.ALL_METHODS),
+                () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
+                false,
+                Collections.emptySet(),
+                customReaderPropertyNameResolver,
+                customWriterPropertyNameResolver,
+                this::mapToPropertyElement);
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
         return new JavaPropertyElement(
-            JavaClassElement.this,
-            value.type,
-            value.readAccessKind == null ? null : value.getter,
-            value.writeAccessKind == null ? null : value.setter,
-            value.field,
-            elementAnnotationMetadataFactory,
-            value.propertyName,
-            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded,
-            visitorContext);
+                JavaClassElement.this,
+                value.type,
+                value.readAccessKind == null ? null : value.getter,
+                value.writeAccessKind == null ? null : value.setter,
+                value.field,
+                elementAnnotationMetadataFactory,
+                value.propertyName,
+                value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+                value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+                value.isExcluded,
+                visitorContext);
     }
 
     private List<MethodElement> getRecordMethods() {
@@ -393,11 +393,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 if (element instanceof ExecutableElement executableElement) {
                     if (recordComponents.contains(name)) {
                         methodElements.add(
-                            new JavaMethodElement(
-                                JavaClassElement.this,
-                                new JavaNativeElement.Method(executableElement),
-                                elementAnnotationMetadataFactory,
-                                visitorContext)
+                                new JavaMethodElement(
+                                        JavaClassElement.this,
+                                        new JavaNativeElement.Method(executableElement),
+                                        elementAnnotationMetadataFactory,
+                                        visitorContext)
                         );
                     }
                 } else if (element instanceof VariableElement) {
@@ -436,11 +436,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             protected void accept(DeclaredType type, Element element, Object o) {
                 if (element instanceof VariableElement variableElement) {
                     fieldElements.add(
-                        new JavaFieldElement(
-                            JavaClassElement.this,
-                            new JavaNativeElement.Variable(variableElement),
-                            elementAnnotationMetadataFactory,
-                            visitorContext)
+                            new JavaFieldElement(
+                                    JavaClassElement.this,
+                                    new JavaNativeElement.Variable(variableElement),
+                                    elementAnnotationMetadataFactory,
+                                    visitorContext)
                     );
                 }
             }
@@ -521,9 +521,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
         if (enclosingElement instanceof javax.lang.model.element.PackageElement packageElement) {
             return new JavaPackageElement(
-                packageElement,
-                elementAnnotationMetadataFactory,
-                visitorContext
+                    packageElement,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
             );
         } else {
             return PackageElement.DEFAULT_PACKAGE;
@@ -589,8 +589,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
             List<ConstructorElement> constructors = getAccessibleConstructors();
             Optional<ConstructorElement> annotatedConstructor = constructors.stream()
-                .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
-                .findFirst();
+                    .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
+                    .findFirst();
             if (annotatedConstructor.isPresent()) {
                 return annotatedConstructor.map(c -> c);
             }
@@ -614,7 +614,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     return Optional.of(constructor);
                 }
             }
-            return Optional.of(constructors.get(constructors.size() - 1));
+            if (constructors.isEmpty()) {
+                // constructor not accessible
+                return Optional.empty();
+            } else {
+                return Optional.of(constructors.get(constructors.size() - 1));
+            }
         }
         return ArrayableClassElement.super.getPrimaryConstructor();
     }
@@ -626,12 +631,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return staticCreators;
         }
         return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
-            .filter(io.micronaut.inject.ast.Element::isStatic)
-            .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
-                .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()
-            )
-            .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
-            .stream().toList();
+                .filter(io.micronaut.inject.ast.Element::isStatic)
+                .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
+                        .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()
+                )
+                .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
+                .stream().toList();
     }
 
     @Override
@@ -640,8 +645,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             Element enclosingElement = this.classElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement typeElement) {
                 return Optional.of(visitorContext.getElementFactory().newClassElement(
-                    typeElement,
-                    elementAnnotationMetadataFactory
+                        typeElement,
+                        elementAnnotationMetadataFactory
                 ));
             }
         }
@@ -655,24 +660,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return Collections.emptyList();
         }
         return typeArguments.stream()
-            .map(tm -> newClassElement(tm, getTypeArguments()))
-            .toList();
+                .map(tm -> newClassElement(tm, getTypeArguments()))
+                .toList();
     }
 
     @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
-            // we want the *declared* variables, so we don't pass in our genericsInfo.
-            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
-            .toList();
+                // we want the *declared* variables, so we don't pass in our genericsInfo.
+                .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+                .toList();
     }
 
     @NonNull
     @Override
     public ClassElement getRawClassElement() {
         return visitorContext.getElementFactory().newClassElement(classElement, elementAnnotationMetadataFactory)
-            .withArrayDimensions(getArrayDimensions());
+                .withArrayDimensions(getArrayDimensions());
     }
 
     @NonNull
@@ -805,7 +810,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         @Override
         protected boolean excludeClass(TypeElement classNode) {
             return classNode.getQualifiedName().toString().equals(Object.class.getName())
-                || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+                    || classNode.getQualifiedName().toString().equals(Enum.class.getName());
         }
 
         @Override
@@ -815,43 +820,43 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 case METHOD -> {
                     if (isSource) {
                         yield elementFactory.newSourceMethodElement(
-                            JavaClassElement.this,
-                            (ExecutableElement) nativeType,
-                            elementAnnotationMetadataFactory
+                                JavaClassElement.this,
+                                (ExecutableElement) nativeType,
+                                elementAnnotationMetadataFactory
                         );
                     } else {
                         yield elementFactory.newMethodElement(
-                            JavaClassElement.this,
-                            (ExecutableElement) nativeType,
-                            elementAnnotationMetadataFactory
+                                JavaClassElement.this,
+                                (ExecutableElement) nativeType,
+                                elementAnnotationMetadataFactory
                         );
                     }
                 }
                 case FIELD -> elementFactory.newFieldElement(
-                    JavaClassElement.this,
-                    (VariableElement) nativeType,
-                    elementAnnotationMetadataFactory
+                        JavaClassElement.this,
+                        (VariableElement) nativeType,
+                        elementAnnotationMetadataFactory
                 );
                 case ENUM_CONSTANT -> elementFactory.newEnumConstantElement(
-                    JavaClassElement.this,
-                    (VariableElement) nativeType,
-                    elementAnnotationMetadataFactory
+                        JavaClassElement.this,
+                        (VariableElement) nativeType,
+                        elementAnnotationMetadataFactory
                 );
                 case CONSTRUCTOR -> elementFactory.newConstructorElement(
-                    JavaClassElement.this,
-                    (ExecutableElement) nativeType,
-                    elementAnnotationMetadataFactory
+                        JavaClassElement.this,
+                        (ExecutableElement) nativeType,
+                        elementAnnotationMetadataFactory
                 );
-                case CLASS, ENUM -> {
+                case CLASS, ENUM, RECORD, INTERFACE, ANNOTATION_TYPE -> {
                     if (isSource) {
                         yield elementFactory.newSourceClassElement(
-                            (TypeElement) nativeType,
-                            elementAnnotationMetadataFactory
+                                (TypeElement) nativeType,
+                                elementAnnotationMetadataFactory
                         );
                     } else {
                         yield elementFactory.newClassElement(
-                            (TypeElement) nativeType,
-                            elementAnnotationMetadataFactory
+                                (TypeElement) nativeType,
+                                elementAnnotationMetadataFactory
                         );
                     }
                 }
@@ -880,7 +885,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             } else if (elementType == ConstructorElement.class) {
                 return EnumSet.of(ElementKind.CONSTRUCTOR);
             } else if (elementType == ClassElement.class) {
-                return EnumSet.of(ElementKind.CLASS, ElementKind.ENUM);
+                return EnumSet.of(ElementKind.CLASS, ElementKind.ENUM, ElementKind.RECORD, ElementKind.INTERFACE, ElementKind.ANNOTATION_TYPE);
             }
             throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
         }
