@@ -59,18 +59,8 @@ The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`
 
 For Java language applications, it's also possible to use https://docs.oracle.com/en/java/javase/17/language/records.html[Java Record Classes] for immutable configuration with ann:context.annotation.ConfigurationProperties[]. For example:
 
-[source, java]
-----
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.NonNull;
-import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
+snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Java Record Example"]
 
-@ConfigurationProperties("vat")
-public record ValueAddedTaxConfiguration(
-    @NonNull @NotNull BigDecimal percentage) { // <1>
-}
-----
 <1> The `percentage` field defines a configuration property for "vat"
 
 NOTE: From a performance perspective Java records are better than interfaces; however, they have the disadvantage of not supporting link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[@Refreshable]. Use one of the other mechanisms for immutable configuration if that's a requirement.
