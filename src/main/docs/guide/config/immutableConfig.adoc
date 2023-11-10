@@ -63,7 +63,7 @@ snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imp
 
 <1> The `percentage` field defines a configuration property for "vat"
 
-NOTE: From a performance perspective Java records are better than interfaces; however, they have the disadvantage of not supporting link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[@Refreshable]. Use one of the other mechanisms for immutable configuration if that's a requirement.
+NOTE: From a performance perspective Java records are better than interfaces.
 
 == Customizing accessors
 
