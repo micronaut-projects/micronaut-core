@@ -2,6 +2,8 @@ The Micronaut framework supports a general event system through the context. The
 
 dependency::micronaut-context[]
 
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
+
 === Publishing Events
 
 The api:context.event.ApplicationEventPublisher[] API supports events of any type, although all events that the Micronaut framework publishes extend api:context.event.ApplicationEvent[].
