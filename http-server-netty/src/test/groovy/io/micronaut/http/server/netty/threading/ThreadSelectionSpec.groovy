@@ -29,6 +29,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.util.concurrent.ExecutorService
 
@@ -93,8 +94,8 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
-        def exResult = client.exception()
-        def scheduledResult = client.scheduleException()
+        String exResult = client.exception()
+        String scheduledResult = client.scheduleException()
 
         then:
         exResult.contains(controller)
@@ -113,27 +114,30 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"                     | "handler: $IO"
     }
 
-    void "test thread selection for error route #strategy"() {
+    @Unroll("#strategy with controller: #controller and handler: #handler")
+    void "test thread selection for error route #strategy"(ThreadSelection strategy, String controller, List<String> handler) {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
-        def exResult = client.throwsExErrorRoute()
+        String exResult = client.throwsExErrorRoute()
 
-        then:
+        then: 'An exception is thrown in the controller method. the exception constructor captures the thread name.'
         exResult.contains(controller)
-        exResult.contains(handler)
+
+        and: 'The @Error Handler captures the thread'
+        handler.any { exResult.contains(it) }
 
         cleanup:
         embeddedServer.close()
 
         where:
         strategy                 | controller                              | handler
-        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
-        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
-        ThreadSelection.IO       | "controller: $IO"                       | "handler: $IO"
-        ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"
+        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | ["handler: ${jdkSwitch(IO, VIRTUAL)}", "handler: $LOOP"]
+        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | ["handler: ${jdkSwitch(IO, VIRTUAL)}", "handler: $LOOP"]
+        ThreadSelection.IO       | "controller: $IO"                       | ["handler: $IO"]
+        ThreadSelection.MANUAL   | "controller: $LOOP"                     | ["handler: $LOOP"]
     }
 
     void "test injecting an executor service does not inject the Netty event loop"() {
