@@ -28,7 +28,7 @@ import io.micronaut.http.annotation.RequestAttribute;
 /**
  * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link RequestAttribute}
  * annotation to trigger binding from an HTTP request attribute.
- * NOTE: The binder is annotates as postponed to allow injecting attributes added by filters.
+ * NOTE: The binder is annotating as postponed to allow injecting attributes added by filters.
  *
  * @param <T> A type
  * @author Ahmed Lafta

@@ -34,7 +34,8 @@ internal class TestControllerTest(
         val responseWithoutInputAfterCallWithInput =
             client.toBlocking().exchange("/testEndpoint", DemoObject::class.java)
         assertEquals(200, responseWithoutInputAfterCallWithInput.status.code)
-        // this should be again defaultText, but the request context is not cleared and thus this assert fails
+        
+        // this should be again defaultText, but the request context is not cleared and thus this asserts fails
         assertEquals("defaultText", responseWithoutInputAfterCallWithInput.body()!!.text)
     }
 }

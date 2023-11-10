@@ -108,7 +108,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         annotationMetadataMethod.loadThis();
 
         // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
-        // then we setup an annotation metadata reference from the method to the class (or inherited method) metadata
+        // then we set up an annotation metadata reference from the method to the class (or inherited method) metadata
         AnnotationMetadata annotationMetadata = this.annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             annotationMetadataMethod.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));

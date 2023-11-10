@@ -6,7 +6,7 @@ The prefered way is using the https://marketplace.visualstudio.com/items?itemNam
 
 NOTE: It is not possible to have both the official https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack] and the GraalVM Extension Pack for Java installed at the same time so if you prefer the former, skip this section and go to Option 2)
 
-The https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.graalvm[GraalVM Tools for Java] are preferred since they delegate to the build system for running applications and tests which means there is no additional setup or differences with regards to how javac is configured for annotation processing when compared to the https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack] which is based on the Eclipse compiler.
+The https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.graalvm[GraalVM Tools for Java] are preferred since they delegate to the build system for running applications and tests which means there is no additional setup or differences with regard to how javac is configured for annotation processing when compared to the https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack] which is based on the Eclipse compiler.
 
 The GraalVM Extension Pack also includes the https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut[GraalVM Tools for Micronaut] extension which features:
 
