@@ -10,7 +10,7 @@ import spock.lang.Specification
 
 import java.util.concurrent.ExecutionException
 
-class BlockingSpec extends Specification {
+class BlockingDeadlockSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext ctx = ApplicationContext.run([
