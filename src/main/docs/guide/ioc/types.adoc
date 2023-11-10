@@ -39,7 +39,8 @@ NOTE: There are 3 different provider types supported, however the `BeanProvider`
 [NOTE]
 ====
 When injecting a `java.lang.Collection`, or `java.util.stream.Stream`, `Array` of beans into a bean matching the injection type, then the owning bean will not be a member of the injected collection.  A common pattern demonstrating this is aggregation. For example:
-```java
+[source,java]
+----
 @Singleton
 class AggregateEngine implements Engine {
   @Inject
@@ -52,7 +53,7 @@ class AggregateEngine implements Engine {
 
   ...
 }
-```
+----
 In this example, the injected member variable `engines` will not contain an instance of `AggregateEngine`
 ====
 
