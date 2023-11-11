@@ -31,7 +31,7 @@ graalvmNative {
         enabled = true
     }
     binaries {
-        configureEach {
+        all {
             resources.autodetect()
         }
     }

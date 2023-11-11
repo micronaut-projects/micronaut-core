@@ -14,7 +14,7 @@ repositories {
     mavenCentral()
 }
 
-configurations.configureEach {
+configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
     resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
 }
@@ -60,7 +60,7 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
-configurations.configureEach {
+configurations.all {
     resolutionStrategy.dependencySubstitution {
         rootProject.subprojects.each {
             if (!it.name.startsWith('test-')) {
