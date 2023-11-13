@@ -55,6 +55,16 @@ snippet::io.micronaut.docs.config.immutable.VehicleSpec[tags="start",indent=0,ti
 
 The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`
 
+==== Using Java Record Classes to define immutable configuration
+
+For Java language applications, it's also possible to use https://docs.oracle.com/en/java/javase/17/language/records.html[Java Record Classes] for immutable configuration with ann:context.annotation.ConfigurationProperties[]. For example:
+
+snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Java Record Example"]
+
+<1> The `percentage` field defines a configuration property for "vat"
+
+NOTE: From a performance perspective Java records are better than interfaces.
+
 == Customizing accessors
 
 As already explained in <<configurationPropertiesAccessorsStyle, Change accessors style>>, it is also possible to customize the accessors when creating immutable configuration properties:
