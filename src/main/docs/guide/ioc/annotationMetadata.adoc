@@ -104,6 +104,6 @@ include::core-processor/src/main/java/io/micronaut/inject/beans/visitor/EntityIn
 ----
 
 <1> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
-<2> One or more annotations can be returned, in this case `@Transient`.
+<2> One or more annotations can be returned.
 
 NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead, although note it requires the annotation class itself to be on the annotation processor classpath.
