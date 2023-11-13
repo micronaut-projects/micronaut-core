@@ -16,7 +16,6 @@
 package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -45,7 +44,8 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) { // <1>
-        return Arrays.asList( // <2>
+        // <2>
+        return Arrays.asList(
                 AnnotationValue.builder(Introspected.class).build(),
                 AnnotationValue.builder(ReflectiveAccess.class).build()
         );
