@@ -1,11 +1,9 @@
 package io.micronaut.docs.ioc.introspection
 
 import io.micronaut.core.beans.BeanIntrospection
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import org.junit.jupiter.api.Test
 import spock.lang.Specification
 
-@MicronautTest
 class PersonSpec extends Specification {
 
     @Test
