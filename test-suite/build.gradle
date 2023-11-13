@@ -101,6 +101,9 @@ dependencies {
     testFixturesApi libs.spock
     testFixturesApi libs.managed.groovy
     testFixturesApi libs.jetbrains.annotations
+
+    testImplementation(libs.javax.persistence)
+    testImplementation(libs.jakarta.persistence)
 }
 
 //tasks.withType(Test).configureEach {

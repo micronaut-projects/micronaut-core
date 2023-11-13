@@ -70,6 +70,9 @@ dependencies {
     testImplementation libs.bcpkix
 
     testImplementation libs.managed.reactor
+
+    testImplementation(libs.javax.persistence)
+    testImplementation(libs.jakarta.persistence)
 }
 
 configurations.testRuntimeClasspath {
