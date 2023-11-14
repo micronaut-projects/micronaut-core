@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,7 +152,10 @@ public class CorsFilter implements Ordered {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
+
+        return (
+            !corsOriginConfiguration.getAllowedOriginsRegex().isPresent() && isAny(corsOriginConfiguration.getAllowedOrigins())
+        ) && isHostLocal(host);
     }
 
     /**
