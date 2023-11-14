@@ -63,7 +63,7 @@ public class HeadersTest {
     }
 
     /**
-     * Multiple Headers are properly received as list and not as single header
+     * Multiple Headers are properly received as list and not as single header.
      */
     @Test
     void multipleHeadersAreReceivedAsList() throws IOException {
