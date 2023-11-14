@@ -141,7 +141,10 @@ public class CorsFilter implements HttpServerFilter {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAnyOrigin(corsOriginConfiguration.getAllowedOriginsRegex().isPresent(), corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
+
+        return (
+            !corsOriginConfiguration.getAllowedOriginsRegex().isPresent() && isAny(corsOriginConfiguration.getAllowedOrigins())
+        ) && isHostLocal(host);
     }
 
     /**
@@ -350,11 +353,6 @@ public class CorsFilter implements HttpServerFilter {
         Pattern p = Pattern.compile(originRegex);
         Matcher m = p.matcher(requestOrigin);
         return m.matches();
-    }
-
-    private static boolean isAnyOrigin(boolean isAllowedOriginsRegexConfigured, List<String> values) {
-        // True if a regular expression has not been set for origin, and the allowed hosts are still ANY
-        return !isAllowedOriginsRegexConfigured && isAny(values);
     }
 
     private static boolean isAny(List<String> values) {
