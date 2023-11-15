@@ -21,7 +21,11 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Options;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -30,9 +34,12 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.BiConsumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -87,11 +94,12 @@ public class OptionsFilterTest {
                         .assertResponse(httpResponse -> {
                             assertNotNull(httpResponse.getHeaders().get(HttpHeaders.ALLOW));
                             assertNotNull(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW));
-                            assertEquals(4, httpResponse.getHeaders().getAll(HttpHeaders.ALLOW).size());
-                            assertTrue(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW).stream().anyMatch(v -> v.equals(HttpMethod.GET.toString())));
-                            assertTrue(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW).stream().anyMatch(v -> v.equals(HttpMethod.POST.toString())));
-                            assertTrue(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW).stream().anyMatch(v -> v.equals(HttpMethod.OPTIONS.toString())));
-                            assertTrue(httpResponse.getHeaders().getAll(HttpHeaders.ALLOW).stream().anyMatch(v -> v.equals(HttpMethod.HEAD.toString())));
+                            List<String> allowedMethods = httpResponse.getHeaders().get(HttpHeaders.ALLOW, List.class).orElseThrow();
+                            assertEquals(4, allowedMethods .size());
+                            assertTrue(allowedMethods.contains(HttpMethod.GET.toString()));
+                            assertTrue(allowedMethods.contains(HttpMethod.POST.toString()));
+                            assertTrue(allowedMethods.contains(HttpMethod.OPTIONS.toString()));
+                            assertTrue(allowedMethods.contains(HttpMethod.HEAD.toString()));
                         })
                     .build()));
     }
