@@ -205,6 +205,7 @@ public class CorsSimpleRequestTest {
      */
     @Test
     // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
+    @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaRegexConfiguration() throws IOException {
         asserts(SPECNAME,
             Map.of(
@@ -222,6 +223,7 @@ public class CorsSimpleRequestTest {
      */
     @Test
     // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
+    @Tag("multipart")
     void corsSimpleRequestForLocalhostForbiddenViaRegexConfiguration() throws IOException {
         asserts(SPECNAME,
             Map.of(
