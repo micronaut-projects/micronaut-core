@@ -51,6 +51,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -60,11 +61,10 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
-import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -192,14 +192,17 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest;
         try {
-            mnRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
+            mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
         } catch (IllegalArgumentException e) {
+            body.release();
+
             // invalid URI
             NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
-                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
+                new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
+                ByteBody.empty(),
                 ctx,
                 conversionService,
                 serverConfiguration
@@ -207,11 +210,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.attachment(errorRequest);
             try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
                 new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
-            }
-            if (request instanceof StreamedHttpRequest streamed) {
-                streamed.closeIfNoSubscriber();
-            } else {
-                ((FullHttpRequest) request).release();
             }
             return;
         }

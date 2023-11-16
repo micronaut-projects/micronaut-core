@@ -1,6 +1,9 @@
 package io.micronaut.http.server.netty.handler
 
-import io.micronaut.http.netty.stream.StreamedHttpRequest
+
+import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.server.netty.body.ByteBody
+import io.micronaut.http.server.netty.body.ImmediateByteBody
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
@@ -35,7 +38,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 outboundAccess.writeFull(resp)
             }
 
@@ -80,7 +83,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def sink = Sinks.many().unicast().<HttpContent>onBackpressureBuffer()
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 outboundAccess.writeStreamed(resp, sink.asFlux())
             }
 
@@ -128,10 +131,10 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-                assert request instanceof FullHttpRequest
-                assert request.content().toString(StandardCharsets.UTF_8) == "foobar"
-                request.release()
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                assert body instanceof ImmediateByteBody
+                assert body.contentUnclaimed().toString(StandardCharsets.UTF_8) == "foobar"
+                body.release()
                 outboundAccess.writeFull(resp)
             }
 
@@ -167,8 +170,8 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-                Flux.from((StreamedHttpRequest) request).collectList().subscribe { outboundAccess.writeFull(resp) }
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).collectList().subscribe { outboundAccess.writeFull(resp) }
             }
 
             @Override
@@ -211,7 +214,7 @@ class PipeliningServerHandlerSpec extends Specification {
             }
         }, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 assert request instanceof FullHttpRequest
                 request.release()
                 outboundAccess.writeFull(resp)
@@ -248,7 +251,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def cleaned = 0
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 assert request instanceof FullHttpRequest
                 request.release()
                 outboundAccess.writeStreamed(resp, sink.asFlux().doOnCancel {

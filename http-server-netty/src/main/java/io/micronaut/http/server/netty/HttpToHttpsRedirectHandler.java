@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -30,6 +31,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpRequest;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
@@ -50,8 +52,8 @@ record HttpToHttpsRedirectHandler(
 ) implements RequestHandler {
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-        NettyHttpRequest<?> strippedRequest = NettyHttpRequest.createSafe(request, ctx, conversionService, serverConfiguration);
+    public void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        NettyHttpRequest<?> strippedRequest = NettyHttpRequest.createSafe(request, body, ctx, conversionService, serverConfiguration);
 
         UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
         strippedRequest.release();

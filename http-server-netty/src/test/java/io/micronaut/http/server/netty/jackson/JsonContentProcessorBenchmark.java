@@ -6,6 +6,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.netty.body.JsonCounter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
@@ -110,6 +111,7 @@ public class JsonContentProcessorBenchmark {
             });
             request = new NettyHttpRequest<>(
                 new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"),
+                ByteBody.empty(),
                 ch.pipeline().firstContext(),
                 ConversionService.SHARED,
                 configuration

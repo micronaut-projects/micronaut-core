@@ -185,6 +185,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
+                            ByteBody body,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
                             HttpServerConfiguration serverConfiguration) throws IllegalArgumentException {
@@ -199,30 +200,28 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        this.body = ByteBody.of(nettyRequest);
+        this.body = body;
         this.contentLength = headers.contentLength().orElse(-1);
         this.contentType = headers.contentType().orElse(null);
         this.origin = headers.getOrigin().orElse(null);
     }
 
-    public static NettyHttpRequest<?> createSafe(io.netty.handler.codec.http.HttpRequest request, ChannelHandlerContext ctx, ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
+    public static NettyHttpRequest<?> createSafe(io.netty.handler.codec.http.HttpRequest request, ByteBody body, ChannelHandlerContext ctx, ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
         try {
             return new NettyHttpRequest<>(
                 request,
+                body,
                 ctx,
                 conversionService,
                 serverConfiguration
             );
         } catch (IllegalArgumentException iae) {
             // invalid URI
-            if (request instanceof StreamedHttpRequest streamed) {
-                streamed.closeIfNoSubscriber();
-            } else {
-                ((FullHttpRequest) request).release();
-            }
+            body.release();
 
             return new NettyHttpRequest<>(
                 new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
+                ByteBody.empty(),
                 ctx,
                 conversionService,
                 serverConfiguration
