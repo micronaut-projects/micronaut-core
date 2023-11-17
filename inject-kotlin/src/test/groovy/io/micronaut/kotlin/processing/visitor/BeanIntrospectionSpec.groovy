@@ -32,6 +32,29 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
 
+    void "test data classes with default arguments"() {
+        when:
+        def introspection = buildBeanIntrospection("test.Example", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Example(
+    val name : String,
+    val booleanValue: Boolean = true
+)
+""")
+
+        then:
+        introspection != null
+        introspection.beanProperties.size() == 2
+        introspection.constructorArguments.size() == 2
+        def bean = introspection.instantiate("Fred", false)
+        bean.name == "Fred"
+        !bean.booleanValue
+    }
+
     void "test basic introspection"() {
         when:
         def introspection = buildBeanIntrospection("test.Test", """
