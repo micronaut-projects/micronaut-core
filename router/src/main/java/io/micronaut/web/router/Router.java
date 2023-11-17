@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
@@ -22,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
+import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
 
 import java.net.URI;
 import java.util.List;
@@ -159,6 +161,16 @@ public interface Router {
             return uriRoutes.get(0);
         }
         return null;
+    }
+
+    /**
+     * Collect all routes in this router into the given {@link ShortCircuitRouterBuilder}.
+     *
+     * @param builder The builder to write routes to
+     */
+    @Internal
+    default void collectRoutes(@NonNull ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
+        builder.addLegacyFallbackRouting();
     }
 
     /**
@@ -323,6 +335,18 @@ public interface Router {
     @NonNull List<GenericHttpFilter> findFilters(
             @NonNull HttpRequest<?> request
     );
+
+    /**
+     * Get the fixed (request-independent) filter list. If this method returns anything but
+     * optional, <i>any</i> call to {@link #findFilters} must return the same filters as returned
+     * by this method.
+     *
+     * @return The fixed filter list, or {@link Optional#empty()} if the filter list is dynamic
+     */
+    @Internal
+    default Optional<List<GenericHttpFilter>> getFixedFilters() {
+        return Optional.empty();
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI.

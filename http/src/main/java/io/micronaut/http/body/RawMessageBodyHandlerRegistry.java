@@ -43,6 +43,7 @@ import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -83,11 +84,11 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         return null;
     }
 
-    protected abstract <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes);
+    protected abstract <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, @Nullable List<MediaType> mediaTypes);
 
     @SuppressWarnings({"unchecked"})
     @Override
-    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaTypes) {
+    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaTypes) {
         HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyReader<?> messageBodyReader = readers.get(key);
         if (messageBodyReader == null) {
@@ -146,7 +147,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
     private record RawEntry(Class<?> type, MessageBodyHandler<?> handler) {
     }
 
-    record HandlerKey<T>(Argument<T> type, List<MediaType> mediaTypes) {
+    record HandlerKey<T>(Argument<T> type, @Nullable List<MediaType> mediaTypes) {
         @Override
         public boolean equals(Object o) {
             if (this == o) {
@@ -156,7 +157,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
                 return false;
             }
             HandlerKey<?> that = (HandlerKey<?>) o;
-            return type.equalsType(that.type) && mediaTypes.equals(that.mediaTypes);
+            return type.equalsType(that.type) && Objects.equals(mediaTypes, that.mediaTypes);
         }
 
         @Override
@@ -242,8 +243,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-            addContentType(outgoingHeaders, mediaType);
+        public ByteBuffer<?> writeTo(MediaType mediaType, Object object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             return bufferFactory.wrap(object.toString().getBytes(getCharset(mediaType)));
         }
 
@@ -294,8 +294,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(Argument<byte[]> type, MediaType mediaType, byte[] object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-            addContentType(outgoingHeaders, mediaType);
+        public ByteBuffer<?> writeTo(MediaType mediaType, byte[] object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             return bufferFactory.wrap(object);
         }
 
@@ -353,8 +352,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(Argument<ByteBuffer<?>> type, MediaType mediaType, ByteBuffer<?> object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-            addContentType(outgoingHeaders, mediaType);
+        public ByteBuffer<?> writeTo(MediaType mediaType, ByteBuffer<?> object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             return object;
         }
 

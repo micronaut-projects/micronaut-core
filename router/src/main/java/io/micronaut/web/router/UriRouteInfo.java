@@ -15,11 +15,13 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.net.URI;
 import java.util.Optional;
@@ -83,6 +85,17 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      */
     @Nullable
     UriRouteMatch<T, R> tryMatch(@NonNull String uri);
+
+    /**
+     * Get a {@link MatchRule} that is equivalent to {@link #tryMatch(String)}.
+     *
+     * @return The equivalent rule or {@link Optional#empty()} if it cannot be expressed as a rule
+     * @since 4.3.0
+     */
+    @Internal
+    default Optional<MatchRule> pathMatchRule() {
+        return Optional.empty();
+    }
 
     /**
      * @return The port the route listens to, or null if the default port

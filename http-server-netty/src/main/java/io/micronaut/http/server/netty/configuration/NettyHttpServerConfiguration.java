@@ -163,6 +163,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
+    /**
+     * The default value for fast routing.
+     *
+     * @since 4.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_FAST_ROUTING = false;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -196,6 +204,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
+    private boolean fastRouting = DEFAULT_FAST_ROUTING;
 
     /**
      * Default empty constructor.
@@ -726,6 +735,30 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    /**
+     * Whether fast routing should be enabled for routes that are simple enough to be supported.
+     * During fast routing, not all framework features may be available, such as the thread-local
+     * request context or some error handling. Default {@value DEFAULT_FAST_ROUTING}.
+     *
+     * @return {@code true} if fast routing should be enabled
+     * @since 4.3.0
+     */
+    public boolean isFastRouting() {
+        return fastRouting;
+    }
+
+    /**
+     * Whether fast routing should be enabled for routes that are simple enough to be supported.
+     * During fast routing, not all framework features may be available, such as the thread-local
+     * request context or some error handling. Default {@value DEFAULT_FAST_ROUTING}.
+     *
+     * @param fastRouting {@code true} if fast routing should be enabled
+     * @since 4.3.0
+     */
+    public void setFastRouting(boolean fastRouting) {
+        this.fastRouting = fastRouting;
     }
 
     /**
@@ -1476,6 +1509,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         public boolean isBind() {
             return bind;
         }
+
         /**
          * Whether the server should bind to the socket. {@code true} by default. If set to
          * {@code false}, the socket must already be bound and listening.

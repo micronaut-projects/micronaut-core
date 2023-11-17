@@ -35,6 +35,8 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.shortcircuit.MatchRule;
+import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -218,7 +220,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return Collections.emptyList();
         }
         List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
-        if (routes.size() == 1) {
+        if (uriRoutes.size() == 1) {
             return uriRoutes;
         }
 
@@ -228,7 +230,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
             final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(routes.size());
+            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(uriRoutes.size());
             for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
                 if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
                     mostSpecific.add(routeMatch);
@@ -530,6 +532,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return Collections.unmodifiableList(httpFilters);
     }
 
+    @Override
+    public Optional<List<GenericHttpFilter>> getFixedFilters() {
+        if (preconditionFilterRoutes.isEmpty()) {
+            return Optional.of(alwaysMatchesHttpFilters.get());
+        } else {
+            return Optional.empty();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @NonNull
     @Override
@@ -616,6 +627,92 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
+        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : routesByMethod.entrySet()) {
+            HttpMethod parsed = HttpMethod.parse(entry.getKey());
+            if (parsed == HttpMethod.CUSTOM) {
+                continue;
+            }
+            for (UriRouteInfo<Object, Object> routeInfo : entry.getValue()) {
+                List<MatchRule> conditions = new ArrayList<>();
+                boolean complete = toMatchRule(parsed, routeInfo, conditions);
+                MatchRule matchRule = MatchRule.and(conditions);
+                Optional<MatchRule> pathMatchRule = routeInfo.pathMatchRule();
+                if (complete && pathMatchRule.isPresent() && pathMatchRule.get() instanceof MatchRule.PathMatchExact) {
+                    builder.addRoute(matchRule, routeInfo);
+                } else {
+                    // we can't match this route using MatchRule, or it needs path variables. Register for legacy handling.
+                    builder.addLegacyRoute(matchRule);
+                }
+            }
+        }
+
+        builder.addLegacyFallbackRouting();
+    }
+
+    /**
+     * Collect the conditions that match a given route.
+     *
+     * @param method     The request method
+     * @param route      The route
+     * @param conditions The conditions list to write to
+     * @return {@code true} iff the match process can be fully mapped to the
+     * {@link MatchRule}s written to {@code conditions}. When {@code false}, there may be
+     * additional criteria that were not written to {@code conditions}, so legacy routing must be
+     * used.
+     */
+    private boolean toMatchRule(
+        HttpMethod method,
+        UriRouteInfo<Object, Object> route,
+        List<? super MatchRule> conditions
+    ) {
+        boolean complete = true;
+
+        conditions.add(new MatchRule.Method(method));
+
+        MatchRule pathMatch = route.pathMatchRule().orElse(null);
+        if (pathMatch == null) {
+            complete = false;
+        } else {
+            conditions.add(pathMatch);
+        }
+
+        if (ports != null && route.getPort() == null) {
+            // if the route has its own port configured, it's part of route.matching, and we don't
+            // need it here
+            conditions.add(MatchRule.or(ports.stream().map(MatchRule.ServerPort::new).toList()));
+        }
+        if (method.permitsRequestBody()) {
+            if (!route.isPermitsRequestBody()) {
+                conditions.add(MatchRule.fail());
+                return true;
+            }
+            MatchRule consumeRule = route.doesConsumeRule().orElse(null);
+            if (consumeRule == null) {
+                complete = false;
+            } else {
+                conditions.add(consumeRule);
+            }
+        }
+
+        MatchRule produceRule = route.doesProduceRule().orElse(null);
+        if (produceRule == null) {
+            complete = false;
+        } else {
+            conditions.add(produceRule);
+        }
+
+        MatchRule matchingRule = route.matchingRule().orElse(null);
+        if (matchingRule == null) {
+            complete = false;
+        } else {
+            conditions.add(matchingRule);
+        }
+
+        return complete;
     }
 
     private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {

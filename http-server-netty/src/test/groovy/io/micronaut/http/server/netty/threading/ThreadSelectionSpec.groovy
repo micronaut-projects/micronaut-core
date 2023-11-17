@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.threading
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.http.HttpRequest
@@ -44,7 +45,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection strategy #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ThreadSelectionSpec', 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         expect:
@@ -66,7 +67,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection strategy for reactive types #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ThreadSelectionSpec', 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
 
@@ -89,7 +90,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection for exception handlers #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ThreadSelectionSpec', 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
@@ -115,7 +116,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection for error route #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ThreadSelectionSpec', 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
@@ -149,6 +150,7 @@ class ThreadSelectionSpec extends Specification {
     }
 
     @Client("/thread-selection")
+    @Requires(property = "spec.name", value = "ThreadSelectionSpec")
     static interface ThreadSelectionClient {
         @Get("/blocking")
         String blocking()
@@ -188,6 +190,7 @@ class ThreadSelectionSpec extends Specification {
     }
 
     @Controller("/thread-selection")
+    @Requires(property = "spec.name", value = "ThreadSelectionSpec")
     static class ThreadSelectionController {
         @Get("/blocking")
         String blocking() {
@@ -266,6 +269,7 @@ class ThreadSelectionSpec extends Specification {
     }
 
     @Filter("/thread-selection/alter**")
+    @Requires(property = "spec.name", value = "ThreadSelectionSpec")
     static class ThreadSelectionFilter implements HttpServerFilter {
 
         @Override

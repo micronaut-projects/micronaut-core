@@ -20,6 +20,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -111,7 +112,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
 
     @NonNull
     private List<MediaType> resolveMediaTypes(List<MediaType> mediaTypes) {
-        if (codecConfigurations.isEmpty()) {
+        if (codecConfigurations.isEmpty() || mediaTypes == null) {
             return mediaTypes;
         }
         List<MediaType> resolvedMediaTypes = new ArrayList<>(mediaTypes.size());
@@ -173,7 +174,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     }
 
     private record MediaTypeQualifier<T>(Argument<?> type,
-                                         List<MediaType> mediaTypes,
+                                         @Nullable List<MediaType> mediaTypes,
                                          Class<? extends Annotation> annotationType) implements Qualifier<T> {
 
         @Override
@@ -194,7 +195,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 }
                 String[] applicableTypes = c.getAnnotationMetadata().stringValues(annotationType);
                 return ((applicableTypes.length == 0) || Arrays.stream(applicableTypes)
-                    .anyMatch(mt -> mediaTypes.contains(new MediaType(mt)))
+                    .anyMatch(mt -> mediaTypes != null && mediaTypes.contains(new MediaType(mt)))
                 );
             });
         }

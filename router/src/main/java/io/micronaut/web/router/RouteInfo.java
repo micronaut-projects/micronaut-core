@@ -29,6 +29,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -167,12 +168,34 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     boolean doesConsume(@Nullable MediaType contentType);
 
     /**
+     * Get a {@link MatchRule} that is equivalent to {@link #doesConsume(MediaType)}.
+     *
+     * @return The equivalent rule or {@link Optional#empty()} if it cannot be expressed as a rule
+     * @since 4.3.0
+     */
+    @Internal
+    default Optional<MatchRule> doesConsumeRule() {
+        return Optional.empty();
+    }
+
+    /**
      * Whether the route does produce any of the given types.
      *
      * @param acceptableTypes The acceptable types
      * @return True if it is
      */
     boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
+
+    /**
+     * Get a {@link MatchRule} that is equivalent to {@link #doesProduce(Collection)}.
+     *
+     * @return The equivalent rule or {@link Optional#empty()} if it cannot be expressed as a rule
+     * @since 4.3.0
+     */
+    @Internal
+    default Optional<MatchRule> doesProduceRule() {
+        return Optional.empty();
+    }
 
     /**
      * Whether the route does produce any of the given types.

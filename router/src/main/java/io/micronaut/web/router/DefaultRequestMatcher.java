@@ -21,8 +21,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
@@ -53,7 +55,7 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
     }
 
     @Override
-    public boolean matching(HttpRequest<?> httpRequest) {
+    public final boolean matching(HttpRequest<?> httpRequest) {
         if (predicates.isEmpty()) {
             return true;
         }
@@ -63,5 +65,15 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
             }
         }
         return true;
+    }
+
+    @Override
+    public Optional<MatchRule> matchingRule() {
+        if (predicates.stream().allMatch(p -> p instanceof MatchRule)) {
+            //noinspection unchecked,rawtypes
+            return Optional.of(MatchRule.and((List) predicates));
+        } else {
+            return Optional.empty();
+        }
     }
 }

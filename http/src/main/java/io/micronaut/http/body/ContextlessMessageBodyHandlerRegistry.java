@@ -60,7 +60,10 @@ public final class ContextlessMessageBodyHandlerRegistry extends RawMessageBodyH
 
     @SuppressWarnings("unchecked")
     @Nullable
-    private <T> MessageBodyHandler<T> findHandler(List<MediaType> mediaTypes) {
+    private <T> MessageBodyHandler<T> findHandler(@Nullable List<MediaType> mediaTypes) {
+        if (mediaTypes == null) {
+            return null;
+        }
         for (MediaType mediaType : mediaTypes) {
             for (Entry entry : entries) {
                 if (mediaType.matches(entry.mediaType)) {

@@ -32,11 +32,13 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Stream;
 
 /**
  * The default route info implementation.
@@ -196,13 +198,34 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean doesConsume(MediaType contentType) {
+    public final boolean doesConsume(MediaType contentType) {
         return contentType == null || consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
     }
 
     @Override
-    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+    public final Optional<MatchRule> doesConsumeRule() {
+        if (consumesMediaTypesContainsAll) {
+            return Optional.of(MatchRule.pass());
+        } else {
+            return Optional.of(MatchRule.or(Stream.concat(
+                Stream.of(new MatchRule.ContentType(null)),
+                consumesMediaTypes.stream().map(MatchRule.ContentType::new)
+            ).toList()));
+        }
+    }
+
+    @Override
+    public final boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
         return producesMediaTypesContainsAll || anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
+    }
+
+    @Override
+    public final Optional<MatchRule> doesProduceRule() {
+        if (producesMediaTypesContainsAll) {
+            return Optional.of(MatchRule.pass());
+        } else {
+            return Optional.of(new MatchRule.Accept(producesMediaTypes));
+        }
     }
 
     @Override
@@ -223,7 +246,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean explicitlyConsumes(MediaType contentType) {
+    public final boolean explicitlyConsumes(MediaType contentType) {
         return consumesMediaTypes.contains(contentType);
     }
 

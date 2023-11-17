@@ -15,7 +15,11 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.web.router.shortcircuit.MatchRule;
+
+import java.util.Optional;
 
 /**
  * Route with a request predicate.
@@ -32,5 +36,17 @@ public interface RequestMatcher {
      * @return true if route matches this request
      */
     boolean matching(HttpRequest<?> httpRequest);
+
+    /**
+     * Get a {@link MatchRule} that is equivalent to {@link #matching(HttpRequest)}.
+     *
+     * @return The equivalent rule or {@link Optional#empty()} if this matcher cannot be expressed
+     * as a rule
+     * @since 4.3.0
+     */
+    @Internal
+    default Optional<MatchRule> matchingRule() {
+        return Optional.empty();
+    }
 
 }

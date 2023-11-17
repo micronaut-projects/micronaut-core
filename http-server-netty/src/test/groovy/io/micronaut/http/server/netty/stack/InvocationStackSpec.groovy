@@ -217,6 +217,7 @@ class InvocationStackSpec extends Specification {
 
     }
 
+    @Requires(property = "spec", value = "InvocationStackSpec")
     @Filter("/stack-check/with-one-reactive-filter*")
     static class MyOneFilter implements HttpServerFilter {
 
@@ -229,6 +230,7 @@ class InvocationStackSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec", value = "InvocationStackSpec")
     @Filter("/stack-check/with-two-reactive-filters*")
     static class MyTwoFilter1 implements HttpServerFilter {
 
@@ -241,6 +243,7 @@ class InvocationStackSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec", value = "InvocationStackSpec")
     @Filter("/stack-check/with-two-reactive-filters*")
     static class MyTwoFilter2 implements HttpServerFilter {
 

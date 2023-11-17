@@ -27,36 +27,54 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.RawMessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
+import io.micronaut.http.netty.body.ShortCircuitNettyBodyWriter;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.cors.CorsFilter;
 import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.netty.shortcircuit.ExecutionLeaf;
+import io.micronaut.http.server.netty.shortcircuit.MatchPlan;
+import io.micronaut.http.server.netty.shortcircuit.NettyShortCircuitRouterBuilder;
+import io.micronaut.http.server.netty.shortcircuit.ShortCircuitArgumentBinder;
+import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -65,8 +83,11 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.reactivestreams.Processor;
@@ -83,6 +104,7 @@ import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
@@ -117,6 +139,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
+    final MatchPlan<RequestHandler> shortCircuitMatchPlan;
 
     /**
      * @param serverConfiguration          The Netty HTTP server configuration
@@ -144,6 +167,14 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
         this.conversionService = conversionService;
+
+        if (serverConfiguration.isFastRouting()) {
+            NettyShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new NettyShortCircuitRouterBuilder<>();
+            routeExecutor.getRouter().collectRoutes(scrb);
+            this.shortCircuitMatchPlan = scrb.transform(this::shortCircuitHandler).plan();
+        } else {
+            this.shortCircuitMatchPlan = null;
+        }
     }
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
@@ -193,6 +224,19 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        if (shortCircuitMatchPlan != null &&
+            request.decoderResult().isSuccess() &&
+            // origin needs to be checked by CorsFilter
+            !request.headers().contains(HttpHeaderNames.ORIGIN) &&
+            body instanceof ImmediateByteBody) {
+
+            ExecutionLeaf<RequestHandler> instantResult = shortCircuitMatchPlan.execute(request);
+            if (instantResult instanceof ExecutionLeaf.Route<RequestHandler> route) {
+                route.routeMatch().accept(ctx, request, body, outboundAccess);
+                return;
+            }
+        }
+
         NettyHttpRequest<Object> mnRequest;
         try {
             mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
@@ -217,6 +261,124 @@ public final class RoutingInBoundHandler implements RequestHandler {
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
             new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
         }
+    }
+
+    @Nullable
+    private static MatchRule.ContentType findFixedContentType(MatchRule matchRule) {
+        if (matchRule instanceof MatchRule.ContentType ct) {
+            return ct;
+        } else if (matchRule instanceof MatchRule.And and) {
+            return and.rules().stream()
+                .map(RoutingInBoundHandler::findFixedContentType)
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+        } else {
+            return null;
+        }
+    }
+
+    private ExecutionLeaf<RequestHandler> shortCircuitHandler(MatchRule rule, UriRouteInfo<?, ?> routeInfo) {
+        if (routeInfo.isWebSocketRoute()) {
+            return ExecutionLeaf.indeterminate();
+        }
+        List<GenericHttpFilter> fixedFilters = routeExecutor.getRouter().getFixedFilters().orElse(null);
+        // CorsFilter is handled specially here. It's always present, so we can't bail, but it only does anything when the Origin header is set, which is checked in accept().
+        if (fixedFilters == null || !fixedFilters.stream().allMatch(ghf -> FilterRunner.isCorsFilter(ghf, CorsFilter.class))) {
+            return ExecutionLeaf.indeterminate();
+        }
+        MethodExecutionHandle<?, ?> executionHandle = routeInfo.getTargetMethod();
+        if (executionHandle.getReturnType().isOptional() ||
+            executionHandle.getReturnType().getType() == HttpStatus.class) {
+            return ExecutionLeaf.indeterminate();
+        }
+        boolean unwrapResponse = HttpResponse.class.isAssignableFrom(executionHandle.getReturnType().getType());
+        MatchRule.ContentType fixedContentType = findFixedContentType(rule);
+        MediaType responseMediaType;
+        if (fixedContentType != null) {
+            responseMediaType = fixedContentType.expectedType();
+        } else {
+            List<MediaType> produces = routeInfo.getProduces();
+            if (!produces.isEmpty()) {
+                responseMediaType = produces.get(0);
+            } else {
+                responseMediaType = MediaType.APPLICATION_JSON_TYPE;
+            }
+        }
+        RequestArgumentBinder<Object>[] argumentBinders = routeInfo.resolveArgumentBinders(requestArgumentSatisfier.getBinderRegistry());
+        ShortCircuitArgumentBinder.Prepared[] shortCircuitBinders = new ShortCircuitArgumentBinder.Prepared[argumentBinders.length];
+        for (int i = 0; i < argumentBinders.length; i++) {
+            if (!(argumentBinders[i] instanceof ShortCircuitArgumentBinder<Object> scb)) {
+                return ExecutionLeaf.indeterminate();
+            }
+            //noinspection unchecked
+            Optional<ShortCircuitArgumentBinder.Prepared> prep = scb.prepare(executionHandle.getArguments()[i], fixedContentType);
+            if (prep.isEmpty()) {
+                return ExecutionLeaf.indeterminate();
+            }
+            shortCircuitBinders[i] = prep.get();
+        }
+        if (routeInfo.getExecutor(serverConfiguration.getThreadSelection()) != null ||
+            routeInfo.isSuspended() ||
+            routeInfo.isAsyncOrReactive()) {
+            return ExecutionLeaf.indeterminate();
+        }
+        if (!(executionHandle instanceof UnsafeExecutionHandle<?, ?> unsafeExecutionHandle)) {
+            return ExecutionLeaf.indeterminate();
+        }
+        @SuppressWarnings("unchecked")
+        MessageBodyWriter<Object> messageBodyWriter = (MessageBodyWriter<Object>) routeInfo.getMessageBodyWriter();
+        ShortCircuitNettyBodyWriter<Object> scWriter ;
+        RawMessageBodyHandler<Object> rawWriter ;
+        if (messageBodyWriter instanceof ShortCircuitNettyBodyWriter<Object> scw) {
+            rawWriter = null;
+            scWriter = scw;
+        } else if (messageBodyWriter instanceof RawMessageBodyHandler<Object> raw) {
+            rawWriter = raw;
+            scWriter = null;
+        } else {
+            return ExecutionLeaf.indeterminate();
+        }
+        return new ExecutionLeaf.Route<>(new RequestHandler() {
+            @Override
+            public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                try {
+                    NettyHttpHeaders requestHeaders = new NettyHttpHeaders(request.headers(), conversionService);
+
+                    Object[] arguments = shortCircuitBinders.length == 0 ? ArrayUtils.EMPTY_OBJECT_ARRAY : new Object[shortCircuitBinders.length];
+                    for (int i = 0; i < arguments.length; i++) {
+                        arguments[i] = shortCircuitBinders[i].bind(request, requestHeaders, (ImmediateByteBody) body);
+                    }
+                    Object result = unsafeExecutionHandle.invokeUnsafe(arguments);
+                    HttpResponseStatus status = HttpResponseStatus.OK;
+                    HttpHeaders responseHeaders;
+                    if (unwrapResponse) {
+                        HttpResponse<?> resp = (HttpResponse<?>) result;
+                        responseHeaders = ((NettyHttpHeaders) resp.getHeaders()).getNettyHeaders();
+                        if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                            responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                        }
+                        status = HttpResponseStatus.valueOf(resp.code(), resp.reason());
+                        result = resp.body();
+                    } else {
+                        responseHeaders = new DefaultHttpHeaders();
+                        responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                    }
+                    if (scWriter != null) {
+                        scWriter.writeTo(requestHeaders, status, responseHeaders, result, outboundAccess);
+                    } else {
+                        ByteBuf buf = (ByteBuf) rawWriter.writeTo(responseMediaType, result, NettyByteBufferFactory.DEFAULT).asNativeBuffer();
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
+                    }
+                } catch (Exception e) {
+                    RoutingInBoundHandler.this.handleUnboundError(e);
+                }
+            }
+
+            @Override
+            public void handleUnboundError(Throwable cause) {
+                throw new UnsupportedOperationException();
+            }
+        });
     }
 
     public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,

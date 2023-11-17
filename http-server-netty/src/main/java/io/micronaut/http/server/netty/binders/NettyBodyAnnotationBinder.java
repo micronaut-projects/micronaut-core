@@ -21,8 +21,10 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -33,11 +35,13 @@ import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
+import io.micronaut.http.server.netty.shortcircuit.ShortCircuitArgumentBinder;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.util.List;
 import java.util.Optional;
 
-final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
+final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> implements ShortCircuitArgumentBinder<T> {
     private static final CharSequence ATTR_CONVERTIBLE_BODY = "NettyBodyAnnotationBinder.convertibleBody";
 
     final HttpServerConfiguration httpServerConfiguration;
@@ -158,5 +162,39 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return imm.rawContent(httpServerConfiguration)
             .convert(conversionService, context)
             .map(o -> (T) o.claimForExternal());
+    }
+
+    @Override
+    public Optional<Prepared> prepare(Argument<T> argument, MatchRule.ContentType fixedContentType) {
+        boolean hasBodyAnnotation = argument.getAnnotationMetadata().hasAnnotation(Body.class);
+        Optional<String> optionalBodyComponent = argument.getAnnotationMetadata().stringValue(Body.class);
+        if (!hasBodyAnnotation || optionalBodyComponent.isPresent()) {
+            // only full body binding implemented
+            return Optional.empty();
+        }
+        boolean raw = DefaultHttpContentProcessorResolver.isRaw(argument);
+        MessageBodyReader<T> reader;
+        if (raw) {
+            reader = null;
+        } else {
+            if (fixedContentType == null) {
+                return Optional.empty();
+            }
+            Optional<MessageBodyReader<T>> opt = bodyHandlerRegistry.findReader(argument, fixedContentType.expectedType() == null ? null : List.of(fixedContentType.expectedType()));
+            if (opt.isEmpty()) {
+                return Optional.empty();
+            }
+            reader = opt.get();
+        }
+        return Optional.of((nettyRequest, mnHeaders, body) -> {
+            if (body.empty()) {
+                return null;
+            }
+            if (raw) {
+                return body.rawContent(httpServerConfiguration).convert(conversionService, ConversionContext.of(argument)).orElse(null);
+            } else {
+                return body.processSingle(httpServerConfiguration, reader, argument, fixedContentType.expectedType(), mnHeaders).claimForExternal();
+            }
+        });
     }
 }
