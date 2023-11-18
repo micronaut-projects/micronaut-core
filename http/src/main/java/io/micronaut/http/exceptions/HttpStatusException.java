@@ -49,6 +49,27 @@ public class HttpStatusException extends HttpException {
     }
 
     /**
+     * @param status  The {@link io.micronaut.http.HttpStatus}
+     * @param message The message
+     * @param cause   The throwable
+     */
+    public HttpStatusException(HttpStatus status, String message, Throwable cause) {
+        super(message, cause);
+        this.status = status;
+    }
+
+    /**
+     * @param status The {@link io.micronaut.http.HttpStatus}
+     * @param body   The arbitrary object to return
+     * @param cause   The throwable
+     */
+    public HttpStatusException(HttpStatus status, Object body, Throwable cause) {
+        super(cause);
+        this.status = status;
+        this.body = body;
+    }
+
+    /**
      * @return The {@link io.micronaut.http.HttpStatus}
      */
     public HttpStatus getStatus() {

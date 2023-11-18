@@ -37,6 +37,13 @@ public abstract class HttpException extends RuntimeException {
     }
 
     /**
+     * @param cause   The throwable
+     */
+    public HttpException(Throwable cause) {
+        super(cause);
+    }
+
+    /**
      * @param message The message
      * @param cause   The throwable
      */
