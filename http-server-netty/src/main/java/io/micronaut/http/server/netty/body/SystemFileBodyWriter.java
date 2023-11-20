@@ -48,7 +48,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.util.concurrent.ExecutorService;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
@@ -171,24 +170,6 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         IntRange(long firstPos, long lastPos) {
             this.firstPos = firstPos;
             this.lastPos = lastPos;
-        }
-    }
-
-    private static class RafInputStream extends InputStream {
-        private final RandomAccessFile raf;
-
-        RafInputStream(RandomAccessFile raf) {
-            this.raf = raf;
-        }
-
-        @Override
-        public int read() throws IOException {
-            return raf.read();
-        }
-
-        @Override
-        public int read(@NotNull byte[] b, int off, int len) throws IOException {
-            return raf.read(b, off, len);
         }
     }
 
