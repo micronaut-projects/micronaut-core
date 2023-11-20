@@ -164,7 +164,7 @@ public class FullHttpStackBenchmark {
                     "spec.name", "FullHttpStackBenchmark",
                     //"micronaut.server.netty.server-type", NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT,
                     "micronaut.server.date-header", false, // disabling this makes the response identical each time
-                    "micronaut.server.netty.fast-routing", true
+                    "micronaut.server.netty.optimized-routing", true
                 ));
                 EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
                 EmbeddedChannel channel = ((NettyHttpServer) server).buildEmbeddedChannel(false);
