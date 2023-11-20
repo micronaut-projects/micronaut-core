@@ -33,15 +33,23 @@ import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.scheduling.TaskExecutors;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jetbrains.annotations.NotNull;
 
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.concurrent.ExecutorService;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 
@@ -57,8 +65,11 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<SystemFile> {
     private static final String UNIT_BYTES = "bytes";
 
-    public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
+    private final ExecutorService ioExecutor;
+
+    public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
         super(configuration);
+        this.ioExecutor = ioExecutor;
     }
 
     @Override
@@ -113,31 +124,19 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
 
                 // Write the request data
                 final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-                writeFile(systemFile, nettyContext, position, contentLength, finalResponse);
+
+                File file = systemFile.getFile();
+                InputStream is;
+                try {
+                    is = new FileInputStream(file);
+                } catch (FileNotFoundException e) {
+                    throw new MessageBodyException("Could not find file", e);
+                }
+
+                nettyContext.writeStream(finalResponse, new RangeInputStream(is, position, contentLength), ioExecutor);
             }
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
-        }
-    }
-
-    private static void writeFile(SystemFile systemFile, NettyWriteContext context, long position, long contentLength, DefaultHttpResponse finalResponse) {
-        // Write the content.
-        File file = systemFile.getFile();
-        RandomAccessFile randomAccessFile = open(file);
-
-        context.writeFile(
-            finalResponse,
-            randomAccessFile,
-            position,
-            contentLength
-        );
-    }
-
-    private static RandomAccessFile open(File file) {
-        try {
-            return new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException e) {
-            throw new MessageBodyException("Could not find file", e);
         }
     }
 
@@ -175,4 +174,90 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         }
     }
 
+    private static class RafInputStream extends InputStream {
+        private final RandomAccessFile raf;
+
+        RafInputStream(RandomAccessFile raf) {
+            this.raf = raf;
+        }
+
+        @Override
+        public int read() throws IOException {
+            return raf.read();
+        }
+
+        @Override
+        public int read(@NotNull byte[] b, int off, int len) throws IOException {
+            return raf.read(b, off, len);
+        }
+    }
+
+    private static final class RangeInputStream extends InputStream {
+        private final InputStream delegate;
+        private final long toSkip;
+        private long remainingLength;
+        private boolean skipped = false;
+        private boolean skipSuccess = false;
+
+        private RangeInputStream(InputStream delegate, long toSkip, long length) {
+            this.delegate = delegate;
+            this.toSkip = toSkip;
+            this.remainingLength = length;
+
+            if (toSkip == 0) {
+                skipped = true;
+                skipSuccess = true;
+            }
+        }
+
+        private boolean doSkip() throws IOException {
+            if (!skipped) {
+                skipped = true;
+                try {
+                    delegate.skipNBytes(toSkip);
+                    skipSuccess = true;
+                } catch (EOFException ignored) {
+                }
+            }
+            return skipSuccess;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (!doSkip()) {
+                return -1;
+            }
+            if (remainingLength <= 0) {
+                return -1;
+            }
+            int read = delegate.read();
+            if (read != -1) {
+                remainingLength--;
+            }
+            return read;
+        }
+
+        @Override
+        public int read(@NotNull byte[] b, int off, int len) throws IOException {
+            if (!doSkip()) {
+                return -1;
+            }
+            if (remainingLength <= 0) {
+                return -1;
+            }
+            if (len > remainingLength) {
+                len = (int) remainingLength;
+            }
+            int n = delegate.read(b, off, len);
+            if (n != -1) {
+                remainingLength -= n;
+            }
+            return n;
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+    }
 }
