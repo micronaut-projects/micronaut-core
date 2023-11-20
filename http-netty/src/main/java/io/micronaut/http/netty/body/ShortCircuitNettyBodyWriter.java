@@ -38,7 +38,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
  */
 @Internal
 @Experimental
-public interface ShortCircuitNettyBodyWriter<T> extends NettyBodyWriter<T> {
+public sealed interface ShortCircuitNettyBodyWriter<T> extends NettyBodyWriter<T> permits NettyJsonHandler, NettyTextPlainHandler {
     @Override
     default void writeTo(HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, Argument<T> type, MediaType mediaType, T object, NettyWriteContext writeContext) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();

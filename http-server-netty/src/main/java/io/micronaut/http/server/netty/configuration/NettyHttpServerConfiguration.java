@@ -169,7 +169,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @since 4.3.0
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_FAST_ROUTING = false;
+    public static final boolean DEFAULT_OPTIMIZED_ROUTING = false;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
@@ -204,7 +204,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
-    private boolean fastRouting = DEFAULT_FAST_ROUTING;
+    private boolean optimizedRouting = DEFAULT_OPTIMIZED_ROUTING;
 
     /**
      * Default empty constructor.
@@ -740,25 +740,25 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * Whether fast routing should be enabled for routes that are simple enough to be supported.
      * During fast routing, not all framework features may be available, such as the thread-local
-     * request context or some error handling. Default {@value DEFAULT_FAST_ROUTING}.
+     * request context or some error handling. Default {@value DEFAULT_OPTIMIZED_ROUTING}.
      *
-     * @return {@code true} if fast routing should be enabled
+     * @return {@code true} if optimized routing should be enabled
      * @since 4.3.0
      */
-    public boolean isFastRouting() {
-        return fastRouting;
+    public boolean isOptimizedRouting() {
+        return optimizedRouting;
     }
 
     /**
      * Whether fast routing should be enabled for routes that are simple enough to be supported.
      * During fast routing, not all framework features may be available, such as the thread-local
-     * request context or some error handling. Default {@value DEFAULT_FAST_ROUTING}.
+     * request context or some error handling. Default {@value DEFAULT_OPTIMIZED_ROUTING}.
      *
-     * @param fastRouting {@code true} if fast routing should be enabled
+     * @param optimizedRouting {@code true} if optimized routing should be enabled
      * @since 4.3.0
      */
-    public void setFastRouting(boolean fastRouting) {
-        this.fastRouting = fastRouting;
+    public void setOptimizedRouting(boolean optimizedRouting) {
+        this.optimizedRouting = optimizedRouting;
     }
 
     /**

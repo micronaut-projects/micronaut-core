@@ -168,7 +168,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
         this.conversionService = conversionService;
 
-        if (serverConfiguration.isFastRouting()) {
+        if (serverConfiguration.isOptimizedRouting()) {
             NettyShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new NettyShortCircuitRouterBuilder<>();
             routeExecutor.getRouter().collectRoutes(scrb);
             this.shortCircuitMatchPlan = scrb.transform(this::shortCircuitHandler).plan();

@@ -16,7 +16,7 @@ import spock.lang.Specification
 class FastRoutingSpec extends Specification {
     def test(boolean fastRouting) {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'FastRoutingSpec', 'micronaut.server.netty.fast-routing': fastRouting])
+        def ctx = ApplicationContext.run(['spec.name': 'FastRoutingSpec', 'micronaut.server.netty.optimized-routing': fastRouting])
         def server = ctx.getBean(EmbeddedServer)
         server.start()
         def client = ctx.createBean(HttpClient, server.URI).toBlocking()
