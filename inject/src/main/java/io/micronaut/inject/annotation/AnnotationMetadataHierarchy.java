@@ -322,15 +322,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull String annotation, @NonNull String member) {
-        String[] values = hierarchy[0].stringValues(annotation, member);
-        for (int i = 1; i < hierarchy.length; i++) {
-            AnnotationMetadata annotationMetadata = hierarchy[i];
-            final String[] moreValues = annotationMetadata.stringValues(annotation, member);
-            if (ArrayUtils.isNotEmpty(moreValues)) {
-                values = ArrayUtils.concat(values, moreValues);
+        return firstNotEmptyStringValuesInHierarchy(annotation, member);
+    }
+
+    @NonNull
+    private String[] firstNotEmptyStringValuesInHierarchy(@NonNull String annotation, @NonNull String member) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            String[] values = annotationMetadata.stringValues(annotation, member);
+            if (ArrayUtils.isNotEmpty(values)) {
+                return values;
             }
         }
-        return values;
+        return ArrayUtils.EMPTY_STRING_ARRAY;
     }
 
     @Override
