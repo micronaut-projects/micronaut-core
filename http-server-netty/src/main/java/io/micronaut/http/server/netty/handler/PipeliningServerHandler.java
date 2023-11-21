@@ -30,13 +30,11 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoop;
-import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -303,24 +301,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @see #channelReadComplete
          */
         void readComplete() {
-        }
-    }
-
-    /**
-     * Wrapper class for a netty response with a special body type, like
-     * {@link HttpChunkedInput} or
-     * {@link FileRegion}.
-     *
-     * @param response The response
-     * @param body     The body, or {@code null} if there is no body
-     * @param needLast Whether to finish the response with a
-     *                 {@link LastHttpContent}
-     */
-    private record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
-        CustomResponse {
-            if (response instanceof FullHttpResponse) {
-                throw new IllegalArgumentException("Response must not be a FullHttpResponse to send a special body");
-            }
         }
     }
 
