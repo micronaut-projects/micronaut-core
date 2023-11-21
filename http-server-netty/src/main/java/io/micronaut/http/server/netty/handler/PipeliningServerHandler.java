@@ -105,9 +105,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private boolean reading = false;
     /**
-     * {@code true} iff we want to read more data.
+     * {@code true} iff {@code ctx.read()} has been called already.
      */
-    private boolean moreRequested = false;
+    private boolean readCalled = false;
     /**
      * {@code true} iff this handler has been removed.
      */
@@ -151,16 +151,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Set whether we need more input, i.e. another call to {@link #channelRead}. This is usally a
-     * {@link ChannelHandlerContext#read()} call, but it's coalesced until
-     * {@link #channelReadComplete}.
-     *
-     * @param needMore {@code true} iff we need more input
+     * Call {@code ctx.read()} if necessary.
      */
-    private void setNeedMore(boolean needMore) {
-        boolean oldMoreRequested = moreRequested;
-        moreRequested = needMore;
-        if (!oldMoreRequested && !reading && needMore) {
+    private void refreshNeedMore() {
+        // if readCalled is true, ctx.read() is already called and we haven't seen the associated readComplete yet.
+
+        // needMore is false if there is downstream backpressure.
+
+        // requestHandler itself (i.e. non-streaming request processing) does not have
+        // backpressure. For this, check whether there is a request that has been fully read but
+        // has no response yet. If there is, apply backpressure.
+        if (!readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
+            readCalled = true;
             ctx.read();
         }
     }
@@ -168,6 +170,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         this.ctx = ctx;
+        // we take control of reading now.
+        ctx.channel().config().setAutoRead(false);
+        refreshNeedMore();
     }
 
     @Override
@@ -195,13 +200,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         inboundHandler.readComplete();
         reading = false;
+        // only unset readCalled now. This ensures no read call is done before channelReadComplete
+        readCalled = false;
         if (flushPending) {
             ctx.flush();
             flushPending = false;
         }
-        if (moreRequested) {
-            ctx.read();
-        }
+        refreshNeedMore();
     }
 
     @Override
@@ -267,6 +272,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     if (next != null && next.handler != null) {
                         outboundQueue.poll();
                         outboundHandler = next.handler;
+                        refreshNeedMore();
                     } else {
                         return;
                     }
@@ -286,7 +292,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * An inbound handler is responsible for all incoming messages.
      */
-    private abstract static class InboundHandler {
+    private abstract class InboundHandler {
+        /**
+         * @return {@code true} iff this handler can process more data. This is usually {@code true},
+         * except for streaming requests when there is downstream backpressure.
+         */
+        boolean needMore() {
+            return true;
+        }
+
         /**
          * @see #channelRead
          */
@@ -448,7 +462,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 sink.tryEmitComplete();
                 inboundHandler = baseInboundHandler;
             }
-            setNeedMore(requested > 0);
         }
 
         @Override
@@ -457,6 +470,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (sink.tryEmitError(cause) != Sinks.EmitResult.OK) {
                 requestHandler.handleUnboundError(cause);
             }
+        }
+
+        @Override
+        boolean needMore() {
+            return requested > 0;
         }
 
         private void request(long n) {
@@ -472,20 +490,27 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 newRequested = Long.MAX_VALUE;
             }
             requested = newRequested;
-            setNeedMore(newRequested > 0);
+            refreshNeedMore();
         }
 
         Flux<HttpContent> flux() {
             return sink.asFlux()
                 .doOnRequest(this::request)
-                .doOnCancel(this::releaseQueue);
+                .doOnCancel(this::cancel);
         }
 
         void closeIfNoSubscriber() {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(this::closeIfNoSubscriber);
+                return;
+            }
+
             if (sink.currentSubscriberCount() == 0) {
                 releaseQueue();
                 if (inboundHandler == this) {
                     inboundHandler = droppingInboundHandler;
+                    refreshNeedMore();
                 }
             }
         }
@@ -498,6 +523,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 c.release();
             }
+        }
+
+        private void cancel() {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(this::cancel);
+                return;
+            }
+
+            if (inboundHandler == this) {
+                inboundHandler = droppingInboundHandler;
+                refreshNeedMore();
+            }
+            releaseQueue();
         }
     }
 
