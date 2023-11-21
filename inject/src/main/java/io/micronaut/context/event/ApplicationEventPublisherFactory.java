@@ -192,7 +192,7 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     private ApplicationEventPublisher<Object> createObjectEventPublisher(BeanContext beanContext) {
-        return new ApplicationEventPublisher<Object>() {
+        return new ApplicationEventPublisher<>() {
             @Override
             public void publishEvent(Object event) {
                 getTypedEventPublisher(Argument.of(event.getClass()), beanContext).publishEvent(event);

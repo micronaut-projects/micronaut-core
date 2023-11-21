@@ -97,7 +97,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
             }
         }
 
-        return new BoundExecutable<T, R>() {
+        return new BoundExecutable<>() {
             @Override
             public Executable<T, R> getTarget() {
                 return target;
@@ -157,7 +157,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
             }
         }
 
-        return new BoundExecutable<T, R>() {
+        return new BoundExecutable<>() {
 
             @Override
             public List<Argument<?>> getUnboundArguments() {

@@ -8,7 +8,7 @@ public class MyIterable implements Iterable<String> {
 
     @Override
     public Iterator<String> iterator() {
-        return new Iterator<String>() {
+        return new Iterator<>() {
 
             @Override
             public boolean hasNext() {

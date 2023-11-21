@@ -169,7 +169,7 @@ public class Convertible implements Car {
      * value to avoid null checks for omitted provider injections.
      */
     private static <T> jakarta.inject.Provider<T> nullProvider() {
-        return new org.atinject.jakartatck.auto.Convertible.NullProvider<T>();
+        return new org.atinject.jakartatck.auto.Convertible.NullProvider<>();
     }
 
     static class NullProvider<T> implements jakarta.inject.Provider<T> {
@@ -181,7 +181,7 @@ public class Convertible implements Car {
     }
 
     public static ThreadLocal<Convertible> localConvertible
-            = new ThreadLocal<Convertible>();
+            = new ThreadLocal<>();
 
     public static class Tests {
 

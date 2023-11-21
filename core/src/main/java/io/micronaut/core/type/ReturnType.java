@@ -78,7 +78,7 @@ public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataPro
         for (Argument<?> argument : typeArguments) {
             argumentMap.put(argument.getName(), argument);
         }
-        return new ReturnType<T1>() {
+        return new ReturnType<>() {
             @Override
             public Class<T1> getType() {
                 return type;

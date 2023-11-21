@@ -73,7 +73,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
             return () -> Optional.of(result);
         } catch (Exception e) {
             context.reject(e);
-            return new BindingResult<Object>() {
+            return new BindingResult<>() {
                 @Override
                 public List<ConversionError> getConversionErrors() {
                     return CollectionUtils.iterableToList(context);

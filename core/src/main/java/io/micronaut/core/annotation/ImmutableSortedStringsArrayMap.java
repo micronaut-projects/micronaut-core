@@ -160,10 +160,10 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     @NonNull
     @Override
     public Collection<V> values() {
-        return new AbstractCollection<V>() {
+        return new AbstractCollection<>() {
             @Override
             public Iterator<V> iterator() {
-                return new Iterator<V>() {
+                return new Iterator<>() {
                     private int index = 0;
 
                     @Override

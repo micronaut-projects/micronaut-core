@@ -169,7 +169,7 @@ public class Convertible implements Car {
      * value to avoid null checks for omitted provider injections.
      */
     private static <T> Provider<T> nullProvider() {
-        return new NullProvider<T>();
+        return new NullProvider<>();
     }
 
     static class NullProvider<T> implements Provider<T> {
@@ -180,7 +180,7 @@ public class Convertible implements Car {
         }
     }
 
-    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<Convertible>();
+    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<>();
 
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)

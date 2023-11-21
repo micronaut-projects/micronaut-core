@@ -216,7 +216,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     @Override
     default Iterator<Map.Entry<String, V>> iterator() {
         Iterator<String> names = names().iterator();
-        return new Iterator<Map.Entry<String, V>>() {
+        return new Iterator<>() {
             @Override
             public boolean hasNext() {
                 return names.hasNext();
@@ -229,7 +229,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
                 }
 
                 String name = names.next();
-                return new Map.Entry<String, V>() {
+                return new Map.Entry<>() {
                     @Override
                     public String getKey() {
                         return name;
