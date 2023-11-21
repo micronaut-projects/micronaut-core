@@ -962,6 +962,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         }
 
+        boolean hasFormatting = formattingAnnotation != null;
+        if (hasFormatting) {
+            for (Class sourceSuperType : sourceHierarchy) {
+                for (Class targetSuperType : targetHierarchy) {
+                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                    typeConverter = typeConverters.get(pair);
+                    if (typeConverter != null) {
+                        converterCache.put(pair, typeConverter);
+                        return typeConverter;
+                    }
+                }
+            }
+        }
+
         return UNCONVERTIBLE;
     }
 
