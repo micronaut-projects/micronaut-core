@@ -20,20 +20,29 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.server.cors.CorsUtil;
-import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.UriRouteMatch;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 import static io.micronaut.http.server.cors.CorsFilter.CORS_FILTER_ORDER;
 
 /**
  * This Filter intercepts HTTP OPTIONS requests which are not CORS Preflight requests.
- * It responds with a NO_CONTENT(204) response, and it populates the Allow HTTP Header with the supported HTTP methods for the request URI.
+ * It responds with an OK(200) response, and it populates the Allow HTTP Header with the supported HTTP methods for the request URI.
  * @author Sergio del Amo
  * @since 4.2.0
  */
@@ -45,20 +54,10 @@ public final class OptionsFilter implements Ordered {
     @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = HttpServerConfiguration.PREFIX + ".dispatch-options-requests";
 
-    private final Router router;
-
-    /**
-     *
-     * @param router Router
-     */
-    public OptionsFilter(Router router) {
-        this.router = router;
-    }
-
-    @RequestFilter
+    @ResponseFilter
     @Nullable
     @Internal
-    public HttpResponse<?> filterRequest(HttpRequest<?> request) {
+    public HttpResponse<?> filterResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
         if (request.getMethod() != HttpMethod.OPTIONS) {
             return null; // proceed
         }
@@ -68,13 +67,15 @@ public final class OptionsFilter implements Ordered {
         if (hasOptionsRouteMatch(request)) {
             return null; // proceed
         }
-        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(HttpStatus.OK);
-        router.findAny(request.getUri().toString(), request)
-            .map(UriRouteMatch::getHttpMethod)
-            .map(HttpMethod::toString)
-            .forEach(allow -> mutableHttpResponse.header(HttpHeaders.ALLOW, allow));
-        mutableHttpResponse.header(HttpHeaders.ALLOW, HttpMethod.OPTIONS.toString());
-        return mutableHttpResponse;
+        if (HttpStatus.METHOD_NOT_ALLOWED.equals(response.getStatus())) {
+            List<String> allowedMethods = response.getHeaders().get(HttpHeaders.ALLOW, String[].class)
+                .map(allow -> new ArrayList<>(Arrays.asList(allow))).orElse(new ArrayList<>());
+            allowedMethods.add(HttpMethod.OPTIONS.toString());
+            response.getHeaders().remove(HttpHeaders.ALLOW);
+            response.getHeaders().allowGeneric(allowedMethods);
+            response.status(HttpStatus.OK);
+        }
+        return response;
     }
 
     private boolean hasOptionsRouteMatch(HttpRequest<?> request) {
