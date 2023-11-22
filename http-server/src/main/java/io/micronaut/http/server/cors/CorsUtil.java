@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -29,13 +30,17 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
  * @author Graeme Rocher
  * @since 1.0
  */
-class CorsUtil {
+@Internal
+public final class CorsUtil {
+    private CorsUtil() {
+
+    }
 
     /**
      * @param request The {@link HttpRequest} object
      * @return Return whether this request is a pre-flight request
      */
-    static boolean isPreflightRequest(HttpRequest<?> request) {
+    public static boolean isPreflightRequest(HttpRequest<?> request) {
         HttpHeaders headers = request.getHeaders();
         Optional<String> origin = request.getOrigin();
         return origin.isPresent() && headers.contains(ACCESS_CONTROL_REQUEST_METHOD) && HttpMethod.OPTIONS == request.getMethod();

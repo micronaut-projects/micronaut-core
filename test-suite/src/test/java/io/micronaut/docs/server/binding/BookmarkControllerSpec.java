@@ -21,30 +21,30 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class BookmarkControllerSpec {
+class BookmarkControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -54,7 +54,7 @@ public class BookmarkControllerSpec {
     }
 
     @Test
-    public void testBindingPagination() {
+    void testBindingPagination() {
         UriTemplate template = new UriTemplate("/api/bookmarks/list{?offset,max,sort,order}");
         Map<String, Object> params = new HashMap<>();
         params.put("offset", 0);

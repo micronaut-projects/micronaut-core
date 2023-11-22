@@ -42,7 +42,7 @@ public class SupplierBenchmark {
     }
 
     private static <T> Supplier<T> memoizedUsingLambda(Supplier<T> actual) {
-        return new Supplier<T>() {
+        return new Supplier<>() {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 
@@ -63,7 +63,7 @@ public class SupplierBenchmark {
     }
 
     private static <T> Supplier<T> memoizedNonEmptyUsingLambda(Supplier<T> actual) {
-        return new Supplier<T>() {
+        return new Supplier<>() {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 

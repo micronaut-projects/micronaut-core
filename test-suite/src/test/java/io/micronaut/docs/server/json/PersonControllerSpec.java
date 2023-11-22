@@ -23,33 +23,33 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class PersonControllerSpec {
+class PersonControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", PersonControllerSpec.class.getSimpleName()));
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -59,8 +59,8 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testGlobalErrorHandler() {
-        HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
+    void testGlobalErrorHandler() {
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
         Flux.from(client.exchange("/people/error", Map.class))
                 .blockFirst());
         HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse();
@@ -70,7 +70,7 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testSave() {
+    void testSave() {
         HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person.class);
         assertTrue(response.getBody().isPresent());
         Person person = response.getBody().get();
@@ -86,7 +86,7 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testSaveReactive() {
+    void testSaveReactive() {
         HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person.class);
         assertTrue(response.getBody().isPresent());
         Person person = response.getBody().get();
@@ -96,7 +96,7 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testSaveFuture() {
+    void testSaveFuture() {
         HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person.class);
         assertTrue(response.getBody().isPresent());
         Person person = response.getBody().get();
@@ -106,7 +106,7 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testSaveArgs() {
+    void testSaveArgs() {
         HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person.class);
         assertTrue(response.getBody().isPresent());
         Person person = response.getBody().get();
@@ -116,8 +116,8 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testPersonNotFound() {
-        HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
+    void testPersonNotFound() {
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 Flux.from(client.exchange("/people/Sally", Map.class))
                         .blockFirst());
         HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse();
@@ -127,8 +127,8 @@ public class PersonControllerSpec {
     }
 
     @Test
-    public void testSaveInvalidJson() {
-        HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
+    void testSaveInvalidJson() {
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange(HttpRequest.POST("/people", "{\""), Argument.of(Person.class), Argument.of(Map.class)));
         HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse();
         assertTrue(response.getBody(Map.class).get().get("message").toString().startsWith("Invalid JSON: Unexpected end-of-input"));

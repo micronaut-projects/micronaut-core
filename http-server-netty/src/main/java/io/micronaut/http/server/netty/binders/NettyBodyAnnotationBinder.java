@@ -89,7 +89,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         ExecutionFlow<ImmediateByteBody> buffered = nhr.byteBody()
             .buffer(nhr.getChannelHandlerContext().alloc());
 
-        return new PendingRequestBindingResult<T>() {
+        return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
             Optional<T> result;
 

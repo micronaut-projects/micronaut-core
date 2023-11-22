@@ -17,30 +17,32 @@ package io.micronaut.docs.annotation.requestattributes;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
-public class RequestAttributeSpec {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+class RequestAttributeSpec {
 
     @Test
-    public void testSenderAttributes() throws Exception {
+    void testSenderAttributes() {
 
-        try(EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class)) {
+        try (EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class)) {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
             Story story = Mono.from(client.getById("jan2019")).block();
 
-            Assert.assertNotNull(story);
+            assertNotNull(story);
 
             Map<String, Object> attributes = filter.getLatestRequestAttributes();
-            Assert.assertNotNull(attributes);
-            Assert.assertEquals("jan2019", attributes.get("story-id"));
-            Assert.assertEquals("storyClient", attributes.get("client-name"));
-            Assert.assertEquals("1", attributes.get("version"));
+            assertNotNull(attributes);
+            assertEquals("jan2019", attributes.get("story-id"));
+            assertEquals("storyClient", attributes.get("client-name"));
+            assertEquals("1", attributes.get("version"));
         }
     }
 }

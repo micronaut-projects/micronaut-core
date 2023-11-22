@@ -1,18 +1,18 @@
 package io.micronaut.docs.streaming
 
-import io.kotest.matchers.shouldNotBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert.fail
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import kotlin.test.fail
 
 class HeadlineControllerSpec: StringSpec() {
 

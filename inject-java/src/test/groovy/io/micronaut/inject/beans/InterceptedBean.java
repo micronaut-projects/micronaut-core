@@ -16,7 +16,6 @@
 package io.micronaut.inject.beans;
 
 import io.micronaut.aop.proxytarget.Mutating;
-import io.micronaut.scheduling.annotation.Async;
 
 import jakarta.inject.Singleton;
 

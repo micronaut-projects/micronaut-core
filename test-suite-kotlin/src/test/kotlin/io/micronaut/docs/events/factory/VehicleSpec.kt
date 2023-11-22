@@ -1,12 +1,8 @@
 package io.micronaut.docs.events.factory
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import org.junit.Test
-
-import org.junit.Assert.assertEquals
 
 class VehicleSpec : StringSpec({
 

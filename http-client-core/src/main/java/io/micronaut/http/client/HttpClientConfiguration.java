@@ -101,6 +101,12 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
+    /**
+     * The default value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
+
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -118,7 +124,7 @@ public abstract class HttpClientConfiguration {
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
-    private Duration connectionPoolIdleTimeout = Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
+    private Duration connectionPoolIdleTimeout = DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS == 0 ? null : Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
 
     private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
@@ -160,6 +166,8 @@ public abstract class HttpClientConfiguration {
     );
 
     private LogLevel logLevel;
+
+    private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
 
     /**
      * Default constructor.
@@ -731,6 +739,32 @@ public abstract class HttpClientConfiguration {
      */
     public void setAlpnModes(@NonNull List<String> alpnModes) {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
+    }
+
+    /**
+     * Whether to allow blocking a netty event loop with a call to {@link BlockingHttpClient}. When
+     * this is off (the default), any calls that block an event loop will throw an error. Such
+     * calls are almost always a mistake that can lead to hard-to-debug transient issues such as
+     * read timeouts. Only enable this setting if you are sure you won't hit such a bug.
+     *
+     * @return {@code true} if blocking an event loop should be allowed
+     */
+    public boolean isAllowBlockEventLoop() {
+        return allowBlockEventLoop;
+    }
+
+    /**
+     * Whether to allow blocking a netty event loop with a call to {@link BlockingHttpClient}. When
+     * this is off (the default), any calls that block an event loop will throw an error. Such
+     * calls are almost always a mistake that can lead to hard-to-debug transient issues such as
+     * read timeouts. Only enable this setting if you are sure you won't hit such a bug.
+     * <br>
+     * Default value: {@value DEFAULT_ALLOW_BLOCK_EVENT_LOOP}
+     *
+     * @param allowBlockEventLoop {@code true} if blocking an event loop should be allowed
+     */
+    public void setAllowBlockEventLoop(boolean allowBlockEventLoop) {
+        this.allowBlockEventLoop = allowBlockEventLoop;
     }
 
     /**

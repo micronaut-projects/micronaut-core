@@ -73,7 +73,7 @@ import java.util.*;
 class TestConfiguration extends ParentConfiguration {
     @Override
     public void setSettings(
-            @MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE) Properties props){
+            @MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE) Properties props) {
         super.setSettings(props);
     }
 

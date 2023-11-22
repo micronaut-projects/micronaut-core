@@ -49,9 +49,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Experimental
 public @interface Parallel {
     /**
-     * The default behaviour is to shutdown the context if an error occurs on initialization. Can be set false if shutdown is not required.
+     * The default behaviour is to shut down the context if an error occurs on initialization. Can be set false if shutdown is not required.
      *
-     * @return Whether to shutdown the application if an error occurs.
+     * @return Whether to shut down the application if an error occurs.
      */
     boolean shutdownOnError() default true;
 }

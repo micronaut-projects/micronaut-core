@@ -425,11 +425,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         // default Connection header if not set explicitly
         closeConnectionIfError(message, request, outboundAccess);
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
-        // close handled by HttpServerKeepAliveHandler
-        if (request.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
-            // consume incoming data
-            Flux.from(streamed).subscribe(HttpContent::release);
-        }
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
             writeStreamedWithErrorHandling(request, outboundAccess, streamed);
         } else {

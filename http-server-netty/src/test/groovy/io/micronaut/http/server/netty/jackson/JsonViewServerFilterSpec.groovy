@@ -20,6 +20,8 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -125,5 +127,21 @@ class JsonViewServerFilterSpec extends Specification {
         rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
         rsp.body().birthdate == null
         rsp.body().password == null
+    }
+
+    def "errors are written properly"() {
+        when:
+        client.toBlocking().exchange(HttpRequest.GET('/jsonview/failing'), TestModel)
+
+        then:
+        def f = thrown HttpClientResponseException
+        f.response.getBody(JsonError).get().message == "Internal Server Error"
+
+        when:
+        client.toBlocking().exchange(HttpRequest.GET('/jsonview/failing-with-route'))
+
+        then:
+        HttpClientResponseException e = thrown()
+        e.response.getBody(JsonError).get().message == "failure2"
     }
 }

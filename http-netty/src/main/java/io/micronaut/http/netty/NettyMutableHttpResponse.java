@@ -434,7 +434,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
                 } else {
                     conversion = conversionService.convert(value, conversionContext);
                 }
-                nextConvertor = new BodyConvertor<T>() {
+                nextConvertor = new BodyConvertor<>() {
 
                     @Override
                     public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {

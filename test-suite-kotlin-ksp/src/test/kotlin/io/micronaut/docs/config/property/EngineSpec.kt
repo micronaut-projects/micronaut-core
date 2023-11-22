@@ -1,13 +1,8 @@
 package io.micronaut.docs.config.property
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
-import org.junit.Test
-
-import java.util.LinkedHashMap
-
-import org.junit.Assert.assertEquals
 
 class EngineSpec : StringSpec({
 

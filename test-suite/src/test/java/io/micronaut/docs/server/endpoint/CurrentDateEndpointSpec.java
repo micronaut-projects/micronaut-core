@@ -23,19 +23,19 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
-import reactor.core.publisher.Flux;
+import org.junit.jupiter.api.Test;
 
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CurrentDateEndpointSpec {
+class CurrentDateEndpointSpec {
 
     @Test
-    public void testReadCustomDateEndpoint() {
+    void testReadCustomDateEndpoint() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
@@ -47,7 +47,7 @@ public class CurrentDateEndpointSpec {
     }
 
     @Test
-    public void testReadCustomDateEndpointWithArgument() {
+    void testReadCustomDateEndpointWithArgument() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
@@ -61,7 +61,7 @@ public class CurrentDateEndpointSpec {
 
     // issue https://github.com/micronaut-projects/micronaut-core/issues/883
     @Test
-    public void testReadWithProduces() {
+    void testReadWithProduces() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
@@ -73,7 +73,7 @@ public class CurrentDateEndpointSpec {
     }
 
     @Test
-    public void testWriteCustomDateEndpoint() {
+    void testWriteCustomDateEndpoint() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
         Date originalDate, resetDate;
@@ -96,7 +96,7 @@ public class CurrentDateEndpointSpec {
     }
 
     @Test
-    public void testDisableEndpoint() {
+    void testDisableEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("custom.date.enabled", false);
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);

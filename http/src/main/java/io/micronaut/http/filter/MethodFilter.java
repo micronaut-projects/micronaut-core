@@ -341,29 +341,6 @@ record MethodFilter<T>(FilterOrder order,
         return args;
     }
 
-    private record FilterMethodContext(
-        MutablePropagatedContext mutablePropagatedContext,
-        HttpRequest<?> request,
-        @Nullable HttpResponse<?> response,
-        @Nullable Throwable failure,
-        @Nullable InternalFilterContinuation<?> continuation) {
-    }
-
-    private interface FilterArgBinder {
-        Object bind(FilterMethodContext context);
-    }
-
-    /**
-     * The continuation creator.
-     */
-    private interface ContinuationCreator {
-
-        InternalFilterContinuation<?> create(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
-                                             FilterContext filterContext,
-                                             MutablePropagatedContext mutablePropagatedContext);
-
-    }
-
     @SuppressWarnings({"java:S3776", "java:S3740"}) // performance
     private static FilterReturnHandler prepareReturnHandler(ConversionService conversionService,
                                                             Argument<?> type,
@@ -444,6 +421,29 @@ record MethodFilter<T>(FilterOrder order,
         } else {
             throw new IllegalArgumentException("Unsupported filter return type " + type.getType().getName());
         }
+    }
+
+    private record FilterMethodContext(
+        MutablePropagatedContext mutablePropagatedContext,
+        HttpRequest<?> request,
+        @Nullable HttpResponse<?> response,
+        @Nullable Throwable failure,
+        @Nullable InternalFilterContinuation<?> continuation) {
+    }
+
+    private interface FilterArgBinder {
+        Object bind(FilterMethodContext context);
+    }
+
+    /**
+     * The continuation creator.
+     */
+    private interface ContinuationCreator {
+
+        InternalFilterContinuation<?> create(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                             FilterContext filterContext,
+                                             MutablePropagatedContext mutablePropagatedContext);
+
     }
 
     private interface FilterReturnHandler {

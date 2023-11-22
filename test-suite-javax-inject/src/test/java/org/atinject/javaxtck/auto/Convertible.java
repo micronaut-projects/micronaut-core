@@ -21,8 +21,6 @@ import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultBeanContext;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -171,7 +169,7 @@ public class Convertible implements Car {
      * value to avoid null checks for omitted provider injections.
      */
     private static <T> Provider<T> nullProvider() {
-        return new NullProvider<T>();
+        return new NullProvider<>();
     }
 
     static class NullProvider<T> implements Provider<T> {
@@ -182,7 +180,7 @@ public class Convertible implements Car {
         }
     }
 
-    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<Convertible>();
+    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<>();
 
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)

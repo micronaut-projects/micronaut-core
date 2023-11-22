@@ -473,7 +473,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     transformedCandidates.add(candidate);
                 } else {
                     // if we have reached here we are likely in a nested a class being resolved directly from the context
-                    // traverse and try reformulate the path
+                    // traverse and try to reformulate the path
                     @SuppressWarnings("unchecked")
                     Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
                     if (declaringClass != null) {

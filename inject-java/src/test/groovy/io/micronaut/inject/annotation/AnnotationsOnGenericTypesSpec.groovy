@@ -14,7 +14,6 @@ import jakarta.validation.constraints.Min
 
 class AnnotationsOnGenericTypesSpec extends AbstractTypeElementSpec {
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on type arguments for executable methods'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics.Test', '''
@@ -42,7 +41,6 @@ class Test {
         annotationMetadata.hasAnnotation(Min)
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on type arguments for executable methods exclude type level annotations'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics.Test', '''
@@ -76,7 +74,6 @@ class Foo {
         !annotationMetadata.hasAnnotation(Singleton)
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on parameters exclude type level annotations at runtime'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics.Test', '''
@@ -111,7 +108,6 @@ class Foo {
         !annotationMetadata.hasAnnotation(Singleton)
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on type arguments return types'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics2.Test', '''
@@ -139,7 +135,6 @@ class Test {
         annotationMetadata.hasAnnotation(Min)
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on generics in field injection points'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics2.Test', '''
@@ -165,7 +160,6 @@ class Test {
         annotationMetadata.hasAnnotation(Min)
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on generics in method argument injection points'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics2.Test', '''

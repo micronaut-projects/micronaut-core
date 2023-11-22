@@ -17,7 +17,6 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.beans.TestIntroduction;
-import io.micronaut.core.convert.ConversionServiceBenchmark;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;

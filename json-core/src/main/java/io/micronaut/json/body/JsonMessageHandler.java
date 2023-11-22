@@ -54,7 +54,8 @@ import java.io.OutputStream;
     MediaType.APPLICATION_JSON_GITHUB,
     MediaType.APPLICATION_JSON_FEED,
     MediaType.APPLICATION_JSON_PROBLEM,
-    MediaType.APPLICATION_JSON_PATCH
+    MediaType.APPLICATION_JSON_PATCH,
+    MediaType.APPLICATION_JSON_MERGE_PATCH
 })
 @Consumes({
     MediaType.APPLICATION_JSON,
@@ -63,7 +64,8 @@ import java.io.OutputStream;
     MediaType.APPLICATION_JSON_GITHUB,
     MediaType.APPLICATION_JSON_FEED,
     MediaType.APPLICATION_JSON_PROBLEM,
-    MediaType.APPLICATION_JSON_PATCH
+    MediaType.APPLICATION_JSON_PATCH,
+    MediaType.APPLICATION_JSON_MERGE_PATCH
 })
 @BootstrapContextCompatible
 public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {

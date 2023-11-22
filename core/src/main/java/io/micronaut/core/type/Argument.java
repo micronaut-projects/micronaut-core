@@ -135,7 +135,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
      * name within the comparison so this method offers a variation that just compares types.
      *
-     * @param other The type type
+     * @param other The type
      * @return True if they are equal
      */
     boolean equalsType(@Nullable Argument<?> other);

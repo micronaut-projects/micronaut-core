@@ -18,7 +18,6 @@ package io.micronaut.inject.field.mapinjection;
 import jakarta.inject.Inject;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 public class B {

@@ -51,7 +51,7 @@ public @interface Import {
     String[] packages() default {};
 
     /**
-     * The annotation types to include in a search when specifying the {@link #packages()} attribute (this attribute has no effect when combined with {@link #classes()}.
+     * The annotation types to include in a search when specifying the {@link #packages()} attribute (this attribute has no effect when combined with {@link #classes()}).
      *
      * <p>If set to {@code "*"} will include all non-abstract classes. Defaults to only included types annotated with JSR-330 scopes or qualifiers.</p>
      *

@@ -16,26 +16,21 @@
 package io.micronaut.docs.aop.around;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
 
-public class AroundSpec {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-    // tag::test[]
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
+class AroundSpec {
 
     @Test
-    public void testNotNull() {
+    void testNotNull() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
-            NotNullExample exampleBean = applicationContext.getBean(NotNullExample.class);
-
-            thrown.expect(IllegalArgumentException.class);
-            thrown.expectMessage("Null parameter [taskName] not allowed");
-
-            exampleBean.doWork(null);
+            var ex = assertThrows(IllegalArgumentException.class, () -> {
+                var exampleBean = applicationContext.getBean(NotNullExample.class);
+                exampleBean.doWork(null);
+            });
+            assertEquals(ex.getMessage(), "Null parameter [taskName] not allowed");
         }
     }
-    // end::test[]
 }

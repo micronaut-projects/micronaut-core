@@ -2,7 +2,7 @@ package io.micronaut.docs.expressions
 
 import io.micronaut.context.ApplicationContext
 import spock.lang.AutoCleanup
-import spock.lang.Shared;
+import spock.lang.Shared
 import spock.lang.Specification
 
 import static java.util.concurrent.TimeUnit.SECONDS
@@ -11,9 +11,9 @@ import static org.awaitility.Awaitility.await
 class ExampleJobSpec extends Specification {
     @Shared
     @AutoCleanup
-    ApplicationContext ctx = ApplicationContext.run(["spec.name":  "ExampleJobTest"])
+    ApplicationContext ctx = ApplicationContext.run(["spec.name": "ExampleJobTest"])
 
-    void testJobCondition(){
+    void testJobCondition() {
         given:
         ExampleJob exampleJob = ctx.getBean(ExampleJob)
 

@@ -17,24 +17,17 @@ package io.micronaut.docs.annotation;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import jakarta.validation.ConstraintViolationException;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
-import jakarta.validation.ConstraintViolationException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import static org.junit.Assert.assertEquals;
-
-public class PetControllerSpec {
-
-    // tag::errorRule[]
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
-    // end::errorRule[]
+class PetControllerSpec {
 
     @Test
-    public void testPostPet() {
+    void testPostPet() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
@@ -49,16 +42,14 @@ public class PetControllerSpec {
     }
 
     @Test
-    public void testPostPetValidation() {
+    void testPostPetValidation() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
-        // tag::error[]
-        thrown.expect(ConstraintViolationException.class);
-        thrown.expectMessage("save.age: must be greater than or equal to 1");
-        Mono.from(client.save("Fred", -1)).block();
-        // end::error[]
-
+        var ex = assertThrows(ConstraintViolationException.class, () -> {
+            var client = embeddedServer.getApplicationContext().getBean(PetClient.class);
+            Mono.from(client.save("Fred", -1)).block();
+        });
+        assertEquals(ex.getMessage(), "save.age: must be greater than or equal to 1");
 
         embeddedServer.stop();
     }

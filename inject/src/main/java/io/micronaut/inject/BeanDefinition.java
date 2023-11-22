@@ -174,7 +174,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The constructor injection point
      */
     default ConstructorInjectionPoint<T> getConstructor() {
-        return new ConstructorInjectionPoint<T>() {
+        return new ConstructorInjectionPoint<>() {
 
             @Override
             public Argument<?>[] getArguments() {
@@ -384,6 +384,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * Resolve the declared qualifier for this bean.
      * @return The qualifier or null if this isn't one
      */
+    @Override
     default @Nullable Qualifier<T> getDeclaredQualifier() {
         return QualifiedBeanType.super.getDeclaredQualifier();
     }
@@ -391,6 +392,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     /**
      * @return Method that can be overridden to resolve a dynamic qualifier
      */
+    @Override
     default @Nullable Qualifier<T> resolveDynamicQualifier() {
         return QualifiedBeanType.super.resolveDynamicQualifier();
     }

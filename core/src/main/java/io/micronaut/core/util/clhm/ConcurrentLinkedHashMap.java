@@ -117,7 +117,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
      *
      * A memento of the reads and writes that were performed on the map are
      * recorded in buffers. These buffers are drained at the first opportunity
-     * after a write or when the read buffer exceeds a threshold size. The reads
+     * after write or when the read buffer exceeds a threshold size. The reads
      * are recorded in a lossy buffer, allowing the reordering operations to be
      * discarded if the draining process cannot keep up. Due to the concurrent
      * nature of the read and write operations a strict policy ordering is not
@@ -385,7 +385,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Performs the post-processing work required after a write.
+     * Performs the post-processing work required after write.
      *
      * @param task the pending operation to be applied
      */
@@ -639,7 +639,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
      *
      * @param key key with which the specified value is to be associated
      * @param value value to be associated with the specified key
-     * @param onlyIfAbsent a write is performed only if the key is not already
+     * @param onlyIfAbsent write is performed only if the key is not already
      *     associated with a value
      * @return the prior value in the data store or null if no mapping was found
      */
@@ -880,7 +880,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Returns a unmodifiable snapshot {@link Set} view of the keys contained in
+     * Returns an unmodifiable snapshot {@link Set} view of the keys contained in
      * this map. The set's iterator returns the keys whose order of iteration is
      * the ascending order in which its entries are considered eligible for
      * retention, from the least-likely to be retained to the most-likely.

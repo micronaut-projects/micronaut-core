@@ -65,11 +65,12 @@ dependencies {
     testRuntimeOnly libs.junit.jupiter.engine
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
-    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation libs.bcpkix
-    }
+    testImplementation libs.bcpkix
 
     testImplementation libs.managed.reactor
+
+    testImplementation(libs.javax.persistence)
+    testImplementation(libs.jakarta.persistence)
 }
 
 configurations.testRuntimeClasspath {
@@ -83,10 +84,6 @@ configurations.testRuntimeClasspath {
 //kotlin {
 //    kotlinDaemonJvmArgs = ["-Xdebug","-Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=y"]
 //}
-
-tasks.named("compileTestKotlin") {
-    kotlinOptions.jvmTarget = "17"
-}
 
 tasks.named("test") {
     useJUnitPlatform()

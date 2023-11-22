@@ -16,7 +16,6 @@
 package io.micronaut.docs.qualifiers.replaces.defaultimpl;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

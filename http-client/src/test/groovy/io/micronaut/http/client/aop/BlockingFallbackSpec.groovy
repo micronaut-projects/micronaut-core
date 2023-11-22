@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
@@ -35,7 +36,9 @@ class BlockingFallbackSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run([
+            'spec.name':'BlockingFallbackSpec',
+    ])
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -69,6 +72,7 @@ class BlockingFallbackSpec extends Specification {
 
     @Client('/blocking/fallback/books')
     @Recoverable
+    @Requires(property = 'spec.name', value = 'BlockingFallbackSpec')
     static interface BookClient extends BookApi {
         @Override
         @Recoverable(api = BookApi)
@@ -76,6 +80,7 @@ class BlockingFallbackSpec extends Specification {
     }
 
     @Fallback
+    @Requires(property = 'spec.name', value = 'BlockingFallbackSpec')
     static class BookFallback implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
@@ -114,6 +119,7 @@ class BlockingFallbackSpec extends Specification {
     }
 
     @Controller("/blocking/fallback/books")
+    @Requires(property = 'spec.name', value = 'BlockingFallbackSpec')
     static class BookController implements BookApi {
 
         @Override

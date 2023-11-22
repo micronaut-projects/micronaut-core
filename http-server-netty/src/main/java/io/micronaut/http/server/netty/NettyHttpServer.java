@@ -674,10 +674,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
-            for (Listener listener : activeListeners) {
-                if (listener.httpPipelineBuilder != null) {
-                    listener.httpPipelineBuilder.close();
-                    listener.httpPipelineBuilder = null;
+            if (activeListeners != null) {
+                for (Listener listener : activeListeners) {
+                    if (listener.httpPipelineBuilder != null) {
+                        listener.httpPipelineBuilder.close();
+                        listener.httpPipelineBuilder = null;
+                    }
                 }
             }
             this.activeListeners = null;

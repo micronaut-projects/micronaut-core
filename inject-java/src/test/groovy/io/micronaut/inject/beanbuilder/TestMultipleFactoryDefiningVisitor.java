@@ -13,7 +13,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 public class TestMultipleFactoryDefiningVisitor implements TypeElementVisitor<Prototype, Object> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (element.hasAnnotation(Prototype.class)){
+        if (element.hasAnnotation(Prototype.class)) {
 
             context.getClassElement(OtherBeanProducer.class)
                     .ifPresent((producer) -> {

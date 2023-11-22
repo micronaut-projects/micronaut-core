@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 
 /**
  * Used to bind Bindable parameters to a Bean object.
- * NOTE: The binder is annotates as postponed to allow injecting values added by filters.
+ * NOTE: The binder is annotating as postponed to allow injecting values added by filters.
 
  * @author Anze Sodja
  * @author graemerocher
