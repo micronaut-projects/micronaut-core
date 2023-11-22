@@ -526,7 +526,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
-                return new MutableAnnotationMetadataDelegate<AnnotationMetadata>() {
+                return new MutableAnnotationMetadataDelegate<>() {
 
                     @Override
                     public AnnotationMetadata getAnnotationMetadata() {

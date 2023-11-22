@@ -55,7 +55,7 @@ public class EmptyPropertySource implements PropertySource {
 
     @Override
     public Iterator<String> iterator() {
-        return new Iterator<String>() {
+        return new Iterator<>() {
             @Override
             public boolean hasNext() {
                 return false;

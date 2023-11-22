@@ -914,7 +914,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, T value) {
             if (nextConvertor == null) {
                 Optional<T> conversion = conversionService.convert(value, conversionContext);
-                nextConvertor = new BodyConvertor<T>() {
+                nextConvertor = new BodyConvertor<>() {
 
                     @Override
                     public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {

@@ -28,7 +28,7 @@ public class Tire extends RoundThing {
 
     protected static final FuelTank NEVER_INJECTED = new FuelTank();
 
-    protected static final Set<String> moreProblems = new LinkedHashSet<String>();
+    protected static final Set<String> moreProblems = new LinkedHashSet<>();
 
     FuelTank constructorInjection = NEVER_INJECTED;
     @Inject FuelTank fieldInjection = NEVER_INJECTED;

@@ -166,7 +166,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
-    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<BeanRegistration<?>>() {
+    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<>() {
         // Keep anonymous class to avoid lambda overhead during the startup
         @Override
         public int compare(BeanRegistration<?> o1, BeanRegistration<?> o2) {

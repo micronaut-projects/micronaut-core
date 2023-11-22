@@ -575,7 +575,7 @@ public final class AnnotationMetadataSupport {
             if (annotationValue != null) {
                 return this.annotationValue;
             } else {
-                return new AnnotationValue<A>(annotationClass.getName());
+                return new AnnotationValue<>(annotationClass.getName());
             }
         }
     }
