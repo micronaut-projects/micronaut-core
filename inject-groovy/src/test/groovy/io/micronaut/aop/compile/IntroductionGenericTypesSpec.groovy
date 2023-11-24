@@ -310,9 +310,7 @@ interface MyBean extends MyPrecompiledInterface<SubPerson> {
 
 }
 
-class Person {}
 class SubPerson extends Person {}
-
 ''')
         then:
         !beanDefinition.isAbstract()

@@ -50,14 +50,14 @@ spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
 testcontainers = "1.18.3"
-vertx = "3.9.13"
+vertx = "3.9.16"
 wiremock = "2.33.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.14"
+managed-groovy = "4.0.15"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.15.3"
 managed-jackson-databind = "2.15.3"
