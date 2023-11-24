@@ -480,6 +480,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'LogbookNettyServerCustomizerSpec')
     @Controller("/logbook/logged")
     static class LoggedController {
         @Get("/")
