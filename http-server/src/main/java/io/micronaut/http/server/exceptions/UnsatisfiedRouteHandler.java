@@ -55,7 +55,7 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
+            LOG.trace("{} (Bad Request): {}", request, exception.getMessage(), exception);
         }
         return responseProcessor.processResponse(ErrorContext.builder(request)
                 .cause(exception)

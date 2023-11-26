@@ -187,7 +187,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
                     } catch (Exception e) {
                         if (LOG.isErrorEnabled()) {
-                            LOG.error("Error invoking Fallback [" + fallbackHandle + "]: " + e.getMessage(), e);
+                            LOG.error("Error invoking Fallback [{}]: {}", fallbackHandle, e.getMessage(), e);
                         }
                         newFuture.completeExceptionally(throwable);
                     }
@@ -236,7 +236,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      */
     protected Object resolveFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception) {
         if (LOG.isErrorEnabled()) {
-            LOG.error("Type [" + context.getTarget().getClass().getName() + "] executed with error: " + exception.getMessage(), exception);
+            LOG.error("Type [{}] executed with error: {}", context.getTarget().getClass().getName(), exception.getMessage(), exception);
         }
 
         Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);

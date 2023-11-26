@@ -271,7 +271,7 @@ public final class RouteExecutor {
             logIgnoredException(cause);
         } else {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                LOG.error("Unexpected error occurred: {}", cause.getMessage(), cause);
             }
         }
     }
@@ -283,7 +283,7 @@ public final class RouteExecutor {
 
     static void logIgnoredException(Throwable cause) {
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+            LOG.debug("Swallowed an IOException caused by client connectivity: {}", cause.getMessage(), cause);
         }
     }
 
@@ -337,7 +337,7 @@ public final class RouteExecutor {
 
         if (errorRoute != null) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
+                LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute, cause);
             }
             requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(errorRoute, httpRequest);
         }

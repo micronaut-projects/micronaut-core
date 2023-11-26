@@ -330,7 +330,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 httpClient.close();
             } catch (Throwable e) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
+                    LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
                 }
             }
         }

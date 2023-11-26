@@ -155,7 +155,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+                        LOG.error("Error publishing request terminated event: {}", e.getMessage(), e);
                     }
                 }
             }
@@ -175,18 +175,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
         // running any filters
         if (isIgnorable(cause)) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+                LOG.debug("Swallowed an IOException caused by client connectivity: {}", cause.getMessage(), cause);
             }
             return;
         }
 
         if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                LOG.debug("Micronaut Server Error - No request state present. Cause: {}", cause.getMessage(), cause);
             }
         } else {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                LOG.error("Micronaut Server Error - No request state present. Cause: {}", cause.getMessage(), cause);
             }
         }
     }

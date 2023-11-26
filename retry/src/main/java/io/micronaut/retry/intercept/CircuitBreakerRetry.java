@@ -93,7 +93,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     public void open() {
         if (currentState() == CircuitState.OPEN && lastError != null) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage());
+                LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage(), lastError);
             }
             if (lastError instanceof RuntimeException exception && !throwWrappedException) {
                 throw exception;
@@ -188,7 +188,7 @@ class CircuitBreakerRetry implements MutableRetryState {
             throw new IllegalArgumentException("Exception cause cannot be null");
         }
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage());
+            LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage(), cause);
         }
         this.childState = (MutableRetryState) retryStateBuilder.build();
         this.lastError = cause;
@@ -201,7 +201,7 @@ class CircuitBreakerRetry implements MutableRetryState {
                     eventPublisher.publishEvent(new CircuitOpenEvent(method, childState, cause));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing CircuitOpen event: " + e.getMessage(), e);
+                        LOG.error("Error publishing CircuitOpen event: {}", e.getMessage(), e);
                     }
                 }
             }
@@ -229,7 +229,7 @@ class CircuitBreakerRetry implements MutableRetryState {
                     eventPublisher.publishEvent(new CircuitClosedEvent(method));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing CircuitClosedEvent: " + e.getMessage(), e);
+                        LOG.error("Error publishing CircuitClosedEvent: {}", e.getMessage(), e);
                     }
                 }
             }

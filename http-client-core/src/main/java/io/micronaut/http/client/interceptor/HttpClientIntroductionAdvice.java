@@ -381,7 +381,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                     }
                                 }
                                 if (LOG.isErrorEnabled()) {
-                                    LOG.error("Client [" + declaringType.getName() + "] received HTTP error response: " + t.getMessage(), t);
+                                    LOG.error("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
                                 }
                                 future.completeExceptionally(t);
                             }
