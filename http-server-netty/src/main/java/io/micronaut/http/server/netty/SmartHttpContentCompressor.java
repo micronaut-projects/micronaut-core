@@ -17,10 +17,15 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.compression.Brotli;
+import io.netty.handler.codec.compression.CompressionOptions;
+import io.netty.handler.codec.compression.GzipOptions;
+import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponse;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -42,8 +47,19 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
      * @param httpCompressionStrategy The compression strategy
      */
     SmartHttpContentCompressor(HttpCompressionStrategy httpCompressionStrategy) {
-        super(httpCompressionStrategy.getCompressionLevel());
+        super(nettyCompressionOptions(httpCompressionStrategy));
         this.httpCompressionStrategy = httpCompressionStrategy;
+    }
+
+    private static CompressionOptions[] nettyCompressionOptions(HttpCompressionStrategy strategy) {
+      GzipOptions defaultGzipOpts = StandardCompressionOptions.gzip();
+      GzipOptions gzipOpts = StandardCompressionOptions.gzip(strategy.getCompressionLevel(), defaultGzipOpts.windowBits(), defaultGzipOpts.memLevel());
+      List<CompressionOptions> compressionOptionsList = new ArrayList<CompressionOptions>();
+      compressionOptionsList.add(gzipOpts);
+      if (Brotli.isAvailable()) {
+          compressionOptionsList.add(StandardCompressionOptions.brotli());
+      }
+      return compressionOptionsList.toArray(new CompressionOptions[0]);
     }
 
     /**
