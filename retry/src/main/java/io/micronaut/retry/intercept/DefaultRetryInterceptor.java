@@ -248,7 +248,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                             }
                         }
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delayMillis, e.getMessage(), e);
+                            LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delayMillis, e.getMessage());
                         }
                         Thread.sleep(delayMillis);
                     } catch (InterruptedException e1) {

@@ -93,7 +93,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     public void open() {
         if (currentState() == CircuitState.OPEN && lastError != null) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage(), lastError);
+                LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage());
             }
             if (lastError instanceof RuntimeException exception && !throwWrappedException) {
                 throw exception;
@@ -188,7 +188,7 @@ class CircuitBreakerRetry implements MutableRetryState {
             throw new IllegalArgumentException("Exception cause cannot be null");
         }
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage(), cause);
+            LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage());
         }
         this.childState = (MutableRetryState) retryStateBuilder.build();
         this.lastError = cause;

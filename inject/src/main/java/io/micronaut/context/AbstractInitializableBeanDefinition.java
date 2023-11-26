@@ -2170,7 +2170,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             }
         } catch (DisabledBeanException e) {
             if (ConditionLog.LOG.isDebugEnabled()) {
-                ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage(), e);
+                ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
             }
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());

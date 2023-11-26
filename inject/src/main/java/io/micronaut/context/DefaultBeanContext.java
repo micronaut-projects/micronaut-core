@@ -1797,7 +1797,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage(), e);
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
             return Optional.empty();
         }
@@ -1974,7 +1974,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     initializeEagerBean(eagerInitDefinition);
                 } catch (DisabledBeanException e) {
                     if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", eagerInitDefinition.getBeanType().getSimpleName(), e.getMessage(), e);
+                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", eagerInitDefinition.getBeanType().getSimpleName(), e.getMessage());
                     }
                 } catch (Throwable e) {
                     throw new BeanInstantiationException(MSG_BEAN_DEFINITION + eagerInitDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
@@ -3509,7 +3509,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage(), e);
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage());
             }
         }
 
