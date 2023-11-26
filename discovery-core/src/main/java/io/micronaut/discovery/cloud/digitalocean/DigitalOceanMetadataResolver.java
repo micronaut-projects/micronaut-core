@@ -142,7 +142,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
             }
         } catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error connecting to{}reading instance metadata", configuration.getUrl(), ioe);
+                LOG.error("Error connecting to {} reading instance metadata", configuration.getUrl(), ioe);
             }
         }
 
