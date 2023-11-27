@@ -9,7 +9,7 @@ import java.sql.Statement
 
 class ConnectionInterceptorSpec extends Specification {
 
-    void "test the beans are available"() {
+    void "test connection interceptor"() {
         given:
         ApplicationContext context = ApplicationContext.builder("test").build()
         context.registerSingleton(Mock(DataSource))
