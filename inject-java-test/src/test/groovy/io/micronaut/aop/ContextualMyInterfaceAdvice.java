@@ -1,6 +1,5 @@
-package io.micronaut.connection.interceptor;
+package io.micronaut.aop;
 
-import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Internal;
 
@@ -10,7 +9,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Retention(RUNTIME)
 @Introduction
-@Type(ContextualConnectionInterceptor.class)
+@Type(ContextualMyInterfaceInterceptor.class)
 @Internal
-@interface ContextualConnectionAdvice {
+@interface ContextualMyInterfaceAdvice {
 }
