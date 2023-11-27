@@ -1,4 +1,4 @@
-package io.micronaut.management.endpoint.health
+package io.micronaut.connection.interceptor
 
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
