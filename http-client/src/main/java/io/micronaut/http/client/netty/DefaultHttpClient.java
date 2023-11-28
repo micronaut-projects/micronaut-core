@@ -31,6 +31,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -830,7 +831,7 @@ public class DefaultHttpClient implements
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
-            .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType, blockHint));
+            .switchMap(uri -> (Publisher) exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType, blockHint));
     }
 
     @Override
@@ -995,14 +996,14 @@ public class DefaultHttpClient implements
      * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}.
      */
     @SuppressWarnings("MagicNumber")
-    private  <I> Publisher<MutableHttpResponse<?>> buildStreamExchange(
+    private <I> Publisher<HttpResponse<?>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             @NonNull MutableHttpRequest<I> request,
             @NonNull URI requestURI,
             @Nullable Argument<?> errorType) {
 
         AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        Flux<MutableHttpResponse<?>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
+        Flux<HttpResponse<?>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
 
         streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
 
@@ -1031,7 +1032,7 @@ public class DefaultHttpClient implements
                     }
 
                     AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
-                    Flux<MutableHttpResponse<?>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
+                    Flux<HttpResponse<?>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
                     // apply filters
                     //noinspection unchecked
                     proxyResponsePublisher = Flux.from(
@@ -1039,10 +1040,10 @@ public class DefaultHttpClient implements
                                     request,
                                     requestWrapper.get(),
                                     requestURI,
-                                    (Publisher) proxyResponsePublisher
+                                    proxyResponsePublisher
                             )
                     );
-                    return proxyResponsePublisher;
+                    return proxyResponsePublisher.map(HttpResponse::toMutableResponse);
                 });
     }
 
@@ -1052,7 +1053,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    private <I> Flux<MutableHttpResponse<?>> connectAndStream(
+    private <I> Flux<HttpResponse<?>> connectAndStream(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
@@ -1087,11 +1088,11 @@ public class DefaultHttpClient implements
     /**
      * Implementation of {@link #exchange(io.micronaut.http.HttpRequest, Argument, Argument)} (after URI resolution).
      */
-    private <I, O, E> Publisher<? extends io.micronaut.http.HttpResponse<O>> exchangeImpl(
+    private <I, E> Publisher<io.micronaut.http.HttpResponse<?>> exchangeImpl(
         URI requestURI,
         io.micronaut.http.HttpRequest<?> parentRequest,
         MutableHttpRequest<I> request,
-        @NonNull Argument<O> bodyType,
+        @NonNull Argument<?> bodyType,
         @NonNull Argument<E> errorType,
         @Nullable BlockHint blockHint) {
         AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
@@ -1105,7 +1106,7 @@ public class DefaultHttpClient implements
 
         Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
 
-        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
+        Flux<io.micronaut.http.HttpResponse<?>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
             poolHandle.channel.pipeline()
                 .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
                     @Override
@@ -1134,13 +1135,13 @@ public class DefaultHttpClient implements
             });
         });
 
-        Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
+        Publisher<io.micronaut.http.HttpResponse<?>> finalPublisher = applyFilterToResponsePublisher(
             parentRequest,
             request,
             requestURI,
             responsePublisher
         );
-        Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
+        Flux<io.micronaut.http.HttpResponse<?>> finalReactiveSequence = Flux.from(finalPublisher);
         // apply timeout to flowable too in case a filter applied another policy
         Optional<Duration> readTimeout = configuration.getReadTimeout();
         if (readTimeout.isPresent()) {
@@ -1219,11 +1220,11 @@ public class DefaultHttpClient implements
         return null;
     }
 
-    private <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
+    private <I> Publisher<io.micronaut.http.HttpResponse<?>> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            Publisher<R> responsePublisher) {
+            Publisher<io.micronaut.http.HttpResponse<?>> responsePublisher) {
 
         if (!(request instanceof MutableHttpRequest<?> mutRequest)) {
             return responsePublisher;
@@ -1245,10 +1246,17 @@ public class DefaultHttpClient implements
         }
 
         FilterRunner.sortReverse(filters);
-        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
-        FilterRunner runner = new FilterRunner(filters);
-        Mono<R> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
+        FilterRunner runner = new FilterRunner(filters, (filteredRequest, propagatedContext) -> {
+            try {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    return ReactiveExecutionFlow.fromPublisher(responsePublisher);
+                }
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        });
+        Mono<io.micronaut.http.HttpResponse<?>> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
         if (parentRequest != null) {
             responseMono = responseMono.contextWrite(c -> {
                 // existing entry takes precedence. The parentRequest is derived from a thread
@@ -1387,15 +1395,15 @@ public class DefaultHttpClient implements
         );
     }
 
-    private Flux<MutableHttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<?>> publisher) {
+    private Flux<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<HttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
                     final HttpResponse<?> response = exception.getResponse();
-                    if (response instanceof NettyStreamedHttpResponse streamedResponse) {
+                    if (response instanceof NettyStreamedHttpResponse<?> streamedResponse) {
                         return Mono.create(emitter -> {
                             final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
-                            nettyResponse.subscribe(new Subscriber<HttpContent>() {
+                            nettyResponse.subscribe(new Subscriber<>() {
                                 final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
                                 Subscription s;
                                 @Override
@@ -2142,7 +2150,7 @@ public class DefaultHttpClient implements
 
         @Override
         protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType, null);
+            return uri -> (Publisher) exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType, null);
         }
 
         @Override
@@ -2423,7 +2431,7 @@ public class DefaultHttpClient implements
 
         @Override
         protected Function<URI, Publisher<? extends MutableHttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
+            return uri -> Mono.from(buildStreamExchange(parentRequest, redirectRequest, uri, null)).map(HttpResponse::toMutableResponse);
         }
     }
 }

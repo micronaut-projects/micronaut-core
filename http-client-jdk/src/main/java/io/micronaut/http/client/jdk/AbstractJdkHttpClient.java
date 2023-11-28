@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
@@ -371,10 +372,18 @@ abstract class AbstractJdkHttpClient {
             filterResolver.resolveFilters(request, clientFilterEntries);
 
         FilterRunner.sortReverse(filters);
-        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
-        FilterRunner runner = new FilterRunner(filters);
-        return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
+        FilterRunner runner = new FilterRunner(filters, (filteredRequest, propagatedContext) -> {
+            try {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
+                }
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        });
+        return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher())
+            .map(x -> x);
     }
 
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(

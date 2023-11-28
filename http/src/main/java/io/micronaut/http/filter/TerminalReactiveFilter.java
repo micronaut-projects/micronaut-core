@@ -55,6 +55,22 @@ final class TerminalReactiveFilter implements InternalHttpFilter {
     }
 
     @Override
+    public boolean hasContinuation() {
+        return false;
+    }
+
+    @Override
+    public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+        try {
+            try (PropagatedContext.Scope ignore = context.propagatedContext().propagate()) {
+                return ReactiveExecutionFlow.fromPublisher(responsePublisher).map(context::withResponse);
+            }
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    @Override
     public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
         try {

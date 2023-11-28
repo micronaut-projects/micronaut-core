@@ -49,6 +49,29 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
     boolean isFiltersResponse();
 
     /**
+     * If the filter with continuation.
+     *
+     * @return true if the filter has continuation
+     * @since 4.3.0
+     */
+    boolean hasContinuation();
+
+    /**
+     * Filter request.
+     *
+     * @param context The filter context
+     * @return The filter execution flow
+     * @since 4.3.0
+     */
+    @NonNull
+    default ExecutionFlow<FilterContext> processRequestFilter(@NonNull FilterContext context) {
+        if (!isFiltersRequest()) {
+            throw new IllegalStateException("Filtering request is not supported!");
+        }
+        return ExecutionFlow.just(context);
+    }
+
+    /**
      * Filter request.
      *
      * @param context    The filter context

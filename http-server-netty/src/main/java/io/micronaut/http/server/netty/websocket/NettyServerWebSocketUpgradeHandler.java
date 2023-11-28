@@ -27,7 +27,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -141,10 +140,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
                 .findFirst();
 
-            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
-            ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> {
+            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
+            ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> {
                 try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg)).propagate()) {
-                    return requestLifecycle.handle();
+                    return requestLifecycle.handle(msg);
                 }
             });
             responseFlow.onComplete((response, throwable) -> {
@@ -167,7 +166,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         next.responseWritten(attachment);
     }
 
-    private void writeResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> msg, boolean shouldProceedNormally, MutableHttpResponse<?> actualResponse, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    private void writeResponse(ChannelHandlerContext ctx,
+                               NettyHttpRequest<?> msg,
+                               boolean shouldProceedNormally,
+                               HttpResponse<?> actualResponse,
+                               PipeliningServerHandler.OutboundAccess outboundAccess) {
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
@@ -224,7 +227,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @param response      The response
      * @return The channel future
      **/
-    protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
+    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response) {
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
@@ -239,7 +242,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                         maxFramePayloadLength
                 );
         handshaker = wsFactory.newHandshaker(req.getNativeRequest());
-        MutableHttpHeaders headers = response.getHeaders();
+        io.micronaut.http.HttpHeaders headers = response.getHeaders();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders;
         if (headers instanceof NettyHttpHeaders httpHeaders) {
             nettyHeaders = httpHeaders.getNettyHeaders();
@@ -269,7 +272,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @param req The request
      * @return The socket URL
      */
-    protected String getWebSocketURL(ChannelHandlerContext ctx, HttpRequest req) {
+    private String getWebSocketURL(ChannelHandlerContext ctx, HttpRequest req) {
         boolean isSecure = ctx.pipeline().get(SslHandler.class) != null;
         return (isSecure ? SCHEME_SECURE_WEBSOCKET : SCHEME_WEBSOCKET) + req.getHeaders().get(HttpHeaderNames.HOST) + req.getUri();
     }
@@ -289,27 +292,27 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         boolean shouldProceedNormally;
 
-        WebsocketRequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request, @Nullable RouteMatch<?> route) {
-            super(routeExecutor, request);
+        WebsocketRequestLifecycle(RouteExecutor routeExecutor, @Nullable RouteMatch<?> route) {
+            super(routeExecutor);
             this.route = route;
         }
 
-        ExecutionFlow<MutableHttpResponse<?>> handle() {
+        ExecutionFlow<HttpResponse<?>> handle(HttpRequest<?> request) {
             MutableHttpResponse<?> proceed = HttpResponse.ok();
 
             if (route != null) {
-                request().setAttribute(HttpAttributes.ROUTE_MATCH, route);
-                request().setAttribute(HttpAttributes.ROUTE_INFO, route);
+                request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
+                request.setAttribute(HttpAttributes.ROUTE_INFO, route);
                 proceed.setAttribute(HttpAttributes.ROUTE_MATCH, route);
                 proceed.setAttribute(HttpAttributes.ROUTE_INFO, route);
             }
 
-            ExecutionFlow<MutableHttpResponse<?>> response;
+            ExecutionFlow<HttpResponse<?>> response;
             if (route != null) {
-                response = runWithFilters(() -> ExecutionFlow.just(proceed));
+                response = runWithFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
             } else {
-                response = onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
-                    .putInContext(ServerRequestContext.KEY, request());
+                response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
+                    .putInContext(ServerRequestContext.KEY, request);
             }
             return response.map(r -> {
                 if (r == proceed) {
