@@ -1,0 +1,7 @@
+Apache NetBeans can open Maven and Gradle projects out of the box. 
+
+Make sure that the **Java Web and EE** feature is enabled at `Tools -> Plugins -> Installed`,
+in order to have additional support for Micronaut, like code completion for configuration
+and data elements.
+
+image::netbeans-plugins-java-web-ee.png[NetBeans Plugins,,555]
