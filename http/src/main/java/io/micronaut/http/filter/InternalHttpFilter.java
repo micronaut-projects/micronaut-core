@@ -17,6 +17,7 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
 
@@ -96,7 +97,7 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      */
     @NonNull
     default ExecutionFlow<FilterContext> processResponseFilter(@NonNull FilterContext context,
-                                                               @NonNull Throwable exceptionToFilter) {
+                                                               @Nullable Throwable exceptionToFilter) {
         if (!isFiltersResponse()) {
             throw new IllegalStateException("Filtering response is not supported!");
         }

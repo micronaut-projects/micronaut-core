@@ -75,6 +75,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -509,7 +510,7 @@ public final class RouteExecutor {
         } else if (body instanceof String) {
             // Micro-optimization for String values
             response = forStatus(routeInfo, null).body(body);
-        } else  if (body instanceof HttpStatus httpStatus) {
+        } else if (body instanceof HttpStatus httpStatus) {
             response = HttpResponse.status(httpStatus);
         }
         if (response != null) {
@@ -521,7 +522,7 @@ public final class RouteExecutor {
             outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                 ReactivePropagation.propagate(
                     propagatedContext,
-                    fromReactiveExecute(propagatedContext, request, body, routeInfo)
+                    fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
                 )
             );
         } else {
