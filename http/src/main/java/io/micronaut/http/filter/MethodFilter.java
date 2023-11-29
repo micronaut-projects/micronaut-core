@@ -59,6 +59,7 @@ import java.util.function.Predicate;
  * @param order               The order
  * @param bean                The bean instance
  * @param method              The method
+ * @param unsafeExecutable    The optional unsafe method executor
  * @param isResponseFilter    If it's a response filter
  * @param argBinders          The argument binders
  * @param filterCondition     The filter condition
@@ -66,6 +67,7 @@ import java.util.function.Predicate;
  * @param filtersException    The filter exception
  * @param waitForBody         Should it wait for the body
  * @param returnHandler       The return handler
+ * @param isConditional       Is conditional filter
  * @param <T>                 The bean type
  * @author Jonas Konrad
  * @author Denis Stepanov
@@ -76,6 +78,8 @@ import java.util.function.Predicate;
 record MethodFilter<T>(FilterOrder order,
                        T bean,
                        Executable<T, ?> method,
+                       @Nullable
+                       UnsafeExecutable<T, ?> unsafeExecutable,
                        boolean isResponseFilter,
                        FilterArgBinder[] argBinders,
                        @Nullable
@@ -84,7 +88,8 @@ record MethodFilter<T>(FilterOrder order,
                        ContinuationCreator continuationCreator,
                        boolean filtersException,
                        boolean waitForBody,
-                       FilterReturnHandler returnHandler
+                       FilterReturnHandler returnHandler,
+                       boolean isConditional
 ) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
@@ -213,19 +218,29 @@ record MethodFilter<T>(FilterOrder order,
             order,
             bean,
             method,
+            method instanceof UnsafeExecutable unsafeExecutable ? unsafeExecutable : null,
             isResponseFilter,
             fulfilled,
             filterCondition,
             continuationCreator,
             filtersException,
             waitForBody,
-            returnHandler
+            returnHandler,
+            bean instanceof ConditionalFilter
         );
     }
 
     private static boolean isReactive(Argument<?> continuationReturnType) {
         // Argument.isReactive doesn't work in http-validation, this is a workaround
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
+    }
+
+    @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        if (isConditional) {
+            return ((ConditionalFilter) bean).isEnabled(request);
+        }
+        return true;
     }
 
     @Override
@@ -323,7 +338,7 @@ record MethodFilter<T>(FilterOrder order,
         try {
             Object[] args = bindArgs(methodContext);
             Object returnValue;
-            if (method instanceof UnsafeExecutable<T, ?> unsafeExecutable) {
+            if (unsafeExecutable != null) {
                 returnValue = unsafeExecutable.invokeUnsafe(bean, args);
             } else {
                 returnValue = method.invoke(bean, args);
