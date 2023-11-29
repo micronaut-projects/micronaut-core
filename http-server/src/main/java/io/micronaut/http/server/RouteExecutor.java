@@ -206,18 +206,22 @@ public final class RouteExecutor {
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
         logException(cause);
-        final MutableHttpResponse<Object> response = HttpResponse.serverError();
-        response.setAttribute(HttpAttributes.EXCEPTION, cause);
-        response.setAttribute(HttpAttributes.ROUTE_INFO, new DefaultRouteInfo<>(
+        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
+        mutableHttpResponse.setAttribute(HttpAttributes.EXCEPTION, cause);
+        mutableHttpResponse.setAttribute(HttpAttributes.ROUTE_INFO, new DefaultRouteInfo<>(
                 ReturnType.of(MutableHttpResponse.class, Argument.OBJECT_ARGUMENT),
                 Object.class,
                 true,
                 false));
-        MutableHttpResponse<?> mutableHttpResponse = errorResponseProcessor.processResponse(
-            ErrorContext.builder(httpRequest)
-                .cause(cause)
-                .errorMessage("Internal Server Error: " + cause.getMessage())
-                .build(), response);
+        try {
+            mutableHttpResponse = errorResponseProcessor.processResponse(
+                ErrorContext.builder(httpRequest)
+                    .cause(cause)
+                    .errorMessage("Internal Server Error: " + cause.getMessage())
+                    .build(), mutableHttpResponse);
+        } catch (Exception e) {
+            logException(e);
+        }
         applyConfiguredHeaders(mutableHttpResponse.getHeaders());
         if (mutableHttpResponse.getContentType().isEmpty() && httpRequest.getMethod() != HttpMethod.HEAD) {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);

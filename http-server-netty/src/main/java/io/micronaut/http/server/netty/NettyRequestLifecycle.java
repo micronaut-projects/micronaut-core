@@ -59,8 +59,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         super(rib.routeExecutor);
         this.rib = rib;
         this.outboundAccess = outboundAccess;
-
-        multipartEnabled(rib.multipartEnabled);
     }
 
     void handleNormal(NettyHttpRequest<?> request) {

@@ -45,7 +45,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
     private final SimpleHttpParameters parameters = new SimpleHttpParameters(ConversionService.SHARED);
 
-    private HttpMethod method;
+    private final HttpMethod method;
     private URI uri;
     private Object body;
 
@@ -53,13 +53,13 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
      * Simple {@link MutableHttpRequest} implementation.
      *
      * @param method the HTTP method
-     * @param uri    the URI of the request
+     * @param url    the URI of the request
      * @param body   the optional body of the request
      */
-    public SimpleHttpRequest(HttpMethod method, String uri, B body) {
+    public SimpleHttpRequest(HttpMethod method, String url, B body) {
         this.method = method;
         try {
-            this.uri = new URI(uri);
+            this.uri = new URI(url);
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException("Wrong URI", e);
         }

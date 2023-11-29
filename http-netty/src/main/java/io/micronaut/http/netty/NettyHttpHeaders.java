@@ -16,17 +16,18 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.util.HttpHeadersUtil;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValidationUtil;
-import jakarta.annotation.Nullable;
 
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -53,10 +54,24 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
+@SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public class NettyHttpHeaders implements MutableHttpHeaders {
 
     private final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
     private ConversionService conversionService;
+
+    @Nullable
+    private OptionalLong contentLength;
+    @Nullable
+    private Optional<MediaType> contentType;
+    @Nullable
+    private Optional<String> origin;
+    @Nullable
+    private List<MediaType> accept;
+    @Nullable
+    private Optional<Charset> acceptCharset;
+    @Nullable
+    private Optional<Locale> acceptLanguage;
 
     /**
      * @param nettyHeaders      The Netty Http headers
@@ -141,6 +156,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         validateHeader(header, value);
         nettyHeaders.add(header, value);
+        onModify(header);
         return this;
     }
 
@@ -148,7 +164,24 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public MutableHeaders set(CharSequence header, CharSequence value) {
         validateHeader(header, value);
         nettyHeaders.set(header, value);
+        onModify(header);
         return this;
+    }
+
+    private void onModify(CharSequence header) {
+        if (contentType != null && header.equals(HttpHeaders.CONTENT_TYPE)) {
+            contentType = null;
+        } else if (contentLength != null && header.equals(HttpHeaders.CONTENT_LENGTH)) {
+            contentLength = null;
+        } else if (accept != null && header.equals(HttpHeaders.ACCEPT)) {
+            accept = null;
+        } else if (acceptCharset != null && header.equals(HttpHeaders.ACCEPT_CHARSET)) {
+            acceptCharset = null;
+        } else if (acceptLanguage != null && header.equals(HttpHeaders.ACCEPT_LANGUAGE)) {
+            acceptLanguage = null;
+        } else if (origin != null && header.equals(HttpHeaders.ORIGIN)) {
+            origin = null;
+        }
     }
 
     /**
@@ -159,6 +192,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      */
     public void setUnsafe(CharSequence header, CharSequence value) {
         nettyHeaders.set(header, value);
+        onModify(header);
     }
 
     public static void validateHeader(CharSequence name, CharSequence value) {
@@ -173,6 +207,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders remove(CharSequence header) {
         nettyHeaders.remove(header);
+        onModify(header);
         return this;
     }
 
@@ -271,6 +306,15 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public Optional<MediaType> contentType() {
+        Optional<MediaType> cachedContentType = contentType;
+        if (cachedContentType == null) {
+            cachedContentType = resolveContentType();
+            contentType = cachedContentType;
+        }
+        return cachedContentType;
+    }
+
+    private Optional<MediaType> resolveContentType() {
         // optimization to avoid ConversionService
         String str = get(HttpHeaderNames.CONTENT_TYPE);
         if (str != null) {
@@ -284,11 +328,20 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public OptionalLong contentLength() {
+        OptionalLong cachedContentLength = contentLength;
+        if (cachedContentLength == null) {
+            cachedContentLength = resolveContentLength();
+            contentLength = cachedContentLength;
+        }
+        return cachedContentLength;
+    }
+
+    private OptionalLong resolveContentLength() {
         // optimization to avoid ConversionService
-        Optional<String> str = findFirst(HttpHeaderNames.CONTENT_LENGTH);
-        if (str.isPresent()) {
+        String str = get(HttpHeaderNames.CONTENT_LENGTH);
+        if (str != null) {
             try {
-                return OptionalLong.of(Long.parseLong(str.get()));
+                return OptionalLong.of(Long.parseLong(str));
             } catch (NumberFormatException ignored) {
             }
         }
@@ -297,41 +350,79 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public List<MediaType> accept() {
+        List<MediaType> cachedAccept = accept;
+        if (cachedAccept == null) {
+            cachedAccept = resolveAccept();
+            accept = cachedAccept;
+        }
+        return cachedAccept;
+    }
+
+    private List<MediaType> resolveAccept() {
         // use HttpHeaderNames instead of HttpHeaders
         return MediaType.orderedOf(getAll(HttpHeaderNames.ACCEPT));
     }
 
-    @Nullable
     @Override
-    public Charset acceptCharset() {
+    public Optional<Charset> findAcceptCharset() {
+        Optional<Charset> cachedAcceptCharset = acceptCharset;
+        if (cachedAcceptCharset == null) {
+            cachedAcceptCharset = resolveAcceptCharset();
+            acceptCharset = cachedAcceptCharset;
+        }
+        return cachedAcceptCharset;
+    }
+
+    private Optional<Charset> resolveAcceptCharset() {
         String text = get(HttpHeaderNames.ACCEPT_CHARSET);
         if (text == null) {
-            return null;
+            return Optional.empty();
         }
         text = HttpHeadersUtil.splitAcceptHeader(text);
         if (text != null) {
             try {
-                return Charset.forName(text);
+                return Optional.of(Charset.forName(text));
             } catch (Exception ignored) {
             }
         }
         // default to UTF-8
-        return StandardCharsets.UTF_8;
+        return Optional.of(StandardCharsets.UTF_8);
     }
 
-    @Nullable
     @Override
-    public Locale acceptLanguage() {
+    public Optional<Locale> findAcceptLanguage() {
+        Optional<Locale> cachedAcceptLanguage = acceptLanguage;
+        if (cachedAcceptLanguage == null) {
+            cachedAcceptLanguage = resolveAcceptLanguage();
+            acceptLanguage = cachedAcceptLanguage;
+        }
+        return cachedAcceptLanguage;
+    }
+
+    private Optional<Locale> resolveAcceptLanguage() {
         String text = get(HttpHeaderNames.ACCEPT_LANGUAGE);
         if (text == null) {
-            return null;
+            return Optional.empty();
         }
         String part = HttpHeadersUtil.splitAcceptHeader(text);
-        return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+        return Optional.ofNullable(part == null ? Locale.getDefault() : Locale.forLanguageTag(part));
     }
 
     @Override
     public Optional<String> getOrigin() {
-        return findFirst(HttpHeaderNames.ORIGIN);
+        Optional<String> cachedOrigin = origin;
+        if (cachedOrigin == null) {
+            cachedOrigin = resolveOrigin();
+            origin = cachedOrigin;
+        }
+        return cachedOrigin;
+    }
+
+    private Optional<String> resolveOrigin() {
+        Optional<String> cachedOrigin = origin;
+        if (cachedOrigin == null) {
+            cachedOrigin = findFirst(HttpHeaderNames.ORIGIN);
+        }
+        return cachedOrigin;
     }
 }

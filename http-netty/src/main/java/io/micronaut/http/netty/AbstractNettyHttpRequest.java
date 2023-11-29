@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -34,9 +33,6 @@ import io.netty.util.DefaultAttributeMap;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.Collection;
-import java.util.Locale;
-import java.util.Optional;
 
 /**
  * Abstract implementation of {@link HttpRequest} for Netty.
@@ -51,15 +47,13 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
     protected final ConversionService conversionService;
     protected final HttpMethod httpMethod;
-    protected final URI uri;
+    protected final String url;
     protected final String httpMethodName;
 
+    private URI uri;
     private NettyHttpParameters httpParameters;
-    private Optional<MediaType> mediaType;
     private Charset charset;
-    private Optional<Locale> locale;
     private String path;
-    private Collection<MediaType> accept;
 
     /**
      * @param nettyRequest      The Http netty request
@@ -68,22 +62,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
-        URI fullUri = URI.create(nettyRequest.uri());
-        if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
-            // https://example.com/foo -> /foo
-            try {
-                fullUri = new URI(
-                        null, // scheme
-                        null, // authority
-                        fullUri.getPath(),
-                        fullUri.getQuery(),
-                        fullUri.getFragment()
-                );
-            } catch (URISyntaxException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
-        this.uri = fullUri;
+        this.url = nettyRequest.uri();
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
     }
@@ -164,37 +143,11 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     @Override
-    public Collection<MediaType> accept() {
-        if (accept == null) {
-            accept = HttpRequest.super.accept();
-        }
-        return accept;
-    }
-
-    @Override
-    @SuppressWarnings("java:S2789") // performance opt
-    public Optional<MediaType> getContentType() {
-        if (mediaType == null) {
-            mediaType = HttpRequest.super.getContentType();
-        }
-        return mediaType;
-    }
-
-    @Override
     public Charset getCharacterEncoding() {
         if (charset == null) {
             charset = initCharset(HttpRequest.super.getCharacterEncoding());
         }
         return charset;
-    }
-
-    @Override
-    @SuppressWarnings("java:S2789") // performance opt
-    public Optional<Locale> getLocale() {
-        if (locale == null) {
-            locale = HttpRequest.super.getLocale();
-        }
-        return locale;
     }
 
     @Override
@@ -204,7 +157,17 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public URI getUri() {
-        return this.uri;
+        URI u = this.uri;
+        if (u == null) {
+            synchronized (this) { // double check
+                u = this.uri;
+                if (u == null) {
+                    u = createURI(url);
+                    this.uri = u;
+                }
+            }
+        }
+        return u;
     }
 
     @Override
@@ -214,7 +177,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 p = this.path;
                 if (p == null) {
-                    p = decodePath();
+                    p = parsePath(url);
                     this.path = p;
                 }
             }
@@ -223,7 +186,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     /**
-     * @param characterEncoding The charactger encoding
+     * @param characterEncoding The character encoding
      * @return The Charset
      */
     protected abstract Charset initCharset(Charset characterEncoding);
@@ -238,18 +201,65 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return cs != null ? new QueryStringDecoder(uri, cs) : new QueryStringDecoder(uri);
     }
 
-    private String decodePath() {
-        QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return queryStringDecoder.rawPath();
-    }
-
     private NettyHttpParameters decodeParameters() {
-        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+        QueryStringDecoder queryStringDecoder = createDecoder(getUri());
         return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }
 
     @Override
     public String getMethodName() {
         return httpMethodName;
+    }
+
+    private static URI createURI(String url) {
+        URI fullUri = URI.create(url);
+        if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
+            // https://example.com/foo -> /foo
+            try {
+                fullUri = new URI(
+                    null, // scheme
+                    null, // authority
+                    fullUri.getPath(),
+                    fullUri.getQuery(),
+                    fullUri.getFragment()
+                );
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+        return fullUri;
+    }
+
+    /**
+     * Extract the path out of the uri.
+     * https://github.com/eclipse-vertx/vert.x/blob/master/src/main/java/io/vertx/core/http/impl/HttpUtils.java
+     */
+    private static String parsePath(String uri) {
+        if (uri.isEmpty()) {
+            return "";
+        }
+        int i;
+        if (uri.charAt(0) == '/') {
+            i = 0;
+        } else {
+            i = uri.indexOf("://");
+            if (i == -1) {
+                i = 0;
+            } else {
+                i = uri.indexOf('/', i + 3);
+                if (i == -1) {
+                    // contains no /
+                    return "/";
+                }
+            }
+        }
+        int queryStart = uri.indexOf('?', i);
+        if (queryStart == -1) {
+            queryStart = uri.length();
+            if (i == 0) {
+                return uri;
+            }
+        }
+        return uri.substring(i, queryStart);
     }
 }

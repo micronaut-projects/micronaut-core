@@ -76,7 +76,7 @@ public class HttpUtil {
             if (contentTypeCharset.isPresent()) {
                 return contentTypeCharset;
             } else {
-                return Optional.ofNullable(request.getHeaders().acceptCharset());
+                return request.getHeaders().findAcceptCharset();
             }
         } catch (UnsupportedCharsetException e) {
             return Optional.empty();
