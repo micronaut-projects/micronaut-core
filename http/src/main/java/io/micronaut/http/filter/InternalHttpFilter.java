@@ -31,7 +31,7 @@ import java.util.function.Function;
  * @since 4.2.0
  */
 @Internal
-sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter, TerminalFilter, TerminalReactiveFilter {
+sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter {
 
     /**
      * If the filter supports filtering a request.
