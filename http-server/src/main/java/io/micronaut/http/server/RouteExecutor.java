@@ -516,21 +516,29 @@ public final class RouteExecutor {
         if (response != null) {
             return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
         }
-        // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
-        boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-        if (isReactive) {
-            outgoingResponse = ReactiveExecutionFlow.fromPublisher(
-                ReactivePropagation.propagate(
-                    propagatedContext,
-                    fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
-                )
-            );
+        if (routeInfo.isImperative()) {
+            outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
         } else {
-            if (routeInfo.isSuspended()) {
-                outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
+            // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
+            boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
+            if (isReactive) {
+                outgoingResponse = ReactiveExecutionFlow.fromPublisher(
+                    ReactivePropagation.propagate(
+                        propagatedContext,
+                        fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
+                    )
+                );
             } else {
-                outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
+                if (routeInfo.isSuspended()) {
+                    outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
+                } else {
+                    outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
+                }
             }
+        }
+        response = outgoingResponse.tryCompleteValue();
+        if (response != null) {
+            return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
         }
         return outgoingResponse.map(res -> finaliseResponse(request, routeInfo, routeMatch, res));
     }
