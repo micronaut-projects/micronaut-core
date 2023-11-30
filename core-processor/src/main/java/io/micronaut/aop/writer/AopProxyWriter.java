@@ -530,12 +530,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             String methodElementKey = methodElement.getName() +
                     Arrays.stream(methodElement.getSuspendParameters())
-                            .map(p -> p.getType().getName())
+                            .map(p -> toTypeString(p.getType()))
                             .collect(Collectors.joining(","));
 
             String overriddenByKey = overriddenBy.getName() +
                     Arrays.stream(methodElement.getSuspendParameters())
-                            .map(p -> p.getGenericType().getName())
+                            .map(p -> toTypeString(p.getGenericType()))
                             .collect(Collectors.joining(","));
 
             if (!methodElementKey.equals(overriddenByKey)) {
@@ -1623,7 +1623,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             this.name = name;
             this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
             this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
-            this.rawTypes = this.argumentTypes.stream().map(ClassElement::getName).toList();
+            this.rawTypes = this.argumentTypes.stream().map(AopProxyWriter::toTypeString).toList();
             this.returnType = returnType;
         }
 

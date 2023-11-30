@@ -40,7 +40,6 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Null
 import spock.lang.IgnoreIf
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
@@ -3292,6 +3291,32 @@ class MyBean {
         method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
         method.getParameters()[0].getType().getAnnotationNames().isEmpty()
         method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+    }
+
+    void "test similar methods with arrays"() {
+        ClassElement ce = buildClassElement('''
+package test;
+
+import io.micronaut.aop.Introduction;
+
+@Introduction
+interface MyInterface {
+
+    String process(String str);
+
+    String process(String str, int intParam);
+
+    String process2(String str, int intParam);
+
+    String process(String str, int intArrayParam[]);
+}
+
+''')
+
+        when:
+        def methods = ce.getMethods();
+        then:
+        methods.size() == 4
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
