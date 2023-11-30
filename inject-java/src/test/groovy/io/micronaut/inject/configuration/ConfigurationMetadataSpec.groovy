@@ -439,7 +439,7 @@ class Test {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -449,7 +449,7 @@ class Neo4jProperties {
         prefixes="with",
         allowZeroArgs=true
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 
 }
@@ -457,61 +457,115 @@ class Neo4jProperties {
         then:
             jsonEquals(metadataJson, '''
 {
-  "groups": [
-    {
-      "name": "neo4j.test",
-      "type": "test.Neo4jProperties"
-    }
-  ],
-  "properties": [
-    {
-      "name": "neo4j.test.uri",
-      "type": "java.net.URI",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.logging",
-      "type": "org.neo4j.driver.v1.Logging",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.leaked-sessions-logging",
-      "type": "boolean",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.max-idle-sessions",
-      "type": "int",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.connection-liveness-check-timeout",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    },
-    {
-      "name": "neo4j.test.encryption",
-      "type": "boolean",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.trust-strategy",
-      "type": "org.neo4j.driver.v1.Config$TrustStrategy",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.connection-timeout",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    },
-    {
-      "name": "neo4j.test.max-transaction-retry-time",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    }
-  ]
-}
-''')
+	"groups": [
+		{
+			"name": "neo4j.test",
+			"type": "test.Neo4jProperties"
+		}
+	],
+	"properties": [
+		{
+			"name": "neo4j.test.uri",
+			"type": "java.net.URI",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.logging",
+			"type": "org.neo4j.driver.Logging",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.leaked-sessions-logging",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.connection-liveness-check-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.max-connection-lifetime",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.max-connection-pool-size",
+			"type": "int",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.connection-acquisition-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.encryption",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.trust-strategy",
+			"type": "org.neo4j.driver.Config$TrustStrategy",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.routing-table-purge-delay",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.fetch-size",
+			"type": "long",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.connection-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.max-transaction-retry-time",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.resolver",
+			"type": "org.neo4j.driver.net.ServerAddressResolver",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.driver-metrics",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.metrics-adapter",
+			"type": "org.neo4j.driver.MetricsAdapter",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.event-loop-threads",
+			"type": "int",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.user-agent",
+			"type": "java.lang.String",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.notification-config",
+			"type": "org.neo4j.driver.NotificationConfig",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.telemetry-disabled",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		}
+	]
+}''')
     }
 
     void "test specifying a configuration prefix"() {
@@ -520,7 +574,7 @@ class Neo4jProperties {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -531,7 +585,7 @@ class Neo4jProperties {
         allowZeroArgs=true,
         configurationPrefix="options"
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 
 }
@@ -539,61 +593,115 @@ class Neo4jProperties {
         then:
             jsonEquals(metadataJson, '''
 {
-  "groups": [
-    {
-      "name": "neo4j.test",
-      "type": "test.Neo4jProperties"
-    }
-  ],
-  "properties": [
-    {
-      "name": "neo4j.test.uri",
-      "type": "java.net.URI",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.logging",
-      "type": "org.neo4j.driver.v1.Logging",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.leaked-sessions-logging",
-      "type": "boolean",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.max-idle-sessions",
-      "type": "int",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.connection-liveness-check-timeout",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    },
-    {
-      "name": "neo4j.test.options.encryption",
-      "type": "boolean",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.trust-strategy",
-      "type": "org.neo4j.driver.v1.Config$TrustStrategy",
-      "sourceType": "test.Neo4jProperties"
-    },
-    {
-      "name": "neo4j.test.options.connection-timeout",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    },
-    {
-      "name": "neo4j.test.options.max-transaction-retry-time",
-      "type": "java.time.Duration",
-      "sourceType": "org.neo4j.driver.v1.Config$ConfigBuilder"
-    }
-  ]
-}
-''')
+	"groups": [
+		{
+			"name": "neo4j.test",
+			"type": "test.Neo4jProperties"
+		}
+	],
+	"properties": [
+		{
+			"name": "neo4j.test.uri",
+			"type": "java.net.URI",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.logging",
+			"type": "org.neo4j.driver.Logging",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.leaked-sessions-logging",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.connection-liveness-check-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.max-connection-lifetime",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.max-connection-pool-size",
+			"type": "int",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.connection-acquisition-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.encryption",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.trust-strategy",
+			"type": "org.neo4j.driver.Config$TrustStrategy",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.routing-table-purge-delay",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.fetch-size",
+			"type": "long",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.connection-timeout",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.max-transaction-retry-time",
+			"type": "java.time.Duration",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.resolver",
+			"type": "org.neo4j.driver.net.ServerAddressResolver",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.driver-metrics",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.metrics-adapter",
+			"type": "org.neo4j.driver.MetricsAdapter",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.event-loop-threads",
+			"type": "int",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.user-agent",
+			"type": "java.lang.String",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.notification-config",
+			"type": "org.neo4j.driver.NotificationConfig",
+			"sourceType": "test.Neo4jProperties"
+		},
+		{
+			"name": "neo4j.test.options.telemetry-disabled",
+			"type": "boolean",
+			"sourceType": "test.Neo4jProperties"
+		}
+	]
+}''')
     }
 
     void "test inner"() {

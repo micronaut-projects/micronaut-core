@@ -17,14 +17,13 @@ package io.micronaut.kotlin.processing.beans.configproperties
 
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationProperties
-import org.neo4j.driver.v1.Config
+import org.neo4j.driver.Config
 import java.net.URI
-import java.net.URISyntaxException
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     var uri: URI? = null
 
     @ConfigurationBuilder(prefixes = ["with"], allowZeroArgs = true)
-    var options = Config.build()
+    var options = Config.builder()
 }
