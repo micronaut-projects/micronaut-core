@@ -2448,7 +2448,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             loadEagerBeans(producer, parallelDefinitions);
                         } catch (Throwable e) {
                             BeanDefinitionReference<Object> beanDefinitionReference = producer.getReference();
-                            LOG.error("Parallel Bean definition [{}{}{}", beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2462,7 +2462,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         try {
                             initializeEagerBean(beanDefinition);
                         } catch (Throwable e) {
-                            LOG.error("Parallel Bean definition [{}{}{}", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
