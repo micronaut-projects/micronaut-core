@@ -80,8 +80,7 @@ class MyBean  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
@@ -90,7 +89,6 @@ class MyBean  {
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
-
     }
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on abstract classes"() {
@@ -121,20 +119,20 @@ abstract class MyBean  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
+
         then:"the methods are invocable"
         listenerAdviceInterceptor.recievedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
 
+        cleanup:
+        context.close()
     }
-
-
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on interfaces"() {
         when:
@@ -215,14 +213,16 @@ interface SpecificInterface {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
         instance.$proxyMethods.length == 2
+
+        cleanup:
+        context.close()
     }
 
     void "test interface multiple inheritance"() {
@@ -294,8 +294,7 @@ interface MyInterface4 {
             beanDefinition != null
 
         when:
-            def context = new DefaultBeanContext()
-            context.start()
+            ApplicationContext context = ApplicationContext.run()
             def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
             def introducer = context.getBean(StubIntroducer)
         then:

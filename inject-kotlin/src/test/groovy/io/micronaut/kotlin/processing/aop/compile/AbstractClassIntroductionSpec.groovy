@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.aop.compile
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -30,13 +31,15 @@ abstract class AbstractBean {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise"() {
@@ -63,13 +66,15 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise that also defines advice on the method"() {
@@ -98,8 +103,7 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
@@ -138,8 +142,7 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
@@ -174,8 +177,7 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
@@ -210,8 +212,7 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
@@ -250,8 +251,7 @@ abstract class AbstractBean: Foo {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:

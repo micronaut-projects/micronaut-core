@@ -20,8 +20,6 @@ import junit.framework.TestCase;
 import org.atinject.javaxtck.auto.accessories.Cupholder;
 import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -496,7 +494,7 @@ public class Convertible implements Car {
     }
 
     public static class PrivateTests extends TestCase {
-        private final BeanContext context = new DefaultBeanContext().start();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Engine engine = car.engineProvider.get();
         private final SpareTire spareTire = car.spareTire;

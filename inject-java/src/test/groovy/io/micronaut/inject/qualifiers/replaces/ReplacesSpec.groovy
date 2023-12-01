@@ -27,7 +27,7 @@ class ReplacesSpec extends Specification {
 //    @Ignore
     void "test that a bean can be marked to replace another bean"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -37,6 +37,9 @@ class ReplacesSpec extends Specification {
         !b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+
+        cleanup:
+        context.close()
     }
 
     void "test that a bean that has AOP advice applied can be replaced"() {

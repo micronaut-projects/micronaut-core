@@ -195,7 +195,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
-    private final SingletonScope singletonScope = new SingletonScope();
+    protected final SingletonScope singletonScope = new SingletonScope();
 
     private final BeanContextConfiguration beanContextConfiguration;
 

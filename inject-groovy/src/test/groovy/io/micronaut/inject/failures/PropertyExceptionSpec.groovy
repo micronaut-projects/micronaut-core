@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 17/05/2017.
  */
@@ -31,20 +28,22 @@ class PropertyExceptionSpec extends Specification {
 
     void "test error message when exception occurs setting a property"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(B)
 
         then:"The implementation is injected"
-        def e = thrown(BeanInstantiationException)
+        BeanInstantiationException e = thrown()
         e.cause.message == 'bad'
         e.message.normalize() == '''\
 Error instantiating bean of type  [io.micronaut.inject.failures.PropertyExceptionSpec$B]
 
 Message: bad
 Path Taken: new B() --> B.a'''
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

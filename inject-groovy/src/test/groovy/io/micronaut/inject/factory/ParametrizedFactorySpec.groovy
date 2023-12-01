@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.factory
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Factory
@@ -34,41 +35,48 @@ import jakarta.inject.Singleton
 class ParametrizedFactorySpec extends Specification  {
     void "test parametrized factory definition"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
-        C c = beanContext.createBean(C, Collections.singletonMap("count", 10))
+        C c = context.createBean(C, Collections.singletonMap("count", 10))
 
         expect:
         c != null
         c.count == 10
         c.b != null
 
+        cleanup:
+        context.close()
     }
 
     void "test parametrized factory definition missing parameter"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        C c = beanContext.createBean(C)
+        context.createBean(C)
 
         then:
-        def e = thrown(BeanInstantiationException)
+        BeanInstantiationException e = thrown()
         e.message.contains('Missing bean argument [int count] for type: io.micronaut.inject.factory.ParametrizedFactorySpec$C. Required arguments: int count')
+
+        cleanup:
+        context.close()
 
     }
 
     void "test parametrized factory definition invalid parameter"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        C c = beanContext.createBean(C, Collections.singletonMap("count", "test"))
+        context.createBean(C, Collections.singletonMap("count", "test"))
 
         then:
-        def e = thrown(BeanInstantiationException)
+        BeanInstantiationException e = thrown()
         e.message.contains('Invalid bean argument [int count]. Cannot convert object [test] to required type: int')
 
+        cleanup:
+        context.close()
     }
 
     static class B {

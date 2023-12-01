@@ -16,6 +16,7 @@
 package io.micronaut.aop.introduction
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -29,12 +30,15 @@ class AbstractClassIntroductionAdviceSpec extends Specification {
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        AbstractClass foo = beanContext.getBean(AbstractClass)
+        ApplicationContext context = ApplicationContext.run()
+        AbstractClass foo = context.getBean(AbstractClass)
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                 | args         | result

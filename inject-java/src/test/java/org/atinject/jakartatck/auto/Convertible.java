@@ -17,8 +17,6 @@
 package org.atinject.jakartatck.auto;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Provider;
@@ -26,11 +24,7 @@ import org.atinject.jakartatck.auto.accessories.Cupholder;
 import org.atinject.jakartatck.auto.accessories.SpareTire;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class Convertible implements Car {
 
@@ -472,7 +466,7 @@ public class Convertible implements Car {
 
     public static class PrivateTests {
 
-        private final BeanContext context = new DefaultBeanContext().start();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Engine engine = car.engineProvider.get();
         private final SpareTire spareTire = car.spareTire;

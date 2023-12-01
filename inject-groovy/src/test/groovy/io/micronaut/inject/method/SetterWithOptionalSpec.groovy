@@ -15,13 +15,10 @@
  */
 package io.micronaut.inject.method
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 30/05/2017.
  */
@@ -30,8 +27,7 @@ class SetterWithOptionalSpec extends Specification {
 
     void "test injection of optional objects"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has an optional setter with @Inject"
         B b =  context.getBean(B)
@@ -39,6 +35,9 @@ class SetterWithOptionalSpec extends Specification {
         then:"The implementation is injected"
         b.a != null
         !b.c.isPresent()
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

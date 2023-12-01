@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.context
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
  */
@@ -30,7 +27,7 @@ class RegisterSingletonSpec extends Specification {
 
     void "test register singleton method"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
         def b = new B()
 
         when:
@@ -48,7 +45,7 @@ class RegisterSingletonSpec extends Specification {
 
     void "test register named singleton method"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
         def b = new B()
         def b1 = new B()
         def b2 = new B()

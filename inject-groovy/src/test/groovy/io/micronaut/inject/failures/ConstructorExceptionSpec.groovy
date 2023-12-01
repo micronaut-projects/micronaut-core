@@ -15,15 +15,11 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.exceptions.DependencyInjectionException
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 17/05/2017.
  */
@@ -31,8 +27,7 @@ class ConstructorExceptionSpec extends Specification {
 
     void "test error message when exception occurs in constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
@@ -45,6 +40,9 @@ Error instantiating bean of type  [io.micronaut.inject.failures.ConstructorExcep
 
 Message: bad
 Path Taken: new B() --> B.a --> new A([C c])'''
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

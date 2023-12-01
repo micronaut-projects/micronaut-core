@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.CircularDependencyException
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 16/05/2017.
  */
@@ -30,14 +27,13 @@ class PropertyCircularDependencyFailureSpec extends Specification {
 
     void "test simple property circular dependency failure"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(B)
 
         then:"The implementation is injected"
-        def e = thrown(CircularDependencyException)
+        CircularDependencyException e = thrown()
         e.message.normalize() == '''\
 Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B
 
@@ -48,6 +44,8 @@ new B() --> B.setA([A a]) --> A.setB([B b])
 |                                        |
 |                                        |
 +----------------------------------------+'''
+        cleanup:
+        context.close()
     }
 
     @Singleton

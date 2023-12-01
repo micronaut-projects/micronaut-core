@@ -15,19 +15,15 @@
  */
 package io.micronaut.inject.factory
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Bean
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
-import spock.lang.Specification
-
 import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +31,7 @@ import jakarta.inject.Singleton
 class BeanInitializingWithFactorySpec extends Specification {
     void "test bean initializing event listener"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is retrieved where a BeanInitializedEventListener is present"
         B b= context.getBean(B)
@@ -43,6 +39,8 @@ class BeanInitializingWithFactorySpec extends Specification {
         then:"The event is triggered prior to @PostConstruct hooks"
         b.name == "CHANGED"
 
+        cleanup:
+        context.close()
     }
 
     static class B {

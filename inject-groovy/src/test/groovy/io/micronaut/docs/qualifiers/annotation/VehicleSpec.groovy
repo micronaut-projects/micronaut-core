@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.qualifiers.annotation
 
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 /**
@@ -27,8 +27,7 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        Vehicle vehicle = new DefaultBeanContext()
-                .start()
+        Vehicle vehicle = ApplicationContext.run()
                 .getBean(Vehicle)
         println( vehicle.start() )
         // end::start[]

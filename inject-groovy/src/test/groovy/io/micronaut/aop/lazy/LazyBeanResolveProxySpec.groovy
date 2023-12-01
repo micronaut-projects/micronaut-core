@@ -16,6 +16,7 @@
 package io.micronaut.aop.lazy
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -29,12 +30,15 @@ class LazyBeanResolveProxySpec extends Specification {
     @Unroll
     void "test AOP method invocation on lazily resolved bean for #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        LazyTargetClass foo = beanContext.getBean(LazyTargetClass)
+        ApplicationContext context = ApplicationContext.run()
+        LazyTargetClass foo = context.getBean(LazyTargetClass)
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result

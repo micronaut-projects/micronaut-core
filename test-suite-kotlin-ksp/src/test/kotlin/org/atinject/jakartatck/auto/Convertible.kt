@@ -454,7 +454,7 @@ open class Convertible : Car {
     }
 
     class PrivateTests {
-        private val context = DefaultBeanContext().start()
+        private val context = ApplicationContext.run()
         private val car = context.getBean(Convertible::class.java)
         private val engine = car.engineProvider!!.get()
         private val spareTire = car.spareTire

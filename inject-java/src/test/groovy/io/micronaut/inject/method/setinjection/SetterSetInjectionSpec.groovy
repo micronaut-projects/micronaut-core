@@ -15,15 +15,13 @@
  */
 package io.micronaut.inject.method.setinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class SetterSetInjectionSpec extends Specification {
     void "test injection via setter that takes an array"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -33,5 +31,8 @@ class SetterSetInjectionSpec extends Specification {
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
         b.all.contains(context.getBean(AnotherImpl))
+
+        cleanup:
+        context.close()
     }
 }

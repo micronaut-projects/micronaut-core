@@ -17,6 +17,7 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Unroll
@@ -30,12 +31,15 @@ class InterfaceIntroductionAdviceSpec extends AbstractBeanDefinitionSpec {
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceIntroductionClass foo = beanContext.getBean(InterfaceIntroductionClass)
+        ApplicationContext context = ApplicationContext.run()
+        InterfaceIntroductionClass foo = context.getBean(InterfaceIntroductionClass)
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                 | args         | result
@@ -45,16 +49,16 @@ class InterfaceIntroductionAdviceSpec extends AbstractBeanDefinitionSpec {
     }
 
     void "test injecting an introduction advice with generics"() {
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        InjectParentInterface foo = beanContext.getBean(InjectParentInterface)
+        InjectParentInterface foo = context.getBean(InjectParentInterface)
 
         then:
         noExceptionThrown()
 
         cleanup:
-        beanContext.close()
+        context.close()
     }
 
     void "test typeArgumentsMap are created for introduction advice"() {
