@@ -16,6 +16,7 @@
 
 package org.atinject.jakartatck.auto;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultBeanContext;
 import jakarta.inject.Inject;
@@ -185,7 +186,7 @@ public class Convertible implements Car {
 
     public static class Tests {
 
-        private final BeanContext context = BeanContext.run();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Cupholder cupholder = car.cupholder;
         private final SpareTire spareTire = car.spareTire;

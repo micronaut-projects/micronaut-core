@@ -41,18 +41,19 @@ class ReplacesSpec extends Specification {
 
     void "test that a bean that has AOP advice applied can be replaced"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.getBeansOfType(H).size() == 1
         context.getBean(H).test("foo") == "replacement foo"
+
         cleanup:
         context.close()
     }
 
     void "test that named beans can be replaced"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(E1Replacement)
@@ -63,11 +64,14 @@ class ReplacesSpec extends Specification {
         context.getBeansOfType(E).contains(context.getBean(E1Replacement))
         context.getBeansOfType(E).contains(context.getBean(E2Replacement))
         context.getBeansOfType(E).contains(context.getBean(E3))
+
+        cleanup:
+        context.close()
     }
 
     void "test that qualified beans can be replaced"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(G1QualifierReplacement)
@@ -79,6 +83,9 @@ class ReplacesSpec extends Specification {
         context.getBeansOfType(G).contains(context.getBean(G1QualifierReplacement))
         context.getBeansOfType(G).contains(context.getBean(G2QualifierReplacement))
         context.getBeansOfType(G).contains(context.getBean(G3Qualifier))
+
+        cleanup:
+        context.close()
     }
 
     void "test that introduction advice can be replaced with inheritance"() {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.method.nullableinjection
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.fail
@@ -25,7 +25,7 @@ class SetterWithNullableSpec {
 
     @Test
     fun testInjectionOfNullableObjects() {
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         val b = context.getBean(B::class.java)
         assertNull(b.a)
         context.close()
@@ -33,7 +33,7 @@ class SetterWithNullableSpec {
 
     @Test
     fun testNormalInjectionStillFails() {
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         try {
             context.getBean(C::class.java)
             fail<Any>("Expected a DependencyInjectionException to be thrown")

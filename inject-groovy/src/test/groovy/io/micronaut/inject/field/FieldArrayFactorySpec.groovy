@@ -15,15 +15,12 @@
  */
 package io.micronaut.inject.field
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Factory
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Provider
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 12/05/2017.
  */
@@ -31,7 +28,7 @@ class FieldArrayFactorySpec extends Specification {
 
     void "test injection with field supplied by a provider"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained which has a field that depends on a bean provided by a provider"
         B b =  context.getBean(B)

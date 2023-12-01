@@ -35,7 +35,7 @@ class RequiresBeanSpec extends Specification {
 
     void "test that a configuration can require a bean"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         context.start()
 
         expect:

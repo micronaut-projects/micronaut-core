@@ -15,6 +15,7 @@
  */
 package org.atinject.jakartatck.auto
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import org.atinject.jakartatck.auto.accessories.Cupholder
@@ -134,7 +135,7 @@ open class Convertible : Car {
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class Tests {
 
-        private val context = BeanContext.run()
+        private val context = ApplicationContext.run()
         private val car = context.getBean(Convertible::class.java)
         private val cupholder = car.cupholder
         private val spareTire = car.spareTire

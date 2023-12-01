@@ -1,6 +1,6 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
@@ -222,7 +222,7 @@ interface MyBean  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()

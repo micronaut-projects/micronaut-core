@@ -15,6 +15,7 @@
  */
 package org.atinject.javaxtck.auto;
 
+import io.micronaut.context.ApplicationContext;
 import junit.framework.TestCase;
 import org.atinject.javaxtck.auto.accessories.Cupholder;
 import org.atinject.javaxtck.auto.accessories.RoundThing;
@@ -186,7 +187,7 @@ public class Convertible implements Car {
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     public static class Tests {
 
-        private final BeanContext context = BeanContext.run();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Cupholder cupholder = car.cupholder;
         private final SpareTire spareTire = car.spareTire;
