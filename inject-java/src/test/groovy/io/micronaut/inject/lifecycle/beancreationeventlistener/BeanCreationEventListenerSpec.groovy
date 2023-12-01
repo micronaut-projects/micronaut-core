@@ -47,7 +47,8 @@ class BeanCreationEventListenerSpec extends Specification {
         OffendingMethodListener.executed = false
 
         when:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
+
         then:
         ACreatedListener.initialized == false
         ACreatedListener.executed == false
@@ -108,8 +109,8 @@ class BeanCreationEventListenerSpec extends Specification {
 
     void "test application bean creation listener"() {
         given:
-        BeanContext context = ApplicationContext.builder().start()
-
+        ApplicationContext context = ApplicationContext.run()
+        
         when:
         B b = context.getBean(B)
 

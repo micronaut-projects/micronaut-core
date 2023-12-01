@@ -15,11 +15,9 @@
  */
 package io.micronaut.kotlin.processing.aop.simple
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -29,11 +27,14 @@ class SimpleClassTypeLevelAopSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        AnotherClass foo = beanContext.getBean(AnotherClass)
+        ApplicationContext context = ApplicationContext.run()
+        AnotherClass foo = context.getBean(AnotherClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == expected
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | expected

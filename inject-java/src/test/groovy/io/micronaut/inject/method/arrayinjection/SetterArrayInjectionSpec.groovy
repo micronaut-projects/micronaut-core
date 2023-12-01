@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.method.arrayinjection
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -49,8 +50,7 @@ class Foo {}
 
     void "test injection via setter that takes an array"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -60,5 +60,8 @@ class Foo {}
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
         b.all.contains(context.getBean(AnotherImpl))
+
+        cleanup:
+        context.close()
     }
 }

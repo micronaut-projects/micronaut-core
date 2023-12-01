@@ -17,6 +17,7 @@ package io.micronaut.inject.inheritance
 
 import groovy.transform.PackageScope
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -32,8 +33,7 @@ class AbstractInheritanceSpec extends AbstractBeanDefinitionSpec {
 
     void "test values are injected for abstract parent class"() {
         given:
-        BeanContext context  = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is retrieved that has abstract inherited values"
         B b = context.getBean(B)
@@ -44,6 +44,9 @@ class AbstractInheritanceSpec extends AbstractBeanDefinitionSpec {
         b.a.is(b.another)
         b.packagePrivate != null
         b.packagePrivate.is(b.another)
+
+        cleanup:
+        context.close()
     }
 
     void "test qualifiers are not inherited"() {

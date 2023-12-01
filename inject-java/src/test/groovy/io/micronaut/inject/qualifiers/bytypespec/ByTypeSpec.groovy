@@ -15,8 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.bytypespec
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 /**
  * @author Graeme Rocher
@@ -26,7 +25,7 @@ class ByTypeSpec extends Specification {
 
     void "test by type qualifier injection"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         Bean b = context.getBean(Bean)
@@ -35,7 +34,8 @@ class ByTypeSpec extends Specification {
         b.foos.find { it instanceof One}
         b.foos.find { it instanceof Two}
         !b.foos.find { it instanceof Three}
+
+        cleanup:
+        context.close()
     }
-
-
 }

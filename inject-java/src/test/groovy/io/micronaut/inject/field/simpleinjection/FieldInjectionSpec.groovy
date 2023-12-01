@@ -45,18 +45,20 @@ class Bar {
 
     void "test injection via field with interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"Alpha bean is obtained that has a field with @Inject"
         B b =  context.getBean(B)
 
         then:"The implementation is injected"
         b.a != null
+
+        cleanup:
+        context.close()
     }
 
     void "test values injection with private fields"() {
-        BeanContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
             E e = context.getBean(E)

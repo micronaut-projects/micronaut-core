@@ -15,21 +15,17 @@
  */
 package io.micronaut.inject.method
 
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 11/05/2017.
  */
 class SetterArrayInjectionSpec extends Specification {
     void "test injection via setter that takes an array"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -38,6 +34,9 @@ class SetterArrayInjectionSpec extends Specification {
         b.all != null
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

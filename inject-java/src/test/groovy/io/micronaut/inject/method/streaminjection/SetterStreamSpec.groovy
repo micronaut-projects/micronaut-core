@@ -15,15 +15,13 @@
  */
 package io.micronaut.inject.method.streaminjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class SetterStreamSpec extends Specification {
     void "test injection via method that takes a stream"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -34,5 +32,8 @@ class SetterStreamSpec extends Specification {
         b.all.contains(context.getBean(AImpl))
         b.another.count() == 2
         b.another2.count() == 2
+
+        cleanup:
+        context.close()
     }
 }

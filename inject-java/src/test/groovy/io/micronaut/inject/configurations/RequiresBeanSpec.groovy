@@ -35,7 +35,7 @@ class RequiresBeanSpec extends Specification {
 
     void "test that a configuration can require a bean"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         context.start()
 
         expect:
@@ -51,54 +51,56 @@ class RequiresBeanSpec extends Specification {
     @IgnoreIf({ env["GITHUB_ACTIONS"] } ) // fails on GitHub actions, which is expected
     void "test that a condition can be required for a bean when false"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
         !context.containsBean(GitHubActionsBean)
+
+        cleanup:
+        context.close()
     }
 
     void "test that a condition can be required for a bean when true"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
         context.containsBean(TrueBean)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property when not present"() {
-        given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-
         when:
-        applicationContext.start()
+        ApplicationContext context = ApplicationContext.run()
 
         then:
-        !applicationContext.containsBean(RequiresProperty)
+        !context.containsBean(RequiresProperty)
 
         when:
-        applicationContext.getBean(RequiresProperty)
+        context.getBean(RequiresProperty)
 
         then:
-        def e = thrown(NoSuchBeanException)
+        NoSuchBeanException e = thrown()
         def list = e.message.readLines().collect { it.trim()}
         list[0] == 'No bean of type [io.micronaut.inject.configurations.requiresproperty.RequiresProperty] exists. The bean [RequiresProperty] is disabled because it is within the package [io.micronaut.inject.configurations.requiresproperty] which is disabled due to bean requirements:'
         list[1] == '* Required property [data-source.url] with value [null] not present'
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property when present"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(PropertySource.of(
-                'test',
-                ['dataSource.url':'jdbc::blah']
-        ))
-        applicationContext.start()
+        ApplicationContext context = ApplicationContext.run(['dataSource.url':'jdbc::blah'])
 
         expect:
-        applicationContext.containsBean(RequiresProperty)
+        context.containsBean(RequiresProperty)
+
+        cleanup:
+        context.close()
     }
 }

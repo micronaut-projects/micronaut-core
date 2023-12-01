@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 16/05/2017.
  */
@@ -30,20 +27,22 @@ class NestedDependencyFailureSpec extends Specification {
 
     void "test injection via setter with interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
 
         then:"The implementation is injected"
-        def e = thrown(DependencyInjectionException)
+        DependencyInjectionException e = thrown()
 
         e.message.normalize().contains( '''\
 Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.NestedDependencyFailureSpec$C
 
 Message: No bean of type [io.micronaut.inject.failures.NestedDependencyFailureSpec$D] exists.''')
         e.message.normalize().contains('Path Taken: new B() --> B.a --> new A([C c]) --> new C([D d])')
+
+        cleanup:
+        context.close()
     }
 
     static class D {}

@@ -15,6 +15,7 @@
  */
 package io.micronaut.docs.events.factory;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        final BeanContext context = BeanContext.run();
+        final ApplicationContext context = ApplicationContext.run();
         Vehicle vehicle = context.getBean(Vehicle.class);
         System.out.println(vehicle.start());
         // end::start[]
