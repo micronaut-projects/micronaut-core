@@ -368,7 +368,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         Channel channel = ctx.channel();
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Removing WebSocket Server session: " + serverSession);
+            LOG.debug("Removing WebSocket Server session: {}", serverSession);
         }
         webSocketSessionRepository.removeChannel(channel);
         try {

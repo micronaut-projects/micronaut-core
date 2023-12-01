@@ -194,7 +194,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
                                     }
                                 } catch (IOException e) {
                                     if (LOG.isWarnEnabled()) {
-                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                        LOG.warn("Failed to close file stream : {}", fileUpload.getName());
                                     }
                                 }
                             }
@@ -207,7 +207,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
                                     emitter.success(true);
                                 } catch (IOException e) {
                                     if (LOG.isWarnEnabled()) {
-                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                        LOG.warn("Failed to close file stream : {}", fileUpload.getName());
                                     }
                                     emitter.success(false);
                                 }

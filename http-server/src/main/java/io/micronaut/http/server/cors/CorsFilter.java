@@ -96,7 +96,7 @@ public class CorsFilter implements Ordered {
     public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
         String origin = request.getOrigin().orElse(null);
         if (origin == null) {
-            LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
+            LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
             return null; // proceed
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);

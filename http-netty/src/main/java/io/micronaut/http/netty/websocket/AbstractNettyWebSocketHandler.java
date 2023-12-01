@@ -224,7 +224,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 } catch (Exception e) {
 
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error invoking to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + e.getMessage(), e);
+                        LOG.error("Error invoking to @OnError handler {}.{}: {}", target.getClass().getSimpleName(), errorMethod.getExecutableMethod(), e.getMessage(), e);
                     }
                     fallback.accept(e);
                     return;
@@ -233,7 +233,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                     flowable.collectList().subscribe(objects -> fallback.accept(cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
-                            LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
+                            LOG.error("Error subscribing to @OnError handler {}.{}: {}", target.getClass().getSimpleName(), errorMethod.getExecutableMethod(), throwable.getMessage(), throwable);
                         }
                         fallback.accept(cause);
                     });
@@ -425,7 +425,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                 },
                                 error -> {
                                     if (LOG.isErrorEnabled()) {
-                                        LOG.error("Error Processing WebSocket Pong Message [" + webSocketBean + "]: " + error.getMessage(), error);
+                                        LOG.error("Error Processing WebSocket Pong Message [{}]: {}", webSocketBean, error.getMessage(), error);
                                     }
                                     exceptionCaught(ctx, error);
                                 },
@@ -434,7 +434,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+                        LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
                     }
                     exceptionCaught(ctx, e);
                 }
@@ -451,7 +451,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {
         if (LOG.isErrorEnabled()) {
-            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+            LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
         }
         exceptionCaught(ctx, e);
     }
@@ -505,7 +505,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error invoking @OnClose handler for WebSocket bean [" + target + "]: " + e.getMessage(), e);
+                        LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
                     }
                 }
             } else {
@@ -527,7 +527,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
         } catch (Exception e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error invoking @OnClose handler " + target.getClass().getSimpleName() + "." + methodExecutionHandle.getExecutableMethod() + ": " + e.getMessage(), e);
+                LOG.error("Error invoking @OnClose handler {}.{}: {}", target.getClass().getSimpleName(), methodExecutionHandle.getExecutableMethod(), e.getMessage(), e);
             }
             ctx.close();
             return;
@@ -539,7 +539,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
             }, throwable -> {
                 if (throwable != null && LOG.isErrorEnabled()) {
-                    LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
+                    LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, throwable.getMessage(), throwable);
                 }
                 ctx.close();
             });

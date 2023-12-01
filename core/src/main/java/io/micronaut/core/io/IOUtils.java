@@ -225,7 +225,7 @@ public class IOUtils {
             } catch (IOException e) {
                 Logger logger = LoggerFactory.getLogger(Logger.class);
                 if (logger.isWarnEnabled()) {
-                    logger.warn("Failed to close reader: " + e.getMessage(), e);
+                    logger.warn("Failed to close reader: {}", e.getMessage(), e);
                 }
             }
         }
