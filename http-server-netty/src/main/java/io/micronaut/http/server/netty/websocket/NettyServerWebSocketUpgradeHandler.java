@@ -206,7 +206,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Error opening WebSocket: " + e.getMessage(), e);
+                    LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
                 }
                 ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
             }

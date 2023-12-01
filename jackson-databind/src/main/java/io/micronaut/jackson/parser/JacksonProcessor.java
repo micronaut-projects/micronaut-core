@@ -147,7 +147,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void onUpstreamMessage(byte[] message) {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Received upstream bytes of length: " + message.length);
+            LOG.trace("Received upstream bytes of length: {}", message.length);
         }
 
         try {

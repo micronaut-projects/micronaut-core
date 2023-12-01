@@ -268,7 +268,7 @@ public final class ApplicationEventPublisherFactory<T>
                     String msg = ex.getMessage();
                     if (msg == null || msg.startsWith(event.getClass().getName())) {
                         if (EventLogger.LOG.isDebugEnabled()) {
-                            EventLogger.LOG.debug("Incompatible listener for event: " + listener, ex);
+                            EventLogger.LOG.debug("Incompatible listener for event: {}", listener, ex);
                         }
                     } else {
                         throw ex;
