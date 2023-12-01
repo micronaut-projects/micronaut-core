@@ -20,11 +20,13 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -104,7 +106,10 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         }
         optionalFullBodyArgument = super.getFullRequestBodyType();
         this.messageBodyReader = optionalBodyArgument.flatMap(b -> {
-            if (b.isAsyncOrReactive() || b.isOptional()) {
+            if (b.getAnnotationMetadata().stringValue(Body.class).isPresent()) {
+                // Special case for `@Body("myProperty")`
+                b = Argument.of(ConvertibleValues.class);
+            } else if (b.isAsyncOrReactive() || b.isOptional()) {
                 b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
             return messageBodyHandlerRegistry.findReader(b, consumesMediaTypes);
