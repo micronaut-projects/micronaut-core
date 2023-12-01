@@ -176,7 +176,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                     throw e;
                 } else {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Error decoding HTTP error response body: " + e.getMessage(), e);
+                        LOG.debug("Error decoding HTTP error response body: {}", e.getMessage(), e);
                     }
                     converted = Optional.empty();
                 }

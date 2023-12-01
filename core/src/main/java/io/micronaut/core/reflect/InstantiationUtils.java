@@ -56,7 +56,7 @@ public class InstantiationUtils {
         } catch (Throwable e) {
             Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
             if (log.isDebugEnabled()) {
-                log.debug("Tried, but could not instantiate type: " + name, e);
+                log.debug("Tried, but could not instantiate type: {}", name, e);
             }
             return Optional.empty();
         }
@@ -81,7 +81,7 @@ public class InstantiationUtils {
         final Supplier<T> reflectionFallback = () -> {
             Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
             if (log.isDebugEnabled()) {
-                log.debug("Tried, but could not instantiate type: " + type);
+                log.debug("Tried, but could not instantiate type: {}", type);
             }
             return null;
         };
@@ -156,7 +156,7 @@ public class InstantiationUtils {
                 } catch (Throwable e1) {
                     Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
                     if (log.isDebugEnabled()) {
-                        log.debug("Tried, but could not instantiate type: " + type, e);
+                        log.debug("Tried, but could not instantiate type: {}", type, e);
                     }
                     return null;
                 }
@@ -187,7 +187,7 @@ public class InstantiationUtils {
         } catch (Throwable e) {
             Logger log = ClassUtils.REFLECTION_LOGGER;
             if (log.isDebugEnabled()) {
-                log.debug("Tried, but could not instantiate type: " + type, e);
+                log.debug("Tried, but could not instantiate type: {}", type, e);
             }
             return Optional.empty();
         }
@@ -207,7 +207,7 @@ public class InstantiationUtils {
                 try {
                     Logger log = ClassUtils.REFLECTION_LOGGER;
                     if (log.isDebugEnabled()) {
-                        log.debug("Reflectively instantiating type: " + type);
+                        log.debug("Reflectively instantiating type: {}", type);
                     }
                     return type.getDeclaredConstructor().newInstance();
                 } catch (Throwable e) {
@@ -236,7 +236,7 @@ public class InstantiationUtils {
                 try {
                     Logger log = ClassUtils.REFLECTION_LOGGER;
                     if (log.isDebugEnabled()) {
-                        log.debug("Reflectively instantiating type: " + type);
+                        log.debug("Reflectively instantiating type: {}", type);
                     }
                     final Constructor<T> declaredConstructor = type.getDeclaredConstructor(argTypes);
                     declaredConstructor.setAccessible(true);

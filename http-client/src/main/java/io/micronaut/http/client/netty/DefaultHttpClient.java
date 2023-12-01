@@ -2201,7 +2201,7 @@ public class DefaultHttpClient implements
             } catch (Exception t) {
                 makeNormalBodyParseError(msg, t, cause -> {
                     if (!responsePromise.tryFailure(cause) && log.isWarnEnabled()) {
-                        log.warn("Exception fired after handler completed: " + t.getMessage(), t);
+                        log.warn("Exception fired after handler completed: {}", t.getMessage(), t);
                     }
                 });
             }

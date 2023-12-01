@@ -134,7 +134,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
             }
         } catch (IOException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error starting file watch service: " + e.getMessage(), e);
+                LOG.error("Error starting file watch service: {}", e.getMessage(), e);
             }
         }
         return this;
@@ -168,7 +168,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
             getWatchService().close();
         } catch (IOException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error stopping file watch service: " + e.getMessage(), e);
+                LOG.error("Error stopping file watch service: {}", e.getMessage(), e);
             }
         }
     }

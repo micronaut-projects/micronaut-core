@@ -19,7 +19,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
-import org.neo4j.driver.v1.Config
+import org.neo4j.driver.Config
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -310,7 +311,7 @@ class Test {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -320,7 +321,7 @@ class Neo4jProperties {
         prefixes="with",
         allowZeroArgs=true
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 
 }
@@ -334,7 +335,7 @@ class Neo4jProperties {
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.encryptionLevel':'none',
                 'neo4j.test.leakedSessionsLogging':true,
-                'neo4j.test.maxIdleSessions':2
+                'neo4j.test.maxConnectionPoolSize':2
         )
         def bean = factory.instantiate(applicationContext)
 
@@ -343,11 +344,11 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
-        config.maxIdleConnectionPoolSize() == 2
-        config.encrypted() == true // deprecated properties are ignored
+        config.maxConnectionPoolSize() == 2
+        !config.encrypted()
         config.logLeakedSessions()
     }
 
@@ -357,7 +358,7 @@ class Neo4jProperties {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -368,7 +369,7 @@ class Neo4jProperties {
         allowZeroArgs=true,
         configurationPrefix="options"
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 
 }
@@ -382,7 +383,7 @@ class Neo4jProperties {
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
-                'neo4j.test.options.maxIdleSessions':2
+                'neo4j.test.options.maxConnectionPoolSize':2
         )
         def bean = factory.instantiate(applicationContext)
 
@@ -391,11 +392,11 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
-        config.maxIdleConnectionPoolSize() == 2
-        config.encrypted() == true // deprecated properties are ignored
+        config.maxConnectionPoolSize() == 2
+        !config.encrypted()
         config.logLeakedSessions()
     }
 
@@ -405,7 +406,7 @@ class Neo4jProperties {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -416,7 +417,7 @@ class Neo4jProperties {
         allowZeroArgs=true,
         value="options"
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 
 }
@@ -430,7 +431,7 @@ class Neo4jProperties {
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
-                'neo4j.test.options.maxIdleSessions':2
+                'neo4j.test.options.maxConnectionPoolSize':2
         )
         def bean = factory.instantiate(applicationContext)
 
@@ -439,11 +440,11 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
-        config.maxIdleConnectionPoolSize() == 2
-        config.encrypted() == true // deprecated properties are ignored
+        config.maxConnectionPoolSize() == 2
+        !config.encrypted()
         config.logLeakedSessions()
     }
 
@@ -454,7 +455,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AccessorsStyle;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -465,7 +466,7 @@ class Neo4jProperties {
         value = "options"
     )
     @AccessorsStyle(writePrefixes = "with")
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 }
 ''')
         then:
@@ -477,7 +478,7 @@ class Neo4jProperties {
         ApplicationContext applicationContext = ApplicationContext.run(
             'neo4j.test.options.encryptionLevel':'none',
             'neo4j.test.options.leakedSessionsLogging':true,
-            'neo4j.test.options.maxIdleSessions':2
+            'neo4j.test.options.maxConnectionPoolSize':2
         )
         def bean = factory.instantiate(applicationContext)
 
@@ -486,11 +487,11 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
-        config.maxIdleConnectionPoolSize() == 2
-        config.encrypted() == true // deprecated properties are ignored
+        config.maxConnectionPoolSize() == 2
+        !config.encrypted()
         config.logLeakedSessions()
     }
 
@@ -500,7 +501,7 @@ class Neo4jProperties {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -510,7 +511,7 @@ class Neo4jProperties {
         prefixes="with",
         allowZeroArgs=true
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.builder();
 
 }
 ''')
@@ -530,7 +531,7 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
         config.idleTimeBeforeConnectionTest() == 6000
@@ -542,7 +543,7 @@ class Neo4jProperties {
 package test;
 
 import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -551,7 +552,7 @@ class Neo4jProperties {
         prefixes="with",
         allowZeroArgs=true
     )
-    public final Config.ConfigBuilder options = Config.build();
+    public final Config.ConfigBuilder options = Config.builder();
 
 }
 ''')
@@ -566,7 +567,7 @@ class Neo4jProperties {
         bean.options != null
 
         when:
-        Config config = bean.options.toConfig()
+        Config config = bean.options.build()
 
         then:
         config.idleTimeBeforeConnectionTest() == 17000

@@ -170,7 +170,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     try {
                         eventPublisher.publishEvent(new RetryEvent(context, retryState, exception));
                     } catch (Exception e) {
-                        LOG.error("Error occurred publishing RetryEvent: " + e.getMessage(), e);
+                        LOG.error("Error occurred publishing RetryEvent: {}", e.getMessage(), e);
                     }
                 }
                 executorService.schedule(() -> {
@@ -200,7 +200,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     try {
                         eventPublisher.publishEvent(new RetryEvent(context, retryState, exception));
                     } catch (Exception e1) {
-                        LOG.error("Error occurred publishing RetryEvent: " + e1.getMessage(), e1);
+                        LOG.error("Error occurred publishing RetryEvent: {}", e1.getMessage(), e1);
                     }
                 }
                 if (LOG.isDebugEnabled()) {
@@ -244,7 +244,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                             try {
                                 eventPublisher.publishEvent(new RetryEvent(context, retryState, e));
                             } catch (Exception e1) {
-                                LOG.error("Error occurred publishing RetryEvent: " + e1.getMessage(), e1);
+                                LOG.error("Error occurred publishing RetryEvent: {}", e1.getMessage(), e1);
                             }
                         }
                         if (LOG.isDebugEnabled()) {

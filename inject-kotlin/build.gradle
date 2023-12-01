@@ -23,6 +23,7 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
+    testImplementation project(":context")
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
     testImplementation libs.managed.kotlin.stdlib

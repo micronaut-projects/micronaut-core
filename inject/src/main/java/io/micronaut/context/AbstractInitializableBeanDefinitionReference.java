@@ -199,7 +199,7 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
             } catch (Throwable e) {
                 if (e instanceof TypeNotPresentException || e instanceof ClassNotFoundException || e instanceof NoClassDefFoundError) {
                     if (ConditionLog.LOG.isTraceEnabled()) {
-                        ConditionLog.LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                        ConditionLog.LOG.trace("Bean definition for type [{}] not loaded since it is not on the classpath", beanTypeName, e);
                     }
                 } else {
                     throw new BeanContextException("Unexpected error loading bean definition [" + beanDefinitionTypeName + "]: " + e.getMessage(), e);
