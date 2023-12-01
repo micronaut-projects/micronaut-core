@@ -195,7 +195,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
-    private final SingletonScope singletonScope = new SingletonScope();
+    protected final SingletonScope singletonScope = new SingletonScope();
 
     private final BeanContextConfiguration beanContextConfiguration;
 
@@ -856,7 +856,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return getBean(null, beanType, qualifier);
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage(), e);
             }
             throw newNoSuchBeanException(
                 null,
@@ -1214,7 +1214,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
             } catch (Exception e) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error disposing bean [" + beanToDestroy + "]... Continuing...", e);
+                    LOG.warn("Error disposing bean [{}]... Continuing...", beanToDestroy, e);
                 }
             }
         }
@@ -2033,7 +2033,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                             processor.process(beanDefinition, method);
                                         } catch (Throwable e) {
                                             if (LOG.isErrorEnabled()) {
-                                                LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
+                                                LOG.error("Error processing bean method {}.{} with processor ({}): {}", beanDefinition, method, processor, e.getMessage(), e);
                                             }
                                             Boolean shutdownOnError = method.booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                                             if (shutdownOnError) {
@@ -2448,7 +2448,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             loadEagerBeans(producer, parallelDefinitions);
                         } catch (Throwable e) {
                             BeanDefinitionReference<Object> beanDefinitionReference = producer.getReference();
-                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2462,7 +2462,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         try {
                             initializeEagerBean(beanDefinition);
                         } catch (Throwable e) {
-                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();

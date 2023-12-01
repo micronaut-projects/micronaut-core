@@ -1,6 +1,6 @@
 package io.micronaut.docs.expressions
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -9,7 +9,8 @@ import spock.lang.Specification
 class AnnotationContextExampleSpec extends Specification {
     @Shared
     @AutoCleanup
-    BeanContext beanContext = BeanContext.run()
+    ApplicationContext beanContext = ApplicationContext.run()
+
     void "testAnnotationContextEvaluation"() {
         given:
         BeanDefinition<Example> beanDefinition = beanContext.getBeanDefinition(Example)

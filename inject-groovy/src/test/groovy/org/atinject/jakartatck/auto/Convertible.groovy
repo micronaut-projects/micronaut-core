@@ -16,6 +16,7 @@
 package org.atinject.jakartatck.auto
 
 import groovy.transform.PackageScope
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import junit.framework.TestCase
@@ -182,9 +183,7 @@ class Convertible implements Car {
 
     static class Tests extends Specification {
 
-        private final BeanContext context = new DefaultBeanContext() {{
-            start()
-        }}
+        private final ApplicationContext context = ApplicationContext.run()
         private final Convertible car = context.getBean(Convertible)
         private final Cupholder cupholder = car.cupholder
         private final SpareTire spareTire = car.spareTire
@@ -491,7 +490,7 @@ class Convertible implements Car {
     }
 
     static class PrivateTests extends Specification {
-        private final BeanContext context = new DefaultBeanContext().start()
+        private final ApplicationContext context = ApplicationContext.run()
         private final Convertible car = context.getBean(Convertible)
         private final Engine engine = car.engineProvider.get()
         private final SpareTire spareTire = car.spareTire

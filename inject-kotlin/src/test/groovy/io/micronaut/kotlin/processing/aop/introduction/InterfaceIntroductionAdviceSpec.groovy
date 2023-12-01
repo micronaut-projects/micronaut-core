@@ -1,23 +1,26 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.aop.Intercepted
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
 
 class InterfaceIntroductionAdviceSpec extends Specification {
 
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceIntroductionClass foo = beanContext.getBean(InterfaceIntroductionClass)
+        ApplicationContext context = ApplicationContext.run()
+        InterfaceIntroductionClass foo = context.getBean(InterfaceIntroductionClass)
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                 | args         | result
@@ -27,16 +30,17 @@ class InterfaceIntroductionAdviceSpec extends Specification {
     }
 
     void "test injecting an introduction advice with generics"() {
-        BeanContext beanContext = new DefaultBeanContext().start()
+        given:
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        InjectParentInterface foo = beanContext.getBean(InjectParentInterface)
+        context.getBean(InjectParentInterface)
 
         then:
         noExceptionThrown()
 
         cleanup:
-        beanContext.close()
+        context.close()
     }
 
     void "test typeArgumentsMap are created for introduction advice"() {

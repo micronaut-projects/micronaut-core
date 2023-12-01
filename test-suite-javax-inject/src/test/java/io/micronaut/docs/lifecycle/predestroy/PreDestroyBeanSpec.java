@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.lifecycle.predestroy;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +24,7 @@ public class PreDestroyBeanSpec {
     @Test
     public void testBeanClosingOnContextClose() {
         // tag::start[]
-        BeanContext ctx = BeanContext.run();
+        ApplicationContext ctx = ApplicationContext.run();
         PreDestroyBean preDestroyBean = ctx.getBean(PreDestroyBean.class);
         Connection connection = ctx.getBean(Connection.class);
         ctx.stop();

@@ -1,9 +1,8 @@
 package io.micronaut.inject.any
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanProvider
 import io.micronaut.context.exceptions.NonUniqueBeanException
-import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -12,7 +11,7 @@ import spock.lang.Specification
 import java.util.stream.Collectors
 
 class AnyProviderSpec extends Specification {
-    @Shared @AutoCleanup BeanContext beanContext = BeanContext.run()
+    @Shared @AutoCleanup ApplicationContext beanContext = ApplicationContext.run()
 
     void 'test any injection'() {
         when:

@@ -16,6 +16,7 @@
 package io.micronaut.inject.inheritance
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -25,8 +26,7 @@ class AbstractInheritanceSpec extends AbstractTypeElementSpec {
 
     void "test values are injected for abstract parent class"() {
         given:
-        BeanContext context  = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is retrieved that has abstract inherited values"
         B b = context.getBean(B)
@@ -37,6 +37,9 @@ class AbstractInheritanceSpec extends AbstractTypeElementSpec {
         b.a.is(b.another)
         b.packagePrivate != null
         b.packagePrivate.is(b.another)
+
+        cleanup:
+        context.close()
     }
 
     @PendingFeature

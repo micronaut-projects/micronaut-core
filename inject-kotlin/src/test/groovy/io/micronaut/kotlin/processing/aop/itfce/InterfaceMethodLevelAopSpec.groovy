@@ -1,8 +1,7 @@
 package io.micronaut.kotlin.processing.aop.itfce
 
 import io.micronaut.aop.Intercepted
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.kotlin.processing.aop.simple.CovariantClass
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -12,11 +11,14 @@ class InterfaceMethodLevelAopSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceClass foo = beanContext.getBean(InterfaceClass)
+        ApplicationContext context = ApplicationContext.run()
+        InterfaceClass foo = context.getBean(InterfaceClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -50,18 +52,17 @@ class InterfaceMethodLevelAopSpec extends Specification {
 
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        InterfaceClass foo = beanContext.getBean(InterfaceClass)
-
+        InterfaceClass foo = context.getBean(InterfaceClass)
 
         then:
         foo instanceof Intercepted
         foo.test("test") == "Name is changed"
 
         cleanup:
-        beanContext.close()
+        context.close()
     }
 
 }

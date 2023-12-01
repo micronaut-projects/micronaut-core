@@ -1,6 +1,6 @@
 package io.micronaut.docs.events.factory
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class VehicleSpec extends Specification {
@@ -9,7 +9,7 @@ class VehicleSpec extends Specification {
 
         when:
         // tag::start[]
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         Vehicle vehicle = context.getBean(Vehicle)
         println vehicle.start()
         // end::start[]

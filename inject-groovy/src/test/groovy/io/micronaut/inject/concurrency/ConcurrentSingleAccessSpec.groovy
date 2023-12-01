@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.concurrency
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
-import jakarta.inject.Singleton
 import java.util.concurrent.ConcurrentLinkedQueue
-
 /**
  * Created by graemerocher on 17/05/2017.
  */
@@ -29,8 +27,7 @@ class ConcurrentSingleAccessSpec extends Specification {
 
     void "test that concurrent access to a singleton returns the same object"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         def threads = []
@@ -47,6 +44,9 @@ class ConcurrentSingleAccessSpec extends Specification {
 
         then:
         beans.unique().size() == 1
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

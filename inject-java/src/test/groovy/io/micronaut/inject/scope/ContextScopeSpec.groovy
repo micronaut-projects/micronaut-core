@@ -15,19 +15,20 @@
  */
 package io.micronaut.inject.scope
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 class ContextScopeSpec extends Specification {
 
     void "test context scope"() {
-        given:
-        DefaultBeanContext beanContext = new DefaultBeanContext()
-
         when:"The context is started"
-        beanContext.start()
+        ApplicationContext context = ApplicationContext.run()
 
         then:"So is the bean"
-        beanContext.@singletonScope.@singletonByBeanDefinition.values().find() { it.bean instanceof A }
+        context.@singletonScope.@singletonByBeanDefinition.values().find() { it.bean instanceof A }
+
+        cleanup:
+        context.close()
     }
 }

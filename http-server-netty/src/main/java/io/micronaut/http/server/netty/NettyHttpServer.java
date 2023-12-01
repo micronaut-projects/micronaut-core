@@ -492,8 +492,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         String configName = workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT;
         return nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(configName)
                 .orElseGet(() -> {
-                    LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. " +
-                                     "Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
+                    LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
                     shutdownWorker = true;
                     return newGroup;
@@ -603,7 +602,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 if (isBindError) {
                     LOG.error("Unable to start server. Port {} already in use.", displayAddress(cfg));
                 } else {
-                    LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+                    LOG.error("Error starting Micronaut server: {}", e.getMessage(), e);
                 }
             }
             stopInternal(false);
@@ -639,7 +638,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private void logShutdownErrorIfNecessary(Future<?> future) {
         if (!future.isSuccess() && LOG.isWarnEnabled()) {
             Throwable e = future.cause();
-            LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
+            LOG.warn("Error stopping Micronaut server: {}", e.getMessage(), e);
         }
     }
 
@@ -699,7 +698,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
+                LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
             }
         }
     }

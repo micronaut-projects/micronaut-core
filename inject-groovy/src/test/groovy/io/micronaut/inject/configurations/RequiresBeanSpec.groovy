@@ -36,8 +36,7 @@ class RequiresBeanSpec extends Specification {
 
     void "test that a configuration can require a bean"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
@@ -48,58 +47,67 @@ class RequiresBeanSpec extends Specification {
         Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
 //        !context.containsBean(GitHubActionsBean) // TODO: these are broken because closures are not supported for @Requires( condition = {})
 //        !context.containsBean(GitHubActionsBean2)
+
+        cleanup:
+        context.close()
     }
 
     void "test that a condition can be required for a bean when false"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
 //        !context.containsBean(GitHubActionsBean2) // TODO: these are broken because closures are not supported for @Requires( condition = {})
+
+        cleanup:
+        context.close()
     }
 
 //    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueBean")
     void "test that a condition can be required for a bean when true"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
         context.containsBean(TrueBean)
+
+        cleanup:
+        context.close()
     }
 
     void "test that a lambda condition can be required for a bean when true"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.containsBean(ABean)
         context.containsBean(TrueLambdaBean)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property when not present"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
-        !applicationContext.containsBean(RequiresProperty)
+        !context.containsBean(RequiresProperty)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property when present"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(PropertySource.of(
-                'test',
-                ['dataSource.url':'jdbc::blah']
-        ))
-        applicationContext.start()
-
+        ApplicationContext context = ApplicationContext.run(['dataSource.url':'jdbc::blah'])
+        
         expect:
-        applicationContext.containsBean(RequiresProperty)
+        context.containsBean(RequiresProperty)
+
+        cleanup:
+        context.close()
     }
 }

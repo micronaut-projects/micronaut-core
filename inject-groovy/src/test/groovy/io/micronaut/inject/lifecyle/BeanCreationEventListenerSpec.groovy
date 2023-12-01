@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.lifecyle
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
-import spock.lang.Specification
-
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
  */
@@ -30,7 +27,7 @@ class BeanCreationEventListenerSpec extends Specification {
 
     void "test bean creation listener"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b= context.getBean(B)
@@ -39,6 +36,8 @@ class BeanCreationEventListenerSpec extends Specification {
         b instanceof ChildB
         b.name == "good"
 
+        cleanup:
+        context.close()
     }
 
     @Singleton

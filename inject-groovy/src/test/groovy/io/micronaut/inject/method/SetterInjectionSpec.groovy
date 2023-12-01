@@ -15,26 +15,26 @@
  */
 package io.micronaut.inject.method
 
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Specification
 
 class SetterInjectionSpec extends Specification {
 
 
     void "test injection via setter with interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
 
         then:"The implementation is injected"
         b.a != null
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

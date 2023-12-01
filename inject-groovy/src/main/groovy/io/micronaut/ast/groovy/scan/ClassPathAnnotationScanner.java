@@ -118,7 +118,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                         traverseFile(annotation, classes, Paths.get(url.toURI()));
                     } catch (URISyntaxException e) {
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
+                            LOG.debug("Ignoring file [{}] due to URI error: {}", url, e.getMessage(), e);
                         }
                     }
                 } else if (includeJars && Arrays.asList("jar", "zip", "war").contains(protocol)) {
@@ -135,17 +135,17 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                                     scanInputStream(annotation, inputStream, classes);
                                 } catch (IOException e) {
                                     if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Ignoring JAR entry [" + entry.getName() + "] due to I/O error: " + e.getMessage(), e);
+                                        LOG.debug("Ignoring JAR entry [{}] due to I/O error: {}", entry.getName(), e.getMessage(), e);
                                     }
                                 } catch (ClassNotFoundException e) {
                                     if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Ignoring JAR entry [" + entry.getName() + "]. Class not found: " + e.getMessage(), e);
+                                        LOG.debug("Ignoring JAR entry [{}]. Class not found: {}", entry.getName(), e.getMessage(), e);
                                     }
                                 }
                             });
                     } else {
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Ignoring JAR URI entry [" + url + "]. No JarURLConnection found.");
+                            LOG.debug("Ignoring JAR URI entry [{}]. No JarURLConnection found.", url);
                         }
                         // TODO: future support for servlet containers
                     }
@@ -155,7 +155,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
             return classes;
         } catch (IOException e) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Ignoring I/O Exception scanning package: " + pkg, e);
+                LOG.debug("Ignoring I/O Exception scanning package: {}", pkg, e);
             }
             return Collections.emptyList();
         }
@@ -178,7 +178,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                 });
             } catch (IOException e) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Ignoring directory [" + filePath + "] due to I/O error: " + e.getMessage(), e);
+                    LOG.debug("Ignoring directory [{}] due to I/O error: {}", filePath, e.getMessage(), e);
                 }
             }
         } else {
@@ -199,11 +199,11 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                 scanInputStream(annotation, inputStream, classes);
             } catch (IOException e) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
+                    LOG.debug("Ignoring file [{}] due to I/O error: {}", fileName, e.getMessage(), e);
                 }
             } catch (ClassNotFoundException e) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
+                    LOG.debug("Ignoring file [{}]. Class not found: {}", fileName, e.getMessage(), e);
                 }
             }
         }

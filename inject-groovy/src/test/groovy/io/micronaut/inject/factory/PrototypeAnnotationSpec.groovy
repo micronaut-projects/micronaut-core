@@ -15,11 +15,9 @@
  */
 package io.micronaut.inject.factory
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import spock.lang.Specification
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -29,10 +27,13 @@ class PrototypeAnnotationSpec extends Specification{
     void "test @bean annotation makes a class available as a bean"() {
 
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
-        beanContext.getBean(A) != beanContext.getBean(A) // prototype by default
+        context.getBean(A) != context.getBean(A) // prototype by default
+
+        cleanup:
+        context.close()
     }
 
     @Prototype

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.property
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -30,8 +31,7 @@ import java.util.stream.Stream
 class PropertyStreamSpec extends Specification {
     void "test injection via property that takes a stream"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -40,6 +40,9 @@ class PropertyStreamSpec extends Specification {
         b.all != null
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

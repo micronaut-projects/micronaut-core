@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers
 
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
 import spock.lang.Specification
 
@@ -26,8 +26,7 @@ class CompositeSpec extends Specification {
 
     void 'test using a composite qualifier'() {
         given:
-        DefaultBeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         Qualifier qualifier = Qualifiers.byQualifiers(Qualifiers.byType(Runnable), Qualifiers.byName('thread'))

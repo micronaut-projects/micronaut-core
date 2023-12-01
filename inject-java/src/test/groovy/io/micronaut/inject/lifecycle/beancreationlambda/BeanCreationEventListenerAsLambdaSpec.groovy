@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.lifecycle.beancreationlambda
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class BeanCreationEventListenerAsLambdaSpec extends Specification {
@@ -23,7 +23,7 @@ class BeanCreationEventListenerAsLambdaSpec extends Specification {
 
     void "test bean creation listener"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b= context.getBean(B)
@@ -31,6 +31,9 @@ class BeanCreationEventListenerAsLambdaSpec extends Specification {
         then:
         b instanceof ChildB
         b.name == "good"
+
+        cleanup:
+        context.close()
 
     }
 }

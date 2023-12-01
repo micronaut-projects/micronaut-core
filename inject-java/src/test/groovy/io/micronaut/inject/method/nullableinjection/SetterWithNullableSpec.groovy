@@ -25,8 +25,7 @@ class SetterWithNullableSpec extends Specification {
 
     void "test injection of nullable objects"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has an setter with @Inject and @Nullable"
         B b =  context.getBean(B)

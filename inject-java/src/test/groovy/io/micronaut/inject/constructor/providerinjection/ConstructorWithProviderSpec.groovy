@@ -15,16 +15,14 @@
  */
 package io.micronaut.inject.constructor.providerinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class ConstructorWithProviderSpec extends Specification {
 
     void "test injection with constructor supplied by a provider"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"
         B b =  context.getBean(B)
@@ -35,5 +33,8 @@ class ConstructorWithProviderSpec extends Specification {
         b.a.is(context.getBean(AImpl))
         ((AImpl)(b.a)).c != null
         ((AImpl)(b.a)).c2 != null
+
+        cleanup:
+        context.close()
     }
 }
