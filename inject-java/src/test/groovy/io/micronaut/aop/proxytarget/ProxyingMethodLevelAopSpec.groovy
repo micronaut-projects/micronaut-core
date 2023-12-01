@@ -16,6 +16,7 @@
 package io.micronaut.aop.proxytarget
 
 import io.micronaut.aop.InterceptedProxy
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -31,14 +32,17 @@ class ProxyingMethodLevelAopSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        ProxyingClass foo = beanContext.getBean(ProxyingClass)
+        ApplicationContext context = ApplicationContext.run()
+        ProxyingClass foo = context.getBean(ProxyingClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
         foo.lifeCycleCount == 0
         foo instanceof InterceptedProxy
         foo.interceptedTarget().lifeCycleCount == 1
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -72,10 +76,10 @@ class ProxyingMethodLevelAopSpec extends Specification {
 
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when: "the bean definition is obtained"
-        BeanDefinition<ProxyingClass> beanDefinition = beanContext.findBeanDefinition(ProxyingClass).get()
+        BeanDefinition<ProxyingClass> beanDefinition = context.findBeanDefinition(ProxyingClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()
@@ -83,16 +87,18 @@ class ProxyingMethodLevelAopSpec extends Specification {
         !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
 
         when:
-        ProxyingClass foo = beanContext.getBean(ProxyingClass)
+        ProxyingClass foo = context.getBean(ProxyingClass)
 
 
         then:
         foo instanceof InterceptedProxy
-        beanContext.findExecutableMethod(ProxyingClass, "test", String).isPresent()
+        context.findExecutableMethod(ProxyingClass, "test", String).isPresent()
         // should not be a reflection based method
-        !beanContext.findExecutableMethod(ProxyingClass, "test", String).get().getClass().getName().contains("Reflection")
+        !context.findExecutableMethod(ProxyingClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
 
+        cleanup:
+        context.close()
     }
 
 }

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.nullableinjection
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
@@ -23,7 +23,7 @@ class FieldNullableInjectionSpec {
 
     @Test
     fun testNullableFieldInjection() {
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         val b = context.getBean(B::class.java)
         assertNull(b.a)
         context.close()

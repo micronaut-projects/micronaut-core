@@ -1,13 +1,13 @@
 package io.micronaut.inject.factory.composite
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 class CompositeBeanFromFactorySpec extends Specification {
 
-    @Shared @AutoCleanup BeanContext context = BeanContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
 
     void "test composite factory method"() {
         given:

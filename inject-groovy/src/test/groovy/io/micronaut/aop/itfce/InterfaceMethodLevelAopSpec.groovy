@@ -16,6 +16,7 @@
 package io.micronaut.aop.itfce
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -31,11 +32,14 @@ class InterfaceMethodLevelAopSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceClass foo = beanContext.getBean(InterfaceClass)
+        ApplicationContext context = ApplicationContext.run()
+        InterfaceClass foo = context.getBean(InterfaceClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -69,10 +73,10 @@ class InterfaceMethodLevelAopSpec extends Specification {
 
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when: "the bean definition is obtained"
-        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanDefinition(InterfaceClass).get()
+        BeanDefinition<InterfaceClass> beanDefinition = context.findBeanDefinition(InterfaceClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()
@@ -80,16 +84,17 @@ class InterfaceMethodLevelAopSpec extends Specification {
         !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
 
         when:
-        InterfaceClass foo = beanContext.getBean(InterfaceClass)
-
+        InterfaceClass foo = context.getBean(InterfaceClass)
 
         then:
         foo instanceof Intercepted
-        beanContext.findExecutableMethod(InterfaceClass, "test", String).isPresent()
+        context.findExecutableMethod(InterfaceClass, "test", String).isPresent()
         // should not be a reflection based method
-        !beanContext.findExecutableMethod(InterfaceClass, "test", String).get().getClass().getName().contains("Reflection")
+        !context.findExecutableMethod(InterfaceClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
 
+        cleanup:
+        context.close()
     }
 
 }

@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.aop.simple
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -31,12 +32,15 @@ class SimpleClassMethodLevelAopSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        SimpleClass foo = beanContext.getBean(SimpleClass)
+        ApplicationContext context = ApplicationContext.run()
+        SimpleClass foo = context.getBean(SimpleClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
         foo.postConstructInvoked
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -67,13 +71,12 @@ class SimpleClassMethodLevelAopSpec extends Specification {
         'testListWithWildCardOut'     | ['test', new CovariantClass<>()]           | new CovariantClass<>('changed')        // test for generics
     }
 
-
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when: "the bean definition is obtained"
-        BeanDefinition<SimpleClass> beanDefinition = beanContext.findBeanDefinition(SimpleClass).get()
+        BeanDefinition<SimpleClass> beanDefinition = context.findBeanDefinition(SimpleClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()
@@ -81,27 +84,33 @@ class SimpleClassMethodLevelAopSpec extends Specification {
         !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
 
         when:
-        SimpleClass foo = beanContext.getBean(SimpleClass)
+        SimpleClass foo = context.getBean(SimpleClass)
 
 
         then:
         foo instanceof Intercepted
-        beanContext.findExecutableMethod(SimpleClass, "test", String).isPresent()
+        context.findExecutableMethod(SimpleClass, "test", String).isPresent()
         // should not be a reflection based method
-        !beanContext.findExecutableMethod(SimpleClass, "test", String).get().getClass().getName().contains("Reflection")
+        !context.findExecutableMethod(SimpleClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
+
+        cleanup:
+        context.close()
     }
 
     void "test modifying the interceptor parameters is not supported"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        SimpleClass foo = beanContext.getBean(SimpleClass)
+        ApplicationContext context = ApplicationContext.run()
+        SimpleClass foo = context.getBean(SimpleClass)
 
         when: "the interceptor is called"
         foo.invalidInterceptor()
 
         then:
         thrown(UnsupportedOperationException)
+
+        cleanup:
+        context.close()
     }
 
 }

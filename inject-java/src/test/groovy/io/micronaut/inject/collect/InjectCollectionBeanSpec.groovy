@@ -15,27 +15,33 @@
  */
 package io.micronaut.inject.collect
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class InjectCollectionBeanSpec extends Specification {
 
     void "test resolve collection bean"() {
         given:
-        def ctx = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run()
 
         expect:
         ctx.getBean(ThingThatNeedsMySetOfStrings).strings.size() == 1
         ctx.getBean(ThingThatNeedsMySetOfStrings).strings == ctx.getBean(ThingThatNeedsMySetOfStrings).otherStrings
+
+        cleanup:
+        ctx.close()
     }
 
     void "test resolve iterable bean"() {
         when:
-        def ctx = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(MyIterable)
         ctx.getBean(ThingThatNeedsMyIterable)
 
         then:
         noExceptionThrown()
+
+        cleanup:
+        ctx.close()
     }
 }

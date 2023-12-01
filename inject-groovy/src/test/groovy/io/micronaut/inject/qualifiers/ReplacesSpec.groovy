@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.qualifiers
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
  */
@@ -29,7 +27,7 @@ class ReplacesSpec extends Specification {
 
     void "test that a bean can be marked to replace another bean"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -39,6 +37,9 @@ class ReplacesSpec extends Specification {
         !b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+
+        cleanup:
+        context.close()
     }
 
     static interface A {}

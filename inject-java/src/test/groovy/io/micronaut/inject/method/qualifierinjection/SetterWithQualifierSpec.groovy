@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.method.qualifierinjection
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -88,8 +89,7 @@ class TwoA implements A {
 
     void "test that a property with a qualifier is injected correctly"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -97,5 +97,8 @@ class TwoA implements A {
         then:
         b.a instanceof OneA
         b.a2 instanceof TwoA
+
+        cleanup:
+        context.close()
     }
 }

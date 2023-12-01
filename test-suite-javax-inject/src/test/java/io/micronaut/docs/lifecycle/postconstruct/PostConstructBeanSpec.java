@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.lifecycle.postconstruct;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +24,7 @@ public class PostConstructBeanSpec {
     @Test
     public void testBeanPostConstructWithJavax() {
         // tag::start[]
-        try(BeanContext ctx = BeanContext.run()) {
+        try(ApplicationContext ctx = ApplicationContext.run()) {
             final B bean = ctx.getBean(B.class);
             Assertions.assertNotNull(bean.getA());
             Assertions.assertTrue(bean.injectedFirst);

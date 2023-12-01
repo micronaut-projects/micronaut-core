@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.injectionpoint;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,12 +24,12 @@ class VehicleSpec {
 
     @Test
     void testStartVehicle() {
-        BeanContext beanContext = BeanContext.run();
-        Vehicle vehicle = beanContext.getBean(Vehicle.class);
+        ApplicationContext context = ApplicationContext.run();
+        Vehicle vehicle = context.getBean(Vehicle.class);
         System.out.println( vehicle.start() );
 
         assertEquals("Starting V6", vehicle.start());
 
-        beanContext.close();
+        context.close();
     }
 }

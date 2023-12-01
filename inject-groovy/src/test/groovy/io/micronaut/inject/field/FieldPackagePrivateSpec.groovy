@@ -16,25 +16,25 @@
 package io.micronaut.inject.field
 
 import groovy.transform.PackageScope
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Specification
 
 class FieldPackagePrivateSpec extends Specification {
 
     void "test that a package private field is injected correctly"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
 
         then:
         b.a instanceof AImpl
+
+        cleanup:
+        context.close()
     }
 
     static class B {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.primary
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import spock.lang.Specification
 /**
@@ -24,9 +24,8 @@ import spock.lang.Specification
 class PrimarySpec extends Specification {
 
     void "test the @Primary annotation influences bean selection"() {
-
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -36,16 +35,22 @@ class PrimarySpec extends Specification {
         b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+
+        cleanup:
+        context.close()
     }
 
     void "test duplicate @Primary bean throws exception"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        C c = context.getBean(C)
+        context.getBean(C)
 
         then:
         thrown(NonUniqueBeanException)
+
+        cleanup:
+        context.close()
     }
 }
