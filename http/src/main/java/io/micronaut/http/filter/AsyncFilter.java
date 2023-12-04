@@ -45,6 +45,19 @@ record AsyncFilter(InternalHttpFilter actual, Executor executor) implements Inte
     }
 
     @Override
+    public boolean hasContinuation() {
+        return actual.hasContinuation();
+    }
+
+    @Override
+    public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+        if (isFiltersRequest()) {
+            return ExecutionFlow.async(executor, () -> actual.processRequestFilter(context));
+        }
+        return InternalHttpFilter.super.processRequestFilter(context);
+    }
+
+    @Override
     public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
         if (isFiltersRequest()) {

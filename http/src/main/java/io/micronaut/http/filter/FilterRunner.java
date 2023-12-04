@@ -24,10 +24,10 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 
 import java.util.List;
 import java.util.ListIterator;
+import java.util.function.BiFunction;
 
 /**
  * The filter runner will start processing the filters in the forward order.
@@ -53,15 +53,17 @@ public class FilterRunner {
      * filters in the reverse order.
      */
     private final List<InternalHttpFilter> filters;
-    private final PropagatedContext initialPropagatedContext = PropagatedContext.getOrEmpty();
+    private final BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider;
 
     /**
      * Create a new filter runner, to be used only once.
      *
-     * @param filters The filters to run
+     * @param filters          The filters to run
+     * @param responseProvider The response provider
      */
-    public FilterRunner(List<GenericHttpFilter> filters) {
+    public FilterRunner(List<GenericHttpFilter> filters, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         this.filters = (List) filters; // GenericHttpFilter is sealed and all implementations implement InternalHttpFilter
+        this.responseProvider = responseProvider;
     }
 
     private static void checkOrdered(List<? extends GenericHttpFilter> filters) {
@@ -102,7 +104,7 @@ public class FilterRunner {
      * @return A flow that will be passed on to the next filter
      */
     @SuppressWarnings("java:S1452")
-    protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+    protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
         return ExecutionFlow.just(response);
     }
 
@@ -113,11 +115,12 @@ public class FilterRunner {
      * @param request           The current request
      * @param failure           The failure
      * @param propagatedContext The propagated context
-     * @return A flow that will be passed on to the next filter
+     * @return A flow that will be passed on to the next filter, or null if exception is not remapped
      */
+    @Nullable
     @SuppressWarnings("java:S1452")
-    protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
-        return ExecutionFlow.error(failure);
+    protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+        return null;
     }
 
     /**
@@ -127,67 +130,152 @@ public class FilterRunner {
      * @return The flow that completes after all filters and the terminal operation, with the final
      * response
      */
-    @SuppressWarnings("java:S1452")
-    public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
-        return (ExecutionFlow) filterRequest(new FilterContext(request, initialPropagatedContext), filters.listIterator());
+    public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request) {
+        return run(request, PropagatedContext.getOrEmpty());
     }
 
-    private ExecutionFlow<HttpResponse<?>> filterRequest(FilterContext context,
-                                                         ListIterator<InternalHttpFilter> iterator) {
-        return filterRequest0(context, iterator)
-            .flatMap(newContext -> {
-                if (newContext.response() != null) {
-                    return filterResponse(newContext, iterator, null);
-                }
-                return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
-            });
-    }
-
-    private ExecutionFlow<FilterContext> filterRequest0(FilterContext context,
-                                                        ListIterator<InternalHttpFilter> iterator) {
-        if (context.response() != null) {
-            return ExecutionFlow.just(context);
+    /**
+     * Execute the filters for the given request. May only be called once
+     *
+     * @param request The request
+     * @param propagatedContext The propagated context
+     * @return The flow that completes after all filters and the terminal operation, with the final
+     * response
+     */
+    public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request,
+                                                    PropagatedContext propagatedContext) {
+        ListIterator<InternalHttpFilter> iterator = filters.listIterator();
+        ExecutionFlow<FilterContext> flow = filterRequest(new FilterContext(request, propagatedContext), iterator);
+        FilterContext flowContext = flow.tryCompleteValue();
+        if (flowContext != null) {
+            return filterResponse(flowContext, iterator, null);
         }
-        if (iterator.hasNext()) {
+        return flow.flatMap(context -> filterResponse(context, iterator, null));
+    }
+
+    private ExecutionFlow<FilterContext> filterRequest(FilterContext context,
+                                                       ListIterator<InternalHttpFilter> iterator) {
+        while (iterator.hasNext()) {
             InternalHttpFilter filter = iterator.next();
-            return (filter.isFiltersRequest() ? filter.processRequestFilter(context, newContext -> filterRequest0(newContext, iterator)) : filterRequest0(context, iterator))
-                .onErrorResume(throwable -> {
-                    return processFailure(context.request(), throwable, context.propagatedContext()).map(context::withResponse)
-                        .onErrorResume(throwable2 -> {
-                            // Exception filtering scenario of the http client
-                            return filterResponse(context, iterator, throwable2).map(context::withResponse);
-                        });
+            if (!filter.isFiltersRequest()) {
+                continue;
+            }
+            // At-least one request filter
+            ExecutionFlow<FilterContext> flow;
+            if (filter.hasContinuation()) {
+                flow = filter.processRequestFilter(context, newContext -> {
+                    if (newContext.response() != null) {
+                        return ExecutionFlow.just(newContext);
+                    }
+                    return filterRequest(newContext, iterator);
                 });
-        } else {
-            return ExecutionFlow.just(context);
+            } else {
+                flow = filter.processRequestFilter(context);
+                FilterContext flowContext = flow.tryCompleteValue();
+                if (flowContext != null) {
+                    // Imperative flow: Unwrap the context and continue the loop
+                    if (context != flowContext) {
+                        if (flowContext.response() != null) {
+                            return ExecutionFlow.just(flowContext);
+                        }
+                        context = flowContext;
+                    }
+                    continue;
+                } else {
+                    // Reactive/Async request filter
+                    flow = flow.flatMap(newContext -> {
+                        if (newContext.response() != null) {
+                            return ExecutionFlow.just(newContext);
+                        }
+                        return filterRequest(newContext, iterator);
+                    });
+                }
+            }
+            FilterContext finalContext = context;
+            return flow.onErrorResume(throwable -> processFailureFilterException(finalContext, iterator, throwable));
         }
+        return provideResponse(context, iterator);
     }
 
     private ExecutionFlow<HttpResponse<?>> filterResponse(FilterContext context,
                                                           ListIterator<InternalHttpFilter> iterator,
                                                           @Nullable
                                                           Throwable exception) {
-        if (iterator.hasPrevious()) {
-            // Walk backwards and execute response filters
+        // Walk backwards and execute response filters
+        while (iterator.hasPrevious()) {
             InternalHttpFilter filter = iterator.previous();
-            return (filter.isFiltersResponse() ? filter.processResponseFilter(context, exception) : ExecutionFlow.just(context))
+            if (!filter.isFiltersResponse()) {
+                continue;
+            }
+            ExecutionFlow<FilterContext> flow = filter.processResponseFilter(context, exception);
+            FilterContext flowContext = flow.tryCompleteValue();
+            if (flowContext != null) {
+                // Imperative flow: Unwrap the context and continue the loop
+                if (context != flowContext) {
+                    // Response modified by the filter
+                    flow = processResponse(flowContext.request(), flowContext.response(), flowContext.propagatedContext()).map(flowContext::withResponse);
+                    exception = null;
+                    flowContext = flow.tryCompleteValue();
+                    if (flowContext != null) {
+                        context = flowContext;
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+            // Reactive/Async response filter or unwrap not allowed
+            FilterContext finalContext = context;
+            Throwable finalException = exception;
+            return flow
                 .flatMap(newContext -> {
-                    if (context != newContext) {
+                    if (finalContext != newContext) {
+                        // Response modified by the filter
                         return processResponse(newContext.request(), newContext.response(), newContext.propagatedContext()).map(newContext::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
-                .onErrorResume(throwable -> processFailure(context.request(), throwable, context.propagatedContext()).map(context::withResponse))
-                .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response() == null ? exception : null));
-        } else if (context.response() != null) {
+                .onErrorResume(throwable -> processFailurePropagateException(throwable, finalContext))
+                .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response() == null ? finalException : null));
+        }
+        if (context.response() != null) {
             return ExecutionFlow.just(context.response());
-        } else if (exception != null) {
+        }
+        if (exception != null) {
             // This scenario only applies for client filters
             // Filters didn't remap the exception to any response
             return ExecutionFlow.error(exception);
-        } else {
-            return ExecutionFlow.error(new IllegalStateException("No response after response filters completed!"));
         }
+        return ExecutionFlow.error(new IllegalStateException("No response after response filters completed!"));
+    }
+
+    private ExecutionFlow<FilterContext> processFailurePropagateException(Throwable throwable, FilterContext context) {
+        ExecutionFlow<HttpResponse<?>> flow = processFailure(context.request(), throwable, context.propagatedContext());
+        if (flow == null) {
+            return ExecutionFlow.error(throwable);
+        }
+        return flow.map(context::withResponse);
+    }
+
+    private ExecutionFlow<FilterContext> provideResponse(FilterContext context,
+                                                         ListIterator<InternalHttpFilter> iterator) {
+        ExecutionFlow<HttpResponse<?>> flow = responseProvider.apply(context.request(), context.propagatedContext());
+        if (flow.tryCompleteValue() != null) {
+            return flow.map(context::withResponse);
+        }
+        return flow.map(context::withResponse)
+            .onErrorResume(throwable -> processFailureFilterException(context, iterator, throwable));
+    }
+
+    private ExecutionFlow<FilterContext> processFailureFilterException(FilterContext context,
+                                                                       ListIterator<InternalHttpFilter> iterator,
+                                                                       Throwable throwable) {
+        ExecutionFlow<HttpResponse<?>> flow = processFailure(context.request(), throwable, context.propagatedContext());
+        if (flow == null) {
+            // Exception filtering scenario of the http client
+            return filterResponse(context, iterator, throwable).map(context::withResponse);
+        }
+        return flow.map(context::withResponse);
     }
 
 }

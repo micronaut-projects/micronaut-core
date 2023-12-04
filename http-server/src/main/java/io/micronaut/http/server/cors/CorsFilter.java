@@ -74,7 +74,7 @@ public class CorsFilter implements Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-    
+
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
     @Nullable
@@ -104,7 +104,7 @@ public class CorsFilter implements Ordered {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, corsOriginConfiguration);
             }
-            if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
+            if (validateMethodToMatch(request, corsOriginConfiguration).isEmpty()) {
                 return forbidden();
             }
             if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
@@ -156,7 +156,7 @@ public class CorsFilter implements Ordered {
         String host = httpHostResolver.resolve(request);
 
         return (
-            !corsOriginConfiguration.getAllowedOriginsRegex().isPresent() && isAny(corsOriginConfiguration.getAllowedOrigins())
+            corsOriginConfiguration.getAllowedOriginsRegex().isEmpty() && isAny(corsOriginConfiguration.getAllowedOrigins())
         ) && isHostLocal(host);
     }
 
@@ -334,7 +334,7 @@ public class CorsFilter implements Ordered {
         }
         List<String> allowedOrigins = config.getAllowedOrigins();
         return !allowedOrigins.isEmpty() && (
-            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+            (config.getAllowedOriginsRegex().isEmpty() && isAny(allowedOrigins)) ||
                 allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
         );
     }
@@ -422,7 +422,7 @@ public class CorsFilter implements Ordered {
     private Optional<HttpStatus> validatePreflightRequest(@NonNull HttpRequest<?> request,
                                                           @NonNull CorsOriginConfiguration config) {
         Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
-        if (!methodToMatchOptional.isPresent()) {
+        if (methodToMatchOptional.isEmpty()) {
             return Optional.of(HttpStatus.FORBIDDEN);
         }
         HttpMethod methodToMatch = methodToMatchOptional.get();

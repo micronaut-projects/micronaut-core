@@ -41,6 +41,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
@@ -74,6 +75,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -439,10 +441,10 @@ public final class RouteExecutor {
         return ExecutionFlow.just(forStatus(routeInfo, null).body(body));
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
+    ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
         ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
-        ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
+        ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
@@ -473,11 +475,11 @@ public final class RouteExecutor {
         return executeMethodResponseFlow;
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
-        try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+    private ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
+        try (PropagatedContext.Scope ignore = propagatedContext.plus(new ServerHttpRequestContext(httpRequest)).propagate()) {
             try {
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) routeMatch::execute);
+                Object body = routeMatch.execute();
                 if (body instanceof Optional optional) {
                     body = optional.orElse(null);
                 }
@@ -488,61 +490,67 @@ public final class RouteExecutor {
         }
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,
+    ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,
                                                                 HttpRequest<?> request,
                                                                 Object body,
                                                                 RouteInfo<?> routeInfo,
                                                                 @Nullable
                                                                 RouteMatch<?> routeMatch) {
         ExecutionFlow<MutableHttpResponse<?>> outgoingResponse;
+        MutableHttpResponse<?> response = null;
         if (body == null) {
             if (routeInfo.isVoid()) {
-                MutableHttpResponse<Object> data = forStatus(routeInfo);
+                response = forStatus(routeInfo);
                 if (request.getMethod().permitsRequestBody()) {
-                    data.header(HttpHeaders.CONTENT_LENGTH, "0");
+                    response.header(HttpHeaders.CONTENT_LENGTH, "0");
                 }
-                outgoingResponse = ExecutionFlow.just(data);
             } else {
-                outgoingResponse = ExecutionFlow.just(newNotFoundError(request));
+                response = newNotFoundError(request);
             }
+        } else if (body instanceof String) {
+            // Micro-optimization for String values
+            response = forStatus(routeInfo, null).body(body);
+        } else if (body instanceof HttpStatus httpStatus) {
+            response = HttpResponse.status(httpStatus);
+        }
+        if (response != null) {
+            return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
+        }
+        // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
+        boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
+        if (isReactive) {
+            outgoingResponse = ReactiveExecutionFlow.fromPublisher(
+                ReactivePropagation.propagate(
+                    propagatedContext,
+                    fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
+                )
+            );
         } else {
-            // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
-            boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-            if (isReactive) {
-                outgoingResponse = ReactiveExecutionFlow.fromPublisher(
-                    ReactivePropagation.propagate(
-                        propagatedContext,
-                        fromReactiveExecute(propagatedContext, request, body, routeInfo)
-                    )
-                );
-            } else if (body instanceof HttpStatus httpStatus) { // now we have the raw result, transform it as necessary
-                outgoingResponse = ExecutionFlow.just(HttpResponse.status(httpStatus));
+            if (routeInfo.isSuspended()) {
+                outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
             } else {
-                if (routeInfo.isSuspended()) {
-                    outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
-                } else {
-                    outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
-                }
+                outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
             }
         }
-        outgoingResponse = outgoingResponse.map(response -> {
-            // for head request we never emit the body
-            if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
-                final Object o = response.getBody().orElse(null);
-                if (o instanceof ReferenceCounted referenceCounted) {
-                    referenceCounted.release();
-                }
-                response.body(null);
+        return outgoingResponse.map(res -> finaliseResponse(request, routeInfo, routeMatch, res));
+    }
+
+    private MutableHttpResponse<?> finaliseResponse(HttpRequest<?> request, RouteInfo<?> routeInfo, RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
+        // for head request we never emit the body
+        if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
+            final Object o = response.getBody().orElse(null);
+            if (o instanceof ReferenceCounted referenceCounted) {
+                referenceCounted.release();
             }
-            applyConfiguredHeaders(response.getHeaders());
-            if (routeMatch != null) {
-                response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
-            }
-            response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
-            response.bodyWriter((MessageBodyWriter) routeInfo.getMessageBodyWriter());
-            return response;
-        });
-        return outgoingResponse;
+            response.body(null);
+        }
+        applyConfiguredHeaders(response.getHeaders());
+        if (routeMatch != null) {
+            response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        }
+        response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+        response.bodyWriter((MessageBodyWriter) routeInfo.getMessageBodyWriter());
+        return response;
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> fromKotlinCoroutineExecute(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {

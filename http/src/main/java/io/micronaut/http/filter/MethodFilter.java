@@ -80,6 +80,7 @@ record MethodFilter<T>(FilterOrder order,
                        FilterArgBinder[] argBinders,
                        @Nullable
                        Predicate<FilterMethodContext> filterCondition,
+                       @Nullable
                        ContinuationCreator continuationCreator,
                        boolean filtersException,
                        boolean waitForBody,
@@ -238,29 +239,38 @@ record MethodFilter<T>(FilterOrder order,
     }
 
     @Override
+    public boolean hasContinuation() {
+        return continuationCreator != null;
+    }
+
+    @Override
+    public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+        if (continuationCreator != null) {
+            throw new IllegalStateException("Downstream callback is required for filters with a continuation");
+        }
+        FilterMethodContext filterMethodContext = new FilterMethodContext(
+            MutablePropagatedContext.of(context.propagatedContext()),
+            context.request(),
+            context.response(),
+            null,
+            null);
+        return filter(context, filterMethodContext);
+    }
+
+    @Override
     public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
-        MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-        ExecutionFlow<FilterContext> filterMethodFlow;
-        InternalFilterContinuation<?> continuation;
-        if (continuationCreator != null) {
-            continuation = createContinuation(downstream, context, mutablePropagatedContext);
-        } else {
-            continuation = null;
+        if (continuationCreator == null) {
+            throw new IllegalStateException("Downstream method shouldn't be called when continuation is missing!");
         }
+        MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(context.propagatedContext());
         FilterMethodContext filterMethodContext = new FilterMethodContext(
             mutablePropagatedContext,
             context.request(),
             context.response(),
             null,
-            continuation);
-        try (PropagatedContext.Scope ignore = context.propagatedContext().propagate()) {
-            filterMethodFlow = filter(context, filterMethodContext);
-        }
-        if (continuationCreator != null) {
-            return filterMethodFlow;
-        }
-        return filterMethodFlow.flatMap(downstream);
+            createContinuation(downstream, context, mutablePropagatedContext));
+        return filter(context, filterMethodContext);
     }
 
     @Override
@@ -271,17 +281,13 @@ record MethodFilter<T>(FilterOrder order,
         if (continuationCreator != null) {
             return ExecutionFlow.error(new IllegalStateException("Response filter cannot have a continuation!"));
         }
-        PropagatedContext propagatedContext = context.propagatedContext();
-        MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(propagatedContext);
         FilterMethodContext filterMethodContext = new FilterMethodContext(
-            mutablePropagatedContext,
+            MutablePropagatedContext.of(context.propagatedContext()),
             context.request(),
             context.response(),
             exceptionToFilter,
             null);
-        try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-            return filter(context, filterMethodContext);
-        }
+        return filter(context, filterMethodContext);
     }
 
     @Override
@@ -297,7 +303,7 @@ record MethodFilter<T>(FilterOrder order,
 
     private ExecutionFlow<FilterContext> filter(FilterContext filterContext,
                                                 FilterMethodContext methodContext) {
-        try {
+        try (PropagatedContext.Scope ignore = filterContext.propagatedContext().propagate()) {
             if (filterCondition != null && !filterCondition.test(methodContext)) {
                 return ExecutionFlow.just(filterContext);
             }
@@ -674,7 +680,8 @@ record MethodFilter<T>(FilterOrder order,
         private final MutablePropagatedContext mutablePropagatedContext;
 
         private BlockingContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
-                                         FilterContext filterContext, MutablePropagatedContext mutablePropagatedContext) {
+                                         FilterContext filterContext,
+                                         MutablePropagatedContext mutablePropagatedContext) {
             this.downstream = downstream;
             this.filterContext = filterContext;
             this.mutablePropagatedContext = mutablePropagatedContext;

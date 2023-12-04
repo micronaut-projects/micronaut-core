@@ -208,7 +208,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             );
             outboundAccess.attachment(errorRequest);
             try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
-                new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+                new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
             }
             if (request instanceof StreamedHttpRequest streamed) {
                 streamed.closeIfNoSubscriber();
@@ -224,14 +224,14 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
         outboundAccess.attachment(mnRequest);
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
-            new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
+            new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest);
         }
     }
 
     public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,
-                       NettyHttpRequest<?> nettyHttpRequest,
-                       MutableHttpResponse<?> response,
-                       Throwable throwable) {
+                              NettyHttpRequest<?> nettyHttpRequest,
+                              HttpResponse<?> response,
+                              Throwable throwable) {
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
         }
@@ -288,8 +288,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private void encodeHttpResponse(
         PipeliningServerHandler.OutboundAccess outboundAccess,
         NettyHttpRequest<?> nettyRequest,
-        MutableHttpResponse<?> response,
+        HttpResponse<?> httpResponse,
         Object body) {
+        MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
             @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
 

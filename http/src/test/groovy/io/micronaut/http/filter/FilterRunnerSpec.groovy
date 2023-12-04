@@ -24,10 +24,11 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
+import java.util.function.Supplier
 
 class FilterRunnerSpec extends Specification {
-    private FilterRunner filterRunner(List<GenericHttpFilter> filters) {
-        return new FilterRunner(filters)
+    private FilterRunner filterRunner(List<GenericHttpFilter> filters, Supplier<ExecutionFlow<HttpResponse>> responseProvider) {
+        return new FilterRunner(filters, (filteredRequest, propagatedContext) -> responseProvider.get())
     }
 
     def 'simple tasks should not suspend'() {
@@ -41,15 +42,14 @@ class FilterRunnerSpec extends Specification {
                 before(ReturnType.of(void)) { req ->
                     events.add("before")
                     null
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        def result = filterRunner(filters).run(HttpRequest.GET("/")).tryComplete().value
+        def result = filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")).tryComplete().value
         then:
         result.status() == HttpStatus.OK
         events == ["before", "terminal", "after"]
@@ -71,16 +71,14 @@ class FilterRunnerSpec extends Specification {
                         events.add("after")
                         return resp2
                     })
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    assert req == req2
-                    events.add("terminal")
-                    ExecutionFlow.just(resp1)
-                })
+                }
         ]
 
         when:
-        def result = await(filterRunner(filters).run(req1))
+        def result = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(req1))
         then:
         result != null
         events == ["before", "terminal", "after"]
@@ -106,17 +104,16 @@ class FilterRunnerSpec extends Specification {
                         Flux.from(chain.proceed(request))
                             .contextWrite { it.put('value', 'around 2') }
                     }
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
-                        events.add('terminal: ' + ctx.get('value'))
-                        Mono.just(HttpResponse.ok("resp1"))
-                    }))
-                })
+                }
         ]
 
         when:
-        def runner = filterRunner(filters)
+        def runner = filterRunner(filters, {
+            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
+                events.add('terminal: ' + ctx.get('value'))
+                Mono.just(HttpResponse.ok("resp1"))
+            }))
+        })
         def result = await(
                 ReactiveExecutionFlow.fromFlow(
                         runner.run(HttpRequest.GET("/req1"))
@@ -151,17 +148,16 @@ class FilterRunnerSpec extends Specification {
                                 .doOnNext { events.add('next 2') }
                                 .contextWrite { it.put('value', 'around 2') }
                     }
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
-                        events.add('terminal: ' + ctx.get('value'))
-                        Mono.just(HttpResponse.ok("resp1"))
-                    }))
-                })
+                }
         ]
 
         when:
-        def runner = filterRunner(filters)
+        def runner = filterRunner(filters, {
+            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
+                events.add('terminal: ' + ctx.get('value'))
+                Mono.just(HttpResponse.ok("resp1"))
+            }))
+        })
         def result = await(
                 ReactiveExecutionFlow.fromFlow(
                         runner.run(HttpRequest.GET("/req1"))
@@ -180,15 +176,14 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                before(ReturnType.of(void)) { throw testExc },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                before(ReturnType.of(void)) { throw testExc }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -200,15 +195,14 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                after(ReturnType.of(void)) { req, resp -> throw testExc },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                after(ReturnType.of(void)) { req, resp -> throw testExc }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -218,14 +212,10 @@ class FilterRunnerSpec extends Specification {
     def 'exception in terminal: direct'() {
         given:
         def testExc = new RuntimeException("Test exception")
-        List<GenericHttpFilter> filters = [
-            GenericHttpFilter.terminalFilter (req -> {
-                    throw testExc
-                })
-        ]
+        List<GenericHttpFilter> filters = []
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, { throw testExc }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -234,14 +224,10 @@ class FilterRunnerSpec extends Specification {
     def 'exception in terminal: flow'() {
         given:
         def testExc = new Exception("Test exception")
-        List<GenericHttpFilter> filters = [
-            GenericHttpFilter.terminalFilter (req -> {
-                    return ExecutionFlow.error(testExc)
-                })
-        ]
+        List<GenericHttpFilter> filters = []
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, { ExecutionFlow.error(testExc) }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -254,15 +240,14 @@ class FilterRunnerSpec extends Specification {
         List<GenericHttpFilter> filters = [
                 around(legacy) { request, chain ->
                     throw testExc
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -279,15 +264,14 @@ class FilterRunnerSpec extends Specification {
         List<GenericHttpFilter> filters = [
                 around(legacy) { request, chain ->
                     return Flux.from(chain.proceed(request)).map(r -> { throw testExc })
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -306,15 +290,14 @@ class FilterRunnerSpec extends Specification {
                 around(legacy) { request, chain ->
                     Flux.from(chain.proceed(request)).subscribe()
                     throw testExc
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -333,14 +316,13 @@ class FilterRunnerSpec extends Specification {
                 around(legacy) { request, chain ->
                     Flux.from(chain.proceed(request)).subscribe()
                     throw testExc
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    CompletableFutureExecutionFlow.just(terminalFuture)
-                })
+                }
         ]
 
         when:
-        def flow = filterRunner(filters).run(HttpRequest.GET("/"))
+        def flow = filterRunner(filters, {
+                CompletableFutureExecutionFlow.just(terminalFuture)
+        }).run(HttpRequest.GET("/"))
         // after the run() call, we're suspended waiting for the terminal to finish
         // this exception is logged and dropped
         terminalFuture.completeExceptionally(new RuntimeException("Test exception 2"))
@@ -360,15 +342,14 @@ class FilterRunnerSpec extends Specification {
                 around(legacy) { request, chain ->
                     events.add("around")
                     Flux.just(HttpResponse.ok("foo"))
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/"))).value
         then:
         resp.status == HttpStatus.OK
         events == ["around"]
@@ -387,16 +368,14 @@ class FilterRunnerSpec extends Specification {
                     assert req == req1
                     events.add("before")
                     req2
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    assert req == req2
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(req1))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -408,15 +387,14 @@ class FilterRunnerSpec extends Specification {
                 before(ReturnType.of(HttpResponse)) {
                     events.add("before")
                     HttpResponse.ok()
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         events == ["before"]
     }
@@ -431,16 +409,14 @@ class FilterRunnerSpec extends Specification {
                     assert req == req1
                     events.add("before")
                     Flux.just(req2)
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    assert req == req2
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(req1))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -455,16 +431,14 @@ class FilterRunnerSpec extends Specification {
                     assert req == req1
                     events.add("before")
                     CompletableFuture.completedFuture(req2)
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    assert req == req2
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(req1))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -476,15 +450,14 @@ class FilterRunnerSpec extends Specification {
                 before(ReturnType.of(Flux, Argument.of(HttpResponse))) {
                     events.add("before")
                     Flux.just(HttpResponse.ok())
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
         then:
         events == ["before"]
     }
@@ -499,15 +472,14 @@ class FilterRunnerSpec extends Specification {
                     assert resp == resp1
                     events.add("after")
                     resp2
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(resp1)
-                })
+                }
         ]
 
         when:
-        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
         then:
         resp == resp2
         events == ["terminal", "after"]
@@ -523,15 +495,14 @@ class FilterRunnerSpec extends Specification {
                     assert resp == resp1
                     events.add("after")
                     Flux.just(resp2)
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.just(resp1)
-                })
+                }
         ]
 
         when:
-        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
         then:
         resp == resp2
         events == ["terminal", "after"]
@@ -545,15 +516,14 @@ class FilterRunnerSpec extends Specification {
                 after(ReturnType.of(void)) {
                     events.add("after")
                     null
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.error(testExc)
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.error(testExc)
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -570,15 +540,14 @@ class FilterRunnerSpec extends Specification {
                     assert exc == testExc
                     events.add("after")
                     resp1
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.error(testExc)
-                })
+                }
         ]
 
         when:
-        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.error(testExc)
+        }).run(HttpRequest.GET("/"))).value
         then:
         resp == resp1
         events == ["terminal", "after"]
@@ -592,15 +561,14 @@ class FilterRunnerSpec extends Specification {
                 after(ReturnType.of(void)) { RuntimeException exc ->
                     events.add("after")
                     null
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal")
-                    ExecutionFlow.error(testExc)
-                })
+                }
         ]
 
         when:
-        await(filterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.error(testExc)
+        }).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -644,11 +612,7 @@ class FilterRunnerSpec extends Specification {
                 after(ReturnType.of(void)) {
                     events.add("after3 " + Thread.currentThread().name)
                     null
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    events.add("terminal " + Thread.currentThread().name)
-                    ExecutionFlow.just(HttpResponse.ok())
-                })
+                }
         ]
 
         when:
@@ -657,7 +621,10 @@ class FilterRunnerSpec extends Specification {
             Thread newThread(Runnable r) {
                 return new Thread(r, "thread-outside")
             }
-        }), () -> filterRunner(filters).run(HttpRequest.GET("/")))).value
+        }), () -> filterRunner(filters, {
+            events.add("terminal " + Thread.currentThread().name)
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))).value
         then:
         response.status() == HttpStatus.OK
         events == ["before1 thread-outside", "before2 thread-before", "before3 thread-before", "terminal thread-before", "after3 thread-before", "after2 thread-after", "after1 thread-after"]
@@ -678,16 +645,14 @@ class FilterRunnerSpec extends Specification {
                     assert resp == resp1
                     events.add("after")
                     return resp2
-                },
-                GenericHttpFilter.terminalFilter (req -> {
-                    assert req == req2
-                    events.add("terminal")
-                    ExecutionFlow.just(resp1)
-                })
+                }
         ]
 
         when:
-        def result = await(filterRunner(filters).run(req1))
+        def result = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(req1))
         then:
         result != null
         events == ["before", "terminal", "after"]
