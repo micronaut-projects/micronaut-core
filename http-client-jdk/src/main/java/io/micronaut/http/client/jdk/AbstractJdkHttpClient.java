@@ -382,8 +382,7 @@ abstract class AbstractJdkHttpClient {
                 return ExecutionFlow.error(e);
             }
         });
-        return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher())
-            .map(x -> x);
+        return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
     }
 
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
