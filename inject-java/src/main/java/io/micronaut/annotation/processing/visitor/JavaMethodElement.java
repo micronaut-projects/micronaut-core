@@ -166,14 +166,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             return false;
         }
         if (overridden instanceof JavaMethodElement javaMethodElement) {
-            boolean overrides = visitorContext.getElements().overrides(
+            return visitorContext.getElements().overrides(
                 executableElement,
                 javaMethodElement.executableElement,
                 owningType.classElement
             );
-            if (overrides) {
-                return true;
-            }
         }
         return MethodElement.super.overrides(overridden);
     }
