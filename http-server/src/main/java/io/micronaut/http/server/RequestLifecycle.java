@@ -179,7 +179,7 @@ public class RequestLifecycle {
     }
 
     /**
-     * Handle an error in this request. Also runs filters for the error handling.
+     * Handle an error in this request. It also runs filters for the error handling.
      *
      * @param request   The request
      * @param throwable The error
@@ -285,21 +285,25 @@ public class RequestLifecycle {
      * @return Execution flow that completes after the all the filters and the downstream flow
      */
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
-        List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-        FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
-            @Override
-            protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
-                RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
-                return handleStatusException(request, response, routeInfo, propagatedContext)
-                    .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
-            }
+        try {
+            List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
+            FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+                    RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext)
+                        .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
+                }
 
-            @Override
-            protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
-                return onErrorNoFilter(request, failure, propagatedContext);
-            }
-        };
-        return filterRunner.run(request);
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+                    return onErrorNoFilter(request, failure, propagatedContext);
+                }
+            };
+            return filterRunner.run(request);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> handleStatusException(HttpRequest<?> request,

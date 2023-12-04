@@ -44,8 +44,20 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry {
      * @param method The HTTP method
      * @param uri    The URI
      * @return An {@link Optional} of {@link HttpFilter}
+     * @deprecated Replaced with {@link #match(HttpMethod, String)}.
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     Optional<GenericHttpFilter> match(HttpMethod method, URI uri);
+
+    /**
+     * Matches the given path to this filter route.
+     *
+     * @param method The HTTP method
+     * @param path   The path
+     * @return An {@link Optional} of {@link HttpFilter}
+     * @since 4.3.0
+     */
+    Optional<GenericHttpFilter> match(HttpMethod method, String path);
 
     /**
      * Add an addition pattern to this filter route.

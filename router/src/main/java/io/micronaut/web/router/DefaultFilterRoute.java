@@ -126,13 +126,17 @@ class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public Optional<GenericHttpFilter> match(HttpMethod method, URI uri) {
+        return match(method, uri.getPath());
+    }
+
+    @Override
+    public Optional<GenericHttpFilter> match(HttpMethod method, String path) {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
-        String uriStr = uri.getPath();
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
-            if (matcher.matches(pattern, uriStr)) {
+            if (matcher.matches(pattern, path)) {
                 GenericHttpFilter filter = getFilter();
                 if (!GenericHttpFilter.isEnabled(filter)) {
                     return Optional.empty();

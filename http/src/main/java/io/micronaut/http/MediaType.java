@@ -200,7 +200,7 @@ public class MediaType implements CharSequence {
     public static final String APPLICATION_JSON_MERGE_PATCH = "application/merge-patch+json";
 
     /**
-     * JSON Merge Patch: application/merge-patch+json
+     * JSON Merge Patch: application/merge-patch+json.
      */
     public static final MediaType APPLICATION_JSON_MERGE_PATCH_TYPE = new MediaType(MediaType.APPLICATION_JSON_MERGE_PATCH);
 
