@@ -46,6 +46,7 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -69,6 +70,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.AttributeKey;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -214,6 +216,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 ((FullHttpRequest) request).release();
             }
             return;
+        }
+        if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+            // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
+            AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+            ctx.channel().attr(KEY).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {

@@ -192,10 +192,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
         Objects.requireNonNull(environment, "Environment cannot be null");
-        Channel channel = ctx.channel();
-        if (channel != null) {
-            channel.attr(ServerAttributeKeys.REQUEST_KEY).set(this);
-        }
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
@@ -669,19 +665,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             return Optional.ofNullable(contentType);
         }
-    }
-
-    /**
-     * Remove the current request from the context.
-     *
-     * @param ctx The context
-     * @return The request or null if it is not present
-     */
-    static NettyHttpRequest remove(ChannelHandlerContext ctx) {
-        Channel channel = ctx.channel();
-
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
-        return attr.getAndSet(null);
     }
 
     private BodyConvertor newBodyConvertor() {
