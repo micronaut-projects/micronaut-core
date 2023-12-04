@@ -1116,13 +1116,13 @@ interface Deserializer<T> {
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
@@ -1156,15 +1156,15 @@ interface Deserializer<T> {
             // Arrays are not resolved as KotlinClassElements or placeholders
         then: "The first is a placeholder"
             serdeTypeParam.simpleName == "String[]"
-            serdeTypeParam.isTypeVariable()
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
             serializerTypeParam.simpleName == "String[]"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
             deserializerTypeParam.simpleName == "String[]"
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test inline class return type"() {
