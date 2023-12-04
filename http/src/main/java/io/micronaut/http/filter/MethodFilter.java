@@ -67,7 +67,6 @@ import java.util.function.Predicate;
  * @param filtersException    The filter exception
  * @param waitForBody         Should it wait for the body
  * @param returnHandler       The return handler
- * @param isConditional       Is conditional filter
  * @param <T>                 The bean type
  * @author Jonas Konrad
  * @author Denis Stepanov
