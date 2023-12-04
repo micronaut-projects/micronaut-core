@@ -44,8 +44,10 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalQuery;
 import java.util.Date;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -81,6 +83,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");
     private static final int MILLIS = 3;
+
+    private final Map<String, DateTimeFormatter> formattersCache = new ConcurrentHashMap<>();
 
     @NextMajorVersion("Consider deletion of LocalDate and LocalDateTime converters")
     @Override
@@ -184,7 +188,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             // try explicit format first
             Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
             if (format.isPresent()) {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format.get(), context.getLocale());
+                DateTimeFormatter formatter = getFormatter(format.get(), context);
                 try {
                     T converted = formatter.parse(object, query);
                     return Optional.of(converted);
@@ -216,7 +220,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             // try explicit format first
             Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
             if (format.isPresent()) {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format.get(), context.getLocale());
+                DateTimeFormatter formatter = getFormatter(format.get(), context);
                 try {
                     CharSequence converted = formatter.format(object);
                     return Optional.of(converted);
@@ -240,6 +244,18 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         });
+    }
+
+    private DateTimeFormatter getFormatter(String pattern, ConversionContext context) {
+        var key = pattern + context.getLocale();
+        var cachedFormater = formattersCache.get(key);
+        if (cachedFormater != null) {
+            return cachedFormater;
+        }
+        var formatter = DateTimeFormatter.ofPattern(pattern, context.getLocale());
+        formattersCache.put(key, formatter);
+
+        return formatter;
     }
 
     private <T extends TemporalAccessor> void addTemporalToDateConverter(MutableConversionService conversionService, Class<T> temporalType, Function<T, Instant> toInstant) {
