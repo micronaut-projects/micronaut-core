@@ -473,6 +473,9 @@ internal open class KotlinClassElement(
     override fun isTypeVariable() = typeVariable
 
     override fun isAssignable(type: String): Boolean {
+        if (internalName == type) {
+            return true // Same type
+        }
         val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
         if (otherDeclaration != null) {
             if (declaration == otherDeclaration) {
@@ -512,6 +515,9 @@ internal open class KotlinClassElement(
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
+        if (equals(type)) {
+            return true // Same type
+        }
         if (type is KotlinClassElement) {
             return type.plainKotlinType.isAssignableFrom(plainKotlinType)
         }
