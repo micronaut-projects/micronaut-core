@@ -20,11 +20,13 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -52,7 +54,6 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private static final RequestArgumentBinder[] ZERO_BINDERS = new RequestArgumentBinder[0];
     private final MethodExecutionHandle<T, R> targetMethod;
     private final String[] argumentNames;
-    private final Map<String, Argument<?>> requiredInputs;
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
     private final Optional<Argument<?>> optionalFullBodyArgument;
@@ -76,17 +77,18 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
 
         Argument<?>[] arguments = targetMethod.getArguments();
          argumentNames = new String[arguments.length];
+        Map<String, Argument<?>> requiredInputs;
         if (arguments.length > 0) {
-            Map<String, Argument<?>> requiredInputs = CollectionUtils.newLinkedHashMap(arguments.length);
+            Map<String, Argument<?>> ri = CollectionUtils.newLinkedHashMap(arguments.length);
             for (int i = 0; i < arguments.length; i++) {
                 Argument<?> requiredArgument = arguments[i];
                 String inputName = resolveInputName(requiredArgument);
-                requiredInputs.put(inputName, requiredArgument);
+                ri.put(inputName, requiredArgument);
                 argumentNames[i] = inputName;
             }
-            this.requiredInputs = Collections.unmodifiableMap(requiredInputs);
+            requiredInputs = ri;
         } else {
-            this.requiredInputs = Collections.emptyMap();
+            requiredInputs = Collections.emptyMap();
         }
         if (returnType.isVoid()) {
             isVoid = true;
@@ -104,7 +106,10 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         }
         optionalFullBodyArgument = super.getFullRequestBodyType();
         this.messageBodyReader = optionalBodyArgument.flatMap(b -> {
-            if (b.isAsyncOrReactive() || b.isOptional()) {
+            if (b.getAnnotationMetadata().stringValue(Body.class).isPresent() || !b.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                // Special case for `@Body("myProperty")`
+                b = Argument.of(ConvertibleValues.class);
+            } else if (b.isAsyncOrReactive() || b.isOptional()) {
                 b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
             return messageBodyHandlerRegistry.findReader(b, consumesMediaTypes);
