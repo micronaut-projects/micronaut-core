@@ -179,7 +179,7 @@ public class RequestLifecycle {
     }
 
     /**
-     * Handle an error in this request. Also runs filters for the error handling.
+     * Handle an error in this request. It also runs filters for the error handling.
      *
      * @param request   The request
      * @param throwable The error
