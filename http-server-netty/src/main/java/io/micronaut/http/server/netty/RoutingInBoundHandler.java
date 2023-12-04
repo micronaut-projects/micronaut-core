@@ -439,11 +439,26 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.writeFull(fullResponse, request.getMethod() == HttpMethod.HEAD);
         }
 
+        log(request, nettyResponse);
+    }
+
+    private void writeFinalFullNettyResponse(MutableHttpResponse<?> message,
+                                             NettyHttpRequest<?> request,
+                                             PipeliningServerHandler.OutboundAccess outboundAccess,
+                                             ByteBuf byteBuf) {
+        // default Connection header if not set explicitly
+        closeConnectionIfError(message, request, outboundAccess);
+        FullHttpResponse fullResponse = NettyHttpResponseBuilder.toFullHttpResponse(message, byteBuf);
+        outboundAccess.writeFull(fullResponse, request.getMethod() == HttpMethod.HEAD);
+        log(request, fullResponse);
+    }
+
+    private void log(HttpRequest<?> request, io.netty.handler.codec.http.HttpResponse nettyResponse) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",
                 nettyResponse.status().code(),
-                ((HttpRequest<?>) request).getMethodName(),
-                ((HttpRequest<?>) request).getUri());
+                request.getMethodName(),
+                request.getUri());
         }
     }
 
@@ -535,9 +550,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 type,
                 mediaType,
                 object,
-                outgoingResponse.getHeaders(), bufferFactory);
-            outgoingResponse.body((Object) byteBuffer.asNativeBuffer());
-            writeFinalNettyResponse(outgoingResponse, (NettyHttpRequest<?>) request, (PipeliningServerHandler.OutboundAccess) nettyContext);
+                outgoingResponse.getHeaders(),
+                bufferFactory);
+            ByteBuf buffer = (ByteBuf) byteBuffer.asNativeBuffer();
+            writeFinalFullNettyResponse(outgoingResponse,
+                (NettyHttpRequest<?>) request,
+                (PipeliningServerHandler.OutboundAccess) nettyContext,
+                buffer);
         }
 
         @Override
