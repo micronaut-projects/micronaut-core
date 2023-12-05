@@ -449,8 +449,12 @@ public class RequestLifecycle {
      * @return The fulfilled route match, after all necessary data is available
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        // try to fulfill the argument requirements of the route
-        routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
-        return ExecutionFlow.just(routeMatch);
+        try {
+            // try to fulfill the argument requirements of the route
+            routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
+            return ExecutionFlow.just(routeMatch);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
     }
 }
