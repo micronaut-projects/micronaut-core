@@ -14,6 +14,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SuppressWarnings("java:S2187") // This runs a suite of tests, but has no tests of its own
 @ExcludeClassNamePatterns({
     "io.micronaut.http.client.tck.tests.ContinueTest", // Unsupported body type errors
+    "io.micronaut.http.client.tck.tests.ContentLengthHeaderTest", // GET requests add content-length header until https://github.com/openjdk/jdk/commit/6a7709320d28d8e1593b113fdf39ab583fca3687
 })
 public class JdkHttpMethodTests {
 }
