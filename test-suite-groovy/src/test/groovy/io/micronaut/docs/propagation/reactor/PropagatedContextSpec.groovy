@@ -5,6 +5,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -19,9 +20,10 @@ class PropagatedContextSpec extends Specification {
 
     void "test Mono Request"() {
         when:
-        String hello = client.toBlocking().retrieve(HttpRequest.GET('/hello'), Argument.of(String.class))
+        URI uri = UriBuilder.of('/hello').queryParam('name', 'Dean').build()
+        String hello = client.toBlocking().retrieve(HttpRequest.GET(uri), Argument.of(String))
 
         then:
-        'Hello, World' == hello
+        'Hello, Dean' == hello
     }
 }
