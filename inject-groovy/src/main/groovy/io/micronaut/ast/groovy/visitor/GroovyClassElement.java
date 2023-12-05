@@ -585,6 +585,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public boolean isAssignable(ClassElement type) {
+        if (equals(type)) {
+            return true; // Same type
+        }
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type.getName());
     }
 
