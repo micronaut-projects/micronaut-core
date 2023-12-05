@@ -147,6 +147,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
+    private boolean validateUrl = true;
 
     /**
      * Default constructor.
@@ -531,6 +532,24 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setDispatchOptionsRequests(boolean dispatchOptionsRequests) {
         this.dispatchOptionsRequests = dispatchOptionsRequests;
+    }
+
+    /**
+     * If the url should be validated by converting it to {@link java.net.URI}.
+     *
+     * @param validateUrl The validate URL value
+     * @since 4.3.0
+     */
+    public void setValidateUrl(boolean validateUrl) {
+        this.validateUrl = validateUrl;
+    }
+
+    /**
+     * @return True if the url should be validated
+     * @since 4.3.0
+     */
+    public boolean isValidateUrl() {
+        return validateUrl;
     }
 
     /**

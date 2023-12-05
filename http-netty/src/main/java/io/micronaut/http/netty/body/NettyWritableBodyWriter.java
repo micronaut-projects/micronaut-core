@@ -75,7 +75,7 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
         ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
         MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
         if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+            outgoingHeaders.contentType(mediaType);
         }
         try (ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf)) {
             DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(

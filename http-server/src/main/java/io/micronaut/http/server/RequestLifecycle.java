@@ -71,17 +71,17 @@ public class RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RequestLifecycle.class);
 
     private final RouteExecutor routeExecutor;
-    private boolean multipartEnabled = true;
+    private final boolean multipartEnabled;
+    private final boolean validateUrl;
 
     /**
      * @param routeExecutor The route executor to use for route resolution
      */
     protected RequestLifecycle(RouteExecutor routeExecutor) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
-    }
-
-    protected final void multipartEnabled(boolean multipartEnabled) {
-        this.multipartEnabled = multipartEnabled;
+        this.validateUrl = routeExecutor.serverConfiguration.isValidateUrl();
+        Optional<Boolean> isMultiPartEnabled = routeExecutor.serverConfiguration.getMultipart().getEnabled();
+        this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
     }
 
     /**
@@ -91,48 +91,68 @@ public class RequestLifecycle {
      * @return The response to the request.
      */
     protected final ExecutionFlow<HttpResponse<?>> normalFlow(HttpRequest<?> request) {
-        Objects.requireNonNull(request, "request");
-        if (!multipartEnabled) {
-            MediaType contentType = request.getContentType().orElse(null);
-            if (contentType != null &&
-                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
-                        request.getMethodName(), contentType);
+        try {
+            Objects.requireNonNull(request, "request");
+            if (!multipartEnabled) {
+                MediaType contentType = request.getContentType().orElse(null);
+                if (contentType != null &&
+                    contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
+                            request.getMethodName(), contentType);
+                    }
+                    return onStatusError(
+                        request,
+                        HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                        "Content Type [" + contentType + "] not allowed"
+                    );
                 }
+            }
+
+            UriRouteMatch<Object, Object> routeMatch = routeExecutor.findRouteMatch(request);
+            if (routeMatch == null) {
+                if (validateUrl) {
+                    try {
+                        request.getUri(); // Invalid url will throw an exception
+                    } catch (Throwable t) {
+                        return onError(request, t.getCause());
+                    }
+                }
+                //Check if there is a file for the route before returning route not found
+                FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
+                if (fileCustomizableResponseType != null) {
+                    return runWithFilters(request, (filteredRequest, propagatedContext)
+                        -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
+                }
+                return onRouteMiss(request);
+            }
+
+            RouteExecutor.setRouteAttributes(request, routeMatch);
+
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
+            }
+            // all ok proceed to try and execute the route
+            if (routeMatch.getRouteInfo().isWebSocketRoute()) {
                 return onStatusError(
                     request,
-                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                    "Content Type [" + contentType + "] not allowed"
-                );
+                    HttpResponse.status(HttpStatus.BAD_REQUEST),
+                    "Not a WebSocket request");
             }
-        }
 
-        UriRouteMatch<Object, Object> routeMatch = routeExecutor.findRouteMatch(request);
-        if (routeMatch == null) {
-            //Check if there is a file for the route before returning route not found
-            FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
-            if (fileCustomizableResponseType != null) {
-                return runWithFilters(request, (filteredRequest, propagatedContext)
-                    -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
-            }
-            return onRouteMiss(request);
+            return runWithFilters(request, (filteredRequest, propagatedContext) -> {
+                if (validateUrl) {
+                    try {
+                        request.getUri(); // Invalid url will throw an exception
+                    } catch (Throwable t) {
+                        return onError(filteredRequest, t.getCause());
+                    }
+                }
+                return executeRoute(filteredRequest, propagatedContext, routeMatch);
+            });
+        } catch (Throwable t) {
+            return onError(request, t);
         }
-
-        RouteExecutor.setRouteAttributes(request, routeMatch);
-
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
-        }
-        // all ok proceed to try and execute the route
-        if (routeMatch.getRouteInfo().isWebSocketRoute()) {
-            return onStatusError(
-                request,
-                HttpResponse.status(HttpStatus.BAD_REQUEST),
-                "Not a WebSocket request");
-        }
-
-        return runWithFilters(request, (filteredRequest, propagatedContext) -> executeRoute(filteredRequest, propagatedContext, routeMatch));
     }
 
     private ExecutionFlow<HttpResponse<?>> executeRoute(HttpRequest<?> request,
@@ -186,7 +206,12 @@ public class RequestLifecycle {
      * @return The response for the error
      */
     protected final ExecutionFlow<HttpResponse<?>> onError(HttpRequest<?> request, Throwable throwable) {
-        return runWithFilters(request, (filteredRequest, propagatedContext) -> onErrorNoFilter(filteredRequest, throwable, propagatedContext));
+        try {
+            return runWithFilters(request, (filteredRequest, propagatedContext) -> onErrorNoFilter(filteredRequest, throwable, propagatedContext))
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t));
+        } catch (Throwable e) {
+            return createDefaultErrorResponseFlow(request, e);
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> onErrorNoFilter(HttpRequest<?> request, Throwable t, PropagatedContext propagatedContext) {

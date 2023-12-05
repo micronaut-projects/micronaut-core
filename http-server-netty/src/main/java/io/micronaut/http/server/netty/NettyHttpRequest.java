@@ -56,7 +56,6 @@ import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
@@ -163,17 +162,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private FormRouteCompleter formRouteCompleter;
     private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
 
-    /**
-     * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
-     * we can cache some values.
-     */
-    private boolean headersMutated = false;
-    private final long contentLength;
-    @Nullable
-    private final MediaType contentType;
-    @Nullable
-    private final String origin;
-
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
@@ -196,34 +184,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = ByteBody.of(nettyRequest);
-        this.contentLength = headers.contentLength().orElse(-1);
-        this.contentType = headers.contentType().orElse(null);
-        this.origin = headers.getOrigin().orElse(null);
-    }
-
-    public static NettyHttpRequest<?> createSafe(io.netty.handler.codec.http.HttpRequest request, ChannelHandlerContext ctx, ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
-        try {
-            return new NettyHttpRequest<>(
-                request,
-                ctx,
-                conversionService,
-                serverConfiguration
-            );
-        } catch (IllegalArgumentException iae) {
-            // invalid URI
-            if (request instanceof StreamedHttpRequest streamed) {
-                streamed.closeIfNoSubscriber();
-            } else {
-                ((FullHttpRequest) request).release();
-            }
-
-            return new NettyHttpRequest<>(
-                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
-                ctx,
-                conversionService,
-                serverConfiguration
-            );
-        }
     }
 
     /**
@@ -384,11 +344,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public Optional<String> getOrigin() {
-        if (headersMutated) {
-            return getHeaders().getOrigin();
-        } else {
-            return Optional.ofNullable(origin);
-        }
+        return headers.getOrigin();
     }
 
     @Override
@@ -659,12 +615,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public Optional<MediaType> getContentType() {
-        // this is better than the caching we can do in AbstractNettyHttpRequest
-        if (headersMutated) {
-            return headers.contentType();
-        } else {
-            return Optional.ofNullable(contentType);
-        }
+        return headers.contentType();
     }
 
     private BodyConvertor newBodyConvertor() {
@@ -686,11 +637,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public long getContentLength() {
-        if (headersMutated) {
-            return super.getContentLength();
-        } else {
-            return contentLength;
-        }
+        return headers.contentLength().orElse(-1);
     }
 
     @Override
@@ -721,7 +668,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
-        private URI uri = NettyHttpRequest.this.uri;
+        private URI uri;
         @Nullable
         private MutableHttpParameters httpParameters;
         @Nullable
@@ -761,7 +708,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @Override
         public MutableHttpHeaders getHeaders() {
-            headersMutated = true;
             return headers;
         }
 
@@ -793,7 +739,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 synchronized (this) { // double check
                     httpParameters = this.httpParameters;
                     if (httpParameters == null) {
-                        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+                        QueryStringDecoder queryStringDecoder = createDecoder(getUri());
                         httpParameters = new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
                         this.httpParameters = httpParameters;
                     }

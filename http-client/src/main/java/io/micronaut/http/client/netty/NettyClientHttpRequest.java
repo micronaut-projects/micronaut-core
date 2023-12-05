@@ -80,19 +80,6 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     private ConversionService conversionService = ConversionService.SHARED;
 
     /**
-     * This constructor is actually required for the case of non-standard http methods.
-     *
-     * @param httpMethod     The http method. CUSTOM value is used for non-standard
-     * @param uri            The uri
-     * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
-     */
-    NettyClientHttpRequest(HttpMethod httpMethod, URI uri, String httpMethodName) {
-        this.httpMethod = httpMethod;
-        this.uri = uri;
-        this.httpMethodName = httpMethodName;
-    }
-
-    /**
      * @param httpMethod The Http method
      * @param uri        The URI
      */
@@ -104,11 +91,13 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
      * This constructor is actually required for the case of non-standard http methods.
      *
      * @param httpMethod     The http method. CUSTOM value is used for non-standard
-     * @param uri            The uri
+     * @param url            The uri
      * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
      */
-    NettyClientHttpRequest(HttpMethod httpMethod, String uri, String httpMethodName) {
-        this(httpMethod, URI.create(uri), httpMethodName);
+    NettyClientHttpRequest(HttpMethod httpMethod, String url, String httpMethodName) {
+        this.httpMethod = httpMethod;
+        this.uri = URI.create(url);
+        this.httpMethodName = httpMethodName;
     }
 
     @Override
