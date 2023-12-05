@@ -20,7 +20,7 @@ NOTE: The thread-local values are read-only. To modify them, the `PropagatedCont
 
 To add the context in the middle of the reactive chain, do something like the following:
 
-snippet::io.micronaut.docs.propagation.reactor.PropagatedContextSpec[tags="example", indent=0]
+snippet::io.micronaut.docs.propagation.reactor.HelloController[tags="example", indent=0]
 
 <1> Obtain the current context that has been modified, e.g. with `PropagatedContext.get().plus(...)`, etc.
 <2> Add the context into the reactive chain.
