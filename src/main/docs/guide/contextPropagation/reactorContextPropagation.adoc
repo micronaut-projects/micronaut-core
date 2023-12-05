@@ -22,7 +22,7 @@ To add the context in the middle of the reactive chain, do something like the fo
 
 snippet::io.micronaut.docs.propagation.reactor.PropagatedContextSpec[tags="example", indent=0]
 
-<1> Obtain the current context.
+<1> Obtain the current context that has been modified, e.g. with `PropagatedContext.get().plus(...)`, etc.
 <2> Add the context into the reactive chain.
 
 If you have Micrometer Context Propagation on the classpath but don't want to use it, apply the following configuration:
