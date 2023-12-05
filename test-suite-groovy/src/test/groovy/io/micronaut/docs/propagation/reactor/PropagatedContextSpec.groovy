@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Mono
@@ -39,8 +40,8 @@ class PropagatedContextSpec extends Specification {
 class HelloController {
 
     @Get('/hello')
-    Mono<String> hello() {
-        PropagatedContext propagatedContext = PropagatedContext.get() // <1>
+    Mono<String> hello(HttpRequest<?> httpRequest) {
+        PropagatedContext propagatedContext = PropagatedContext.get() + new ServerHttpRequestContext(httpRequest) // <1>
         return Mono.just('Hello, World')
             .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext)) // <2>
     }
