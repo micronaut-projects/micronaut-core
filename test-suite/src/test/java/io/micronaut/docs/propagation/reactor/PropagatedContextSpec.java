@@ -4,7 +4,6 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Controller;
@@ -21,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Property(name = "spec.name", value = "PropagatedContextSpec")
 @MicronautTest
-public class PropagatedContextSpec {
+class PropagatedContextSpec {
 
     @Inject
     @Client("/")
