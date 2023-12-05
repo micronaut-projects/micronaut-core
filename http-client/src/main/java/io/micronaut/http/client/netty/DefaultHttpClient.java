@@ -1301,7 +1301,7 @@ public class DefaultHttpClient implements
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence sequence) {
                     ByteBuf byteBuf = charSequenceToByteBuf(sequence, requestContentType);
-                    FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf);
+                    FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf, true);
                     nettyRequest.setUri(newUri);
                     return new FullRequestWriter(nettyRequest);
                 } else {
@@ -1352,12 +1352,12 @@ public class DefaultHttpClient implements
                 } else {
                     bodyContent = Unpooled.EMPTY_BUFFER;
                 }
-                FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), bodyContent);
+                FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), bodyContent, true);
                 nettyRequest.setUri(newUri);
                 return new FullRequestWriter(nettyRequest);
             }
         } else {
-            FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), Unpooled.EMPTY_BUFFER);
+            FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), Unpooled.EMPTY_BUFFER, false);
             nettyRequest.setUri(newUri);
             return new FullRequestWriter(nettyRequest);
         }
@@ -1373,10 +1373,12 @@ public class DefaultHttpClient implements
         }
     }
 
-    private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes) {
+    private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes, boolean permitsBody) {
         HttpHeaders headers = request.headers();
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-        headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
+        if(permitsBody) {
+            headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
+        }
         return new DefaultFullHttpRequest(
             request.protocolVersion(),
             request.method(),
