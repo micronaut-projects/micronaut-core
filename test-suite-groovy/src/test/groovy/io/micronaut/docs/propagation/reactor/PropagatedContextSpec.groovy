@@ -1,5 +1,7 @@
 package io.micronaut.docs.propagation.reactor
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.propagation.ReactorPropagation
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.type.Argument
@@ -13,6 +15,7 @@ import jakarta.inject.Inject
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
+@Property(name = 'spec.name', value = 'PropagatedContextSpec')
 @MicronautTest
 class PropagatedContextSpec extends Specification {
 
@@ -28,16 +31,18 @@ class PropagatedContextSpec extends Specification {
         'Hello, World' == hello
     }
 
-    // tag::example[]
-    @Controller
-    static class HelloController {
-
-        @Get('/hello')
-        Mono<String> hello() {
-            PropagatedContext propagatedContext = PropagatedContext.get() // <1>
-            return Mono.just('Hello, World')
-                .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext)) // <2>
-        }
-    }
-    // end::example[]
 }
+
+@Requires(property = 'spec.name', value = 'PropagatedContextSpec')
+// tag::example[]
+@Controller
+class HelloController {
+
+    @Get('/hello')
+    Mono<String> hello() {
+        PropagatedContext propagatedContext = PropagatedContext.get() // <1>
+        return Mono.just('Hello, World')
+            .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext)) // <2>
+    }
+}
+// end::example[]
