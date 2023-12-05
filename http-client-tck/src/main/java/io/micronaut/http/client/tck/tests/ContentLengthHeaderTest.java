@@ -68,7 +68,6 @@ class ContentLengthHeaderTest {
 
     @ParameterizedTest(name = "blocking={0}")
     @ValueSource(booleans = {true, false})
-    @Disabled
     void postContainsHeader(boolean blocking) {
         MutableHttpRequest<String> post = HttpRequest.POST(PATH, "tim");
         String retrieve = blocking
@@ -78,7 +77,7 @@ class ContentLengthHeaderTest {
     }
 
     @ParameterizedTest(name = "blocking={0}")
-    @ValueSource(booleans = {true})
+    @ValueSource(booleans = {true, false})
     void getContainsHeader(boolean blocking) {
         MutableHttpRequest<String> get = HttpRequest.GET(PATH);
         String retrieve = blocking
