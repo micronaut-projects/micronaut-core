@@ -47,7 +47,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
     protected final ConversionService conversionService;
     protected final HttpMethod httpMethod;
-    protected final String url;
+    protected final String unvalidatedUrl;
     protected final String httpMethodName;
 
     private URI uri;
@@ -62,7 +62,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
-        this.url = nettyRequest.uri();
+        this.unvalidatedUrl = nettyRequest.uri();
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
     }
@@ -162,7 +162,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 u = this.uri;
                 if (u == null) {
-                    u = createURI(url);
+                    u = createURI(unvalidatedUrl);
                     this.uri = u;
                 }
             }
@@ -177,7 +177,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 p = this.path;
                 if (p == null) {
-                    p = parsePath(url);
+                    p = parsePath(unvalidatedUrl);
                     this.path = p;
                 }
             }

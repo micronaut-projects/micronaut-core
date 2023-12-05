@@ -21,7 +21,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -169,17 +168,17 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     private void onModify(CharSequence header) {
-        if (contentType != null && header.equals(HttpHeaders.CONTENT_TYPE)) {
+        if (contentType != null && HttpHeaderNames.CONTENT_TYPE.contentEqualsIgnoreCase(header)) {
             contentType = null;
-        } else if (contentLength != null && header.equals(HttpHeaders.CONTENT_LENGTH)) {
+        } else if (contentLength != null && HttpHeaderNames.CONTENT_LENGTH.contentEqualsIgnoreCase(header)) {
             contentLength = null;
-        } else if (accept != null && header.equals(HttpHeaders.ACCEPT)) {
+        } else if (accept != null && HttpHeaderNames.ACCEPT.contentEqualsIgnoreCase(header)) {
             accept = null;
-        } else if (acceptCharset != null && header.equals(HttpHeaders.ACCEPT_CHARSET)) {
+        } else if (acceptCharset != null && HttpHeaderNames.ACCEPT_CHARSET.contentEqualsIgnoreCase(header)) {
             acceptCharset = null;
-        } else if (acceptLanguage != null && header.equals(HttpHeaders.ACCEPT_LANGUAGE)) {
+        } else if (acceptLanguage != null && HttpHeaderNames.ACCEPT_LANGUAGE.contentEqualsIgnoreCase(header)) {
             acceptLanguage = null;
-        } else if (origin != null && header.equals(HttpHeaders.ORIGIN)) {
+        } else if (origin != null && HttpHeaderNames.ORIGIN.contentEqualsIgnoreCase(header)) {
             origin = null;
         }
     }
