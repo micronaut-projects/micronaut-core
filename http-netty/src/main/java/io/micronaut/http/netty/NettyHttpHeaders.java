@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -155,7 +156,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         validateHeader(header, value);
         nettyHeaders.add(header, value);
-        onModify(header);
+        onModify();
         return this;
     }
 
@@ -163,24 +164,17 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public MutableHeaders set(CharSequence header, CharSequence value) {
         validateHeader(header, value);
         nettyHeaders.set(header, value);
-        onModify(header);
+        onModify();
         return this;
     }
 
-    private void onModify(CharSequence header) {
-        if (contentType != null && HttpHeaderNames.CONTENT_TYPE.contentEqualsIgnoreCase(header)) {
-            contentType = null;
-        } else if (contentLength != null && HttpHeaderNames.CONTENT_LENGTH.contentEqualsIgnoreCase(header)) {
-            contentLength = null;
-        } else if (accept != null && HttpHeaderNames.ACCEPT.contentEqualsIgnoreCase(header)) {
-            accept = null;
-        } else if (acceptCharset != null && HttpHeaderNames.ACCEPT_CHARSET.contentEqualsIgnoreCase(header)) {
-            acceptCharset = null;
-        } else if (acceptLanguage != null && HttpHeaderNames.ACCEPT_LANGUAGE.contentEqualsIgnoreCase(header)) {
-            acceptLanguage = null;
-        } else if (origin != null && HttpHeaderNames.ORIGIN.contentEqualsIgnoreCase(header)) {
-            origin = null;
-        }
+    private void onModify() {
+        contentType = null;
+        contentLength = null;
+        accept = null;
+        acceptCharset = null;
+        acceptLanguage = null;
+        origin = null;
     }
 
     /**
@@ -191,7 +185,6 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      */
     public void setUnsafe(CharSequence header, CharSequence value) {
         nettyHeaders.set(header, value);
-        onModify(header);
     }
 
     public static void validateHeader(CharSequence name, CharSequence value) {
@@ -206,14 +199,14 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders remove(CharSequence header) {
         nettyHeaders.remove(header);
-        onModify(header);
+        onModify();
         return this;
     }
 
     @Override
     public MutableHttpHeaders date(LocalDateTime date) {
         if (date != null) {
-            add(HttpHeaderNames.DATE, ZonedDateTime.of(date, ZoneId.systemDefault()));
+            setUnsafe(HttpHeaderNames.DATE, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -221,7 +214,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders expires(LocalDateTime date) {
         if (date != null) {
-            add(HttpHeaderNames.EXPIRES, ZonedDateTime.of(date, ZoneId.systemDefault()));
+            setUnsafe(HttpHeaderNames.EXPIRES, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -229,7 +222,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders lastModified(LocalDateTime date) {
         if (date != null) {
-            add(HttpHeaderNames.LAST_MODIFIED, ZonedDateTime.of(date, ZoneId.systemDefault()));
+            setUnsafe(HttpHeaderNames.LAST_MODIFIED, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -237,33 +230,37 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders ifModifiedSince(LocalDateTime date) {
         if (date != null) {
-            add(HttpHeaderNames.IF_MODIFIED_SINCE, ZonedDateTime.of(date, ZoneId.systemDefault()));
+            setUnsafe(HttpHeaderNames.IF_MODIFIED_SINCE, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
 
     @Override
     public MutableHttpHeaders date(long timeInMillis) {
-        add(HttpHeaderNames.DATE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
+        setUnsafe(HttpHeaderNames.DATE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
     @Override
     public MutableHttpHeaders expires(long timeInMillis) {
-        add(HttpHeaderNames.EXPIRES, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
+        setUnsafe(HttpHeaderNames.EXPIRES, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
     @Override
     public MutableHttpHeaders lastModified(long timeInMillis) {
-        add(HttpHeaderNames.LAST_MODIFIED, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
+        setUnsafe(HttpHeaderNames.LAST_MODIFIED, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
     @Override
     public MutableHttpHeaders ifModifiedSince(long timeInMillis) {
-        add(HttpHeaderNames.IF_MODIFIED_SINCE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
+        setUnsafe(HttpHeaderNames.IF_MODIFIED_SINCE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
+    }
+
+    private void setUnsafe(CharSequence header, ZonedDateTime value) {
+        setUnsafe(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
     }
 
     @Override
@@ -285,12 +282,22 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public MutableHttpHeaders location(URI uri) {
-        return add(HttpHeaderNames.LOCATION, uri.toString());
+        setUnsafe(HttpHeaderNames.LOCATION, uri.toString());
+        return this;
     }
 
     @Override
     public MutableHttpHeaders contentType(MediaType mediaType) {
-        return add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        if (mediaType == null) {
+            nettyHeaders.remove(HttpHeaderNames.CONTENT_TYPE);
+        } else {
+            // optimization for content type validation
+            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
+            nettyHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        contentType = Optional.ofNullable(mediaType);
+        return this;
+
     }
 
     @Override
@@ -424,4 +431,5 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         }
         return cachedOrigin;
     }
+
 }

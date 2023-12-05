@@ -316,13 +316,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> contentType(MediaType mediaType) {
-        if (mediaType == null) {
-            headers.remove(HttpHeaderNames.CONTENT_TYPE);
-        } else {
-            // optimization for content type validation
-            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
-            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
+        headers.contentType(mediaType);
         return this;
     }
 
