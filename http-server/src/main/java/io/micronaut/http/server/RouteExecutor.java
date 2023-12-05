@@ -518,6 +518,7 @@ public final class RouteExecutor {
         if (response != null) {
             return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
         }
+        Objects.requireNonNull(body);
         if (routeInfo.isImperative()) {
             outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
         } else {
@@ -532,7 +533,7 @@ public final class RouteExecutor {
                     outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                         ReactivePropagation.propagate(
                             propagatedContext,
-                            fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
+                            fromReactiveExecute(propagatedContext, request, body, routeInfo)
                         )
                     );
                 } else {
@@ -669,7 +670,10 @@ public final class RouteExecutor {
         return processPublisherBody(propagatedContext, request, response, routeInfo);
     }
 
-    private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
+    @NonNull
+    private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(@NonNull HttpRequest<?> request,
+                                                                        @NonNull Object body,
+                                                                        @NonNull RouteInfo<?> routeInfo) {
         CompletionStage<Object> completionStage = (CompletionStage<Object>) body;
         return completionStage.thenCompose(asyncBody -> {
             MutableHttpResponse<?> mutableResponse;
