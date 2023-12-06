@@ -73,6 +73,7 @@ public class RequestLifecycle {
     private final RouteExecutor routeExecutor;
     private final boolean multipartEnabled;
     private final boolean validateUrl;
+    private HttpRequest<?> request;
 
     /**
      * @param routeExecutor The route executor to use for route resolution
@@ -82,6 +83,52 @@ public class RequestLifecycle {
         this.validateUrl = routeExecutor.serverConfiguration.isValidateUrl();
         Optional<Boolean> isMultiPartEnabled = routeExecutor.serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
+    }
+
+    /**
+     * @param routeExecutor The route executor to use for route resolution
+     * @param request The request
+     * @deprecated Will be removed after 4.3.0
+     */
+    @Deprecated(forRemoval = true, since = "4.3.0")
+    protected RequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request) {
+        this(routeExecutor);
+        this.request = request;
+    }
+
+    /**
+     * Execute this request normally.
+     *
+     * @return The response to the request.
+     * @deprecated Will be removed after 4.3.0
+     */
+    @Deprecated(forRemoval = true, since = "4.3.0")
+    protected final ExecutionFlow<HttpResponse<?>> normalFlow() {
+        return normalFlow(request);
+    }
+
+    /**
+     * The request for this lifecycle. This may be changed by filters.
+     *
+     * @return The current request
+     * @deprecated Will be removed after 4.3.0
+     */
+    @Deprecated(forRemoval = true, since = "4.3.0")
+    protected final HttpRequest<?> request() {
+        return request;
+    }
+
+    /**
+     * Try to find a static file for this request. If there is a file, filters will still run, but
+     * only after the call to this method.
+     *
+     * @return The file at this path, or {@code null} if none is found
+     * @deprecated Will be removed after 4.3.0
+     */
+    @Deprecated(forRemoval = true, since = "4.3.0")
+    @Nullable
+    protected FileCustomizableResponseType findFile() {
+        return null;
     }
 
     /**
@@ -460,7 +507,7 @@ public class RequestLifecycle {
      */
     @Nullable
     protected FileCustomizableResponseType findFile(HttpRequest<?> request) {
-        return null;
+        return findFile();
     }
 
     /**
