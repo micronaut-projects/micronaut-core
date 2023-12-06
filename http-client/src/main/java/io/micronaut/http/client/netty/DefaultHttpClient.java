@@ -1376,7 +1376,7 @@ public class DefaultHttpClient implements
     private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes) {
         HttpHeaders headers = request.headers();
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-        if(permitsRequestBody(request.method())) {
+        if (permitsRequestBody(request.method())) {
             headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
         }
         return new DefaultFullHttpRequest(
