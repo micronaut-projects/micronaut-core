@@ -73,7 +73,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             synchronized (this) { // double check
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
-                    this.expressionResolvers = new ArrayList<>();
                     exResolvers = new ArrayList<>();
                     ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
