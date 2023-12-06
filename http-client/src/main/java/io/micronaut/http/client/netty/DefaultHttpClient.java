@@ -1301,7 +1301,7 @@ public class DefaultHttpClient implements
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence sequence) {
                     ByteBuf byteBuf = charSequenceToByteBuf(sequence, requestContentType);
-                    FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf, true);
+                    FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf);
                     nettyRequest.setUri(newUri);
                     return new FullRequestWriter(nettyRequest);
                 } else {
@@ -1352,12 +1352,12 @@ public class DefaultHttpClient implements
                 } else {
                     bodyContent = Unpooled.EMPTY_BUFFER;
                 }
-                FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), bodyContent, true);
+                FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), bodyContent);
                 nettyRequest.setUri(newUri);
                 return new FullRequestWriter(nettyRequest);
             }
         } else {
-            FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), Unpooled.EMPTY_BUFFER, false);
+            FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), Unpooled.EMPTY_BUFFER);
             nettyRequest.setUri(newUri);
             return new FullRequestWriter(nettyRequest);
         }
@@ -1373,10 +1373,10 @@ public class DefaultHttpClient implements
         }
     }
 
-    private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes, boolean permitsBody) {
+    private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes) {
         HttpHeaders headers = request.headers();
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-        if(permitsBody) {
+        if(permitsRequestBody(request.method())) {
             headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
         }
         return new DefaultFullHttpRequest(
@@ -1386,6 +1386,18 @@ public class DefaultHttpClient implements
             bytes,
             headers,
             LastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
+        );
+    }
+
+    private static boolean requiresRequestBody(io.netty.handler.codec.http.HttpMethod method) {
+        return method != null && (method.equals(HttpMethod.POST) || method.equals(HttpMethod.PUT) || method.equals(HttpMethod.PATCH));
+    }
+
+    private static boolean permitsRequestBody(io.netty.handler.codec.http.HttpMethod method) {
+        return method != null && (requiresRequestBody(method)
+            || method.equals(HttpMethod.OPTIONS)
+            || method.equals(HttpMethod.DELETE)
+            || method.equals(HttpMethod.CUSTOM)
         );
     }
 
