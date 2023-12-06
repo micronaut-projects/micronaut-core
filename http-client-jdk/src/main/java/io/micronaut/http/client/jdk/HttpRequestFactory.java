@@ -59,6 +59,8 @@ public final class HttpRequestFactory {
         configuration.getReadTimeout().ifPresent(builder::timeout);
         if (request.getMethod() == HttpMethod.GET) {
             builder.GET();
+        } else if (request.getMethod() == HttpMethod.DELETE) {
+            builder.DELETE();
         } else {
             HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
             builder.method(request.getMethod().toString(), bodyPublisher);
