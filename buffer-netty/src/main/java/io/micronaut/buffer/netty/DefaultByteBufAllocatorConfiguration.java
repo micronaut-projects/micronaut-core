@@ -39,7 +39,7 @@ import io.micronaut.core.order.Ordered;
 @BootstrapContextCompatible
 @Internal
 @Order(Ordered.HIGHEST_PRECEDENCE)
-final class DefaultByteBufAllocatorConfiguration implements ByteBufAllocatorConfiguration {
+public final class DefaultByteBufAllocatorConfiguration implements ByteBufAllocatorConfiguration {
 
     private static final String PROP_PREFIX = "io.netty.allocator.";
 
