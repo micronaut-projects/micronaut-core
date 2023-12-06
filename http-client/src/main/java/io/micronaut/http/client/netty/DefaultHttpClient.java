@@ -1376,7 +1376,9 @@ public class DefaultHttpClient implements
     private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes) {
         HttpHeaders headers = request.headers();
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-        headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
+        if (permitsRequestBody(request.method())) {
+            headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
+        }
         return new DefaultFullHttpRequest(
             request.protocolVersion(),
             request.method(),
@@ -1384,6 +1386,17 @@ public class DefaultHttpClient implements
             bytes,
             headers,
             LastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
+        );
+    }
+
+    private static boolean requiresRequestBody(io.netty.handler.codec.http.HttpMethod method) {
+        return method != null && (method.equals(io.netty.handler.codec.http.HttpMethod.POST) || method.equals(io.netty.handler.codec.http.HttpMethod.PUT) || method.equals(io.netty.handler.codec.http.HttpMethod.PATCH));
+    }
+
+    private static boolean permitsRequestBody(io.netty.handler.codec.http.HttpMethod method) {
+        return method != null && (requiresRequestBody(method)
+            || method.equals(io.netty.handler.codec.http.HttpMethod.OPTIONS)
+            || method.equals(io.netty.handler.codec.http.HttpMethod.DELETE)
         );
     }
 
