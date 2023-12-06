@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -56,8 +57,12 @@ public final class HttpRequestFactory {
     ) {
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         configuration.getReadTimeout().ifPresent(builder::timeout);
-        HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
-        builder.method(request.getMethod().toString(), bodyPublisher);
+        if (request.getMethod() == HttpMethod.GET) {
+            builder.GET();
+        } else {
+            HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
+            builder.method(request.getMethod().toString(), bodyPublisher);
+        }
         request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
         if (request.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
