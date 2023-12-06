@@ -105,6 +105,7 @@ class MessageUtils {
                 .append(methodName)
                 .append("] of class: ")
                 .append(declaringTypeName)
+                .append(ls)
                 .append(ls);
 
         if (message != null) {

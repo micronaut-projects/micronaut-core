@@ -36,8 +36,9 @@ class PropertyDependencyMissingSpec  extends Specification {
         DependencyInjectionException e = thrown()
         def lines = e.message.lines().toList()
         lines[0] == 'Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyDependencyMissingSpec$B'
-        lines[1] == 'Message: No bean of type [io.micronaut.inject.failures.PropertyDependencyMissingSpec$A] exists. '
-        lines[2] == 'Path Taken: new B() --> B.setA([A a])'
+        lines[1] == ''
+        lines[2] == 'Message: No bean of type [io.micronaut.inject.failures.PropertyDependencyMissingSpec$A] exists. '
+        lines[3] == 'Path Taken: new B() --> B.setA([A a])'
 
         cleanup:
         context.close()
