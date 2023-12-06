@@ -225,7 +225,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 httpClient.close();
             } catch (Throwable e) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
+                    LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
                 }
             }
         }

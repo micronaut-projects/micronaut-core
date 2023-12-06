@@ -1,6 +1,6 @@
 package io.micronaut.docs.inject.intro
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -8,7 +8,7 @@ class VehicleSpec {
     @Test
     fun testStartVehicle() {
         // tag::start[]
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         val vehicle = context.getBean(Vehicle::class.java)
         println(vehicle.start())
         // end::start[]

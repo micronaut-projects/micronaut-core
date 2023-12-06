@@ -17,7 +17,7 @@ package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.*;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -27,7 +27,5 @@ class Neo4jProperties {
             prefixes = "with",
             allowZeroArgs = true
     )
-    Config.ConfigBuilder options = Config.build();
-
-
+    Config.ConfigBuilder options = Config.builder();
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.lifecycle.beanwithprivatepredestroy
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -23,8 +24,7 @@ class BeanWithPreDestroySpec extends Specification{
 
     void "test that a bean with a pre-destroy hook works"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
             B b = context.getBean(B)
@@ -47,8 +47,7 @@ class BeanWithPreDestroySpec extends Specification{
 
     void "test that a bean with a pre-destroy hook works closed on close"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
             B b = context.getBean(B)
@@ -68,8 +67,7 @@ class BeanWithPreDestroySpec extends Specification{
 
     void "test that destroy events run in the right phase"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
 
         when:

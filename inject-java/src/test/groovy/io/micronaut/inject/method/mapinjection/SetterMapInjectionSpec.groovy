@@ -15,14 +15,13 @@
  */
 package io.micronaut.inject.method.mapinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class SetterMapInjectionSpec extends Specification {
     void "test injection via setter that takes an array"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)

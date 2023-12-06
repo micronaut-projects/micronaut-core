@@ -2,6 +2,7 @@ package io.micronaut.http.client.jdk
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.type.Argument
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpHeaders
@@ -52,11 +53,15 @@ class OptionsRequestAttributesSpec extends Specification {
         then:
         noExceptionThrown()
         response.status == HttpStatus.OK
-        response.getHeaders().getAll(HttpHeaders.ALLOW)
-        3 == response.getHeaders().getAll(HttpHeaders.ALLOW).size()
-        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('GET')
-        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('OPTIONS')
-        response.getHeaders().getAll(HttpHeaders.ALLOW).contains('HEAD')
+
+        when:
+        List<String> allowedMethods = response.getHeaders().get(HttpHeaders.ALLOW, Argument.of(List.class, Argument.of(String.class))).orElse(new ArrayList<>())
+
+        then:
+        3 == allowedMethods.size()
+        allowedMethods.contains('GET')
+        allowedMethods.contains('OPTIONS')
+        allowedMethods.contains('HEAD')
 
         cleanup:
         ctx.close()

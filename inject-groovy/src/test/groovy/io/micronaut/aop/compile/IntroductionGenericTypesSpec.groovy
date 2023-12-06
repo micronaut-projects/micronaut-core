@@ -16,6 +16,7 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
@@ -132,12 +133,8 @@ class SubPerson extends Person {}
         returnType(beanDefinition, "getPeopleListArray").type == List
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
 
-
-
-
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
@@ -148,6 +145,9 @@ class SubPerson extends Person {}
         instance.getPeopleSingle() == null
         instance.save(null) == null
         instance.saveAll([]) == null
+
+        cleanup:
+        context.close()
 
     }
 
@@ -218,8 +218,7 @@ class SubPerson extends Person {}
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
@@ -231,6 +230,8 @@ class SubPerson extends Person {}
         instance.save(null) == null
         instance.saveAll([]) == null
 
+        cleanup:
+        context.close()
     }
 
 
@@ -272,14 +273,9 @@ class SubPerson extends Person {}
         returnType(beanDefinition, "getPeopleListArray").type == List
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
 
-
-
-
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-
 
         then:"the methods are invocable"
         instance.getPerson() == null
@@ -289,6 +285,8 @@ class SubPerson extends Person {}
         instance.saveAll([]) == null
         instance.getPeopleArray() == null
 
+        cleanup:
+        context.close()
     }
 
 
@@ -310,9 +308,7 @@ interface MyBean extends MyPrecompiledInterface<SubPerson> {
 
 }
 
-class Person {}
 class SubPerson extends Person {}
-
 ''')
         then:
         !beanDefinition.isAbstract()
@@ -332,10 +328,8 @@ class SubPerson extends Person {}
 
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-
 
         then:"the methods are invocable"
         instance.getPerson() == null
@@ -345,6 +339,8 @@ class SubPerson extends Person {}
         instance.save(null) == null
         instance.saveAll([]) == null
 
+        cleanup:
+        context.close()
     }
 
     ReturnType returnType(BeanDefinition bd, String name) {

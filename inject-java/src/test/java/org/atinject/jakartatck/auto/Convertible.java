@@ -16,8 +16,7 @@
 
 package org.atinject.jakartatck.auto;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Provider;
@@ -25,11 +24,7 @@ import org.atinject.jakartatck.auto.accessories.Cupholder;
 import org.atinject.jakartatck.auto.accessories.SpareTire;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class Convertible implements Car {
 
@@ -169,7 +164,7 @@ public class Convertible implements Car {
      * value to avoid null checks for omitted provider injections.
      */
     private static <T> jakarta.inject.Provider<T> nullProvider() {
-        return new org.atinject.jakartatck.auto.Convertible.NullProvider<T>();
+        return new org.atinject.jakartatck.auto.Convertible.NullProvider<>();
     }
 
     static class NullProvider<T> implements jakarta.inject.Provider<T> {
@@ -181,11 +176,11 @@ public class Convertible implements Car {
     }
 
     public static ThreadLocal<Convertible> localConvertible
-            = new ThreadLocal<Convertible>();
+            = new ThreadLocal<>();
 
     public static class Tests {
 
-        private final BeanContext context = BeanContext.run();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Cupholder cupholder = car.cupholder;
         private final SpareTire spareTire = car.spareTire;
@@ -471,7 +466,7 @@ public class Convertible implements Car {
 
     public static class PrivateTests {
 
-        private final BeanContext context = new DefaultBeanContext().start();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Engine engine = car.engineProvider.get();
         private final SpareTire spareTire = car.spareTire;

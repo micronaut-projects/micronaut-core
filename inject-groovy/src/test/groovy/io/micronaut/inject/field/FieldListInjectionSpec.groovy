@@ -15,21 +15,17 @@
  */
 package io.micronaut.inject.field
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 12/05/2017.
  */
 class FieldListInjectionSpec extends Specification {
     void "test injection via setter that takes a collection"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -38,6 +34,9 @@ class FieldListInjectionSpec extends Specification {
         b.all != null
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

@@ -16,6 +16,7 @@
 package io.micronaut.inject.lifecycle.beanwithprivatepostconstruct
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -67,8 +68,7 @@ class Foo {}
 
     void "test that a bean with a protected post construct hook that the hook is invoked"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -77,5 +77,8 @@ class Foo {}
         b.a != null
         b.injectedFirst
         b.setupComplete
+
+        cleanup:
+        context.close()
     }
 }

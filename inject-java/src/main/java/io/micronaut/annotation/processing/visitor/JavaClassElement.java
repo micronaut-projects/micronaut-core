@@ -532,6 +532,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public boolean isAssignable(String type) {
+        if (getName().equals(type)) {
+            return true; // Same type
+        }
         TypeElement otherElement = visitorContext.getElements().getTypeElement(type);
         if (otherElement != null) {
             return isAssignable(otherElement);
@@ -541,6 +544,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public boolean isAssignable(ClassElement type) {
+        if (equals(type)) {
+            return true; // Same type
+        }
         if (type.isPrimitive()) {
             return isAssignable(type.getName());
         }

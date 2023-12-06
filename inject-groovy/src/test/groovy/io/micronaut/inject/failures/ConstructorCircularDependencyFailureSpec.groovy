@@ -15,14 +15,12 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Singleton
-
 /**
  * Created by graemerocher on 16/05/2017.
  */
@@ -30,8 +28,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
 
     void "test simple constructor circular dependency failure"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
@@ -48,6 +45,9 @@ new B() --> B.a --> new A([C c]) --> new C([B b])
 |                                              |
 |                                              |
 +----------------------------------------------+'''
+
+        cleanup:
+        context.close()
     }
 
     static class C {

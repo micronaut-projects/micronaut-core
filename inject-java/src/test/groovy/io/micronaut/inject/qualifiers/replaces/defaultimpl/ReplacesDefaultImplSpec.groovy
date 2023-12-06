@@ -1,5 +1,6 @@
 package io.micronaut.inject.qualifiers.replaces.defaultimpl
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.NonUniqueBeanException
@@ -9,7 +10,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test A replacement"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"retrieve the interface"
         A a = context.getBean(A)
@@ -24,7 +25,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test B replacement"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"retrieve the interface"
         List<B> bs = context.getBeansOfType(B).toList()
@@ -40,7 +41,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test nested default impls"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         F f = context.getBean(F)
@@ -69,7 +70,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test normal replacement still works"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"retrieve the interface"
         List<C> cs = context.getBeansOfType(C).toList()

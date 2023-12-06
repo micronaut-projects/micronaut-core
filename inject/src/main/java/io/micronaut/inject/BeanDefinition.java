@@ -174,7 +174,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The constructor injection point
      */
     default ConstructorInjectionPoint<T> getConstructor() {
-        return new ConstructorInjectionPoint<T>() {
+        return new ConstructorInjectionPoint<>() {
 
             @Override
             public Argument<?>[] getArguments() {

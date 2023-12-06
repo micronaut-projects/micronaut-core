@@ -16,12 +16,14 @@ dependencies {
     api project(":core-processor")
 
     implementation(libs.managed.ksp.api)
+
     kspTest(project)
     kspTest platform(libs.test.boms.micronaut.validation)
     kspTest (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
 
+    testImplementation project(":context")
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
     testImplementation libs.managed.kotlin.stdlib
@@ -54,9 +56,12 @@ afterEvaluate {
     }
 }
 
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-    kotlinOptions {
-        jvmTarget = "17"
+kotlin {
+    jvmToolchain(17)
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    compilerOptions {
         freeCompilerArgs = ['-Xjvm-default=all']
     }
 }
@@ -70,7 +75,7 @@ tasks.named("test") {
 //    testLogging {
 //        showStandardStreams = true
 //    }
-    maxHeapSize("1G")
+    maxHeapSize("3G")
     forkEvery = 40
     maxParallelForks = 4
 }

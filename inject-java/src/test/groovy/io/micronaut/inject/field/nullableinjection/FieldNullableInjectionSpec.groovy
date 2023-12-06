@@ -15,8 +15,7 @@
  */
 package io.micronaut.inject.field.nullableinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
@@ -24,8 +23,7 @@ class FieldNullableInjectionSpec extends Specification {
 
     void "test nullable injection with field"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)
@@ -39,8 +37,7 @@ class FieldNullableInjectionSpec extends Specification {
 
     void "test normal injection still fails"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         context.getBean(C)
@@ -54,8 +51,7 @@ class FieldNullableInjectionSpec extends Specification {
 
     void "test injecting a nullable provider"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         D d = context.getBean(D)

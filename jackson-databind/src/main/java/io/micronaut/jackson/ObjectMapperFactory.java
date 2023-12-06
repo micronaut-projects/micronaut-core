@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -69,6 +70,9 @@ public class ObjectMapperFactory {
 
     @Inject
     protected ConversionService conversionService;
+
+    @Inject
+    protected BeanContext beanContext;
 
     @Inject
     // have to be fully qualified due to JDK Module type
@@ -143,6 +147,10 @@ public class ObjectMapperFactory {
             objectMapper.findAndRegisterModules();
         }
         objectMapper.registerModules(jacksonModules);
+        if (beanContext != null) {
+            objectMapper.setTypeFactory(objectMapper.getTypeFactory().withClassLoader(beanContext.getClassLoader()));
+        }
+
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
         module.setDeserializers(new MicronautDeserializers(conversionService));
 

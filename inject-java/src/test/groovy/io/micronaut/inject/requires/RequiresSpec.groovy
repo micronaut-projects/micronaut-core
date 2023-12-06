@@ -237,9 +237,8 @@ class MyBean {
 }
 ''')
 
-        def context = new DefaultBeanContext()
+        ApplicationContext context = ApplicationContext.run()
         context.registerSingleton(String.class, "foo")
-        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -278,9 +277,8 @@ class MyBean {
 }
 ''')
 
-        def context = new DefaultBeanContext()
+        ApplicationContext context = ApplicationContext.run()
         context.registerSingleton(String.class, "foo")
-        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -304,9 +302,8 @@ class MyBean {
 }
 ''')
 
-        def context = new DefaultBeanContext()
+        ApplicationContext context = ApplicationContext.run()
         context.registerSingleton(new Outer.Inner())
-        context.start()
 
         then:
         beanDefinition.isEnabled(context)

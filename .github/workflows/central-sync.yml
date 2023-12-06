@@ -20,7 +20,7 @@ jobs:
           ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/wrapper-validation-action@v1
       - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'

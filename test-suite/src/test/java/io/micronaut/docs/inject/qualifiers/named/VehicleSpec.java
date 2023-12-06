@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.inject.qualifiers.named;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        final BeanContext context = BeanContext.run();
+        final ApplicationContext context = ApplicationContext.run();
         Vehicle vehicle = context.getBean(Vehicle.class);
         DefaultGroovyMethods.println(this, vehicle.start());
         // end::start[]

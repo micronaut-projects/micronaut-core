@@ -1,6 +1,6 @@
 package io.micronaut.core
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 import jakarta.inject.Provider
@@ -9,7 +9,7 @@ import jakarta.inject.Singleton
 class ArgumentSpec extends Specification {
 
     void "test argument is provider"() {
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def beanDefinition = context.getBeanDefinition(MyBean)
 
         expect:

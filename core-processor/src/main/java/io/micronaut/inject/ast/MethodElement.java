@@ -267,23 +267,31 @@ public interface MethodElement extends MemberElement {
      * @since 3.1
      */
     default boolean overrides(@NonNull MethodElement overridden) {
-        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+        if (this.equals(overridden) || isStatic() || overridden.isStatic() || overridden.isFinal()) {
+            return false;
+        }
+        // Cannot override existing private/package private methods even if the signature is the same
+        if (overridden.isPrivate()) {
+            return false;
+        }
+        MethodElement newMethod = this;
+        if (overridden.isPackagePrivate() && !newMethod.getDeclaringType().getPackageName().equals(overridden.getDeclaringType().getPackageName())) {
+            // Cannot override package-private from different packages
             return false;
         }
         ClassElement thisType = getDeclaringType();
         ClassElement thatType = overridden.getDeclaringType();
         if (thisType.getName().equals(thatType.getName())) {
-            return false;
+            return false; // Same type
         }
-        if (!thisType.isAssignable(thatType)) {
-            // not a parent class
-            return false;
-        }
-        MethodElement newMethod = this;
         if (newMethod.isAbstract() && !newMethod.isDefault() && (!overridden.isAbstract() || overridden.isDefault())) {
-            return false;
+            return false; // Abstract / default flags doesn't match
         }
         if (!newMethod.getName().equals(overridden.getName()) || overridden.getParameters().length != newMethod.getParameters().length) {
+            return false; // Different method name or parameters not equal
+        }
+        if (!thisType.isAssignable(thatType)) { // More expensive check
+            // not a parent class
             return false;
         }
         for (int i = 0; i < overridden.getParameters().length; i++) {
@@ -297,17 +305,7 @@ public interface MethodElement extends MemberElement {
         }
         ClassElement existingReturnType = overridden.getReturnType().getGenericType();
         ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
-        if (!newTypeReturn.isAssignable(existingReturnType)) {
-            return false;
-        }
-        // Cannot override existing private/package private methods even if the signature is the same
-        if (overridden.isPrivate()) {
-            return false;
-        }
-        if (overridden.isPackagePrivate()) {
-            return newMethod.getDeclaringType().getPackageName().equals(overridden.getDeclaringType().getPackageName());
-        }
-        return true;
+        return newTypeReturn.isAssignable(existingReturnType);
     }
 
     @Override
@@ -526,7 +524,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
-                return new MutableAnnotationMetadataDelegate<AnnotationMetadata>() {
+                return new MutableAnnotationMetadataDelegate<>() {
 
                     @Override
                     public AnnotationMetadata getAnnotationMetadata() {

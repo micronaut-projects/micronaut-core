@@ -2,13 +2,13 @@ package io.micronaut.docs.events.factory
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 
 class VehicleSpec : StringSpec({
 
     "test start vehicle" {
         // tag::start[]
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         val vehicle = context
                 .getBean(Vehicle::class.java)
         println(vehicle.start())

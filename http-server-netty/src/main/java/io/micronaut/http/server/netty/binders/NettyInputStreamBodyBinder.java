@@ -68,7 +68,7 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {
-                    LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+                    LOG.trace("Server received error for argument [{}]: {}", context.getArgument(), t.getMessage(), t);
                 }
                 return BindingResult.empty();
             }

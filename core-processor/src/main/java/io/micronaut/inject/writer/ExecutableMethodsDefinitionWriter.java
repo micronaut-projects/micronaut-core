@@ -204,7 +204,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         String methodKey = methodElement.getName() +
                 "(" +
                 Arrays.stream(methodElement.getSuspendParameters())
-                        .map(p -> p.getType().getName())
+                        .map(p -> toTypeString(p.getType()))
                         .collect(Collectors.joining(",")) +
                 ")";
 
