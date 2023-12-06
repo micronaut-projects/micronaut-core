@@ -1390,14 +1390,13 @@ public class DefaultHttpClient implements
     }
 
     private static boolean requiresRequestBody(io.netty.handler.codec.http.HttpMethod method) {
-        return method != null && (method.equals(HttpMethod.POST) || method.equals(HttpMethod.PUT) || method.equals(HttpMethod.PATCH));
+        return method != null && (method.equals(io.netty.handler.codec.http.HttpMethod.POST) || method.equals(io.netty.handler.codec.http.HttpMethod.PUT) || method.equals(io.netty.handler.codec.http.HttpMethod.PATCH));
     }
 
     private static boolean permitsRequestBody(io.netty.handler.codec.http.HttpMethod method) {
         return method != null && (requiresRequestBody(method)
-            || method.equals(HttpMethod.OPTIONS)
-            || method.equals(HttpMethod.DELETE)
-            || method.equals(HttpMethod.CUSTOM)
+            || method.equals(io.netty.handler.codec.http.HttpMethod.OPTIONS)
+            || method.equals(io.netty.handler.codec.http.HttpMethod.DELETE)
         );
     }
 
