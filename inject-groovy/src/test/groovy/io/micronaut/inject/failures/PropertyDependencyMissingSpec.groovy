@@ -19,11 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import jakarta.inject.Inject
 import spock.lang.Specification
+
 /**
  * Created by graemerocher on 12/05/2017.
  */
 class PropertyDependencyMissingSpec  extends Specification {
-
 
     void "test a useful exception is thrown when a dependency injection failure occurs"() {
         given:
@@ -34,9 +34,10 @@ class PropertyDependencyMissingSpec  extends Specification {
 
         then:"The correct error is thrown"
         DependencyInjectionException e = thrown()
-        e.message.normalize().contains 'Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyDependencyMissingSpec$B'
-        e.message.normalize().contains '''Message: No bean of type [io.micronaut.inject.failures.PropertyDependencyMissingSpec$A] exists. Make sure the bean is not disabled by bean requirements (enable trace logging for 'io.micronaut.context.condition' to check) and if the bean is enabled then ensure the class is declared a bean and annotation processing is enabled (for Java and Kotlin the 'micronaut-inject-java' dependency should be configured as an annotation processor).'''
-        e.message.normalize().contains '''Path Taken: new B() --> B.setA([A a])'''
+        def lines = e.message.lines().toList()
+        lines[0] == 'Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyDependencyMissingSpec$B'
+        lines[1] == 'Message: No bean of type [io.micronaut.inject.failures.PropertyDependencyMissingSpec$A] exists. '
+        lines[2] == 'Path Taken: new B() --> B.setA([A a])'
 
         cleanup:
         context.close()

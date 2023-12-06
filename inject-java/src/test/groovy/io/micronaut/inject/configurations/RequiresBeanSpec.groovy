@@ -16,10 +16,6 @@
 package io.micronaut.inject.configurations
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.configurations.requiresbean.RequiresBean
 import io.micronaut.inject.configurations.requiresconditionfalse.GitHubActionsBean
@@ -85,9 +81,10 @@ class RequiresBeanSpec extends Specification {
 
         then:
         NoSuchBeanException e = thrown()
-        def list = e.message.readLines().collect { it.trim()}
-        list[0] == 'No bean of type [io.micronaut.inject.configurations.requiresproperty.RequiresProperty] exists. The bean [RequiresProperty] is disabled because it is within the package [io.micronaut.inject.configurations.requiresproperty] which is disabled due to bean requirements:'
-        list[1] == '* Required property [data-source.url] with value [null] not present'
+        def list = e.message.readLines().toList()
+        list[0] == 'No bean of type [io.micronaut.inject.configurations.requiresproperty.RequiresProperty] exists. '
+        list[1] == '* [RequiresProperty] is disabled because it is within the package [io.micronaut.inject.configurations.requiresproperty] which is disabled due to bean requirements: '
+        list[2] == ' - Required property [data-source.url] with value [null] not present'
 
         cleanup:
         context.close()

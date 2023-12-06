@@ -34,16 +34,15 @@ class PropertyCircularDependencyFailureSpec extends Specification {
 
         then:"The implementation is injected"
         CircularDependencyException e = thrown()
-        e.message.normalize() == '''\
-Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B
-
-Message: Circular dependency detected
-Path Taken: 
-new B() --> B.setA([A a]) --> A.setB([B b])
-^                                        |
-|                                        |
-|                                        |
-+----------------------------------------+'''
+        def lines = e.message.lines().toList()
+        lines[0] == 'Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B'
+        lines[1] == 'Message: Circular dependency detected'
+        lines[2] == 'Path Taken: '
+        lines[3] == 'new B() --> B.setA([A a]) --> A.setB([B b])'
+        lines[4] == '^                                        |'
+        lines[5] == '|                                        |'
+        lines[6] == '|                                        |'
+        lines[7] == '+----------------------------------------+'
         cleanup:
         context.close()
     }

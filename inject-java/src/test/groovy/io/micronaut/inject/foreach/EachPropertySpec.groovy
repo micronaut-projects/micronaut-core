@@ -17,15 +17,14 @@ package io.micronaut.inject.foreach
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.Qualifier
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
-import io.micronaut.inject.foreach.nested.A
 import io.micronaut.inject.foreach.nested.C
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -41,14 +40,20 @@ class EachPropertySpec extends Specification {
 
         then:
         def error = thrown(NoSuchBeanException)
-        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.'
+        def lines = error.message.lines().toList()
+        lines[0] == "No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists. "
+        lines[1] == "* [MyConfiguration] is disabled because:"
+        lines[2] == " - Configuration requires entries under the prefix: [foo.bar.*]"
 
         when:
         context.getBean(MyConfiguration, Qualifiers.byName("baz"))
 
         then:
         error = thrown(NoSuchBeanException)
-        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists for the given qualifier: @Named(\'baz\'). No configuration entries found under the prefix: [foo.bar.baz]. Provide the necessary configuration to resolve this issue.'
+        def lines2 = error.message.lines().toList()
+        lines2[0] == "No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists for the given qualifier: @Named('baz'). "
+        lines2[1] == "* [MyConfiguration] is disabled because:"
+        lines2[2] == " - Configuration requires entries under the prefix: [foo.bar.baz]"
 
         cleanup:
         context.close()
@@ -63,18 +68,23 @@ class EachPropertySpec extends Specification {
 
         then:
         def error = thrown(NoSuchBeanException)
-        error.message.startsWith("No bean of type [io.micronaut.inject.foreach.MyBean] exists.")
-        error.message.contains("* [MyBean] requires the presence of a bean of type [io.micronaut.inject.foreach.MyConfiguration] which does not exist.")
-        error.message.endsWith("* [MyConfiguration] requires the presence of configuration. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.")
+        def lines = error.message.lines().toList()
+        lines[0] == "No bean of type [io.micronaut.inject.foreach.MyBean] exists. "
+        lines[1] == "* [MyBean] requires the presence of a bean of type [io.micronaut.inject.foreach.MyConfiguration]."
+        lines[2] == " * [MyConfiguration] is disabled because:"
+        lines[3] == "  - Configuration requires entries under the prefix: [foo.bar.*]"
 
         when:
         context.getBean(C.class, Qualifiers.byName("test"))
 
         then:
         error = thrown(NoSuchBeanException)
-        error.message.contains('* [C] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.B] with qualifier [@Named(\'test\')] which does not exist.')
-        error.message.contains("* [B] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.A] with qualifier [@Named('test')] which does not exist.")
-        error.message.endsWith('* [A] requires the presence of configuration. No configuration entries found under the prefix: [foo.test]. Provide the necessary configuration to resolve this issue.')
+        def lines2 = error.message.lines().toList()
+        lines2[0] == "No bean of type [io.micronaut.inject.foreach.nested.C] exists for the given qualifier: @Named('test'). "
+        lines2[1] == "* [C] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.B] with qualifier [@Named('test')]."
+        lines2[2] == " * [B] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.A] with qualifier [@Named('test')]."
+        lines2[3] == "  * [A] is disabled because:"
+        lines2[4] == "   - Configuration requires entries under the prefix: [foo.test]"
 
         cleanup:
         context.close()

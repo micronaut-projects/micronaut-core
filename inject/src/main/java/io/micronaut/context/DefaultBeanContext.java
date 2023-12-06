@@ -2784,59 +2784,98 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T> The bean type
      */
     @Nullable
-    protected  <T> String resolveDisabledBeanMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
-        String disabledMessage = null;
+    protected <T> String resolveDisabledBeanMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+        StringBuilder stringBuilder = new StringBuilder();
+        resolveDisabledBeanMessage("", stringBuilder, CachedEnvironment.getProperty("line.separator"), resolutionContext, beanType, qualifier);
+        return stringBuilder.isEmpty() ? null : stringBuilder.toString();
+    }
+
+    @Internal
+    final <T> void resolveDisabledBeanMessage(String linePrefix,
+                                              StringBuilder messageBuilder,
+                                              String lineSeparator,
+                                              @Nullable BeanResolutionContext resolutionContext,
+                                              Argument<T> beanType,
+                                              @Nullable Qualifier<T> qualifier) {
+        if (linePrefix.length() == 10) {
+            // Break possible cyclic dependencies
+            return;
+        }
+
         for (Map.Entry<String, List<String>> entry : disabledConfigurations.entrySet()) {
             String pkg = entry.getKey();
             if (beanType.getTypeName().startsWith(pkg + ".")) {
-                StringBuilder messageBuilder = new StringBuilder();
-                String ls = CachedEnvironment.getProperty("line.separator");
-                messageBuilder.append("The bean [")
-                              .append(beanType.getTypeString(true))
-                              .append("] is disabled because it is within the package [")
-                              .append(pkg)
-                               .append("] which is disabled due to bean requirements: ")
-                              .append(ls);
+                messageBuilder.append(lineSeparator)
+                    .append(linePrefix)
+                    .append("* [")
+                    .append(beanType.getTypeString(true))
+                    .append("] is disabled because it is within the package [")
+                    .append(pkg)
+                    .append("] which is disabled due to bean requirements: ")
+                    .append(lineSeparator);
                 for (String failure : entry.getValue()) {
-                    messageBuilder.append("* ").append(failure).append(ls);
+                    messageBuilder
+                        .append(linePrefix)
+                        .append(" - ")
+                        .append(failure)
+                        .append(lineSeparator);
                 }
-
-                disabledMessage = messageBuilder.toString();
-                break;
+                messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
+                return;
             }
         }
 
-        if (disabledMessage == null) {
+        Collection<BeanDefinition<T>> beanDefinitions = collectBeanCandidates(
+            resolutionContext,
+            beanType,
+            false,
+            null,
+            disabledBeans.values()
+        ).stream()
+            .sorted(Comparator.comparing(BeanDefinition::getName))
+            .toList();
+        if (qualifier != null) {
+            beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
+        }
 
-            Collection<BeanDefinition<T>> beanDefinitions = collectBeanCandidates(
-                resolutionContext,
-                beanType,
-                false,
-                null,
-                disabledBeans.values()
-            );
-            if (qualifier != null) {
-                beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
-            }
-
-            if (!beanDefinitions.isEmpty()) {
-                StringBuilder messageBuilder = new StringBuilder();
-                String ls = CachedEnvironment.getProperty("line.separator");
-                messageBuilder.append("The following matching beans are disabled by bean requirements: ").append(ls);
-                for (BeanDefinition<T> beanDefinition : beanDefinitions) {
-                    messageBuilder.append("* Bean of type [").append(beanDefinition.asArgument().getTypeString(false))
-                        .append("] is disabled because: ").append(ls);
-                    if (beanDefinition instanceof DisabledBean<T> disabledBean) {
-                        for (String failure : disabledBean.reasons()) {
-                            messageBuilder.append("   - ").append(failure).append(ls);
+        if (!beanDefinitions.isEmpty()) {
+            for (BeanDefinition<T> beanDefinition : beanDefinitions) {
+                messageBuilder
+                    .append(lineSeparator)
+                    .append(linePrefix)
+                    .append("* [").append(beanDefinition.asArgument().getTypeString(true));
+                if (!beanDefinition.getBeanType().equals(beanType.getType())) {
+                    messageBuilder.append("] a candidate of [")
+                        .append(beanType.getTypeString(true));
+                }
+                messageBuilder.append("] is disabled because:")
+                    .append(lineSeparator);
+                if (beanDefinition instanceof DisabledBean<T> disabledBean) {
+                    for (String failure : disabledBean.reasons()) {
+                        messageBuilder
+                            .append(linePrefix)
+                            .append(" - ")
+                            .append(failure)
+                            .append(lineSeparator);
+                        String prefix = "No bean of type [";
+                        if (failure.startsWith(prefix)) {
+                            ClassUtils.forName(failure.substring(prefix.length(), failure.indexOf("]")), classLoader)
+                                .ifPresent(beanClass -> {
+                                    messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
+                                    resolveDisabledBeanMessage(linePrefix + " ",
+                                            messageBuilder,
+                                            lineSeparator,
+                                            resolutionContext,
+                                            Argument.of(beanClass),
+                                            null);
+                                    messageBuilder.append(lineSeparator);
+                                });
                         }
                     }
+                    messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
                 }
-
-                disabledMessage = messageBuilder.toString();
             }
         }
-        return disabledMessage;
     }
 
     @Nullable
