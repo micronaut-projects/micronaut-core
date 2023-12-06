@@ -24,6 +24,7 @@ import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -79,6 +80,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -520,23 +522,30 @@ public final class RouteExecutor {
         if (response != null) {
             return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
         }
+        Objects.requireNonNull(body);
         if (routeInfo.isImperative()) {
             outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
         } else {
-            // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
-            boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-            if (isReactive) {
-                outgoingResponse = ReactiveExecutionFlow.fromPublisher(
-                    ReactivePropagation.propagate(
-                        propagatedContext,
-                        fromReactiveExecute(propagatedContext, request, Objects.requireNonNull(body), routeInfo)
-                    )
+            if (routeInfo.isAsync()) {
+                outgoingResponse = CompletableFutureExecutionFlow.just(
+                    fromCompletionStage(request, body, routeInfo)
                 );
             } else {
-                if (routeInfo.isSuspended()) {
-                    outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
+                // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
+                boolean isReactive = routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
+                if (isReactive) {
+                    outgoingResponse = ReactiveExecutionFlow.fromPublisher(
+                        ReactivePropagation.propagate(
+                            propagatedContext,
+                            fromReactiveExecute(propagatedContext, request, body, routeInfo)
+                        )
+                    );
                 } else {
-                    outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
+                    if (routeInfo.isSuspended()) {
+                        outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
+                    } else {
+                        outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
+                    }
                 }
             }
         }
@@ -663,6 +672,47 @@ public final class RouteExecutor {
         }
         MutableHttpResponse<?> response = forStatus(routeInfo, null).body(body);
         return processPublisherBody(propagatedContext, request, response, routeInfo);
+    }
+
+    @NonNull
+    private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(@NonNull HttpRequest<?> request,
+                                                                        @NonNull Object body,
+                                                                        @NonNull RouteInfo<?> routeInfo) {
+        CompletionStage<Object> completionStage = (CompletionStage<Object>) body;
+        return completionStage.thenCompose(asyncBody -> {
+            MutableHttpResponse<?> mutableResponse;
+            if (asyncBody instanceof Optional<?> optional) {
+                if (optional.isPresent()) {
+                    asyncBody = optional.get();
+                } else {
+                    return CompletableFuture.completedStage(newNotFoundError(request));
+                }
+            }
+            if (asyncBody instanceof HttpResponse<?> httpResponse) {
+                mutableResponse = httpResponse.toMutableResponse();
+                final Argument<?> bodyArgument = routeInfo.getReturnType() // CompletionStage
+                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) // HttpResponse
+                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); // CompletionStage
+                if (bodyArgument.isAsync()) {
+                    CompletionStage<Object> inner = (CompletionStage<Object>) mutableResponse.body();
+                    return inner.thenApply(innerBody -> {
+                        if (innerBody == null) {
+                            return newNotFoundError(request);
+                        }
+                        return mutableResponse.body(innerBody);
+                    });
+                }
+            } else if (asyncBody instanceof HttpStatus status) {
+                mutableResponse = forStatus(routeInfo, status);
+            } else {
+                mutableResponse = forStatus(routeInfo, null)
+                    .body(asyncBody);
+            }
+            if (mutableResponse.body() == null) {
+                return CompletableFuture.completedStage(newNotFoundError(request));
+            }
+            return CompletableFuture.completedStage(mutableResponse);
+        });
     }
 
     private Mono<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,

@@ -18,7 +18,7 @@ package io.micronaut.core.execution;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * The completable future execution flow.
@@ -38,8 +38,8 @@ public interface CompletableFutureExecutionFlow<T> extends ExecutionFlow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> ExecutionFlow<K> just(@NonNull CompletableFuture<K> value) {
-        return (ExecutionFlow<K>) new CompletableFutureExecutionFlowImpl((CompletableFuture<Object>) value);
+    static <K> ExecutionFlow<K> just(@NonNull CompletionStage<K> value) {
+        return (ExecutionFlow<K>) new CompletableFutureExecutionFlowImpl((CompletionStage<Object>) value);
     }
 
 }
