@@ -1,12 +1,9 @@
 package io.micronaut.inject.configproperties.nesting
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Specification
 
 class EachPropertyNestingSpec extends AbstractTypeElementSpec {
 
@@ -127,11 +124,14 @@ class ClassOuterConfig {
         config2.inner.inners.find { it.name == '2nd' }.count == 40
 
         when:"A unresolvable bean is queried"
-        def inner = getBean(context, 'test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig', Qualifiers.byName("foo-bar"))
+        getBean(context, 'test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig', Qualifiers.byName("foo-bar"))
 
         then:
         def e = thrown(NoSuchBeanException)
-        e.message == 'No bean of type [test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig] exists for the given qualifier: @Named(\'foo-bar\'). No configuration entries found under the prefix: [test.*.inner.inners.*]. Provide the necessary configuration to resolve this issue.'
+        def lines = e.message.lines().toList()
+        lines[0] == 'No bean of type [test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig] exists for the given qualifier: @Named(\'foo-bar\'). '
+        lines[1] == '* [ClassInnerEachConfig] is disabled because:'
+        lines[2] == ' - Configuration requires entries under the prefix: [test.*.inner.inners.*]'
     }
 
     @Override
