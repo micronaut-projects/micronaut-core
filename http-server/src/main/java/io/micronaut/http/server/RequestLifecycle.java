@@ -72,7 +72,6 @@ public class RequestLifecycle {
 
     private final RouteExecutor routeExecutor;
     private final boolean multipartEnabled;
-    private final boolean validateUrl;
     private HttpRequest<?> request;
 
     /**
@@ -80,7 +79,6 @@ public class RequestLifecycle {
      */
     protected RequestLifecycle(RouteExecutor routeExecutor) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
-        this.validateUrl = routeExecutor.serverConfiguration.isValidateUrl();
         Optional<Boolean> isMultiPartEnabled = routeExecutor.serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
     }
@@ -158,13 +156,6 @@ public class RequestLifecycle {
 
             UriRouteMatch<Object, Object> routeMatch = routeExecutor.findRouteMatch(request);
             if (routeMatch == null) {
-                if (validateUrl) {
-                    try {
-                        request.getUri(); // Invalid url will throw an exception
-                    } catch (Throwable t) {
-                        return onError(request, t.getCause());
-                    }
-                }
                 //Check if there is a file for the route before returning route not found
                 FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
                 if (fileCustomizableResponseType != null) {
@@ -187,16 +178,7 @@ public class RequestLifecycle {
                     "Not a WebSocket request");
             }
 
-            return runWithFilters(request, (filteredRequest, propagatedContext) -> {
-                if (validateUrl) {
-                    try {
-                        request.getUri(); // Invalid url will throw an exception
-                    } catch (Throwable t) {
-                        return onError(filteredRequest, t.getCause());
-                    }
-                }
-                return executeRoute(filteredRequest, propagatedContext, routeMatch);
-            });
+            return runWithFilters(request, (filteredRequest, propagatedContext) -> executeRoute(filteredRequest, propagatedContext, routeMatch));
         } catch (Throwable t) {
             return onError(request, t);
         }
