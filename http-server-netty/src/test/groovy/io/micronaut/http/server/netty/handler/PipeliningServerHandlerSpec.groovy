@@ -303,7 +303,8 @@ class PipeliningServerHandlerSpec extends Specification {
             int i = 0
 
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                body.release()
                 if (i++ == 0) {
                     outboundAccess.writeStreamed(resp, sink.asFlux())
                 } else {

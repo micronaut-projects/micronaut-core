@@ -694,7 +694,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
-        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : routesByMethod.entrySet()) {
+        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             HttpMethod parsed = HttpMethod.parse(entry.getKey());
             if (parsed == HttpMethod.CUSTOM) {
                 continue;

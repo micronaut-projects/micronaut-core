@@ -45,6 +45,7 @@ class FilterFormSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "FilterFormSpec")
     @ServerFilter("/form-error")
     static class Fltr {
         @RequestFilter

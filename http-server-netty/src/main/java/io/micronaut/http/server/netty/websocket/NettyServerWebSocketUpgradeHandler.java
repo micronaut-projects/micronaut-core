@@ -135,7 +135,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
         if (isWebSocketUpgrade(request)) {
-            NettyHttpRequest<?> msg = NettyHttpRequest.createSafe(request, body, ctx, conversionService, serverConfiguration);
+            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
