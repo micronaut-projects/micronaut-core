@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -56,7 +57,6 @@ import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.body.ShortCircuitNettyBodyWriter;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -110,6 +110,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -290,10 +291,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return ExecutionLeaf.indeterminate();
         }
         List<GenericHttpFilter> fixedFilters = routeExecutor.getRouter().getFixedFilters().orElse(null);
-        // CorsFilter is handled specially here. It's always present, so we can't bail, but it only does anything when the Origin header is set, which is checked in accept().
-        if (fixedFilters == null || !fixedFilters.stream().allMatch(ghf -> FilterRunner.isCorsFilter(ghf, CorsFilter.class))) {
+        if (fixedFilters == null) {
             return ExecutionLeaf.indeterminate();
         }
+        // CorsFilter is handled specially here. It's always present, so we can't bail, but it only does anything when the Origin header is set, which is checked in accept().
+        fixedFilters = fixedFilters.stream().filter(f -> !FilterRunner.isCorsFilter(f, CorsFilter.class)).toList();
         MethodExecutionHandle<?, ?> executionHandle = routeInfo.getTargetMethod();
         if (executionHandle.getReturnType().isOptional() ||
             executionHandle.getReturnType().getType() == HttpStatus.class) {
@@ -346,37 +348,45 @@ public final class RoutingInBoundHandler implements RequestHandler {
         } else {
             return ExecutionLeaf.indeterminate();
         }
+        List<GenericHttpFilter> finalFixedFilters = fixedFilters;
+        BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> exec = (httpRequest, propagatedContext) -> {
+            Object[] arguments = shortCircuitBinders.length == 0 ? ArrayUtils.EMPTY_OBJECT_ARRAY : new Object[shortCircuitBinders.length];
+            ImmediateByteBody body = (ImmediateByteBody) ((NettyHttpRequest<?>) httpRequest).byteBody();
+            for (int i = 0; i < arguments.length; i++) {
+                arguments[i] = shortCircuitBinders[i].bind(httpRequest.getHeaders(), body);
+            }
+            Object result = unsafeExecutionHandle.invokeUnsafe(arguments);
+            if (unwrapResponse) {
+                return ExecutionFlow.just((HttpResponse<?>) result);
+            } else {
+                return ExecutionFlow.just(HttpResponse.ok(result));
+            }
+        };
         return new ExecutionLeaf.Route<>(new RequestHandler() {
             @Override
             public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 try {
-                    NettyHttpHeaders requestHeaders = new NettyHttpHeaders(request.headers(), conversionService);
+                    NettyHttpRequest<Object> nhr = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                    outboundAccess.attachment(nhr);
 
-                    Object[] arguments = shortCircuitBinders.length == 0 ? ArrayUtils.EMPTY_OBJECT_ARRAY : new Object[shortCircuitBinders.length];
-                    for (int i = 0; i < arguments.length; i++) {
-                        arguments[i] = shortCircuitBinders[i].bind(request, requestHeaders, (ImmediateByteBody) body);
-                    }
-                    Object result = unsafeExecutionHandle.invokeUnsafe(arguments);
-                    HttpResponseStatus status = HttpResponseStatus.OK;
-                    HttpHeaders responseHeaders;
-                    if (unwrapResponse) {
-                        HttpResponse<?> resp = (HttpResponse<?>) result;
-                        responseHeaders = ((NettyHttpHeaders) resp.getHeaders()).getNettyHeaders();
-                        if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
-                            responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                    new FilterRunner(finalFixedFilters, exec).run(nhr, PropagatedContext.empty()).onComplete((response, err) -> {
+                        if (err != null) {
+                            RoutingInBoundHandler.this.handleUnboundError(err);
+                        } else {
+                            HttpHeaders responseHeaders = ((NettyHttpHeaders) response.getHeaders()).getNettyHeaders();
+                            if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                                responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                            }
+                            HttpResponseStatus status = HttpResponseStatus.valueOf(response.code(), response.reason());
+                            if (scWriter != null) {
+                                scWriter.writeTo(nhr.getHeaders(), status, responseHeaders, response.body(), outboundAccess);
+                            } else {
+                                ByteBuf buf = (ByteBuf) rawWriter.writeTo(responseMediaType, response.body(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
+                                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
+                            }
                         }
-                        status = HttpResponseStatus.valueOf(resp.code(), resp.reason());
-                        result = resp.body();
-                    } else {
-                        responseHeaders = new DefaultHttpHeaders();
-                        responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
-                    }
-                    if (scWriter != null) {
-                        scWriter.writeTo(requestHeaders, status, responseHeaders, result, outboundAccess);
-                    } else {
-                        ByteBuf buf = (ByteBuf) rawWriter.writeTo(responseMediaType, result, NettyByteBufferFactory.DEFAULT).asNativeBuffer();
-                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
-                    }
+                    });
+
                 } catch (Exception e) {
                     RoutingInBoundHandler.this.handleUnboundError(e);
                 }

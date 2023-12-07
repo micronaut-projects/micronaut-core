@@ -23,7 +23,6 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.web.router.shortcircuit.MatchRule;
-import io.netty.handler.codec.http.HttpRequest;
 
 import java.util.Optional;
 
@@ -52,11 +51,10 @@ public interface ShortCircuitArgumentBinder<T> extends RequestArgumentBinder<T> 
         /**
          * Bind the parameter.
          *
-         * @param nettyRequest The netty request
          * @param mnHeaders    The request headers (micronaut-http class)
          * @param body         The request body
          * @return The bound argument
          */
-        Object bind(@NonNull HttpRequest nettyRequest, HttpHeaders mnHeaders, @NonNull ImmediateByteBody body);
+        Object bind(HttpHeaders mnHeaders, @NonNull ImmediateByteBody body);
     }
 }

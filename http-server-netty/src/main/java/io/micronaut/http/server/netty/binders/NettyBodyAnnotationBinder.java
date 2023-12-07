@@ -21,8 +21,8 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
@@ -37,8 +37,8 @@ import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.shortcircuit.ShortCircuitArgumentBinder;
-import io.micronaut.web.router.shortcircuit.MatchRule;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.util.List;
 import java.util.Optional;
@@ -194,7 +194,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
             reader = opt.get();
         }
-        return Optional.of((nettyRequest, mnHeaders, body) -> {
+        return Optional.of((mnHeaders, body) -> {
             if (body.empty()) {
                 return null;
             }
