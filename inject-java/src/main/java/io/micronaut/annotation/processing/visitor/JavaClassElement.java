@@ -103,6 +103,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private Map<String, Map<String, ClassElement>> resolvedAllTypeArguments;
     @Nullable
     private ClassElement resolvedSuperType;
+    @Nullable
+    private List<ClassElement> resolvedInterfaces;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery(false);
     private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
@@ -256,7 +258,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public Collection<ClassElement> getInterfaces() {
-        return classElement.getInterfaces().stream().map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+        if (resolvedInterfaces == null) {
+            resolvedInterfaces = classElement.getInterfaces().stream().map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+        }
+        return resolvedInterfaces;
     }
 
     @Override
@@ -796,7 +801,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
 
         @Override
-        protected List<Element> getEnclosedElements(TypeElement classNode, ElementQuery.Result<?> result) {
+        protected List<Element> getEnclosedElements(TypeElement classNode, ElementQuery.Result<?> result, boolean includeAbstract) {
             List<? extends Element> ee;
             if (classNode == classElement) {
                 ee = getEnclosedElements();
@@ -804,13 +809,40 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 ee = classNode.getEnclosedElements();
             }
             EnumSet<ElementKind> elementKinds = getElementKind(result);
-            return ee.stream().filter(element -> elementKinds.contains(element.getKind())).collect(Collectors.toList());
+            List<Element> list = new ArrayList<>(elementKinds.size());
+            for (Element element : ee) {
+                Set<Modifier> modifiers = element.getModifiers();
+                if (elementKinds.contains(element.getKind()) && (includeAbstract || isNonAbstractMethod(modifiers, classNode))) {
+                    list.add(element);
+                }
+            }
+            return list;
+        }
+
+        private boolean isNonAbstractMethod(Set<Modifier> modifiers, TypeElement classNode) {
+            if (modifiers.contains(Modifier.DEFAULT)) {
+                return true;
+            }
+            if (modifiers.contains(Modifier.PRIVATE) && isInterface(classNode)) {
+                return true;
+            }
+            return !modifiers.contains(Modifier.ABSTRACT);
         }
 
         @Override
         protected boolean excludeClass(TypeElement classNode) {
             return classNode.getQualifiedName().toString().equals(Object.class.getName())
                     || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+        }
+
+        @Override
+        protected boolean isAbstractClass(TypeElement classNode) {
+            return classNode.getModifiers().contains(Modifier.ABSTRACT);
+        }
+
+        @Override
+        protected boolean isInterface(TypeElement classNode) {
+            return classNode.getKind() == ElementKind.INTERFACE;
         }
 
         @Override

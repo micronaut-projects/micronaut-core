@@ -700,22 +700,24 @@ internal open class KotlinClassElement(
 
         override fun getEnclosedElements(
             classNode: KSClassDeclaration,
-            result: ElementQuery.Result<*>
+            result: ElementQuery.Result<*>,
+            includeAbstract: Boolean
         ): List<KSNode> {
             val elementType: Class<*> = result.elementType
-            return getEnclosedElements(classNode, result, elementType)
+            return getEnclosedElements(classNode, result, elementType, includeAbstract)
         }
 
         private fun getEnclosedElements(
             classNode: KSClassDeclaration,
             result: ElementQuery.Result<*>,
-            elementType: Class<*>
+            elementType: Class<*>,
+            includeAbstract: Boolean
         ): List<KSNode> {
             return when (elementType) {
                 MemberElement::class.java -> {
                     Stream.concat(
-                        getEnclosedElements(classNode, result, FieldElement::class.java).stream(),
-                        getEnclosedElements(classNode, result, MethodElement::class.java).stream()
+                        getEnclosedElements(classNode, result, FieldElement::class.java, includeAbstract).stream(),
+                        getEnclosedElements(classNode, result, MethodElement::class.java, includeAbstract).stream()
                     ).toList()
                 }
 
@@ -729,7 +731,7 @@ internal open class KotlinClassElement(
                                         "hashCode",
                                         "toString",
                                         "equals"
-                                    ).contains(func.simpleName.asString())
+                                    ).contains(func.simpleName.asString()) && (includeAbstract || !func.isAbstract || !classNode.isAbstract())
                         }
                         .toList()
                 }
@@ -771,6 +773,10 @@ internal open class KotlinClassElement(
                     t == builtIns.unitType ||
                     classNode.qualifiedName.toString() == Enum::class.java.name
         }
+
+        override fun isAbstractClass(classNode: KSClassDeclaration) = classNode.isAbstract()
+
+        override fun isInterface(classNode: KSClassDeclaration) = classNode.classKind == ClassKind.INTERFACE
 
         override fun toAstElement(
             nativeType: KSNode,

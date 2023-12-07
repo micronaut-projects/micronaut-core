@@ -815,7 +815,7 @@ interface MyBean extends GenericInterface, SpecificInterface {
         when:
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
-            allMethods.size() == 1
+            allMethods.size() == 2
         when:
             def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
         then:
