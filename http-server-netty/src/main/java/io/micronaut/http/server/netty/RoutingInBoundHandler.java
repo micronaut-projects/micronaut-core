@@ -195,27 +195,29 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-        NettyHttpRequest<Object> mnRequest;
-        try {
-            mnRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
-        } catch (IllegalArgumentException e) {
-            // invalid URI
-            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
-                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
-                ctx,
-                conversionService,
-                serverConfiguration
-            );
-            outboundAccess.attachment(errorRequest);
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
-                new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
+        NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
+        if (serverConfiguration.isValidateUrl()) {
+            try {
+                mnRequest.getUri();
+            } catch (IllegalArgumentException e) {
+                // invalid URI
+                NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                    new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
+                    ctx,
+                    conversionService,
+                    serverConfiguration
+                );
+                outboundAccess.attachment(errorRequest);
+                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                    new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
+                }
+                if (request instanceof StreamedHttpRequest streamed) {
+                    streamed.closeIfNoSubscriber();
+                } else {
+                    ((FullHttpRequest) request).release();
+                }
+                return;
             }
-            if (request instanceof StreamedHttpRequest streamed) {
-                streamed.closeIfNoSubscriber();
-            } else {
-                ((FullHttpRequest) request).release();
-            }
-            return;
         }
         if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
