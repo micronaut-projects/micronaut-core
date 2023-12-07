@@ -16,13 +16,6 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
-import org.reactivestreams.Publisher;
-
-import java.util.function.Function;
 
 /**
  * Base interface for different filter types. Note that while the base interface is exposed, so you
@@ -62,28 +55,6 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     @Internal
     static GenericHttpFilter createLegacyFilter(HttpFilter bean, FilterOrder order) {
         return new AroundLegacyFilter(bean, order);
-    }
-
-    /**
-     * Create a terminal filter.
-     * @param fn The function that supplier {@link MutableHttpResponse} from {@link HttpRequest}.
-     * @return new terminal filter
-     * @since 4.2.0
-     */
-    @Internal
-    static GenericHttpFilter terminalFilter(Function<HttpRequest<?>, ExecutionFlow<MutableHttpResponse<?>>> fn) {
-        return new TerminalFilter(fn);
-    }
-
-    /**
-     * Create a terminal reactive filter.
-     * @param responsePublisher The response publisher
-     * @return new terminal filter
-     * @since 4.2.0
-     */
-    @Internal
-    static GenericHttpFilter terminalReactiveFilter(Publisher<? extends HttpResponse<?>> responsePublisher) {
-        return new TerminalReactiveFilter(responsePublisher);
     }
 
     /**

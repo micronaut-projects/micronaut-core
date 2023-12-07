@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client
 
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -27,7 +12,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.NoHostException
 import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
@@ -49,29 +33,28 @@ class ClientScopeSpec extends Specification {
     void "test client scope annotation method injection"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'ClientScopeSpec',
-                'from.config': '/',
-                'micronaut.server.port': -1])
-        embeddedServer.start()
+                'spec.name'            : 'ClientScopeSpec',
+                'from.config'          : '/',
+                'micronaut.server.port': -1
+        ])
 
-        def applicationContext = ApplicationContext.run([
-                'spec.name': 'ClientScopeSpec',
-                'from.config': '/',
-                'micronaut.server.port': -1,
-                'micronaut.http.client.url': embeddedServer.URI,
-                'micronaut.http.services.my-service.url': embeddedServer.URI,
-                'micronaut.http.services.my-service-declared.url': embeddedServer.URI,
+        EmbeddedServer embeddedServer2 = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                                       : 'ClientScopeSpec',
+                'from.config'                                     : '/',
+                'micronaut.server.port'                           : -1,
+                'micronaut.http.client.url'                       : embeddedServer.URI,
+                'micronaut.http.services.my-service.url'          : embeddedServer.URI,
+                'micronaut.http.services.my-service-declared.url' : embeddedServer.URI,
                 'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
-                'micronaut.http.services.other-service.url': embeddedServer.URI,
-                'micronaut.http.services.other-service.path': "/scope",
-                'micronaut.http.services.other-service-2.url': embeddedServer.URI,
-                'micronaut.http.services.other-service-2.path': "/scope"])
-        def embeddedServer2 = applicationContext.getBean(EmbeddedServer)
-        embeddedServer2.start()
-        MyService myService = applicationContext.getBean(MyService)
+                'micronaut.http.services.other-service.url'       : embeddedServer.URI,
+                'micronaut.http.services.other-service.path'      : "/scope",
+                'micronaut.http.services.other-service-2.url'     : embeddedServer.URI,
+                'micronaut.http.services.other-service-2.path'    : "/scope"
+        ])
 
         when:
-        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
+        MyService myService = embeddedServer2.applicationContext.getBean(MyService)
+        MyJavaService myJavaService = embeddedServer2.applicationContext.getBean(MyJavaService)
 
         then:
         myService.get() == 'success'
@@ -79,8 +62,7 @@ class ClientScopeSpec extends Specification {
         myJavaService.reactiveHttpClient == myService.reactiveHttpClient
 
         when:"test client scope annotation field injection"
-        MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
-
+        MyServiceField myServiceField = embeddedServer2.applicationContext.getBean(MyServiceField)
 
         then:
         myServiceField.get() == 'success'
@@ -88,7 +70,7 @@ class ClientScopeSpec extends Specification {
         myJavaService.reactiveHttpClient == myServiceField.reactiveHttpClient
 
         when:"test client scope annotation constructor injection"
-        MyServiceConstructor serviceConstructor = applicationContext.getBean(MyServiceConstructor)
+        MyServiceConstructor serviceConstructor = embeddedServer2.applicationContext.getBean(MyServiceConstructor)
 
 
         then:
@@ -102,7 +84,7 @@ class ClientScopeSpec extends Specification {
         myServiceField.getPath() == 'success'
 
         when:"test injection after declarative client"
-        MyDeclarativeService client = applicationContext.getBean(MyDeclarativeService)
+        MyDeclarativeService client = embeddedServer2.applicationContext.getBean(MyDeclarativeService)
         client.name()
 
         then:
@@ -111,19 +93,19 @@ class ClientScopeSpec extends Specification {
                 .resolveRequestURI(HttpRequest.GET("/foo"))).blockFirst().toString() == "http://localhost:${embeddedServer2.port}/foo"
 
         when:"test service definition with declarative client with jackson features"
-        MyServiceJacksonFeatures jacksonFeatures = applicationContext.getBean(MyServiceJacksonFeatures)
+        MyServiceJacksonFeatures jacksonFeatures = embeddedServer2.applicationContext.getBean(MyServiceJacksonFeatures)
 
         then:
         jacksonFeatures.name() == "success"
 
         when:"test service definition with declarative client with jackson features: additional module"
-        MyServiceJacksonModule jacksonFeatures2 = applicationContext.getBean(MyServiceJacksonModule)
+        MyServiceJacksonModule jacksonFeatures2 = embeddedServer2.applicationContext.getBean(MyServiceJacksonModule)
 
         then:
         jacksonFeatures2.bean().getFooBar() == "baz"
 
         when:"test no base path with the declarative client"
-        NoBasePathService noBasePathService = applicationContext.getBean(NoBasePathService)
+        NoBasePathService noBasePathService = embeddedServer2.applicationContext.getBean(NoBasePathService)
 
         then:
         noBasePathService.name("http://localhost:${embeddedServer.port}/scope") == "success"
@@ -149,8 +131,8 @@ class ClientScopeSpec extends Specification {
         ex.message == "Request URI specifies no host to connect to"
 
         when:
-        InstanceEquals bean = applicationContext.getBean(InstanceEquals)
-        InstanceDoesNotEqual bean2 = applicationContext.getBean(InstanceDoesNotEqual)
+        InstanceEquals bean = embeddedServer2.applicationContext.getBean(InstanceEquals)
+        InstanceDoesNotEqual bean2 = embeddedServer2.applicationContext.getBean(InstanceDoesNotEqual)
 
         then:
         bean.client.is(bean.client2)
@@ -176,6 +158,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Controller('/scope')
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
         String index() {
@@ -189,6 +172,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class MyService {
 
         @Inject @Client('${from.config}')
@@ -216,6 +200,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class MyServiceField {
 
         @Inject @Client('${from.config}')
@@ -240,6 +225,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class MyServiceConstructor {
 
         private final HttpClient client
@@ -260,6 +246,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class InstanceEquals {
 
         @Inject @Client('/')
@@ -291,6 +278,7 @@ class ClientScopeSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class InstanceDoesNotEqual {
 
         @Inject @Client('/foo')
@@ -311,6 +299,7 @@ class ClientScopeSpec extends Specification {
 
     @Singleton
     @ConfigurationProperties("custom")
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
     static class CustomConfig extends DefaultHttpClientConfiguration {
 
     }

@@ -18,6 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -61,6 +62,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     protected final HttpStatus definedStatus;
     protected final boolean isWebSocketRoute;
     private final boolean isVoid;
+    private final boolean imperative;
     private final boolean suspended;
     private final boolean reactive;
     private final boolean single;
@@ -143,6 +145,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             this.consumesMediaTypes = consumesMediaTypes;
             consumesMediaTypesContainsAll = this.consumesMediaTypes.contains(MediaType.ALL_TYPE);
         }
+        this.imperative = isVoid || !suspended && !reactive && !async && !returnType.getType().equals(Object.class)
+            && (returnType.getType().getPackageName().startsWith("java.") || BeanIntrospector.SHARED.findIntrospection(returnType.getType()).isPresent());
     }
 
     @Override
@@ -198,8 +202,18 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    public boolean consumesAll() {
+        return consumesMediaTypesContainsAll;
+    }
+
+    @Override
     public final boolean doesConsume(MediaType contentType) {
         return contentType == null || consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
+    }
+
+    @Override
+    public boolean producesAll() {
+        return producesMediaTypesContainsAll;
     }
 
     @Override
@@ -258,6 +272,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean isSuspended() {
         return suspended;
+    }
+
+    @Override
+    public boolean isImperative() {
+        return imperative;
     }
 
     @Override

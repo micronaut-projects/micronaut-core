@@ -54,6 +54,7 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.body.ShortCircuitNettyBodyWriter;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -90,6 +91,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.AttributeKey;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -186,7 +188,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+                        LOG.error("Error publishing request terminated event: {}", e.getMessage(), e);
                     }
                 }
             }
@@ -206,18 +208,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
         // running any filters
         if (isIgnorable(cause)) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+                LOG.debug("Swallowed an IOException caused by client connectivity: {}", cause.getMessage(), cause);
             }
             return;
         }
 
         if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                LOG.debug("Micronaut Server Error - No request state present. Cause: {}", cause.getMessage(), cause);
             }
         } else {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                LOG.error("Micronaut Server Error - No request state present. Cause: {}", cause.getMessage(), cause);
             }
         }
     }
@@ -237,29 +239,35 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }
         }
 
-        NettyHttpRequest<Object> mnRequest;
-        try {
-            mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
-        } catch (IllegalArgumentException e) {
-            body.release();
+        NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);if (serverConfiguration.isValidateUrl()) {
+            try {
+                mnRequest.getUri();
+            } catch (IllegalArgumentException e) {
+                body.release();
 
             // invalid URI
             NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                 new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
                 ByteBody.empty(),
-                ctx,
-                conversionService,
-                serverConfiguration
-            );
-            outboundAccess.attachment(errorRequest);
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
-                new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+                    ctx,
+                    conversionService,
+                    serverConfiguration
+                );
+                outboundAccess.attachment(errorRequest);
+                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                    new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest,e.getCause() == null ? e : e.getCause());
+                }
+                return;
             }
-            return;
+        }
+        if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+            // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
+            AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+            ctx.channel().attr(KEY).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
-            new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
+            new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest);
         }
     }
 
@@ -382,9 +390,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,
-                       NettyHttpRequest<?> nettyHttpRequest,
-                       MutableHttpResponse<?> response,
-                       Throwable throwable) {
+                              NettyHttpRequest<?> nettyHttpRequest,
+                              HttpResponse<?> response,
+                              Throwable throwable) {
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
         }
@@ -441,8 +449,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private void encodeHttpResponse(
         PipeliningServerHandler.OutboundAccess outboundAccess,
         NettyHttpRequest<?> nettyRequest,
-        MutableHttpResponse<?> response,
+        HttpResponse<?> httpResponse,
         Object body) {
+        MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
             @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
 
@@ -585,11 +594,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         // default Connection header if not set explicitly
         closeConnectionIfError(message, request, outboundAccess);
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
-        // close handled by HttpServerKeepAliveHandler
-        if (request.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
-            // consume incoming data
-            Flux.from(streamed).subscribe(HttpContent::release);
-        }
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
             writeStreamedWithErrorHandling(request, outboundAccess, streamed);
         } else {
@@ -597,11 +601,26 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.writeFull(fullResponse, request.getMethod() == HttpMethod.HEAD);
         }
 
+        log(request, nettyResponse);
+    }
+
+    private void writeFinalFullNettyResponse(MutableHttpResponse<?> message,
+                                             NettyHttpRequest<?> request,
+                                             PipeliningServerHandler.OutboundAccess outboundAccess,
+                                             ByteBuf byteBuf) {
+        // default Connection header if not set explicitly
+        closeConnectionIfError(message, request, outboundAccess);
+        FullHttpResponse fullResponse = NettyHttpResponseBuilder.toFullHttpResponse(message, byteBuf);
+        outboundAccess.writeFull(fullResponse, request.getMethod() == HttpMethod.HEAD);
+        log(request, fullResponse);
+    }
+
+    private void log(HttpRequest<?> request, io.netty.handler.codec.http.HttpResponse nettyResponse) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",
                 nettyResponse.status().code(),
-                ((HttpRequest<?>) request).getMethodName(),
-                ((HttpRequest<?>) request).getUri());
+                request.getMethodName(),
+                request.getUri());
         }
     }
 
@@ -693,9 +712,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 type,
                 mediaType,
                 object,
-                outgoingResponse.getHeaders(), bufferFactory);
-            outgoingResponse.body((Object) byteBuffer.asNativeBuffer());
-            writeFinalNettyResponse(outgoingResponse, (NettyHttpRequest<?>) request, (PipeliningServerHandler.OutboundAccess) nettyContext);
+                outgoingResponse.getHeaders(),
+                bufferFactory);
+            ByteBuf buffer = (ByteBuf) byteBuffer.asNativeBuffer();
+            writeFinalFullNettyResponse(outgoingResponse,
+                (NettyHttpRequest<?>) request,
+                (PipeliningServerHandler.OutboundAccess) nettyContext,
+                buffer);
         }
 
         @Override

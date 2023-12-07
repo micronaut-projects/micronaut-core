@@ -2,6 +2,7 @@ package io.micronaut.http.client.aop
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
@@ -28,17 +29,21 @@ class RequestBeanSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'RequestBeanSpec',
+    ])
 
     @Shared
-    RequestBeanClient client = embeddedServer.getApplicationContext().getBean(RequestBeanClient)
+    RequestBeanClient client = embeddedServer.applicationContext.getBean(RequestBeanClient)
 
     void "test client RequestBean"() {
-        ClientRequestBean bean = new ClientRequestBean()
-        bean.queryValues = ["ABC", "XYZ"]
-        bean.queryValue = "FOO"
-        bean.forwardedFor = "Tester"
-        bean.path = "request-bean"
+        given:
+        ClientRequestBean bean = new ClientRequestBean().tap {
+            queryValues = ["ABC", "XYZ"]
+            queryValue = "FOO"
+            forwardedFor = "Tester"
+            path = "request-bean"
+        }
 
         when:
         ClientRequestBean resp = client.getBean(bean)
@@ -143,6 +148,7 @@ class RequestBeanSpec extends Specification {
     }
 
     @Controller('/request/bean')
+    @Requires(property = 'spec.name', value = 'RequestBeanSpec')
     static class RequestBeanController {
 
         @Get("/client-{path}")
@@ -223,6 +229,7 @@ class RequestBeanSpec extends Specification {
     }
 
     @Client('/request/bean')
+    @Requires(property = 'spec.name', value = 'RequestBeanSpec')
     static interface RequestBeanClient {
 
         @Get("/client-{path}")
@@ -269,7 +276,6 @@ class RequestBeanSpec extends Specification {
 
         @Get("/unsatisfied/value")
         String getUnsatisfiedValue()
-
     }
 
     @Introspected
@@ -358,7 +364,6 @@ class RequestBeanSpec extends Specification {
         @Nullable
         @QueryValue
         String extendingValue
-
     }
 
     static class SuperBean {
@@ -366,7 +371,6 @@ class RequestBeanSpec extends Specification {
         @Nullable
         @QueryValue
         String superValue
-
     }
 
     @Introspected
@@ -374,14 +378,15 @@ class RequestBeanSpec extends Specification {
 
         @QueryValue
         String value
-
     }
 
     static class TestTypeValue {
+
         String value
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'RequestBeanSpec')
     static class TestTypeValueBinder implements TypedRequestArgumentBinder<TestTypeValue> {
 
         @Override
@@ -405,6 +410,7 @@ class RequestBeanSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'RequestBeanSpec')
     static class TestFilterValueBinder implements TypedRequestArgumentBinder<TestFilterValue> {
 
         @Override
@@ -424,6 +430,7 @@ class RequestBeanSpec extends Specification {
     }
 
     @Filter("/request/bean/**")
+    @Requires(property = 'spec.name', value = 'RequestBeanSpec')
     static class TestFilter implements HttpServerFilter {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
@@ -431,5 +438,4 @@ class RequestBeanSpec extends Specification {
             return chain.proceed(request)
         }
     }
-
 }

@@ -16,6 +16,7 @@
 package io.micronaut.aop.simple
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -29,11 +30,14 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
 
     void "test AOP method invocation"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
+        ApplicationContext context = ApplicationContext.run()
+        SimpleGroovyClass foo = context.getBean(SimpleGroovyClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method        | args         | result
@@ -67,10 +71,10 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
 
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when: "the bean definition is obtained"
-        BeanDefinition<SimpleGroovyClass> beanDefinition = beanContext.findBeanDefinition(SimpleGroovyClass).get()
+        BeanDefinition<SimpleGroovyClass> beanDefinition = context.findBeanDefinition(SimpleGroovyClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()
@@ -78,26 +82,31 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
         !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
 
         when:
-        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
+        SimpleGroovyClass foo = context.getBean(SimpleGroovyClass)
 
 
         then:
         foo instanceof Intercepted
-        beanContext.findExecutableMethod(SimpleGroovyClass, "test", String).isPresent()
+        context.findExecutableMethod(SimpleGroovyClass, "test", String).isPresent()
         // should not be a reflection based method
-        !beanContext.findExecutableMethod(SimpleGroovyClass, "test", String).get().getClass().getName().contains("Reflection")
+        !context.findExecutableMethod(SimpleGroovyClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
 
+        cleanup:
+        context.close()
     }
 
     void "test AOP setup attributes"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
+        SimpleGroovyClass foo = context.getBean(SimpleGroovyClass)
         then:
         foo instanceof Intercepted
         foo.test("test") == "Name is changed"
+
+        cleanup:
+        context.close()
     }
 }

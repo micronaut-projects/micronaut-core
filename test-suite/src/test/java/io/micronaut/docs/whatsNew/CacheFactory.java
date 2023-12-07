@@ -16,7 +16,6 @@
 package io.micronaut.docs.whatsNew;
 
 // tag::imports[]
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 
 import javax.cache.CacheManager;

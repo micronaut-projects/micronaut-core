@@ -1,7 +1,7 @@
 package io.micronaut.docs.server.endpoint
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -9,19 +9,20 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-
-import org.junit.Assert.fail
 import reactor.core.publisher.Flux
+import kotlin.test.fail
 
-class MessageEndpointSpec: StringSpec() {
+class MessageEndpointSpec : StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to MessageEndpointSpec::class.java.simpleName, "endpoints.message.enabled" to true))
+        ApplicationContext.run(
+            EmbeddedServer::class.java,
+            mapOf("spec.name" to MessageEndpointSpec::class.java.simpleName, "endpoints.message.enabled" to true)
+        )
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -33,8 +34,12 @@ class MessageEndpointSpec: StringSpec() {
         }
 
         "test write message endpoint" {
-            var response = Flux.from(client.exchange(HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java)).blockFirst()
+            var response = Flux.from(
+                client.exchange(
+                    HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java
+                )
+            ).blockFirst()
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message updated"

@@ -1,6 +1,6 @@
 package io.micronaut.docs.injectionpoint
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 /**
@@ -12,8 +12,8 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        def beanContext = BeanContext.run()
-        def vehicle = beanContext.getBean(Vehicle)
+        ApplicationContext context = ApplicationContext.run()
+        Vehicle vehicle = context.getBean(Vehicle)
         println vehicle.start()
         // end::start[]
 
@@ -21,6 +21,6 @@ class VehicleSpec extends Specification {
         vehicle.start() == "Starting V6"
 
         cleanup:
-        beanContext.close()
+        context.close()
     }
 }

@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.event
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 import jakarta.inject.Singleton
@@ -28,7 +28,7 @@ class EventListenerSpec extends Specification {
 
     void "test receive event"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         context.publishEvent(new FooEvent())
@@ -47,7 +47,8 @@ class EventListenerSpec extends Specification {
         listener.count == 2
         second.count == 1
 
-
+        cleanup:
+        context.close()
     }
 
 }

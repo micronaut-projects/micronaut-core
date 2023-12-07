@@ -15,16 +15,16 @@
  */
 package io.micronaut.docs.aop.introduction;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class IntroductionSpec {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+class IntroductionSpec {
 
     @Test
-    public void testStubIntroduction() {
+    void testStubIntroduction() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             // tag::test[]
             StubExample stubExample = applicationContext.getBean(StubExample.class);

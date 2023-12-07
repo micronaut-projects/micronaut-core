@@ -83,7 +83,7 @@ public final class ReactivePropagation {
      * @return propagation aware subscriber
      */
     public static <T> Subscriber<T> propagate(PropagatedContext propagatedContext, Subscriber<T> actual) {
-        return new CoreSubscriber<T>() {
+        return new CoreSubscriber<>() {
 
             @Override
             public Context currentContext() {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.context
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Primary
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -31,21 +31,24 @@ class FindBeanDefinitionSpec extends Specification {
 
     void 'test find bean definition'() {
         given:
-        BeanContext beanContext = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run()
 
         expect:
-        beanContext.findBeanDefinition(A).get().beanType == B
-        beanContext.findBeanDefinition(B).get().beanType == B
-        beanContext.findBeanDefinition(IA).get().beanType == B
-        beanContext.findBeanDefinition(IB).get().beanType == B
-        beanContext.findBeanDefinition(Ab).get().beanType == B
-        beanContext.getBean(A, Qualifiers.byName("A")) instanceof A
-        !(beanContext.getBean(A, Qualifiers.byName("A")) instanceof B)
-        beanContext.getBean(A) instanceof B
-        beanContext.getBean(Ab) instanceof B
-        beanContext.getBean(IA) instanceof B
-        beanContext.getBean(IB) instanceof B
-        beanContext.getBean(B) instanceof B
+        ctx.findBeanDefinition(A).get().beanType == B
+        ctx.findBeanDefinition(B).get().beanType == B
+        ctx.findBeanDefinition(IA).get().beanType == B
+        ctx.findBeanDefinition(IB).get().beanType == B
+        ctx.findBeanDefinition(Ab).get().beanType == B
+        ctx.getBean(A, Qualifiers.byName("A")) instanceof A
+        !(ctx.getBean(A, Qualifiers.byName("A")) instanceof B)
+        ctx.getBean(A) instanceof B
+        ctx.getBean(Ab) instanceof B
+        ctx.getBean(IA) instanceof B
+        ctx.getBean(IB) instanceof B
+        ctx.getBean(B) instanceof B
+
+        cleanup:
+        ctx.close()
     }
 
 

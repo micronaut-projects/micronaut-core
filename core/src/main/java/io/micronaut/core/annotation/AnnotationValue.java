@@ -123,7 +123,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param annotationName        The annotation name
      * @param values                The values
      * @param defaultValuesProvider The default values provider
-     * @since 4.3.0
+     * @since 4.2.0
      */
     @UsedByGeneratedCode
     @Internal

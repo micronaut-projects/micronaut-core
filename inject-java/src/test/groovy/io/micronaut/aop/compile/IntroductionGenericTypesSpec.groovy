@@ -16,6 +16,7 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
@@ -129,10 +130,8 @@ class SubPerson extends Person {}
 
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-
 
         then:"the methods are invocable"
         instance.getPerson() == null
@@ -142,6 +141,8 @@ class SubPerson extends Person {}
         instance.save(null) == null
         instance.saveAll([]) == null
 
+        cleanup:
+        context.close()
     }
 
     ReturnType returnType(BeanDefinition bd, String name) {

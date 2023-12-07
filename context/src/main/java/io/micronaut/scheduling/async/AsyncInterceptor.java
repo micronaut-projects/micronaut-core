@@ -111,7 +111,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                                 context.proceed();
                             } catch (Throwable e) {
                                 if (LOG.isErrorEnabled()) {
-                                    LOG.error("Error occurred executing @Async method [" + context.getExecutableMethod() + "]: " + e.getMessage(), e);
+                                    LOG.error("Error occurred executing @Async method [{}]: {}", context.getExecutableMethod(), e.getMessage(), e);
                                 }
                             }
                         });

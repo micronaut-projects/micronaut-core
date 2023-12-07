@@ -17,6 +17,7 @@ package io.micronaut.json.bind;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -24,8 +25,8 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonConfiguration;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Singleton;
 
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * An {@link io.micronaut.core.bind.ArgumentBinder} capable of binding from an object from a map.
@@ -45,12 +45,13 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 @Singleton
 @Primary
 final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
     private final JsonMapper jsonMapper;
-    private final int arraySizeThreshhold;
+    private final int arraySizeThreshold;
     private final BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers;
 
     /**
@@ -60,7 +61,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
      */
     JsonBeanPropertyBinder(JsonMapper jsonMapper, JsonConfiguration configuration, BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers) {
         this.jsonMapper = jsonMapper;
-        this.arraySizeThreshhold = configuration.getArraySizeThreshold();
+        this.arraySizeThreshold = configuration.getArraySizeThreshold();
         this.exceptionHandlers = exceptionHandlers;
     }
 
@@ -72,7 +73,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
             return () -> Optional.of(result);
         } catch (Exception e) {
             context.reject(e);
-            return new BindingResult<Object>() {
+            return new BindingResult<>() {
                 @Override
                 public List<ConversionError> getConversionErrors() {
                     return CollectionUtils.iterableToList(context);
@@ -128,27 +129,15 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
      * @param e      The exception object
      * @return The new conversion error
      */
-    protected ConversionErrorException newConversionError(Object object, Exception e) {
+    private ConversionErrorException newConversionError(Object object, Exception e) {
         for (JsonBeanPropertyBinderExceptionHandler exceptionHandler : exceptionHandlers) {
             Optional<ConversionErrorException> handled = exceptionHandler.toConversionError(object, e);
             if (handled.isPresent()) {
                 return handled.get();
             }
         }
-
-        ConversionError conversionError = new ConversionError() {
-            @Override
-            public Exception getCause() {
-                return e;
-            }
-
-            @Override
-            public Optional<Object> getOriginalValue() {
-                return Optional.empty();
-            }
-        };
         Class<?> type = object != null ? object.getClass() : Object.class;
-        return new ConversionErrorException(Argument.of(type), conversionError);
+        return new ConversionErrorException(Argument.of(type), e);
     }
 
     private JsonNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws IOException {
@@ -157,7 +146,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
             CharSequence key = entry.getKey();
             Object value = entry.getValue();
             String property = key.toString();
-            ValueBuilder current = rootNode;
+            ObjectBuilder current = rootNode;
             String index = null;
             Iterator<String> tokenIterator = StringUtils.splitOmitEmptyStringsIterator(property, '.');
             while (tokenIterator.hasNext()) {
@@ -169,80 +158,33 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
                 }
 
                 if (!tokenIterator.hasNext()) {
-                    if (current instanceof ObjectBuilder objectNode) {
-                        if (index != null) {
-                            ValueBuilder existing = objectNode.values.get(index);
-                            if (!(existing instanceof ObjectBuilder)) {
-                                existing = new ObjectBuilder();
-                                objectNode.values.put(index, existing);
-                            }
-                            ObjectBuilder node = (ObjectBuilder) existing;
-                            node.values.put(token, new FixedValue(jsonMapper.writeValueToTree(value)));
-                            index = null;
-                        } else {
-                            objectNode.values.put(token, new FixedValue(jsonMapper.writeValueToTree(value)));
-                        }
-                    } else if (current instanceof ArrayBuilder arrayNode && index != null) {
-                        int arrayIndex = Integer.parseInt(index);
-                        if (arrayIndex < arraySizeThreshhold) {
-
-                            if (arrayIndex >= arrayNode.values.size()) {
-                                expandArrayToThreshold(arrayIndex, arrayNode);
-                            }
-                            ValueBuilder jsonNode = arrayNode.values.get(arrayIndex);
-                            if (!(jsonNode instanceof ObjectBuilder)) {
-                                jsonNode = new ObjectBuilder();
-                                arrayNode.values.set(arrayIndex, jsonNode);
-                            }
-                            ((ObjectBuilder) jsonNode).values.put(token, new FixedValue(jsonMapper.writeValueToTree(value)));
-                        }
-                        index = null;
+                    if (index != null) {
+                        current = getOrCreateObjectAtKey(current, index);
+                    }
+                    JsonNode valueNode = jsonMapper.writeValueToTree(value);
+                    if (current == rootNode && valueNode.isValueNode()) {
+                        // Store root values as an array of a single value to
+                        // simplify deserialization cases of usersId=1&usersId=2 vs usersId=1 into a collection
+                        ArrayBuilder array = new ArrayBuilder();
+                        array.values.add(new FixedValue(valueNode));
+                        current.values.put(token, array);
+                    } else {
+                        current.values.put(token, new FixedValue(valueNode));
                     }
                 } else {
-                    if (current instanceof ObjectBuilder objectNode) {
-                        ValueBuilder existing = objectNode.values.get(token);
-                        if (index != null) {
-                            ValueBuilder jsonNode;
-                            if (StringUtils.isDigits(index)) {
-                                int arrayIndex = Integer.parseInt(index);
-                                ArrayBuilder arrayNode;
-                                if (!(existing instanceof ArrayBuilder)) {
-                                    arrayNode = new ArrayBuilder();
-                                    objectNode.values.put(token, arrayNode);
-                                } else {
-                                    arrayNode = (ArrayBuilder) existing;
-                                }
-                                expandArrayToThreshold(arrayIndex, arrayNode);
-                                jsonNode = getOrCreateNodeAtIndex(arrayNode, arrayIndex);
-                            } else {
-                                if (!(existing instanceof ObjectBuilder)) {
-                                    existing = new ObjectBuilder();
-                                    objectNode.values.put(token, existing);
-                                }
-                                jsonNode = ((ObjectBuilder) existing).values.get(index);
-                                if (!(jsonNode instanceof ObjectBuilder)) {
-                                    jsonNode = new ObjectBuilder();
-                                    ((ObjectBuilder) existing).values.put(index, jsonNode);
-                                }
-                            }
-
-                            current = jsonNode;
-                            index = null;
+                    if (index != null) {
+                        if (StringUtils.isDigits(index)) {
+                            ArrayBuilder arrayNode = getOrCreateArrayAtKey(current, token);
+                            int arrayIndex = Integer.parseInt(index);
+                            expandArrayToThreshold(arrayIndex, arrayNode);
+                            current = getOrCreateNodeAtIndex(arrayNode, arrayIndex);
                         } else {
-                            if (!(existing instanceof ObjectBuilder)) {
-                                existing = new ObjectBuilder();
-                                objectNode.values.put(token, existing);
-                            }
-                            current = existing;
+                            ObjectBuilder objectNode = getOrCreateObjectAtKey(current, token);
+                            current = getOrCreateObjectAtKey(objectNode, index);
                         }
-                    } else if (current instanceof ArrayBuilder arrayNode && StringUtils.isDigits(index)) {
-                        int arrayIndex = Integer.parseInt(index);
-                        expandArrayToThreshold(arrayIndex, arrayNode);
-                        ObjectBuilder jsonNode = getOrCreateNodeAtIndex(arrayNode, arrayIndex);
-
-                        current = new ObjectBuilder();
-                        jsonNode.values.put(token, current);
                         index = null;
+                    } else {
+                        current = getOrCreateObjectAtKey(current, token);
                     }
                 }
             }
@@ -250,17 +192,38 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         return rootNode.build();
     }
 
+    private ObjectBuilder getOrCreateObjectAtKey(ObjectBuilder objectNode, String key) {
+        ValueBuilder valueBuilder = objectNode.values.get(key);
+        if (valueBuilder instanceof ObjectBuilder objectBuilder) {
+            return objectBuilder;
+        }
+        ObjectBuilder objectBuilder = new ObjectBuilder();
+        objectNode.values.put(key, objectBuilder);
+        return objectBuilder;
+    }
+
+    private ArrayBuilder getOrCreateArrayAtKey(ObjectBuilder objectNode, String key) {
+        ValueBuilder valueBuilder = objectNode.values.get(key);
+        if (valueBuilder instanceof ArrayBuilder arrayBuilder) {
+            return arrayBuilder;
+        }
+        ArrayBuilder arrayBuilder = new ArrayBuilder();
+        objectNode.values.put(key, arrayBuilder);
+        return arrayBuilder;
+    }
+
     private ObjectBuilder getOrCreateNodeAtIndex(ArrayBuilder arrayNode, int arrayIndex) {
         ValueBuilder jsonNode = arrayNode.values.get(arrayIndex);
-        if (!(jsonNode instanceof ObjectBuilder)) {
-            jsonNode = new ObjectBuilder();
-            arrayNode.values.set(arrayIndex, jsonNode);
+        if (jsonNode instanceof ObjectBuilder objectBuilder) {
+            return objectBuilder;
         }
-        return (ObjectBuilder) jsonNode;
+        ObjectBuilder objectBuilder = new ObjectBuilder();
+        arrayNode.values.set(arrayIndex, objectBuilder);
+        return objectBuilder;
     }
 
     private void expandArrayToThreshold(int arrayIndex, ArrayBuilder arrayNode) {
-        if (arrayIndex < arraySizeThreshhold) {
+        if (arrayIndex < arraySizeThreshold) {
             while (arrayNode.values.size() != arrayIndex + 1) {
                 arrayNode.values.add(FixedValue.NULL);
             }
@@ -304,7 +267,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
         @Override
         public JsonNode build() {
-            return JsonNode.createArrayNode(values.stream().map(ValueBuilder::build).collect(Collectors.toList()));
+            return JsonNode.createArrayNode(values.stream().map(ValueBuilder::build).toList());
         }
     }
 }

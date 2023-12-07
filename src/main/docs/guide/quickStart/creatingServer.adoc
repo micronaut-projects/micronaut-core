@@ -35,7 +35,7 @@ If you have created a Maven-based project, use `./mvnw mn:run` instead.
 
 NOTE: For Windows the ./ before commands is not needed
 
-By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> for more options.
+By default, the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> for more options.
 
 To create a service that responds to "Hello World" you first need a controller. The following is an example:
 

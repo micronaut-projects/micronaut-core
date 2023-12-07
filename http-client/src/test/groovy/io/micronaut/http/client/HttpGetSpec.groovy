@@ -35,6 +35,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.annotation.Nullable
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -61,7 +62,6 @@ class HttpGetSpec extends Specification {
 
     @Inject
     @Client("/")
-    @AutoCleanup
     HttpClient client
 
     @Inject
@@ -82,8 +82,8 @@ class HttpGetSpec extends Specification {
                 HttpRequest.GET("/get/simple").header("Accept-Encoding", "gzip")
         ))
         Optional<String> body = flowable.map({ res ->
-            res.getBody(String)}
-        ).blockFirst()
+            res.getBody(String)
+        }).blockFirst()
 
         then:
         body.isPresent()
@@ -288,7 +288,7 @@ class HttpGetSpec extends Specification {
                 HttpRequest.GET("/get/simple")
         )
         String body
-        flowable.next().subscribe((Consumer){ HttpResponse res ->
+        flowable.next().subscribe((Consumer) { HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
@@ -652,12 +652,12 @@ class HttpGetSpec extends Specification {
 
         @Get("/pojoList")
         List<Book> pojoList() {
-            return [ new Book(title: "The Stand") ]
+            return [new Book(title: "The Stand")]
         }
 
         @Get("/nestedPojoList")
         List<List<Book>> nestedPojoList() {
-            return [[ new Book(title: "The Stand") ]]
+            return [[new Book(title: "The Stand")]]
         }
 
         @Get("/emptyList")

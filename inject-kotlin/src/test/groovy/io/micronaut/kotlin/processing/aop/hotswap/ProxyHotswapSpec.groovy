@@ -1,19 +1,18 @@
 package io.micronaut.kotlin.processing.aop.hotswap
 
 import io.micronaut.aop.HotSwappableInterceptedProxy
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class ProxyHotswapSpec extends Specification {
 
     void "test AOP setup attributes"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
         def newInstance = new HotswappableProxyingClass()
 
         when:
-        HotswappableProxyingClass foo = beanContext.getBean(HotswappableProxyingClass)
+        HotswappableProxyingClass foo = context.getBean(HotswappableProxyingClass)
         then:
         foo instanceof HotSwappableInterceptedProxy
         foo.interceptedTarget().getClass() == HotswappableProxyingClass
@@ -25,5 +24,8 @@ class ProxyHotswapSpec extends Specification {
         foo.interceptedTarget().invocationCount == 0
         foo.interceptedTarget() != foo
         foo.interceptedTarget().is(newInstance)
+
+        cleanup:
+        context.close()
     }
 }

@@ -72,7 +72,7 @@ log-commits:
   script:
     - ./log-commits.sh # <1>
 ```
-1.- Executes the script to log the commits. An example of the job execution can be found
+- Executes the script to log the commits. An example of the job execution can be found
 [here](https://gitlab.com/micronaut-projects/micronaut-graal-tests/-/jobs/1950176930).
 
 #### Build Graal stage

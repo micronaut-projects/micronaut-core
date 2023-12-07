@@ -126,6 +126,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      *
      * @return The bean type
      */
+    @Override
     @NonNull Class<T> getBeanType();
 
     /**
@@ -240,7 +241,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     /**
      * The property names as an array.
      *
-     * @return The properties names
+     * @return The property names
      */
     default @NonNull String[] getPropertyNames() {
         return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);

@@ -63,6 +63,7 @@ public class SpareTire extends Tire {
         subPackagePrivateMethodInjected = true;
     }
 
+    @Override
     @Inject protected void injectProtectedMethod() {
         if (subProtectedMethodInjected) {
             overriddenProtectedMethodInjectedTwice = true;
@@ -70,6 +71,7 @@ public class SpareTire extends Tire {
         subProtectedMethodInjected = true;
     }
 
+    @Override
     @Inject public void injectPublicMethod() {
         if (subPublicMethodInjected) {
             overriddenPublicMethodInjectedTwice = true;
@@ -85,18 +87,22 @@ public class SpareTire extends Tire {
         superPackagePrivateMethodForOverrideInjected = true;
     }
 
+    @Override
     protected void injectProtectedMethodForOverride() {
         protectedMethodForOverrideInjected = true;
     }
 
+    @Override
     public void injectPublicMethodForOverride() {
         publicMethodForOverrideInjected = true;
     }
 
+    @Override
     public boolean hasSpareTireBeenFieldInjected() {
         return fieldInjection != NEVER_INJECTED;
     }
 
+    @Override
     public boolean hasSpareTireBeenMethodInjected() {
         return methodInjection != NEVER_INJECTED;
     }

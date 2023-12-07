@@ -33,7 +33,7 @@ public interface GenericElement extends ClassElement {
 
     /**
      * The native type that represents the generic element.
-     * It is expected that the generic element representing 'T extends java.lang.Number`
+     * It is expected that the generic element representing `T` extends java.lang.Number`
      * should be equal to the class element `java.lang.Number`.
      * To find matching placeholders we can use this method to match the native generic type.
      *

@@ -51,6 +51,7 @@ public interface MemberElement extends Element {
      * @return The {@link ElementModifier} types for this class element
      * @since 3.0.0
      */
+    @Override
     default Set<ElementModifier> getModifiers() {
         return Collections.emptySet();
     }

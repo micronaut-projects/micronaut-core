@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Models a return type of an {@link Executable} method in Micronaut.
+ * Models a return type of {@link Executable} method in Micronaut.
  *
  * @param <T> The concrete type
  * @author Graeme Rocher
@@ -78,7 +78,7 @@ public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataPro
         for (Argument<?> argument : typeArguments) {
             argumentMap.put(argument.getName(), argument);
         }
-        return new ReturnType<T1>() {
+        return new ReturnType<>() {
             @Override
             public Class<T1> getType() {
                 return type;

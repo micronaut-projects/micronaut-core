@@ -4,7 +4,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import jakarta.annotation.PreDestroy;
-import java.util.ArrayList;
+
 import java.util.List;
 
 import static io.micronaut.inject.dependent.TestData.DESTRUCTION_ORDER;

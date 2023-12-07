@@ -6,7 +6,7 @@ If you are interested in contributing to the Micronaut Framework and are looking
 
 ## JDK Setup
 
-The Micronaut Framework currently requires JDK 8
+The Micronaut Framework currently requires JDK 17
 
 ## IDE Setup
 

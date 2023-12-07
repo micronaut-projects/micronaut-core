@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.*
@@ -43,16 +44,19 @@ class BlockingCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run([
+            'spec.name': 'BlockingCrudSpec',
+    ])
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test configured client"() {
         given:
-        ApplicationContext anotherContext = ApplicationContext.run(
-                'book.service.uri':"${embeddedServer.URL}/blocking"
-        )
+        ApplicationContext anotherContext = ApplicationContext.run([
+                'spec.name'       : 'BlockingCrudSpec',
+                'book.service.uri': "${embeddedServer.URL}/blocking"
+        ])
         ConfiguredBookClient bookClient = anotherContext.getBean(ConfiguredBookClient)
 
         expect:
@@ -92,14 +96,14 @@ class BlockingCrudSpec extends Specification {
         opt.isPresent()
         opt.get().title == book.title
 
-        when:'the full response is resolved'
+        when: 'the full response is resolved'
         HttpResponse<Book> bookAndResponse = client.getResponse(book.id)
 
-        then:"The response is valid"
+        then: "The response is valid"
         bookAndResponse.status() == HttpStatus.OK
         bookAndResponse.body().title == "The Stand"
 
-        when:'the full response returns 404'
+        when: 'the full response returns 404'
         bookAndResponse = client.getResponse(-1)
 
         then:
@@ -189,14 +193,17 @@ class BlockingCrudSpec extends Specification {
     }
 
     @Client('/blocking/books')
+    @Requires(property = 'spec.name', value = 'BlockingCrudSpec')
     static interface BookClient extends BookApi {
     }
 
     @Client('${book.service.uri}/books')
+    @Requires(property = 'spec.name', value = 'BlockingCrudSpec')
     static interface ConfiguredBookClient extends BookApi {
     }
 
     @Controller("/blocking/books")
+    @Requires(property = 'spec.name', value = 'BlockingCrudSpec')
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
@@ -215,7 +222,7 @@ class BlockingCrudSpec extends Specification {
         @Override
         HttpResponse<Book> getResponse(Long id) {
             def book = books.get(id)
-            if(book) {
+            if (book) {
                 return HttpResponse.ok(book)
             }
             return HttpResponse.notFound()
@@ -233,7 +240,7 @@ class BlockingCrudSpec extends Specification {
 
         @Override
         Book save(String title) {
-            Book book = new Book(title: title, id:currentId.incrementAndGet())
+            Book book = new Book(title: title, id: currentId.incrementAndGet())
             books[book.id] = book
             return book
         }
@@ -241,7 +248,7 @@ class BlockingCrudSpec extends Specification {
         @Override
         Book update(Long id, String title) {
             Book book = books[id]
-            if(book != null) {
+            if (book != null) {
                 book.title = title
             }
             return book
@@ -279,6 +286,7 @@ class BlockingCrudSpec extends Specification {
     }
 
     @Client("/void/404")
+    @Requires(property = 'spec.name', value = 'BlockingCrudSpec')
     static interface VoidNotFoundClient {
 
         @Get
@@ -287,11 +295,11 @@ class BlockingCrudSpec extends Specification {
 
 
     @BookRetryClient
+    @Requires(property = 'spec.name', value = 'BlockingCrudSpec')
     static interface StereotypeClient extends BookApi {
     }
-
-
 }
+
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Client("/blocking/books")

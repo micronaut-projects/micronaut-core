@@ -29,7 +29,6 @@ import static java.util.concurrent.CompletableFuture.supplyAsync
 @Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
-@Requires({ jvm.current.isJava11Compatible() })
 class Http2Java11ClientSpec extends Specification {
 
     @Inject EmbeddedServer embeddedServer

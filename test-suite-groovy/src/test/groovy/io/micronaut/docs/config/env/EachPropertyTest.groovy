@@ -7,11 +7,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.util.stream.Collectors
-
-import static org.junit.Assert.assertEquals
-
-class EachPropertyTest extends Specification{
+class EachPropertyTest extends Specification {
 
     @AutoCleanup
     @Shared
@@ -29,8 +25,11 @@ class EachPropertyTest extends Specification{
         // tag::beans[]
         when:
         Collection<DataSourceConfiguration> beansOfType = applicationContext.getBeansOfType(DataSourceConfiguration.class)
-        assertEquals(2, beansOfType.size()) // <1>
 
+        then:
+        beansOfType.size() == 2 // <1>
+
+        when:
         DataSourceConfiguration firstConfig = applicationContext.getBean(
                 DataSourceConfiguration.class,
                 Qualifiers.byName("one") // <2>
@@ -47,7 +46,7 @@ class EachPropertyTest extends Specification{
                         [period: "10s", limit: "1000"],
                         [period: "1m", limit: "5000"]]])
 
-        List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).collect(Collectors.toList());
+        List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).toList()
 
         expect:
         beansOfType.size() == 2

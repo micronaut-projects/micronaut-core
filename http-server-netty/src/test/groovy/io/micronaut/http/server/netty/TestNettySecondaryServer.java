@@ -2,7 +2,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;

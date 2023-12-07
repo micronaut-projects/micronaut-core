@@ -218,6 +218,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, typeArguments, arrayDimensions);
     }
 
+    @Override
     @NonNull
     public final ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
         if (typeArguments.isEmpty()) {

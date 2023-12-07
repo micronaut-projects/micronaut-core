@@ -65,9 +65,9 @@ class HttpHeadSpec extends Specification {
         Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/simple").header("Accept-Encoding", "gzip")
         ))
-        Optional<String> body = flowable.map({res ->
-            res.getBody(String)}
-        ).blockFirst()
+        Optional<String> body = flowable.map({ res ->
+            res.getBody(String)
+        }).blockFirst()
 
         then:
         !body.isPresent()
@@ -253,7 +253,7 @@ class HttpHeadSpec extends Specification {
                 HttpRequest.HEAD("/head/simple")
         )
         String body
-        flowable.next().subscribe((Consumer){ HttpResponse res ->
+        flowable.next().subscribe((Consumer) { HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
@@ -388,9 +388,9 @@ class HttpHeadSpec extends Specification {
         def flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/reactive")
         ))
-        Optional<String> body = flowable.map({res ->
-            res.getBody(String)}
-        ).blockFirst()
+        Optional<String> body = flowable.map({ res ->
+            res.getBody(String)
+        }).blockFirst()
 
         then:
         !body.isPresent()
@@ -468,7 +468,7 @@ class HttpHeadSpec extends Specification {
 
         @Get("/pojoList")
         List<Book> pojoList() {
-            return [ new Book(title: "The Stand") ]
+            return [new Book(title: "The Stand")]
         }
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
@@ -558,7 +558,7 @@ class HttpHeadSpec extends Specification {
         }
     }
 
-    static class CustomErrorException extends RuntimeException { }
+    static class CustomErrorException extends RuntimeException {}
 
     static class Book {
         String title

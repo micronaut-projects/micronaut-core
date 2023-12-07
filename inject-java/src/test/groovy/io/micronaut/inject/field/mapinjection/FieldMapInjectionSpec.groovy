@@ -15,14 +15,13 @@
  */
 package io.micronaut.inject.field.mapinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class FieldMapInjectionSpec extends Specification {
     void "test injection via setter that takes a collection"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)

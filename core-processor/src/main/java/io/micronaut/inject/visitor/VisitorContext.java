@@ -223,7 +223,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     * This method will look up another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param name The name
      * @return The class element
@@ -233,7 +233,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     * This method will look up another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param name                      The name
      * @param annotationMetadataFactory The element annotation metadata factory
@@ -245,7 +245,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * This method will lookup another class element by name. If it cannot be found an exception thrown.
+     * This method will look up another class element by name. If it cannot be found an exception thrown.
      *
      * @param name                      The name
      * @param annotationMetadataFactory The element annotation metadata factory
@@ -257,7 +257,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     * This method will look up another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param type The name
      * @return The class element

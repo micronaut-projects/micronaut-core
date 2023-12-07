@@ -224,7 +224,7 @@ public class AntPathMatcher implements PathMatcher {
     }
 
     /**
-     * Tests whether or not a string matches against a pattern.
+     * Tests whether a string matches against a pattern.
      * The pattern may contain two special characters:<br>
      * '*' means zero or more characters<br>
      * '?' means one and only one character

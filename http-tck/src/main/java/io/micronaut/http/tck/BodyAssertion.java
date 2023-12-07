@@ -155,6 +155,7 @@ public final class BodyAssertion<T, E> {
         /**
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
+        @Override
         public BodyAssertion<String, String> contains() {
             return new BodyAssertion<>(String.class, String.class, this.body, new StringEvaluator(EvaluatorType.CONTAIN));
         }
@@ -162,6 +163,7 @@ public final class BodyAssertion<T, E> {
         /**
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
+        @Override
         public BodyAssertion<String, String> equals() {
             return new BodyAssertion<>(String.class, String.class, this.body, new StringEvaluator(EvaluatorType.EQUAL));
         }
@@ -181,6 +183,7 @@ public final class BodyAssertion<T, E> {
         /**
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
+        @Override
         public BodyAssertion<byte[], byte[]> contains() {
             return new BodyAssertion<>(byte[].class, byte[].class, this.body, new ByteArrayEvaluator(EvaluatorType.CONTAIN));
         }
@@ -188,6 +191,7 @@ public final class BodyAssertion<T, E> {
         /**
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
+        @Override
         public BodyAssertion<byte[], byte[]> equals() {
             return new BodyAssertion<>(byte[].class, byte[].class, this.body, new ByteArrayEvaluator(EvaluatorType.EQUAL));
         }

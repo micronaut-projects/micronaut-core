@@ -15,8 +15,7 @@
  */
 package io.micronaut.inject.context
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
@@ -33,7 +32,7 @@ class RegisterSingletonSpec extends Specification {
 
     void "test register singleton with generic types"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         context.registerSingleton(new TestReporter())
@@ -47,7 +46,7 @@ class RegisterSingletonSpec extends Specification {
 
     void "test register singleton and exposed type"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         context.registerBeanDefinition(
@@ -87,7 +86,7 @@ class RegisterSingletonSpec extends Specification {
 
     void "test register singleton method"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def b = new B()
 
         when:
@@ -106,7 +105,7 @@ class RegisterSingletonSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1851')
     void "test register singleton with type qualifier"() {
         when:
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         then:
         !context.findBean(DynamicService, Qualifiers.byTypeArguments(String)).present

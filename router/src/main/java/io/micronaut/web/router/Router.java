@@ -152,7 +152,7 @@ public interface Router {
      * @return A match or null, throws {@link DuplicateRouteException} on multiple routes.
      * @since 4.0.0
      */
-    @NonNull
+    @Nullable
     default <T, R> UriRouteMatch<T, R> findClosest(@NonNull HttpRequest<?> request) throws DuplicateRouteException {
         List<UriRouteMatch<T, R>> uriRoutes = findAllClosest(request);
         if (uriRoutes.size() > 1) {

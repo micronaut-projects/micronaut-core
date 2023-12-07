@@ -1,16 +1,14 @@
 package io.micronaut.docs.qualifiers.annotation
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-
+import io.kotest.matchers.shouldBe
+import io.micronaut.context.ApplicationContext
 
 class VehicleSpec : StringSpec({
 
     "test vehicle start uses v8" {
         // tag::start[]
-        val context = BeanContext.run()
+        val context = ApplicationContext.run()
         val vehicle = context.getBean(Vehicle::class.java)
         println(vehicle.start())
         // end::start[]

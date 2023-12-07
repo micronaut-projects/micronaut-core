@@ -16,6 +16,7 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -51,14 +52,15 @@ abstract class AbstractBean {
         beanDefinition.injectedFields.size() == 0
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise"() {
@@ -90,14 +92,15 @@ abstract class AbstractBean implements Foo {
         beanDefinition.injectedFields.size() == 0
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise that also defines advice on the method"() {
@@ -130,14 +133,16 @@ abstract class AbstractBean implements Foo {
         beanDefinition.injectedFields.size() == 0
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise that also defines advice on a super interface method"() {
@@ -182,8 +187,7 @@ abstract class AbstractBean implements Foo {
         beanDefinition.injectedFields.size() == 0
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
@@ -191,6 +195,9 @@ abstract class AbstractBean implements Foo {
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
         instance.another() == 'good'
+
+        cleanup:
+        context.close()
     }
 
     void "test that a non-abstract method defined in class is and implemented from an interface not overridden by the introduction advise that also defines advice on the class"() {
@@ -223,14 +230,16 @@ abstract class AbstractBean implements Foo {
         beanDefinition.injectedFields.size() == 0
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
+
+        cleanup:
+        context.close()
     }
 
 }

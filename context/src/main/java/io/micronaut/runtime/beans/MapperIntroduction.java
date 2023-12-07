@@ -155,7 +155,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         boolean isMap) {
         List<Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>> rootMappers = new ArrayList<>(5);
         for (AnnotationValue<Mapper.Mapping> annotation : annotations) {
-            // a root mapping contains no object to bind to so we assume we bind to the root
+            // a root mapping contains no object to bind to, so we assume we bind to the root
             if (!annotation.contains(Mapper.Mapping.MEMBER_TO) && annotation.contains(Mapper.Mapping.MEMBER_FROM)) {
                 Map<CharSequence, Object> values = annotation.getValues();
                 Object from = values.get(Mapper.Mapping.MEMBER_FROM);

@@ -53,7 +53,7 @@ record HttpToHttpsRedirectHandler(
 
     @Override
     public void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
-        NettyHttpRequest<?> strippedRequest = NettyHttpRequest.createSafe(request, body, ctx, conversionService, serverConfiguration);
+        NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
         UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
         strippedRequest.release();

@@ -24,7 +24,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * A qualifier to lookup any type.
+ * A qualifier to look up any type.
  *
  * @param <T> The generic type
  * @since 3.0.0

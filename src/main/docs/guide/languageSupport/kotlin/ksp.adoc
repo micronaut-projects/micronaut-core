@@ -10,9 +10,9 @@ If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/late
 .build.gradle.kts
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.9.10"
-    id("com.google.devtools.ksp") version "1.9.10-1.0.13"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.10"
+    id("org.jetbrains.kotlin.jvm") version "1.9.20"
+    id("com.google.devtools.ksp") version "1.9.20-1.0.13"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
     id("io.micronaut.application") version "4.0.0"
 }
 version = "0.1"
@@ -28,22 +28,6 @@ dependencies {
 }
 application {
     mainClass.set("example.micronaut.Application")
-}
-java {
-    sourceCompatibility = JavaVersion.toVersion("17")
-    targetCompatibility = JavaVersion.toVersion("17")
-}
-tasks {
-    compileKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
-    compileTestKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
 }
 graalvmNative.toolchainDetection.set(false)
 micronaut {
@@ -61,9 +45,9 @@ If you don't use the https://micronaut-projects.github.io/micronaut-gradle-plugi
 [source, kotlin]
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.9.10"
-    id("com.google.devtools.ksp") version "1.9.10-1.0.13"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.10"
+    id("org.jetbrains.kotlin.jvm") version "1.9.20"
+    id("com.google.devtools.ksp") version "1.9.20-1.0.13"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
     application
 }
 version = "0.1"
@@ -100,22 +84,7 @@ application {
     mainClass.set("dockerisms.Application")
 }
 
-java {
-    sourceCompatibility = JavaVersion.toVersion("17")
-    targetCompatibility = JavaVersion.toVersion("17")
-}
-
 tasks {
-    compileKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
-    compileTestKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
     withType<Test> {
         useJUnitPlatform()
     }

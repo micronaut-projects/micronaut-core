@@ -15,15 +15,14 @@
  */
 package io.micronaut.inject.factory.beanwithfactory
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class BeanInitializingWithFactorySpec extends Specification {
 
     void "test bean initializing event listener"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is retrieved where a BeanInitializedEventListener is present"
         B b = context.getBean(B)
@@ -38,6 +37,8 @@ class BeanInitializingWithFactorySpec extends Specification {
         listener.initialized
         listener.created
 
+        cleanup:
+        context.close()
     }
 }
 

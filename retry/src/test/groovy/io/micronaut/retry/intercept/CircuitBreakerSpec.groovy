@@ -35,7 +35,7 @@ import io.micronaut.core.async.annotation.SingleResult
  * @author graemerocher
  * @since 1.0
  */
-class CircuitBreakerSpec extends Specification{
+class CircuitBreakerSpec extends Specification {
 
     @Retry
     void "test blocking circuit breaker"() {
@@ -83,7 +83,7 @@ class CircuitBreakerSpec extends Specification{
         when:"The service is reset to a valid state"
         listener.reset()
         counterService.countThreshold = 3
-        counterService.countValue=0
+        counterService.countValue = 0
         println "counterService.countThreshold = $counterService.countThreshold"
         counterService.getCount()
 
@@ -154,7 +154,7 @@ class CircuitBreakerSpec extends Specification{
         when:"The service is reset to a valid state"
         listener.reset()
         counterService.countThreshold = 3
-        counterService.countRx=0
+        counterService.countRx = 0
         Mono.from(counterService.getCountSingle()).block()
 
         then:"The exception continues to thrown until the timeout is reached"
@@ -193,7 +193,7 @@ class CircuitBreakerSpec extends Specification{
         context.stop()
     }
 
-    void "test circuit breaker throws a wrapped exception"(){
+    void "test circuit breaker throws a wrapped exception"() {
         given:
         ApplicationContext context = ApplicationContext.run()
         WrappedExceptionService service = context.getBean(WrappedExceptionService)
@@ -229,6 +229,7 @@ class CircuitBreakerSpec extends Specification{
         void reset() {
             events.clear()
         }
+
         @Override
         void onApplicationEvent(RetryEvent event) {
             events.add(event)
@@ -238,6 +239,7 @@ class CircuitBreakerSpec extends Specification{
     @Singleton
     static class MyCircuitOpenEventListener implements ApplicationEventListener<CircuitOpenEvent> {
         CircuitOpenEvent lastEvent
+
         @Override
         void onApplicationEvent(CircuitOpenEvent event) {
             lastEvent = event
@@ -248,6 +250,7 @@ class CircuitBreakerSpec extends Specification{
     @Singleton
     static class MyCircuitClosedEventListener implements ApplicationEventListener<CircuitClosedEvent> {
         CircuitClosedEvent lastEvent
+
         @Override
         void onApplicationEvent(CircuitClosedEvent event) {
             lastEvent = event
@@ -264,7 +267,7 @@ class CircuitBreakerSpec extends Specification{
 
         int getCount() {
             countValue++
-            if(countValue < countThreshold) {
+            if (countValue < countThreshold) {
                 throw new IllegalStateException("Bad count")
             }
             return countValue
@@ -272,12 +275,12 @@ class CircuitBreakerSpec extends Specification{
 
         @SingleResult
         Publisher<Integer> getCountSingle() {
-            Mono.fromCallable({->
+            Mono.fromCallable({ ->
                 countRx++
                 println "countValue = $countRx"
                 println "countThreshold = $countThreshold"
 
-                if(countRx < countThreshold) {
+                if (countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
                 }
                 return countRx
@@ -295,7 +298,7 @@ class CircuitBreakerSpec extends Specification{
 
         int getCount() {
             countValue++
-            if(countValue < countThreshold) {
+            if (countValue < countThreshold) {
                 throw new IllegalStateException("Bad count")
             }
             return countValue
@@ -310,7 +313,7 @@ class CircuitBreakerSpec extends Specification{
 
         int getCount() {
             countValue++
-            if(countValue < countThreshold) {
+            if (countValue < countThreshold) {
                 throw new IllegalStateException("Bad count")
             }
             return countValue

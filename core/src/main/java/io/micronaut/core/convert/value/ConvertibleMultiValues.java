@@ -99,7 +99,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     @Override
     default Iterator<Map.Entry<String, List<V>>> iterator() {
         Iterator<String> headerNames = names().iterator();
-        return new Iterator<Map.Entry<String, List<V>>>() {
+        return new Iterator<>() {
             @Override
             public boolean hasNext() {
                 return headerNames.hasNext();
@@ -112,7 +112,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
                 }
 
                 String name = headerNames.next();
-                return new Map.Entry<String, List<V>>() {
+                return new Map.Entry<>() {
                     @Override
                     public String getKey() {
                         return name;

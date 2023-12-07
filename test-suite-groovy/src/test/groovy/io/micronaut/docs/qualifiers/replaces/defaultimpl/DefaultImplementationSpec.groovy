@@ -1,14 +1,13 @@
 package io.micronaut.docs.qualifiers.replaces.defaultimpl
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class DefaultImplementationSpec extends Specification {
 
     void "test the default is replaced"() {
         given:
-        BeanContext ctx = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run()
 
         when:
         ResponseStrategy responseStrategy = ctx.getBean(ResponseStrategy)

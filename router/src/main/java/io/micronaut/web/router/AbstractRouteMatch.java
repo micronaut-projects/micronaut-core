@@ -57,6 +57,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
     protected final MethodExecutionHandle<T, R> methodExecutionHandle;
+    protected final UnsafeExecutionHandle<T, R> unsafeMethodExecutionHandle;
     protected final ExecutableMethod<T, R> executableMethod;
 
     private final Argument<?>[] arguments;
@@ -94,6 +95,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             this.fulfilledArguments = new boolean[length];
             this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
             this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        }
+        if (methodExecutionHandle instanceof UnsafeExecutionHandle<?,?>) {
+            unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
+        } else {
+            unsafeMethodExecutionHandle = null;
         }
     }
 
@@ -220,12 +226,14 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     public R execute() {
         Argument<?>[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
+            if (unsafeMethodExecutionHandle != null) {
+                return unsafeMethodExecutionHandle.invokeUnsafe();
+            }
             return methodExecutionHandle.invoke();
         }
         if (fulfilled) {
-            if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
-                UnsafeExecutionHandle<T, R> unsafeExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
-                return unsafeExecutionHandle.invokeUnsafe(argumentValues);
+            if (unsafeMethodExecutionHandle != null) {
+                return unsafeMethodExecutionHandle.invokeUnsafe(argumentValues);
             }
             return methodExecutionHandle.invoke(argumentValues);
         }

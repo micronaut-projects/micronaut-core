@@ -242,7 +242,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 for (Argument bodyArgument : bodyArguments) {
                     String argumentName = bodyArgument.getName();
                     MutableArgumentValue<?> value = parameters.get(argumentName);
-                    bodyMap.put(argumentName, value.getValue());
+                    if (bodyArgument.getAnnotationMetadata().hasStereotype(Format.class)) {
+                        conversionService.convert(value.getValue(), ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
+                            .ifPresent(v -> bodyMap.put(argumentName, v));
+                    } else {
+                        bodyMap.put(argumentName, value.getValue());
+                    }
                 }
                 body = bodyMap;
                 request.body(body);
@@ -250,7 +255,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
             if (body != null && !variableSatisfied) {
-                if (body instanceof Map<?,?> map) {
+                if (body instanceof Map<?, ?> map) {
                     for (Map.Entry<?, ?> entry : map.entrySet()) {
                         String k = entry.getKey().toString();
                         Object v = entry.getValue();
@@ -376,7 +381,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                     }
                                 }
                                 if (LOG.isErrorEnabled()) {
-                                    LOG.error("Client [" + declaringType.getName() + "] received HTTP error response: " + t.getMessage(), t);
+                                    LOG.error("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
                                 }
                                 future.completeExceptionally(t);
                             }

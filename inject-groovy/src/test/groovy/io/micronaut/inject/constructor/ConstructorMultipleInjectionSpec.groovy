@@ -15,13 +15,10 @@
  */
 package io.micronaut.inject.constructor
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 12/05/2017.
  */
@@ -31,8 +28,7 @@ class ConstructorMultipleInjectionSpec extends Specification {
 
     void "test injection with constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject and multiple arguments"
         B b =  context.getBean(B)
@@ -42,6 +38,9 @@ class ConstructorMultipleInjectionSpec extends Specification {
         b.a.is(context.getBean(A))
         b.c != null
         b.c.is(context.getBean(C))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

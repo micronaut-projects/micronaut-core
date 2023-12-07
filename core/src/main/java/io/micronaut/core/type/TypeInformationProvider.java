@@ -30,7 +30,7 @@ public interface TypeInformationProvider {
     /**
      * Returns whether the annotation metadata specifies the type as single.
      * @param annotationMetadataProvider The annotation metadata provider
-     * @return True if does
+     * @return True if it does
      */
     default boolean isSpecifiedSingle(@NonNull AnnotationMetadataProvider annotationMetadataProvider) {
         return false;

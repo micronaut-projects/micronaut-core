@@ -15,22 +15,21 @@
  */
 package io.micronaut.docs.factories;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
-import org.junit.Test;
+import io.micronaut.context.ApplicationContext;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class VehicleSpec {
+class VehicleSpec {
 
     @Test
-    public void testStartVehicle() {
-        BeanContext beanContext = BeanContext.run();
-        Vehicle vehicle = beanContext.getBean(Vehicle.class);
+    void testStartVehicle() {
+        ApplicationContext context = ApplicationContext.run();
+        Vehicle vehicle = context.getBean(Vehicle.class);
         System.out.println( vehicle.start() );
 
         assertEquals("Starting V8", vehicle.start());
 
-        beanContext.close();
+        context.close();
     }
 }

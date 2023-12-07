@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
@@ -33,20 +34,16 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class CompletableFutureCrudSpec extends Specification {
 
-    @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name':'CompletableFutureCrudSpec',
+    ])
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    BookClient client = server.applicationContext.getBean(BookClient)
 
     void "test it is possible to implement CRUD operations with CompletableFuture"() {
-        given:
-        BookClient client = context.getBean(BookClient)
-
         when:
-        Book book = client.get(99)
-                          .get()
+        Book book = client.get(99).get()
         List<Book> books = client.list().get()
 
         then:
@@ -99,12 +96,13 @@ class CompletableFutureCrudSpec extends Specification {
         !optionalBook.isPresent()
     }
 
-
     @Client('/future/books')
+    @Requires(property = 'spec.name', value = 'CompletableFutureCrudSpec')
     static interface BookClient extends BookApi {
     }
 
     @Controller("/future/books")
+    @Requires(property = 'spec.name', value = 'CompletableFutureCrudSpec')
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
