@@ -17,6 +17,7 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
 
@@ -30,7 +31,7 @@ import java.util.function.Function;
  * @since 4.2.0
  */
 @Internal
-sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter, TerminalFilter, TerminalReactiveFilter {
+sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter {
 
     /**
      * If the filter supports filtering a request.
@@ -47,6 +48,29 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @since 4.2.0
      */
     boolean isFiltersResponse();
+
+    /**
+     * If the filter with continuation.
+     *
+     * @return true if the filter has continuation
+     * @since 4.3.0
+     */
+    boolean hasContinuation();
+
+    /**
+     * Filter request.
+     *
+     * @param context The filter context
+     * @return The filter execution flow
+     * @since 4.3.0
+     */
+    @NonNull
+    default ExecutionFlow<FilterContext> processRequestFilter(@NonNull FilterContext context) {
+        if (!isFiltersRequest()) {
+            throw new IllegalStateException("Filtering request is not supported!");
+        }
+        return ExecutionFlow.just(context);
+    }
 
     /**
      * Filter request.
@@ -73,7 +97,7 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      */
     @NonNull
     default ExecutionFlow<FilterContext> processResponseFilter(@NonNull FilterContext context,
-                                                               @NonNull Throwable exceptionToFilter) {
+                                                               @Nullable Throwable exceptionToFilter) {
         if (!isFiltersResponse()) {
             throw new IllegalStateException("Filtering response is not supported!");
         }

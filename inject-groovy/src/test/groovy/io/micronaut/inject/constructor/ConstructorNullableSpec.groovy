@@ -15,22 +15,19 @@
  */
 package io.micronaut.inject.constructor
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.core.annotation.Nullable
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Provider
+import spock.lang.Specification
 
 class ConstructorNullableSpec extends Specification {
 
 
     void "test nullable injection with constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)
@@ -44,8 +41,7 @@ class ConstructorNullableSpec extends Specification {
 
     void "test nullable provider injection with constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         D d =  context.getBean(D)
@@ -60,8 +56,7 @@ class ConstructorNullableSpec extends Specification {
 
     void "test normal injection still fails"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         C c =  context.getBean(C)

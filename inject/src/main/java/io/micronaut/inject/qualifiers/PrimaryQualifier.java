@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 /**
- * A qualifier to lookup a primary bean.
+ * A qualifier to look up a primary bean.
  *
  * @param <T> The generic type
  * @author Denis Stepanov

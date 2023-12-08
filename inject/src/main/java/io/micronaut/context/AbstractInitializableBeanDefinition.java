@@ -911,7 +911,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?>[] methodArgumentTypes = methodRef.arguments == null ? Argument.ZERO_ARGUMENTS : methodRef.arguments;
         if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
-            ClassUtils.REFLECTION_LOGGER.debug("Bean of type [" + getBeanType() + "] uses reflection to inject method: '" + methodRef.methodName + "'");
+            ClassUtils.REFLECTION_LOGGER.debug("Bean of type [{}] uses reflection to inject method: '{}'", getBeanType(), methodRef.methodName);
         }
         try {
             Method method = ReflectionUtils.getMethod(
@@ -945,7 +945,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         FieldReference fieldRef = fieldInjection[index];
         try {
             if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
-                ClassUtils.REFLECTION_LOGGER.debug("Bean of type [" + getBeanType() + "] uses reflection to inject field: '" + fieldRef.argument.getName() + "'");
+                ClassUtils.REFLECTION_LOGGER.debug("Bean of type [{}] uses reflection to inject field: '{}'", getBeanType(), fieldRef.argument.getName());
             }
             Field field = ReflectionUtils.getRequiredField(fieldRef.declaringType, fieldRef.argument.getName());
             field.setAccessible(true);

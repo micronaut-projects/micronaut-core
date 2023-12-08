@@ -51,7 +51,7 @@ record HttpToHttpsRedirectHandler(
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-        NettyHttpRequest<?> strippedRequest = NettyHttpRequest.createSafe(request, ctx, conversionService, serverConfiguration);
+        NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
 
         UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
         strippedRequest.release();

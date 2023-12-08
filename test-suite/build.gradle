@@ -94,16 +94,16 @@ dependencies {
     testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.logbook.netty
     testImplementation libs.logback.classic
-
-    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation libs.bcpkix
-    }
+    testImplementation libs.bcpkix
 
     testImplementation libs.managed.reactor
 
     testFixturesApi libs.spock
     testFixturesApi libs.managed.groovy
     testFixturesApi libs.jetbrains.annotations
+
+    testImplementation(libs.javax.persistence)
+    testImplementation(libs.jakarta.persistence)
 }
 
 //tasks.withType(Test).configureEach {

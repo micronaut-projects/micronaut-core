@@ -24,10 +24,9 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -35,37 +34,39 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class UploadControllerSpec {
+class UploadControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
+    @AfterAll
+    static void stopServer() {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
         try {
             File file = File.createTempFile("file.json", "temp");
             file.delete();
-        } catch (IOException e) { }
+        } catch (IOException ignored) {
+        }
     }
 
     @Test
-    public void testFileUpload() {
+    void testFileUpload() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
@@ -83,7 +84,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testFileUploadOutputStream() {
+    void testFileUploadOutputStream() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
@@ -101,7 +102,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testCompletedFileUpload() {
+    void testCompletedFileUpload() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
@@ -119,7 +120,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testCompletedFileUploadWithFilenameButNoBytes() {
+    void testCompletedFileUploadWithFilenameButNoBytes() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
@@ -137,7 +138,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testCompletedFileUploadNoNameWithBytes() {
+    void testCompletedFileUploadNoNameWithBytes() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
@@ -149,7 +150,7 @@ public class UploadControllerSpec {
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
@@ -158,7 +159,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testCompletedFileUploadWithNoFileNameAndNoBytes() {
+    void testCompletedFileUploadWithNoFileNameAndNoBytes() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
@@ -170,7 +171,7 @@ public class UploadControllerSpec {
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
@@ -179,7 +180,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testCompletedFileUploadWithNoPart() {
+    void testCompletedFileUploadWithNoPart() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("filex", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
@@ -191,7 +192,7 @@ public class UploadControllerSpec {
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
@@ -199,7 +200,7 @@ public class UploadControllerSpec {
     }
 
     @Test
-    public void testFileBytesUpload() {
+    void testFileBytesUpload() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.TEXT_PLAIN_TYPE, "some data".getBytes())
                 .addPart("fileName", "bar")

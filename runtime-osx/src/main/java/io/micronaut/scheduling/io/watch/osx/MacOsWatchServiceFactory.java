@@ -60,7 +60,7 @@ public class MacOsWatchServiceFactory {
             return new MacOSXListeningWatchService();
         } catch (Exception e) {
             if (LOG.isWarnEnabled()) {
-                LOG.warn("Unable to create Mac OS X specific watch service. Falling back to default polling strategy: " + e.getMessage(), e);
+                LOG.warn("Unable to create Mac OS X specific watch service. Falling back to default polling strategy: {}", e.getMessage(), e);
             }
             return new WatchServiceFactory().watchService();
         }

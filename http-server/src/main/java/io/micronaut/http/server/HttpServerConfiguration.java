@@ -116,6 +116,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
 
+
+    /**
+     * The default value whether to dispatch OPTIONS Requests.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_DISPATCH_OPTIONS_REQUESTS = false;
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -134,10 +140,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
     private boolean httpToHttpsRedirect = DEFAULT_HTTP_TO_HTTPS_REDIRECT;
+
+    private boolean dispatchOptionsRequests = DEFAULT_DISPATCH_OPTIONS_REQUESTS;
+
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
+    private boolean validateUrl = true;
 
     /**
      * Default constructor.
@@ -340,6 +350,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
+     * Set to true to dispatch OPTIONS requests. Default value ({@value #DEFAULT_DISPATCH_OPTIONS_REQUESTS}.
+     * @return Whether OPTIONS requests should be dispatched.
+     * @since 4.2.0
+     */
+    public boolean isDispatchOptionsRequests() {
+        return dispatchOptionsRequests;
+    }
+
+    /**
      * @param defaultCharset The default charset to use
      */
     public void setDefaultCharset(Charset defaultCharset) {
@@ -504,6 +523,33 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
         this.httpToHttpsRedirect = httpToHttpsRedirect;
+    }
+
+    /**
+     * Set to true to dispatch OPTIONS requests. Default value ({@value #DEFAULT_DISPATCH_OPTIONS_REQUESTS}.
+     * @param dispatchOptionsRequests Set to true to dispatch OPTIONS requests.
+     * @since 4.2.0
+     */
+    public void setDispatchOptionsRequests(boolean dispatchOptionsRequests) {
+        this.dispatchOptionsRequests = dispatchOptionsRequests;
+    }
+
+    /**
+     * If the url should be validated by converting it to {@link java.net.URI}.
+     *
+     * @param validateUrl The validate URL value
+     * @since 4.3.0
+     */
+    public void setValidateUrl(boolean validateUrl) {
+        this.validateUrl = validateUrl;
+    }
+
+    /**
+     * @return True if the url should be validated
+     * @since 4.3.0
+     */
+    public boolean isValidateUrl() {
+        return validateUrl;
     }
 
     /**
@@ -864,6 +910,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return The fixed locale
          */
+        @Override
         @NonNull
         public Optional<Locale> getFixed() {
             return Optional.ofNullable(fixed);

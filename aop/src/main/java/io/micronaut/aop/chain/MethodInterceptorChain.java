@@ -264,7 +264,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
                 );
 
         if (ArrayUtils.isNotEmpty(resolvedInterceptors)) {
-            final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<T1, T1>(
+            final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<>(
                     resolvedInterceptors,
                     bean,
                     interceptedMethod,

@@ -16,35 +16,36 @@
 package io.micronaut.docs.server.routes;
 
 // tag::imports[]
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
 
 // tag::class[]
-public class IssuesControllerTest {
+class IssuesControllerTest {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass // <1>
-    public static void setupServer() {
+    @BeforeAll // <1>
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                     .getApplicationContext()
                     .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass // <2>
-    public static void stopServer() {
+    @AfterAll // <2>
+    static void stopServer() {
         if (server != null) {
             server.stop();
         }
@@ -54,7 +55,7 @@ public class IssuesControllerTest {
     }
 
     @Test
-    public void testIssue() {
+    void testIssue() {
         String body = client.toBlocking().retrieve("/issues/12"); // <3>
 
         assertNotNull(body);
@@ -62,7 +63,7 @@ public class IssuesControllerTest {
     }
 
     @Test
-    public void testShowWithInvalidInteger() {
+    void testShowWithInvalidInteger() {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/hello"));
 
@@ -70,7 +71,7 @@ public class IssuesControllerTest {
     }
 
     @Test
-    public void testIssueWithoutNumber() {
+    void testIssueWithoutNumber() {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/"));
 

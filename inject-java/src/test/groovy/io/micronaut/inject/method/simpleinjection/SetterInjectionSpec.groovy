@@ -15,16 +15,14 @@
  */
 package io.micronaut.inject.method.simpleinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class SetterInjectionSpec extends Specification {
 
     void "test injection via setter with interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"Alpha bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
@@ -32,6 +30,9 @@ class SetterInjectionSpec extends Specification {
         then:"The implementation is injected"
         b.a != null
         b.getA().equals(context.getBean(AImpl))
+
+        cleanup:
+        context.close()
 
     }
 }

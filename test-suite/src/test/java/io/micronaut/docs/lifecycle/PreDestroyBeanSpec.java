@@ -15,17 +15,17 @@
  */
 package io.micronaut.docs.lifecycle;
 
-import io.micronaut.context.BeanContext;
-import org.junit.Test;
+import io.micronaut.context.ApplicationContext;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class PreDestroyBeanSpec {
+class PreDestroyBeanSpec {
 
     @Test
-    public void testBeanClosingOnContextClose() {
+    void testBeanClosingOnContextClose() {
         // tag::start[]
-        BeanContext ctx = BeanContext.run();
+        ApplicationContext ctx = ApplicationContext.run();
         PreDestroyBean preDestroyBean = ctx.getBean(PreDestroyBean.class);
         Connection connection = ctx.getBean(Connection.class);
         ctx.stop();

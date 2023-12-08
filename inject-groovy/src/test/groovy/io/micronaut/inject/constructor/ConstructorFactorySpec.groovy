@@ -15,10 +15,9 @@
  */
 package io.micronaut.inject.constructor
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Provided
 import spock.lang.Specification
 
 import jakarta.inject.Inject
@@ -32,7 +31,7 @@ class ConstructorFactorySpec extends Specification {
 
     void "test injection with constructor supplied by a provider"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"
         B b =  context.getBean(B)

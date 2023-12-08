@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.compose;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import spock.lang.Issue;
@@ -25,7 +25,7 @@ public class CompositionTest {
     @Test
     @Issue("#609")
     public void testComposition() {
-        try (final BeanContext context = BeanContext.run()) {
+        try (final ApplicationContext context = ApplicationContext.run()) {
             final int result = context.getBean(Thing.class).getNumber();
             Assertions.assertEquals(3, result, "Should have resolved 3 candidates for annotation qualifier");
         }

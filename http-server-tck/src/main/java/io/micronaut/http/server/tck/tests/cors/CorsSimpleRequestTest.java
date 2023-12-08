@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -195,22 +195,44 @@ public class CorsSimpleRequestTest {
                 "micronaut.server.cors.configurations.foo.allowed-origins", Collections.singletonList("https://foo.com")
             ),
             createRequest("https://foo.com"),
-            (server, request) -> {
+            CorsSimpleRequestTest::isSuccessfulCorsAssertion
+        );
+    }
 
-                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
+    /**
+     * CORS Simple request for localhost can be allowed via configuration of a regex.
+     * @throws IOException may throw the try for resources
+     */
+    @Test
+    // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
+    @Tag("multipart")
+    void corsSimpleRequestForLocalhostCanBeAllowedViaRegexConfiguration() throws IOException {
+        asserts(SPECNAME,
+            Map.of(
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
+                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
+            ),
+            createRequest("https://foo.com"),
+            CorsSimpleRequestTest::isSuccessfulCorsAssertion
+        );
+    }
 
-                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .assertResponse(response -> CorsAssertion.builder()
-                        .vary("Origin")
-                        .allowCredentials()
-                        .allowOrigin("https://foo.com")
-                        .build()
-                        .validate(response))
-                    .build());
-                assertEquals(1, refreshCounter.getRefreshCount());
-            });
+    /**
+     * CORS Simple request for localhost can be forbidden via configuration of a regex.
+     * @throws IOException may throw the try for resources
+     */
+    @Test
+    // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
+    @Tag("multipart")
+    void corsSimpleRequestForLocalhostForbiddenViaRegexConfiguration() throws IOException {
+        asserts(SPECNAME,
+            Map.of(
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
+                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
+            ),
+            createRequest("https://bar.com"),
+            CorsSimpleRequestTest::isForbidden
+        );
     }
 
     /**
@@ -316,6 +338,21 @@ public class CorsSimpleRequestTest {
         assertEquals(0, refreshCounter.getRefreshCount());
         AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.OK)
+            .build());
+        assertEquals(1, refreshCounter.getRefreshCount());
+    }
+
+    static void isSuccessfulCorsAssertion(ServerUnderTest server, HttpRequest<?> request) {
+        RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+        assertEquals(0, refreshCounter.getRefreshCount());
+        AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            .status(HttpStatus.OK)
+            .assertResponse(response -> CorsAssertion.builder()
+                .vary("Origin")
+                .allowCredentials()
+                .allowOrigin("https://foo.com")
+                .build()
+                .validate(response))
             .build());
         assertEquals(1, refreshCounter.getRefreshCount());
     }

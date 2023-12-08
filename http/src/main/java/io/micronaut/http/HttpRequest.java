@@ -169,7 +169,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
     @Override
     default Optional<Locale> getLocale() {
-        return Optional.ofNullable(getHeaders().acceptLanguage());
+        return getHeaders().findAcceptLanguage();
     }
 
     /**

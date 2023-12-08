@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
@@ -33,6 +34,7 @@ import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
+import io.micronaut.web.router.RouteInfo;
 
 import java.util.List;
 import java.util.Optional;
@@ -89,7 +91,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         ExecutionFlow<ImmediateByteBody> buffered = nhr.byteBody()
             .buffer(nhr.getChannelHandlerContext().alloc());
 
-        return new PendingRequestBindingResult<T>() {
+        return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
             Optional<T> result;
 
@@ -135,14 +137,20 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                     .convert(conversionService, context)
                     .map(o -> (T) o.claimForExternal());
             }
-
+            MessageBodyReader<T> reader = null;
+            final RouteInfo<?> routeInfo = nhr.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+            if (routeInfo != null) {
+                reader = (MessageBodyReader<T>) routeInfo.getMessageBodyReader();
+            }
             MediaType mediaType = nhr.getContentType().orElse(null);
             if (mediaType != null) {
-                Optional<MessageBodyReader<T>> reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType));
-                if (reader.isPresent()) {
+                if (reader == null) {
+                    reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
+                }
+                if (reader != null) {
                     try {
                         //noinspection unchecked
-                        return Optional.ofNullable((T) imm.processSingle(httpServerConfiguration, reader.get(), context.getArgument(), mediaType, nhr.getHeaders()).claimForExternal());
+                        return Optional.ofNullable((T) imm.processSingle(httpServerConfiguration, reader, context.getArgument(), mediaType, nhr.getHeaders()).claimForExternal());
                     } catch (CodecException ce) {
                         if (ce.getCause() instanceof Exception e) {
                             context.reject(e);

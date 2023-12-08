@@ -16,6 +16,7 @@
 package io.micronaut.aop.factory
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -30,12 +31,15 @@ class AdviceDefinedOnConcreteClassFactorySpec extends Specification {
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        ConcreteClass foo = beanContext.getBean(ConcreteClass, Qualifiers.byName("another"))
+        ApplicationContext context = ApplicationContext.run()
+        ConcreteClass foo = context.getBean(ConcreteClass, Qualifiers.byName("another"))
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -62,12 +66,15 @@ class AdviceDefinedOnConcreteClassFactorySpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        ConcreteClass foo = beanContext.getBean(ConcreteClass)
+        ApplicationContext context = ApplicationContext.run()
+        ConcreteClass foo = context.getBean(ConcreteClass)
 
         expect:
         foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result

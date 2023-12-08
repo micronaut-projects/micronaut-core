@@ -75,12 +75,23 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onSubscribe(Subscription s) {
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(() -> onSubscribe(s));
+            return;
+        }
+
         upstreamSubscription = s;
+        upstreamDemanded = true;
         s.request(1);
     }
 
     @Override
     public void onNext(Object o) {
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(() -> onNext(o));
+            return;
+        }
+
         try {
             addData((MicronautHttpData<?>) o);
         } catch (Exception e) {
@@ -91,6 +102,11 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onComplete() {
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(this::onComplete);
+            return;
+        }
+
         for (Claimant claimant : claimants.values()) {
             claimant.sink.tryEmitComplete();
         }
@@ -102,6 +118,11 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onError(Throwable failure) {
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(() -> onError(failure));
+            return;
+        }
+
         for (Claimant claimant : claimants.values()) {
             claimant.sink.tryEmitError(failure);
         }
@@ -250,7 +271,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
             }
             demand = newDemand;
             if (newDemand > 0) {
-                if (!upstreamDemanded) {
+                // upstreamSubscription can be null if onSubscribe is delayed
+                if (!upstreamDemanded && upstreamSubscription != null) {
                     upstreamDemanded = true;
                     upstreamSubscription.request(1);
                 }

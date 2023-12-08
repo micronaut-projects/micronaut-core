@@ -20,36 +20,35 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-
-public class HeadlineControllerSpec {
+class HeadlineControllerSpec {
 
     private static EmbeddedServer embeddedServer;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         embeddedServer = ApplicationContext.run(EmbeddedServer.class);
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(embeddedServer != null) {
             embeddedServer.stop();
         }
     }
 
     @Test
-    public void testConsumeEventStreamObject() {
+    void testConsumeEventStreamObject() {
         SseClient client = embeddedServer.getApplicationContext().createBean(SseClient.class, embeddedServer.getURL());
 
         List<Event<Headline>> events = new ArrayList<>();

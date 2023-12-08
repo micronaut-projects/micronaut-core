@@ -43,6 +43,7 @@ public final class GenericPlaceholderElementAnnotationMetadata extends AbstractE
         this.representingClassElement = representingClassElement;
     }
 
+    @Override
     public AnnotationMetadata getReturnInstance() {
         return getAnnotationMetadata();
     }

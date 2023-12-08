@@ -15,15 +15,14 @@
  */
 package io.micronaut.inject.constructor.mapinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class ConstructorMapInjectionSpec extends Specification {
 
     void "test injection with constructor"() {
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)

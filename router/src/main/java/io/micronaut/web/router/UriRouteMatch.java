@@ -38,6 +38,7 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
     /**
      * @return The backing {@link UriRouteInfo}
      */
+    @Override
     UriRouteInfo<T, R> getRouteInfo();
 
     /**

@@ -18,7 +18,7 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.exceptions.UnimplementedAdviceException
 import io.micronaut.aop.introduction.NotImplementedAdvice
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -48,7 +48,7 @@ interface MyBean {
 
 
 ''')
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         when:
@@ -89,7 +89,7 @@ abstract class MyBean {
 
 
 ''')
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         when:
         bean.test()

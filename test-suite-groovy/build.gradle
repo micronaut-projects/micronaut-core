@@ -47,6 +47,8 @@ dependencies {
 
     testImplementation libs.managed.reactor
     testImplementation(libs.awaitility)
+    testImplementation(libs.javax.persistence)
+    testImplementation(libs.jakarta.persistence)
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

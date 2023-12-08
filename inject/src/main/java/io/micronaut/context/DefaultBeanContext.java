@@ -166,7 +166,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
-    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<BeanRegistration<?>>() {
+    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<>() {
         // Keep anonymous class to avoid lambda overhead during the startup
         @Override
         public int compare(BeanRegistration<?> o1, BeanRegistration<?> o2) {
@@ -195,7 +195,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
-    private final SingletonScope singletonScope = new SingletonScope();
+    protected final SingletonScope singletonScope = new SingletonScope();
 
     private final BeanContextConfiguration beanContextConfiguration;
 
@@ -856,7 +856,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return getBean(null, beanType, qualifier);
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage(), e);
             }
             throw newNoSuchBeanException(
                 null,
@@ -1214,7 +1214,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
             } catch (Exception e) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error disposing bean [" + beanToDestroy + "]... Continuing...", e);
+                    LOG.warn("Error disposing bean [{}]... Continuing...", beanToDestroy, e);
                 }
             }
         }
@@ -2033,7 +2033,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                             processor.process(beanDefinition, method);
                                         } catch (Throwable e) {
                                             if (LOG.isErrorEnabled()) {
-                                                LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
+                                                LOG.error("Error processing bean method {}.{} with processor ({}): {}", beanDefinition, method, processor, e.getMessage(), e);
                                             }
                                             Boolean shutdownOnError = method.booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                                             if (shutdownOnError) {
@@ -2448,7 +2448,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             loadEagerBeans(producer, parallelDefinitions);
                         } catch (Throwable e) {
                             BeanDefinitionReference<Object> beanDefinitionReference = producer.getReference();
-                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2462,7 +2462,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         try {
                             initializeEagerBean(beanDefinition);
                         } catch (Throwable e) {
-                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2784,59 +2784,98 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T> The bean type
      */
     @Nullable
-    protected  <T> String resolveDisabledBeanMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
-        String disabledMessage = null;
+    protected <T> String resolveDisabledBeanMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+        StringBuilder stringBuilder = new StringBuilder();
+        resolveDisabledBeanMessage("", stringBuilder, CachedEnvironment.getProperty("line.separator"), resolutionContext, beanType, qualifier);
+        return stringBuilder.isEmpty() ? null : stringBuilder.toString();
+    }
+
+    @Internal
+    final <T> void resolveDisabledBeanMessage(String linePrefix,
+                                              StringBuilder messageBuilder,
+                                              String lineSeparator,
+                                              @Nullable BeanResolutionContext resolutionContext,
+                                              Argument<T> beanType,
+                                              @Nullable Qualifier<T> qualifier) {
+        if (linePrefix.length() == 10) {
+            // Break possible cyclic dependencies
+            return;
+        }
+
         for (Map.Entry<String, List<String>> entry : disabledConfigurations.entrySet()) {
             String pkg = entry.getKey();
             if (beanType.getTypeName().startsWith(pkg + ".")) {
-                StringBuilder messageBuilder = new StringBuilder();
-                String ls = CachedEnvironment.getProperty("line.separator");
-                messageBuilder.append("The bean [")
-                              .append(beanType.getTypeString(true))
-                              .append("] is disabled because it is within the package [")
-                              .append(pkg)
-                               .append("] which is disabled due to bean requirements: ")
-                              .append(ls);
+                messageBuilder.append(lineSeparator)
+                    .append(linePrefix)
+                    .append("* [")
+                    .append(beanType.getTypeString(true))
+                    .append("] is disabled because it is within the package [")
+                    .append(pkg)
+                    .append("] which is disabled due to bean requirements: ")
+                    .append(lineSeparator);
                 for (String failure : entry.getValue()) {
-                    messageBuilder.append("* ").append(failure).append(ls);
+                    messageBuilder
+                        .append(linePrefix)
+                        .append(" - ")
+                        .append(failure)
+                        .append(lineSeparator);
                 }
-
-                disabledMessage = messageBuilder.toString();
-                break;
+                messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
+                return;
             }
         }
 
-        if (disabledMessage == null) {
+        Collection<BeanDefinition<T>> beanDefinitions = collectBeanCandidates(
+            resolutionContext,
+            beanType,
+            false,
+            null,
+            disabledBeans.values()
+        ).stream()
+            .sorted(Comparator.comparing(BeanDefinition::getName))
+            .toList();
+        if (qualifier != null) {
+            beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
+        }
 
-            Collection<BeanDefinition<T>> beanDefinitions = collectBeanCandidates(
-                resolutionContext,
-                beanType,
-                false,
-                null,
-                disabledBeans.values()
-            );
-            if (qualifier != null) {
-                beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
-            }
-
-            if (!beanDefinitions.isEmpty()) {
-                StringBuilder messageBuilder = new StringBuilder();
-                String ls = CachedEnvironment.getProperty("line.separator");
-                messageBuilder.append("The following matching beans are disabled by bean requirements: ").append(ls);
-                for (BeanDefinition<T> beanDefinition : beanDefinitions) {
-                    messageBuilder.append("* Bean of type [").append(beanDefinition.asArgument().getTypeString(false))
-                        .append("] is disabled because: ").append(ls);
-                    if (beanDefinition instanceof DisabledBean<T> disabledBean) {
-                        for (String failure : disabledBean.reasons()) {
-                            messageBuilder.append("   - ").append(failure).append(ls);
+        if (!beanDefinitions.isEmpty()) {
+            for (BeanDefinition<T> beanDefinition : beanDefinitions) {
+                messageBuilder
+                    .append(lineSeparator)
+                    .append(linePrefix)
+                    .append("* [").append(beanDefinition.asArgument().getTypeString(true));
+                if (!beanDefinition.getBeanType().equals(beanType.getType())) {
+                    messageBuilder.append("] a candidate of [")
+                        .append(beanType.getTypeString(true));
+                }
+                messageBuilder.append("] is disabled because:")
+                    .append(lineSeparator);
+                if (beanDefinition instanceof DisabledBean<T> disabledBean) {
+                    for (String failure : disabledBean.reasons()) {
+                        messageBuilder
+                            .append(linePrefix)
+                            .append(" - ")
+                            .append(failure)
+                            .append(lineSeparator);
+                        String prefix = "No bean of type [";
+                        if (failure.startsWith(prefix)) {
+                            ClassUtils.forName(failure.substring(prefix.length(), failure.indexOf("]")), classLoader)
+                                .ifPresent(beanClass -> {
+                                    messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
+                                    resolveDisabledBeanMessage(linePrefix + " ",
+                                            messageBuilder,
+                                            lineSeparator,
+                                            resolutionContext,
+                                            Argument.of(beanClass),
+                                            null);
+                                    messageBuilder.append(lineSeparator);
+                                });
                         }
                     }
+                    messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
                 }
-
-                disabledMessage = messageBuilder.toString();
             }
         }
-        return disabledMessage;
     }
 
     @Nullable

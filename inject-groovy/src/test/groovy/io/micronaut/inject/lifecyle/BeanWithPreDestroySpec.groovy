@@ -16,6 +16,7 @@
 package io.micronaut.inject.lifecyle
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.LifeCycle
@@ -33,8 +34,7 @@ class BeanWithPreDestroySpec extends AbstractBeanDefinitionSpec {
 
     void "test that a bean with a pre-destroy hook works"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -50,12 +50,14 @@ class BeanWithPreDestroySpec extends AbstractBeanDefinitionSpec {
         then:
         b.noArgsDestroyCalled
         b.injectedDestroyCalled
+
+        cleanup:
+        context.close()
     }
 
     void "test that a bean with a pre-destroy hook works closed on close"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -71,6 +73,9 @@ class BeanWithPreDestroySpec extends AbstractBeanDefinitionSpec {
         then:
         b.noArgsDestroyCalled
         b.injectedDestroyCalled
+
+        cleanup:
+        context.close()
     }
 
     void "test predestroy on an interface method"() {
@@ -126,7 +131,7 @@ class FooFactory {
             private boolean running = true
 
             @Override
-            boolean isRunning(){
+            boolean isRunning() {
                 return running
             }
 

@@ -101,6 +101,7 @@ public class ServerSslConfiguration extends SslConfiguration {
      * @deprecated Please use {@code micronaut.server.ssl.port} instead ({@link ServerSslConfiguration#setPort(int)}).
      */
     @Override
+    @Deprecated
     @SuppressWarnings("deprecation")
     public void setPort(int port) {
         this.port = port;

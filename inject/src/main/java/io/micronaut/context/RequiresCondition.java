@@ -570,7 +570,7 @@ public class RequiresCondition implements Condition {
                 BeanContext beanContext = context.getBeanContext();
                 for (Class<?> type : beans) {
                     if (!beanContext.containsBean(type)) {
-                        context.fail("No bean of type [" + type + "] present within context");
+                        context.fail("No bean of type [" + type.getName() + "] present within context");
                         return false;
                     }
                 }
@@ -595,7 +595,7 @@ public class RequiresCondition implements Condition {
                     );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {
-                            context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type + "] registered in context");
+                            context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type.getName() + "] registered in context");
                             return false;
                         }
                     }

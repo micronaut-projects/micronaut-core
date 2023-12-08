@@ -43,6 +43,7 @@ public final class WildcardElementAnnotationMetadata extends AbstractElementAnno
         this.representingClassElement = representingClassElement;
     }
 
+    @Override
     public AnnotationMetadata getReturnInstance() {
         return getAnnotationMetadata();
     }

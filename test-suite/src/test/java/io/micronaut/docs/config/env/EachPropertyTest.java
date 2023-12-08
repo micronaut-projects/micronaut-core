@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,12 +30,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class EachPropertyTest {
+class EachPropertyTest {
 
     @Test
-    public void testEachProperty() throws URISyntaxException {
+    void testEachProperty() throws URISyntaxException {
         // tag::config[]
         ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
                 "test",
@@ -54,17 +54,14 @@ public class EachPropertyTest {
                 Qualifiers.byName("one") // <2>
         );
 
-        assertEquals(
-                new URI("jdbc:mysql://localhost/one"),
-                firstConfig.getUrl()
-        );
+        assertEquals(new URI("jdbc:mysql://localhost/one"), firstConfig.getUrl());
         // end::beans[]
 
         applicationContext.close();
     }
 
     @Test
-    public void testEachPropertyList() {
+    void testEachPropertyList() {
         List<Map> limits = new ArrayList<>();
         limits.add(CollectionUtils.mapOf("period", "10s", "limit", "1000"));
         limits.add(CollectionUtils.mapOf("period", "1m", "limit", "5000"));
@@ -72,10 +69,7 @@ public class EachPropertyTest {
 
         List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).collect(Collectors.toList());
 
-        assertEquals(
-                2,
-                beansOfType.size()
-        );
+        assertEquals(2, beansOfType.size());
         assertEquals(1000, beansOfType.get(0).getLimit().intValue());
         assertEquals(5000, beansOfType.get(1).getLimit().intValue());
 

@@ -1,6 +1,5 @@
 package io.micronaut.http.server.netty.websocket;
 
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;

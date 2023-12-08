@@ -66,7 +66,11 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+/**
+ * Compiler for kotlin code (for tests).
+ */
 public class KotlinCompiler {
+
     private static final KotlinCompilation KOTLIN_COMPILATION = new KotlinCompilation();
     private static final KotlinCompilation KSP_COMPILATION = new KotlinCompilation();
 

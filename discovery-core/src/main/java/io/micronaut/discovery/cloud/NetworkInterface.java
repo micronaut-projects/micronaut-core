@@ -119,7 +119,7 @@ public class NetworkInterface implements Serializable {
     }
 
     /**
-     * @param id The Id of network interface
+     * @param id The ID of network interface
      */
     protected void setId(String id) {
         this.id = id;

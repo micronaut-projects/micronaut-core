@@ -99,7 +99,10 @@ class ExampleTest(private val application: EmbeddedApplication<*>): StringSpec({
 
         then:
         def e = thrown(NoSuchBeanException)
-        e.message.contains("Bean of type [test.ExampleTest] is disabled")
+        def lines = e.message.lines().toList()
+        lines[0] == 'No bean of type [test.ExampleTest] exists. '
+        lines[1] == '* [ExampleTest] is disabled because:'
+        lines[2] == ' - Custom condition [class io.micronaut.test.condition.TestActiveCondition] failed evaluation'
     }
 
     void "test jvm field"() {
@@ -781,7 +784,7 @@ import jakarta.inject.*
 @Bean(typed = [Runnable::class])
 class Test: Runnable {
 
-    override fun run(){
+    override fun run() {
     }
 }
 

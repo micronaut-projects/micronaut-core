@@ -33,7 +33,4 @@ dependencies {
     testImplementation project(":inject-groovy")
     testImplementation "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
     testImplementation libs.managed.snakeyaml
-    if (!JavaVersion.current().isJava9Compatible()) {
-        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
 }

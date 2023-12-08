@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +70,8 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  */
 @ServerFilter(MATCH_ALL_PATTERN)
 public class CorsFilter implements Ordered {
+    public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
+
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
@@ -94,7 +96,7 @@ public class CorsFilter implements Ordered {
     public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
         String origin = request.getOrigin().orElse(null);
         if (origin == null) {
-            LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
+            LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
             return null; // proceed
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
@@ -102,7 +104,7 @@ public class CorsFilter implements Ordered {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, corsOriginConfiguration);
             }
-            if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
+            if (validateMethodToMatch(request, corsOriginConfiguration).isEmpty()) {
                 return forbidden();
             }
             if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
@@ -152,7 +154,10 @@ public class CorsFilter implements Ordered {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
+
+        return (
+            corsOriginConfiguration.getAllowedOriginsRegex().isEmpty() && isAny(corsOriginConfiguration.getAllowedOrigins())
+        ) && isHostLocal(host);
     }
 
     /**
@@ -213,7 +218,7 @@ public class CorsFilter implements Ordered {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.METRICS.after();
+        return CORS_FILTER_ORDER;
     }
 
     @NonNull
@@ -329,7 +334,7 @@ public class CorsFilter implements Ordered {
         }
         List<String> allowedOrigins = config.getAllowedOrigins();
         return !allowedOrigins.isEmpty() && (
-            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+            (config.getAllowedOriginsRegex().isEmpty() && isAny(allowedOrigins)) ||
                 allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
         );
     }
@@ -417,7 +422,7 @@ public class CorsFilter implements Ordered {
     private Optional<HttpStatus> validatePreflightRequest(@NonNull HttpRequest<?> request,
                                                           @NonNull CorsOriginConfiguration config) {
         Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
-        if (!methodToMatchOptional.isPresent()) {
+        if (methodToMatchOptional.isEmpty()) {
             return Optional.of(HttpStatus.FORBIDDEN);
         }
         HttpMethod methodToMatch = methodToMatchOptional.get();

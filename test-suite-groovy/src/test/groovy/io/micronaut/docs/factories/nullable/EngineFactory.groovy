@@ -26,7 +26,7 @@ class EngineFactory {
     @EachBean(EngineConfiguration)
     Engine buildEngine(EngineConfiguration engineConfiguration) {
         if (engineConfiguration.enabled) {
-            (Engine){ -> engineConfiguration.cylinders }
+            (Engine) { -> engineConfiguration.cylinders }
         } else {
             throw new DisabledBeanException("Engine configuration disabled")
         }

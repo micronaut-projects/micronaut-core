@@ -15,11 +15,10 @@
  */
 package io.micronaut.inject.qualifiers.secondary
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Secondary
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -29,7 +28,7 @@ class SecondarySpec extends Specification {
     void "test the @Secondary annotation influences bean selection"() {
 
         given:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -40,5 +39,8 @@ class SecondarySpec extends Specification {
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
         context.getBean(A, Qualifiers.byStereotype(Secondary)) instanceof A1
+
+        cleanup:
+        context.close()
     }
 }

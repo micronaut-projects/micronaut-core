@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.failures
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.CircularDependencyException
-import spock.lang.Specification
-
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 16/05/2017.
  */
@@ -30,24 +27,25 @@ class PropertyCircularDependencyFailureSpec extends Specification {
 
     void "test simple property circular dependency failure"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(B)
 
         then:"The implementation is injected"
-        def e = thrown(CircularDependencyException)
-        e.message.normalize() == '''\
-Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B
-
-Message: Circular dependency detected
-Path Taken: 
-new B() --> B.setA([A a]) --> A.setB([B b])
-^                                        |
-|                                        |
-|                                        |
-+----------------------------------------+'''
+        CircularDependencyException e = thrown()
+        def lines = e.message.lines().toList()
+        lines[0] == 'Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B'
+        lines[1] == ''
+        lines[2] == 'Message: Circular dependency detected'
+        lines[3] == 'Path Taken: '
+        lines[4] == 'new B() --> B.setA([A a]) --> A.setB([B b])'
+        lines[5] == '^                                        |'
+        lines[6] == '|                                        |'
+        lines[7] == '|                                        |'
+        lines[8] == '+----------------------------------------+'
+        cleanup:
+        context.close()
     }
 
     @Singleton

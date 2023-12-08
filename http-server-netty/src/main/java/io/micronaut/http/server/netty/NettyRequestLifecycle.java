@@ -18,10 +18,11 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
@@ -47,53 +48,60 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
     private final RoutingInBoundHandler rib;
     private final PipeliningServerHandler.OutboundAccess outboundAccess;
+    private final boolean validateUrl;
 
     /**
      * Should only be used where netty-specific stuff is needed, such as reading the body or
-     * writing the response. Otherwise, use {@link #request()} which can be updated by filters
+     * writing the response.
      */
-    private final NettyHttpRequest<?> nettyRequest;
+    private NettyHttpRequest<?> nettyRequest;
 
-    NettyRequestLifecycle(RoutingInBoundHandler rib, PipeliningServerHandler.OutboundAccess outboundAccess, NettyHttpRequest<?> request) {
-        super(rib.routeExecutor, request);
+    NettyRequestLifecycle(RoutingInBoundHandler rib, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        super(rib.routeExecutor);
         this.rib = rib;
+        this.validateUrl = rib.serverConfiguration.isValidateUrl();
         this.outboundAccess = outboundAccess;
-        this.nettyRequest = request;
-
-        multipartEnabled(rib.multipartEnabled);
     }
 
-    void handleNormal() {
+    void handleNormal(NettyHttpRequest<?> request) {
+        this.nettyRequest = request;
+
         if (LOG.isDebugEnabled()) {
-            HttpMethod httpMethod = request().getMethod();
-            LOG.debug("Request {} {}", httpMethod, request().getUri());
+            HttpMethod httpMethod = request.getMethod();
+            LOG.debug("Request {} {}", httpMethod, request.getUri());
         }
 
-        ExecutionFlow<MutableHttpResponse<?>> result;
+        ExecutionFlow<HttpResponse<?>> result;
 
         try {
             // handle decoding failure
-            DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
+            DecoderResult decoderResult = request.getNativeRequest().decoderResult();
             if (decoderResult.isFailure()) {
                 Throwable cause = decoderResult.cause();
                 HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
                 result = onStatusError(
+                    request,
                     HttpResponse.status(status),
                     status.getReason()
                 );
             } else {
-                result = normalFlow();
+                result = normalFlow(request);
             }
-            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
+            ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
+            if (imperativeFlow != null) {
+                rib.writeResponse(outboundAccess, request, imperativeFlow.getValue(), imperativeFlow.getError());
+            } else {
+                result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
+            }
         } catch (Exception e) {
-            handleException(e);
+            handleException(request, e);
         }
     }
 
     @Nullable
     @Override
-    protected FileCustomizableResponseType findFile() {
-        Optional<URL> optionalUrl = rib.staticResourceResolver.resolve(request().getUri().getPath());
+    protected FileCustomizableResponseType findFile(HttpRequest<?> request) {
+        Optional<URL> optionalUrl = rib.staticResourceResolver.resolve(request.getUri().getPath());
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
@@ -112,13 +120,13 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     }
 
     @Override
-    protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch) {
+    protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
         // handle decoding failure
         DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
         if (decoderResult.isFailure()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
-        return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
+        return super.fulfillArguments(routeMatch, request).flatMap(this::waitForBody);
     }
 
     /**
@@ -143,8 +151,8 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         return nettyRequest.getRouteWaitsFor().map(v -> routeMatch);
     }
 
-    void handleException(Throwable cause) {
-        onError(cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
+    void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {
+        onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 
 }

@@ -61,7 +61,7 @@ internal class StringJavaFileObject(className: String, private val contents: Str
     : SimpleJavaFileObject(
     URI.create("string:///" + className.replace('.', '/') + JavaFileObject.Kind.SOURCE.extension),
     JavaFileObject.Kind.SOURCE
-){
+) {
     private var _lastModified = System.currentTimeMillis()
 
     override fun getCharContent(ignoreEncodingErrors: Boolean): CharSequence = contents

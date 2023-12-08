@@ -67,7 +67,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             }
         } catch (MissingResourceException e) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("No default bundle (locale: " + defaultLocale + ") found for base name " + baseName);
+                LOG.debug("No default bundle (locale: {}) found for base name {}", defaultLocale, baseName);
             }
             defaultBundle = null;
         }
