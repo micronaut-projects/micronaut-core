@@ -207,6 +207,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 } catch (NoSuchElementException ignored) {
                 }
 
+                // websocket needs auto read for now
+                ctx.channel().config().setAutoRead(true);
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error opening WebSocket: {}", e.getMessage(), e);

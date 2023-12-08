@@ -21,6 +21,8 @@ import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import io.netty.handler.codec.http.LastHttpContent
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
@@ -289,6 +291,67 @@ class PipeliningServerHandlerSpec extends Specification {
 
         where:
         completeOnCancel << [true, false]
+    }
+
+    def 'read backpressure for streaming requests'() {
+        given:
+        def mon = new MonitorHandler()
+        Subscription subscription = null
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                ((StreamedHttpRequest) request).subscribe(new Subscriber<HttpContent>() {
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        subscription = s
+                    }
+
+                    @Override
+                    void onNext(HttpContent httpContent) {
+                        httpContent.release()
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                        t.printStackTrace()
+                    }
+
+                    @Override
+                    void onComplete() {
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                    }
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        expect:
+        mon.read == 1
+        mon.flush == 0
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        req.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        ch.writeInbound(req)
+        then:
+        // no read call until request
+        mon.read == 1
+
+        when:
+        subscription.request(1)
+        then:
+        mon.read == 2
+
+        when:
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))))
+        then:
+        // read call for the next request
+        mon.read == 3
+        ch.checkException()
     }
 
     def 'empty streaming response while in queue'() {
