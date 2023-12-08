@@ -43,7 +43,7 @@ class EmbeddedTestUtil {
         }
 
         private void forwardLater(Object msg) {
-            if (readPending || dest.config().isAutoRead()) {
+            if (readPending || dest.config().isAutoRead() || msg == FLUSH) {
                 dest.eventLoop().execute(() -> forwardNow(msg))
                 readPending = false
             } else {
