@@ -28,16 +28,17 @@ import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
+import io.micronaut.scheduling.TaskExecutors;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.stream.ChunkedStream;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Body writer for {@link StreamedFile}s.
@@ -49,8 +50,11 @@ import java.io.OutputStream;
 @Experimental
 @Internal
 public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<StreamedFile> {
-    StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
+    private final ExecutorService ioExecutor;
+
+    StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
         super(configuration);
+        this.ioExecutor = ioExecutor;
     }
 
     @Override
@@ -72,8 +76,7 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
                     nettyHeaders
                 );
                 InputStream inputStream = object.getInputStream();
-                HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                nettyContext.writeChunked(finalResponse, chunkedInput);
+                nettyContext.writeStream(finalResponse, inputStream, ioExecutor);
             }
 
         } else {

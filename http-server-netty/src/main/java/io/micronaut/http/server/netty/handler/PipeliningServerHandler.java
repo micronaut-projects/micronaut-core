@@ -18,13 +18,10 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.EmptyHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -32,14 +29,12 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoop;
-import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -49,15 +44,8 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.stream.ChunkedFile;
-import io.netty.handler.stream.ChunkedInput;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.AttributeKey;
-import io.netty.util.ReferenceCountUtil;
-import io.netty.util.ResourceLeakDetector;
-import io.netty.util.ResourceLeakDetectorFactory;
-import io.netty.util.ResourceLeakTracker;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -67,15 +55,15 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
-import java.util.function.Supplier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -86,9 +74,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
-    public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
-        SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
-
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
@@ -316,24 +301,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @see #channelReadComplete
          */
         void readComplete() {
-        }
-    }
-
-    /**
-     * Wrapper class for a netty response with a special body type, like
-     * {@link HttpChunkedInput} or
-     * {@link FileRegion}.
-     *
-     * @param response The response
-     * @param body     The body, or {@code null} if there is no body
-     * @param needLast Whether to finish the response with a
-     *                 {@link LastHttpContent}
-     */
-    private record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
-        CustomResponse {
-            if (response instanceof FullHttpResponse) {
-                throw new IllegalArgumentException("Response must not be a FullHttpResponse to send a special body");
-            }
         }
     }
 
@@ -673,39 +640,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             content.subscribe(new StreamingOutboundHandler(this, response));
         }
 
-        /**
-         * Write a response with a special body
-         * ({@link io.netty.handler.codec.http.HttpChunkedInput},
-         * {@link io.micronaut.http.server.types.files.SystemFile}).
-         *
-         * @param response The response to write
-         */
-        private void writeStreamed(CustomResponse response) {
-            preprocess(response.response());
-            write(new ChunkedOutboundHandler(this, response));
-        }
-
         @Override
-        public void writeChunked(HttpResponse response, HttpChunkedInput chunkedInput) {
-            writeStreamed(new CustomResponse(response, chunkedInput, false));
-        }
-
-        @Override
-        public void writeFile(HttpResponse response, RandomAccessFile randomAccessFile, long position, long contentLength) {
-            SmartHttpContentCompressor predicate = ctx.channel().attr(ZERO_COPY_PREDICATE.get()).get();
-            if (predicate != null && predicate.shouldSkip(response)) {
-                // SSL not enabled - can use zero-copy file transfer.
-                writeStreamed(new CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), true));
-            } else {
-                // SSL enabled - cannot use zero-copy file transfer.
-                try {
-                    // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(randomAccessFile, position, contentLength, LENGTH_8K));
-                    writeStreamed(new CustomResponse(response, chunkedInput, false));
-                } catch (IOException e) {
-                    throw new MessageBodyException("Could not read file", e);
-                }
-            }
+        public void writeStream(HttpResponse response, InputStream stream, ExecutorService executorService) {
+            preprocess(response);
+            write(new BlockingOutboundHandler(this, response, stream, executorService));
         }
     }
 
@@ -921,89 +859,154 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    /**
-     * Handler that writes a files etc.
-     */
-    private final class ChunkedOutboundHandler extends OutboundHandler {
-        private final CustomResponse message;
+    private final class BlockingOutboundHandler extends OutboundHandler {
+        private static final int QUEUE_SIZE = 2;
 
-        ChunkedOutboundHandler(OutboundAccess outboundAccess, CustomResponse message) {
+        private final HttpResponse response;
+        private final InputStream stream;
+        private final ExecutorService blockingExecutor;
+
+        private final Queue<ByteBuf> queue = new ArrayDeque<>(QUEUE_SIZE);
+        private Future<?> worker = null;
+        private boolean workerReady = false;
+        private boolean discard = false;
+        private boolean done = false;
+        private boolean producerWaiting = false;
+        private boolean consumerWaiting = false;
+
+        BlockingOutboundHandler(
+            OutboundAccess outboundAccess,
+            HttpResponse response,
+            InputStream stream,
+            ExecutorService blockingExecutor) {
             super(outboundAccess);
-            this.message = message;
+            this.response = response;
+            this.stream = stream;
+            this.blockingExecutor = blockingExecutor;
         }
 
         @Override
         void writeSome() {
-            boolean responseIsLast = message.body() == null && !message.needLast();
-            write(message.response(), responseIsLast, responseIsLast && outboundAccess.closeAfterWrite);
-            if (message.body() != null) {
-                boolean bodyIsLast = !message.needLast();
-                write(message.body(), bodyIsLast, bodyIsLast && outboundAccess.closeAfterWrite);
+            if (worker == null) {
+                write(response, false, false);
+                worker = blockingExecutor.submit(this::work);
             }
-            if (message.needLast()) {
-                write(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
-            }
-            outboundHandler = null;
-            requestHandler.responseWritten(outboundAccess.attachment);
-            PipeliningServerHandler.this.writeSome();
+            do {
+                ByteBuf msg;
+                synchronized (this) {
+                    if (producerWaiting) {
+                        producerWaiting = false;
+                        notifyAll();
+                    }
+                    msg = queue.poll();
+                    if (msg == null && !this.done) {
+                        consumerWaiting = true;
+                        break;
+                    }
+                }
+                if (msg == null) {
+                    // this.done == true inside the synchronized block
+                    write(LastHttpContent.EMPTY_LAST_CONTENT, true, false);
+
+                    outboundHandler = null;
+                    requestHandler.responseWritten(outboundAccess.attachment);
+                    PipeliningServerHandler.this.writeSome();
+                    break;
+                } else {
+                    write(new DefaultHttpContent(msg), true, false);
+                }
+            } while (ctx.channel().isWritable());
         }
 
         @Override
         void discard() {
-            ReferenceCountUtil.release(message.response());
-            if (message.body() instanceof ChunkedInput<?> ci) {
-                try {
-                    ci.close();
-                } catch (Exception e) {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Failed to close ChunkedInput", e);
+            discard = true;
+            if (worker == null) {
+                worker = blockingExecutor.submit(this::work);
+            } else {
+                synchronized (this) {
+                    if (workerReady) {
+                        worker.cancel(true);
+                        // in case the worker was already done, drain buffers
+                        drain();
+                    } // else worker is still setting up and will see the discard flag in due time
+                }
+            }
+        }
+
+        private void work() {
+            ByteBuf buf = null;
+            try (InputStream stream = this.stream) {
+                synchronized (this) {
+                    this.workerReady = true;
+                    if (this.discard) {
+                        // don't read
+                        return;
                     }
                 }
-            } else if (message.body() instanceof FileRegion fr) {
-                fr.release();
+                while (true) {
+                    buf = ctx.alloc().heapBuffer(LENGTH_8K);
+                    int n = buf.writeBytes(stream, LENGTH_8K);
+                    synchronized (this) {
+                        if (n == -1) {
+                            done = true;
+                            wakeConsumer();
+                            break;
+                        }
+                        while (queue.size() >= QUEUE_SIZE && !discard) {
+                            producerWaiting = true;
+                            wait();
+                        }
+                        if (discard) {
+                            break;
+                        }
+                        queue.add(buf);
+                        // buf is now owned by the queue
+                        buf = null;
+
+                        wakeConsumer();
+                    }
+                }
+            } catch (InterruptedException | InterruptedIOException ignored) {
+            } catch (Exception e) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("InputStream threw an error during read. This error cannot be forwarded to the client. Please make sure any errors are thrown by the controller instead.", e);
+                }
+            } finally {
+                // if we failed to add a buffer to the queue, release it
+                if (buf != null) {
+                    buf.release();
+                }
+                synchronized (this) {
+                    done = true;
+
+                    if (discard) {
+                        drain();
+                    }
+                }
             }
-            outboundHandler = null;
-        }
-    }
-
-    private static class TrackedDefaultFileRegion extends DefaultFileRegion {
-        //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<TrackedDefaultFileRegion>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedDefaultFileRegion.class));
-
-        private final ResourceLeakTracker<TrackedDefaultFileRegion> tracker;
-
-        public TrackedDefaultFileRegion(FileChannel fileChannel, long position, long count) {
-            super(fileChannel, position, count);
-            this.tracker = LEAK_DETECTOR.get().track(this);
         }
 
-        @Override
-        protected void deallocate() {
-            super.deallocate();
-            if (tracker != null) {
-                tracker.close(this);
+        private void wakeConsumer() {
+            assert Thread.holdsLock(this);
+
+            if (!discard && consumerWaiting) {
+                consumerWaiting = false;
+                ctx.executor().execute(PipeliningServerHandler.this::writeSome);
             }
         }
-    }
 
-    private static class TrackedChunkedFile extends ChunkedFile {
-        //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<TrackedChunkedFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedChunkedFile.class));
+        private void drain() {
+            assert Thread.holdsLock(this);
 
-        private final ResourceLeakTracker<TrackedChunkedFile> tracker;
-
-        public TrackedChunkedFile(RandomAccessFile file, long offset, long length, int chunkSize) throws IOException {
-            super(file, offset, length, chunkSize);
-            this.tracker = LEAK_DETECTOR.get().track(this);
-        }
-
-        @Override
-        public void close() throws Exception {
-            super.close();
-            if (tracker != null) {
-                tracker.close(this);
+            ByteBuf buf;
+            while (true) {
+                buf = queue.poll();
+                if (buf != null) {
+                    buf.release();
+                } else {
+                    break;
+                }
             }
         }
     }
