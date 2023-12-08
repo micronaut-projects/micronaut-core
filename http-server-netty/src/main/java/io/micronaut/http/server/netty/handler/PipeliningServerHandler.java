@@ -39,7 +39,6 @@ import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -55,15 +54,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Queue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -350,7 +340,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             HttpHeaders headers = request.headers();
             String contentEncoding = getContentEncoding(headers);
             EmbeddedChannel decompressionChannel;
-            if (contentEncoding == null) {
+            if (contentEncoding == null || !hasBody(request)) {
                 decompressionChannel = null;
             } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                 HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
@@ -382,9 +372,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 inboundHandler = droppingInboundHandler;
                 if (message instanceof HttpContent) {
                     inboundHandler.read(message);
-                }
-                if (decompressionChannel != null) {
-                    decompressionChannel.finish();
                 }
                 requestHandler.accept(ctx, new EmptyHttpRequest(request), outboundAccess);
             } else {
