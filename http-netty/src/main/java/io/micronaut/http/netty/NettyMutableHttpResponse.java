@@ -316,13 +316,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> contentType(MediaType mediaType) {
-        if (mediaType == null) {
-            headers.remove(HttpHeaderNames.CONTENT_TYPE);
-        } else {
-            // optimization for content type validation
-            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
-            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
+        headers.contentType(mediaType);
         return this;
     }
 
@@ -434,7 +428,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
                 } else {
                     conversion = conversionService.convert(value, conversionContext);
                 }
-                nextConvertor = new BodyConvertor<T>() {
+                nextConvertor = new BodyConvertor<>() {
 
                     @Override
                     public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {

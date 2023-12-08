@@ -15,14 +15,11 @@
  */
 package io.micronaut.inject.lifecyle
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 17/05/2017.
  */
@@ -30,8 +27,7 @@ class BeanWithPostConstructSpec extends Specification{
 
     void "test that a bean with a protected post construct hook that the hook is invoked"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -40,6 +36,9 @@ class BeanWithPostConstructSpec extends Specification{
         b.a != null
         b.injectedFirst
         b.setupComplete
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

@@ -19,7 +19,6 @@ import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 import io.micronaut.core.async.annotation.SingleResult;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;

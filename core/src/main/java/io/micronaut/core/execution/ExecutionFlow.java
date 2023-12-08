@@ -164,6 +164,38 @@ public interface ExecutionFlow<T> {
     ImperativeExecutionFlow<T> tryComplete();
 
     /**
+     * Alternative to {@link #tryComplete()} which will unwrap the flow's value.
+     *
+     * @return The imperative flow then returns its value, or {@code null} if this flow is not complete or does not
+     * support this operation
+     * @since 4.3
+     */
+    @Nullable
+    default T tryCompleteValue() {
+        ImperativeExecutionFlow<T> imperativeFlow = tryComplete();
+        if (imperativeFlow != null) {
+            return imperativeFlow.getValue();
+        }
+        return null;
+    }
+
+    /**
+     * Alternative to {@link #tryComplete()} which will unwrap the flow's error.
+     *
+     * @return The imperative flow then returns its error, or {@code null} if this flow is not complete or does not
+     * support this operation
+     * @since 4.3
+     */
+    @Nullable
+    default Throwable tryCompleteError() {
+        ImperativeExecutionFlow<T> imperativeFlow = tryComplete();
+        if (imperativeFlow != null) {
+            return imperativeFlow.getError();
+        }
+        return null;
+    }
+
+    /**
      * Converts the existing flow into the completable future.
      *
      * @return a {@link CompletableFuture} that represents the state if this flow.

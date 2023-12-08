@@ -40,7 +40,6 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Null
 import spock.lang.IgnoreIf
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
@@ -1337,7 +1336,6 @@ enum Test {
     }
 
     @Issue("https://github.com/eclipse-ee4j/cdi-tck/blob/master/lang-model/src/main/java/org/jboss/cdi/lang/model/tck/InheritedMethods.java")
-    @Requires({ jvm.isJava9Compatible() })
     // private static Since Java 9
     void "test inherited methods using ElementQuery"() {
         given:
@@ -1706,27 +1704,27 @@ class Test {
 }
 ''')
         expect:
-            def field = ce.getFields().find { it.name == "deepList"}
-            def fieldType = field.getGenericType()
+        def field = ce.getFields().find { it.name == "deepList"}
+        def fieldType = field.getGenericType()
 
-            fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
+        fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
-            assertListGenericArgument(fieldType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                    })
+        assertListGenericArgument(fieldType, { ClassElement listArg1 ->
+            assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                    assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                 })
             })
+        })
 
-            def level1 = fieldType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+        def level1 = fieldType.getTypeArguments()["E"]
+        level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+        def level2 = level1.getTypeArguments()["E"]
+        level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+        def level3 = level2.getTypeArguments()["E"]
+        level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test annotation metadata present on deep type parameters for method"() {
@@ -1743,27 +1741,27 @@ class Test {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
-            def theType = method.getGenericReturnType()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
+        def theType = method.getGenericReturnType()
 
-            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
+        theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
-            assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                    })
+        assertListGenericArgument(theType, { ClassElement listArg1 ->
+            assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                    assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                 })
             })
+        })
 
-            def level1 = theType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+        def level1 = theType.getTypeArguments()["E"]
+        level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+        def level2 = level1.getTypeArguments()["E"]
+        level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+        def level3 = level2.getTypeArguments()["E"]
+        level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test type annotations on a method and a field"() {
@@ -1783,17 +1781,17 @@ class Test {
 }
 ''')
         expect:
-            def field = ce.findField("myField").get()
-            def method = ce.findMethod("myMethod").get()
+        def field = ce.findField("myField").get()
+        def method = ce.findMethod("myMethod").get()
 
-            // Type annotations shouldn't appear on the field
-            field.getAnnotationMetadata().getAnnotationNames().asList() == []
-            field.getType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            // Type annotations shouldn't appear on the method
-            method.getAnnotationMetadata().getAnnotationNames().asList() == []
-            method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        // Type annotations shouldn't appear on the field
+        field.getAnnotationMetadata().getAnnotationNames().asList() == []
+        field.getType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        // Type annotations shouldn't appear on the method
+        method.getAnnotationMetadata().getAnnotationNames().asList() == []
+        method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
     }
 
     void "test type annotations on a method and a field 2"() {
@@ -1815,22 +1813,22 @@ class Test {
 }
 ''')
         expect:
-            def field = ce.findField("myField").get()
-            def method = ce.findMethod("myMethod").get()
+        def field = ce.findField("myField").get()
+        def method = ce.findMethod("myMethod").get()
 
-            // Type annotations shouldn't appear on the field
-            field.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeFieldRuntimeAnn']
-            field.getType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            // Type annotations shouldn't appear on the method
-            method.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeMethodRuntimeAnn']
-            method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
-            method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        // Type annotations shouldn't appear on the field
+        field.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeFieldRuntimeAnn']
+        field.getType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        // Type annotations shouldn't appear on the method
+        method.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeMethodRuntimeAnn']
+        method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
     }
 
     void "test recursive generic type parameter"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
@@ -1838,16 +1836,16 @@ final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
 
 ''')
         expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "java.lang.Comparable"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Comparable"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def typeArguments = ce.getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "java.lang.Comparable"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Comparable"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test annotation metadata present on deep type parameters for method 2"() {
@@ -1864,28 +1862,28 @@ class Test {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
-            def theType = method.getGenericReturnType()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
+        def theType = method.getGenericReturnType()
 
-            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
+        theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
-            assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn']
-                    })
+        assertListGenericArgument(theType, { ClassElement listArg1 ->
+            assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                    assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn']
                 })
             })
+        })
 
-            def level1 = theType.getTypeArguments()["E"]
-            def level2 = level1.getTypeArguments()["E"]
-            def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+        def level1 = theType.getTypeArguments()["E"]
+        def level2 = level1.getTypeArguments()["E"]
+        def level3 = level2.getTypeArguments()["E"]
+        level3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
     }
 
     void "test annotations on recursive generic type parameter 1"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 final class TrackedSortedSet<@io.micronaut.visitors.TypeUseRuntimeAnn T extends java.lang.Comparable<? super T>> {
@@ -1893,16 +1891,16 @@ final class TrackedSortedSet<@io.micronaut.visitors.TypeUseRuntimeAnn T extends 
 
 ''')
         expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "java.lang.Comparable"
-            typeArgument.getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn']
+        def typeArguments = ce.getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "java.lang.Comparable"
+        typeArgument.getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn']
     }
 
     void "test recursive generic type parameter 2"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 final class Test<T extends Test> { // Missing argument
@@ -1910,18 +1908,18 @@ final class Test<T extends Test> { // Missing argument
 
 ''')
         expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.Test"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+        def typeArguments = ce.getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.Test"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic type parameter 3"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 final class Test<T extends Test<T>> {
@@ -1929,18 +1927,18 @@ final class Test<T extends Test<T>> {
 
 ''')
         expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.Test"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+        def typeArguments = ce.getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.Test"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic type parameter 4"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 final class Test<T extends Test<?>> {
@@ -1948,18 +1946,18 @@ final class Test<T extends Test<?>> {
 
 ''')
         expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.Test"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+        def typeArguments = ce.getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.Test"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 import org.hibernate.SessionFactory;
@@ -1974,20 +1972,20 @@ class MyFactory {
 
 ''')
         expect:
-            def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
-            def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
-            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "org.hibernate.SessionBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+        def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
+        def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
+        def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "org.hibernate.SessionBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 2"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2011,23 +2009,23 @@ class MyBean {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "test.MyBuilder"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 3"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2051,20 +2049,20 @@ class MyBean {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 4"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2088,23 +2086,23 @@ class MyBean {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "test.MyBuilder"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 5"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2128,23 +2126,23 @@ class MyBean {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "test.MyBuilder"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 6"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2168,23 +2166,23 @@ class MyBean<T extends MyBuilder> {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "test.MyBuilder"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 7"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 class MyFactory {
@@ -2208,23 +2206,23 @@ class MyBean<T extends MyBuilder> {
 
 ''')
         expect:
-            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+        def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+        def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+        def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+        typeArguments.size() == 1
+        def typeArgument = typeArguments.get("T")
+        typeArgument.name == "test.MyBuilder"
+        def nextTypeArguments = typeArgument.getTypeArguments()
+        def nextTypeArgument = nextTypeArguments.get("T")
+        nextTypeArgument.name == "test.MyBuilder"
+        def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+        def nextNextTypeArgument = nextNextTypeArguments.get("T")
+        nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test how the annotations from the type are propagated"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -2263,51 +2261,51 @@ class MyBean {
 
 ''')
         when:
-            def saveAll = ce.findMethod("saveAll").get()
-            def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll = ce.findMethod("saveAll").get()
+        def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            listTypeArgument.hasAnnotation(MyEntity.class)
-            listTypeArgument.hasAnnotation(Introspected.class)
+        listTypeArgument.hasAnnotation(MyEntity.class)
+        listTypeArgument.hasAnnotation(Introspected.class)
 
         when:
-            def saveAll2 = ce.findMethod("saveAll2").get()
-            def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll2 = ce.findMethod("saveAll2").get()
+        def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            listTypeArgument2.hasAnnotation(MyEntity.class)
-            listTypeArgument2.hasAnnotation(Introspected.class)
+        listTypeArgument2.hasAnnotation(MyEntity.class)
+        listTypeArgument2.hasAnnotation(Introspected.class)
 
         when:
-            def saveAll3 = ce.findMethod("saveAll3").get()
-            def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll3 = ce.findMethod("saveAll3").get()
+        def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            listTypeArgument3.hasAnnotation(MyEntity.class)
-            listTypeArgument3.hasAnnotation(Introspected.class)
+        listTypeArgument3.hasAnnotation(MyEntity.class)
+        listTypeArgument3.hasAnnotation(Introspected.class)
 
         when:
-            def save2 = ce.findMethod("save2").get()
-            def parameter2 = save2.getParameters()[0].getType()
+        def save2 = ce.findMethod("save2").get()
+        def parameter2 = save2.getParameters()[0].getType()
         then:
-            parameter2.hasAnnotation(MyEntity.class)
-            parameter2.hasAnnotation(Introspected.class)
+        parameter2.hasAnnotation(MyEntity.class)
+        parameter2.hasAnnotation(Introspected.class)
 
         when:
-            def save3 = ce.findMethod("save3").get()
-            def parameter3 = save3.getParameters()[0].getType()
+        def save3 = ce.findMethod("save3").get()
+        def parameter3 = save3.getParameters()[0].getType()
         then:
-            parameter3.hasAnnotation(MyEntity.class)
-            parameter3.hasAnnotation(Introspected.class)
+        parameter3.hasAnnotation(MyEntity.class)
+        parameter3.hasAnnotation(Introspected.class)
 
         when:
-            def get = ce.findMethod("get").get()
-            def returnType = get.getReturnType()
+        def get = ce.findMethod("get").get()
+        def returnType = get.getReturnType()
         then:
-            returnType.hasAnnotation(MyEntity.class)
-            returnType.hasAnnotation(Introspected.class)
+        returnType.hasAnnotation(MyEntity.class)
+        returnType.hasAnnotation(Introspected.class)
     }
 
     void "test alias for recursion"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -2351,14 +2349,14 @@ class MathServiceImpl implements MathService {
 
 ''')
         when:
-            def replaces = ce.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).get(0).getAnnotation(Replaces)
+        def replaces = ce.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).get(0).getAnnotation(Replaces)
         then:
-            replaces.stringValue("bean").get() == "test.MathService"
+        replaces.stringValue("bean").get() == "test.MathService"
     }
 
     void "test how the type annotations from the type are propagated"() {
         given:
-            ClassElement ce = buildClassElement('''\
+        ClassElement ce = buildClassElement('''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -2415,64 +2413,64 @@ class MyBean {
 
 ''')
         when:
-            def saveAll = ce.findMethod("saveAll").get()
-            def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll = ce.findMethod("saveAll").get()
+        def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument)
+        validateBookArgument(listTypeArgument)
 
         when:
-            def saveAll2 = ce.findMethod("saveAll2").get()
-            def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll2 = ce.findMethod("saveAll2").get()
+        def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument2)
+        validateBookArgument(listTypeArgument2)
 
         when:
-            def saveAll3 = ce.findMethod("saveAll3").get()
-            def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll3 = ce.findMethod("saveAll3").get()
+        def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument3)
+        validateBookArgument(listTypeArgument3)
 
         when:
-            def saveAll4 = ce.findMethod("saveAll4").get()
-            def listTypeArgument4 = saveAll4.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll4 = ce.findMethod("saveAll4").get()
+        def listTypeArgument4 = saveAll4.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument4)
+        validateBookArgument(listTypeArgument4)
 
         when:
-            def saveAll5 = ce.findMethod("saveAll5").get()
-            def listTypeArgument5 = saveAll5.getParameters()[0].getType().getTypeArguments(List).get("E")
+        def saveAll5 = ce.findMethod("saveAll5").get()
+        def listTypeArgument5 = saveAll5.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument5)
+        validateBookArgument(listTypeArgument5)
 
         when:
-            def save2 = ce.findMethod("save2").get()
-            def parameter2 = save2.getParameters()[0].getType()
+        def save2 = ce.findMethod("save2").get()
+        def parameter2 = save2.getParameters()[0].getType()
         then:
-            validateBookArgument(parameter2)
+        validateBookArgument(parameter2)
 
         when:
-            def save3 = ce.findMethod("save3").get()
-            def parameter3 = save3.getParameters()[0].getType()
+        def save3 = ce.findMethod("save3").get()
+        def parameter3 = save3.getParameters()[0].getType()
         then:
-            validateBookArgument(parameter3)
+        validateBookArgument(parameter3)
 
         when:
-            def save4 = ce.findMethod("save4").get()
-            def parameter4 = save4.getParameters()[0].getType()
+        def save4 = ce.findMethod("save4").get()
+        def parameter4 = save4.getParameters()[0].getType()
         then:
-            validateBookArgument(parameter4)
+        validateBookArgument(parameter4)
 
         when:
-            def save5 = ce.findMethod("save5").get()
-            def parameter5 = save5.getParameters()[0].getType()
+        def save5 = ce.findMethod("save5").get()
+        def parameter5 = save5.getParameters()[0].getType()
         then:
-            validateBookArgument(parameter5)
+        validateBookArgument(parameter5)
 
         when:
-            def get = ce.findMethod("get").get()
-            def returnType = get.getReturnType()
+        def get = ce.findMethod("get").get()
+        def returnType = get.getReturnType()
         then:
-            validateBookArgument(returnType)
+        validateBookArgument(returnType)
     }
 
     void validateBookArgument(ClassElement classElement) {
@@ -2507,28 +2505,28 @@ class Test {
 }
 ''')
         expect:
-            def method1 = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method1")).get()
-            def genericType = method1.getGenericReturnType()
-            def genericTypeLevel1 = genericType.getTypeArguments()["E"]
-            !genericTypeLevel1.isGenericPlaceholder()
-            !genericTypeLevel1.isWildcard()
-            def genericTypeLevel2 = genericTypeLevel1.getTypeArguments()["E"]
-            !genericTypeLevel2.isGenericPlaceholder()
-            !genericTypeLevel2.isWildcard()
-            def genericTypeLevel3 = genericTypeLevel2.getTypeArguments()["E"]
-            !genericTypeLevel3.isGenericPlaceholder()
-            !genericTypeLevel3.isWildcard()
+        def method1 = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method1")).get()
+        def genericType = method1.getGenericReturnType()
+        def genericTypeLevel1 = genericType.getTypeArguments()["E"]
+        !genericTypeLevel1.isGenericPlaceholder()
+        !genericTypeLevel1.isWildcard()
+        def genericTypeLevel2 = genericTypeLevel1.getTypeArguments()["E"]
+        !genericTypeLevel2.isGenericPlaceholder()
+        !genericTypeLevel2.isWildcard()
+        def genericTypeLevel3 = genericTypeLevel2.getTypeArguments()["E"]
+        !genericTypeLevel3.isGenericPlaceholder()
+        !genericTypeLevel3.isWildcard()
 
-            def type = method1.getReturnType()
-            def typeLevel1 = type.getTypeArguments()["E"]
-            !typeLevel1.isGenericPlaceholder()
-            !typeLevel1.isWildcard()
-            def typeLevel2 = typeLevel1.getTypeArguments()["E"]
-            !typeLevel2.isGenericPlaceholder()
-            !typeLevel2.isWildcard()
-            def typeLevel3 = typeLevel2.getTypeArguments()["E"]
-            !typeLevel3.isGenericPlaceholder()
-            !typeLevel3.isWildcard()
+        def type = method1.getReturnType()
+        def typeLevel1 = type.getTypeArguments()["E"]
+        !typeLevel1.isGenericPlaceholder()
+        !typeLevel1.isWildcard()
+        def typeLevel2 = typeLevel1.getTypeArguments()["E"]
+        !typeLevel2.isGenericPlaceholder()
+        !typeLevel2.isWildcard()
+        def typeLevel3 = typeLevel2.getTypeArguments()["E"]
+        !typeLevel3.isGenericPlaceholder()
+        !typeLevel3.isWildcard()
     }
 
     void "test generics model for wildcard"() {
@@ -2544,16 +2542,16 @@ class Test<T> {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+        def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+        !genericTypeArgument.isGenericPlaceholder()
+        !genericTypeArgument.isRawType()
+        genericTypeArgument.isWildcard()
 
-            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+        def typeArgument = method.getReturnType().getTypeArguments()["E"]
+        !typeArgument.isGenericPlaceholder()
+        !typeArgument.isRawType()
+        typeArgument.isWildcard()
     }
 
     void "test generics model for placeholder"() {
@@ -2569,16 +2567,16 @@ class Test<T> {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            !genericTypeArgument.isWildcard()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+        def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+        genericTypeArgument.isGenericPlaceholder()
+        !genericTypeArgument.isRawType()
+        !genericTypeArgument.isWildcard()
 
-            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            !typeArgument.isWildcard()
+        def typeArgument = method.getReturnType().getTypeArguments()["E"]
+        typeArgument.isGenericPlaceholder()
+        !typeArgument.isRawType()
+        !typeArgument.isWildcard()
     }
 
     void "test generics model for class placeholder wildcard"() {
@@ -2594,40 +2592,40 @@ class Test<T> {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+        def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+        !genericTypeArgument.isGenericPlaceholder()
+        !genericTypeArgument.isRawType()
+        genericTypeArgument.isWildcard()
 
-            def genericWildcard = genericTypeArgument as WildcardElement
-            !genericWildcard.lowerBounds
-            genericWildcard.upperBounds.size() == 1
-            def genericUpperBound = genericWildcard.upperBounds[0]
-            genericUpperBound.name == "java.lang.Object"
-            genericUpperBound.isGenericPlaceholder()
-            !genericUpperBound.isWildcard()
-            !genericUpperBound.isRawType()
-            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-            genericPlaceholderUpperBound.variableName == "T"
-            genericPlaceholderUpperBound.declaringElement.get() == ce
+        def genericWildcard = genericTypeArgument as WildcardElement
+        !genericWildcard.lowerBounds
+        genericWildcard.upperBounds.size() == 1
+        def genericUpperBound = genericWildcard.upperBounds[0]
+        genericUpperBound.name == "java.lang.Object"
+        genericUpperBound.isGenericPlaceholder()
+        !genericUpperBound.isWildcard()
+        !genericUpperBound.isRawType()
+        def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+        genericPlaceholderUpperBound.variableName == "T"
+        genericPlaceholderUpperBound.declaringElement.get() == ce
 
-            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+        def typeArgument = method.getReturnType().getTypeArguments()["E"]
+        !typeArgument.isGenericPlaceholder()
+        !typeArgument.isRawType()
+        typeArgument.isWildcard()
 
-            def wildcard = genericTypeArgument as WildcardElement
-            !wildcard.lowerBounds
-            wildcard.upperBounds.size() == 1
-            def upperBound = wildcard.upperBounds[0]
-            upperBound.name == "java.lang.Object"
-            upperBound.isGenericPlaceholder()
-            !upperBound.isWildcard()
-            !upperBound.isRawType()
-            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-            placeholderUpperBound.variableName == "T"
-            placeholderUpperBound.declaringElement.get() == ce
+        def wildcard = genericTypeArgument as WildcardElement
+        !wildcard.lowerBounds
+        wildcard.upperBounds.size() == 1
+        def upperBound = wildcard.upperBounds[0]
+        upperBound.name == "java.lang.Object"
+        upperBound.isGenericPlaceholder()
+        !upperBound.isWildcard()
+        !upperBound.isRawType()
+        def placeholderUpperBound = upperBound as GenericPlaceholderElement
+        placeholderUpperBound.variableName == "T"
+        placeholderUpperBound.declaringElement.get() == ce
     }
 
     void "test generics model for method placeholder wildcard"() {
@@ -2643,47 +2641,47 @@ class Test {
 }
 ''')
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-            method.getDeclaredTypeVariables().size() == 1
-            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
-            method.getDeclaredTypeVariables()[0].variableName == "T"
-            method.getDeclaredTypeArguments().size() == 1
-            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
-            placeholder.declaringElement.get() == method
-            placeholder.variableName == "T"
-            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+        def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+        method.getDeclaredTypeVariables().size() == 1
+        method.getDeclaredTypeVariables()[0].declaringElement.get() == method
+        method.getDeclaredTypeVariables()[0].variableName == "T"
+        method.getDeclaredTypeArguments().size() == 1
+        def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
+        placeholder.declaringElement.get() == method
+        placeholder.variableName == "T"
+        def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+        !genericTypeArgument.isGenericPlaceholder()
+        !genericTypeArgument.isRawType()
+        genericTypeArgument.isWildcard()
 
-            def genericWildcard = genericTypeArgument as WildcardElement
-            !genericWildcard.lowerBounds
-            genericWildcard.upperBounds.size() == 1
-            def genericUpperBound = genericWildcard.upperBounds[0]
-            genericUpperBound.name == "java.lang.Object"
-            genericUpperBound.isGenericPlaceholder()
-            !genericUpperBound.isWildcard()
-            !genericUpperBound.isRawType()
-            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-            genericPlaceholderUpperBound.variableName == "T"
-            genericPlaceholderUpperBound.declaringElement.get() == method
+        def genericWildcard = genericTypeArgument as WildcardElement
+        !genericWildcard.lowerBounds
+        genericWildcard.upperBounds.size() == 1
+        def genericUpperBound = genericWildcard.upperBounds[0]
+        genericUpperBound.name == "java.lang.Object"
+        genericUpperBound.isGenericPlaceholder()
+        !genericUpperBound.isWildcard()
+        !genericUpperBound.isRawType()
+        def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+        genericPlaceholderUpperBound.variableName == "T"
+        genericPlaceholderUpperBound.declaringElement.get() == method
 
-            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+        def typeArgument = method.getReturnType().getTypeArguments()["E"]
+        !typeArgument.isGenericPlaceholder()
+        !typeArgument.isRawType()
+        typeArgument.isWildcard()
 
-            def wildcard = genericTypeArgument as WildcardElement
-            !wildcard.lowerBounds
-            wildcard.upperBounds.size() == 1
-            def upperBound = wildcard.upperBounds[0]
-            upperBound.name == "java.lang.Object"
-            upperBound.isGenericPlaceholder()
-            !upperBound.isWildcard()
-            !upperBound.isRawType()
-            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-            placeholderUpperBound.variableName == "T"
-            placeholderUpperBound.declaringElement.get() == method
+        def wildcard = genericTypeArgument as WildcardElement
+        !wildcard.lowerBounds
+        wildcard.upperBounds.size() == 1
+        def upperBound = wildcard.upperBounds[0]
+        upperBound.name == "java.lang.Object"
+        upperBound.isGenericPlaceholder()
+        !upperBound.isWildcard()
+        !upperBound.isRawType()
+        def placeholderUpperBound = upperBound as GenericPlaceholderElement
+        placeholderUpperBound.variableName == "T"
+        placeholderUpperBound.declaringElement.get() == method
     }
 
     void "test generics model for constructor placeholder wildcard"() {
@@ -2698,47 +2696,47 @@ class Test {
 }
 ''')
         expect:
-            def method = ce.getPrimaryConstructor().get()
-            method.getDeclaredTypeVariables().size() == 1
-            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
-            method.getDeclaredTypeVariables()[0].variableName == "T"
-            method.getDeclaredTypeArguments().size() == 1
-            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
-            placeholder.declaringElement.get() == method
-            placeholder.variableName == "T"
-            def genericTypeArgument = method.getParameters()[0].getGenericType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+        def method = ce.getPrimaryConstructor().get()
+        method.getDeclaredTypeVariables().size() == 1
+        method.getDeclaredTypeVariables()[0].declaringElement.get() == method
+        method.getDeclaredTypeVariables()[0].variableName == "T"
+        method.getDeclaredTypeArguments().size() == 1
+        def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
+        placeholder.declaringElement.get() == method
+        placeholder.variableName == "T"
+        def genericTypeArgument = method.getParameters()[0].getGenericType().getTypeArguments()["E"]
+        !genericTypeArgument.isGenericPlaceholder()
+        !genericTypeArgument.isRawType()
+        genericTypeArgument.isWildcard()
 
-            def genericWildcard = genericTypeArgument as WildcardElement
-            !genericWildcard.lowerBounds
-            genericWildcard.upperBounds.size() == 1
-            def genericUpperBound = genericWildcard.upperBounds[0]
-            genericUpperBound.name == "java.lang.Object"
-            genericUpperBound.isGenericPlaceholder()
-            !genericUpperBound.isWildcard()
-            !genericUpperBound.isRawType()
-            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-            genericPlaceholderUpperBound.variableName == "T"
-            genericPlaceholderUpperBound.declaringElement.get() == method
+        def genericWildcard = genericTypeArgument as WildcardElement
+        !genericWildcard.lowerBounds
+        genericWildcard.upperBounds.size() == 1
+        def genericUpperBound = genericWildcard.upperBounds[0]
+        genericUpperBound.name == "java.lang.Object"
+        genericUpperBound.isGenericPlaceholder()
+        !genericUpperBound.isWildcard()
+        !genericUpperBound.isRawType()
+        def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+        genericPlaceholderUpperBound.variableName == "T"
+        genericPlaceholderUpperBound.declaringElement.get() == method
 
-            def typeArgument = method.getParameters()[0].getType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+        def typeArgument = method.getParameters()[0].getType().getTypeArguments()["E"]
+        !typeArgument.isGenericPlaceholder()
+        !typeArgument.isRawType()
+        typeArgument.isWildcard()
 
-            def wildcard = genericTypeArgument as WildcardElement
-            !wildcard.lowerBounds
-            wildcard.upperBounds.size() == 1
-            def upperBound = wildcard.upperBounds[0]
-            upperBound.name == "java.lang.Object"
-            upperBound.isGenericPlaceholder()
-            !upperBound.isWildcard()
-            !upperBound.isRawType()
-            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-            placeholderUpperBound.variableName == "T"
-            placeholderUpperBound.declaringElement.get() == method
+        def wildcard = genericTypeArgument as WildcardElement
+        !wildcard.lowerBounds
+        wildcard.upperBounds.size() == 1
+        def upperBound = wildcard.upperBounds[0]
+        upperBound.name == "java.lang.Object"
+        upperBound.isGenericPlaceholder()
+        !upperBound.isWildcard()
+        !upperBound.isRawType()
+        def placeholderUpperBound = upperBound as GenericPlaceholderElement
+        placeholderUpperBound.variableName == "T"
+        placeholderUpperBound.declaringElement.get() == method
     }
 
     void "test generics equality"() {
@@ -2795,40 +2793,40 @@ class Test<T extends Number> {
 }
 ''')
         expect:
-            def numberType = ce.getFields()[0].getType()
-            def constructor = ce.getPrimaryConstructor().get()
-            constructor.getParameters()[0].getGenericType().getTypeArguments(List).get("E") == numberType
-            constructor.getParameters()[0].getType().getTypeArguments(List).get("E") == numberType
+        def numberType = ce.getFields()[0].getType()
+        def constructor = ce.getPrimaryConstructor().get()
+        constructor.getParameters()[0].getGenericType().getTypeArguments(List).get("E") == numberType
+        constructor.getParameters()[0].getType().getTypeArguments(List).get("E") == numberType
 
-            ce.findMethod("method1").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
-            ce.findMethod("method1").get().getReturnType().getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method1").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method1").get().getReturnType().getTypeArguments(List).get("E") == numberType
 
-            ce.findMethod("method2").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
-            ce.findMethod("method2").get().getReturnType().getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method2").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method2").get().getReturnType().getTypeArguments(List).get("E") == numberType
 
-            ce.findMethod("method3").get().getGenericReturnType() == numberType
-            ce.findMethod("method3").get().getReturnType() == numberType
+        ce.findMethod("method3").get().getGenericReturnType() == numberType
+        ce.findMethod("method3").get().getReturnType() == numberType
 
-            ce.findMethod("method4").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-            ce.findMethod("method4").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method4").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method4").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
 
-            ce.findMethod("method5").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-            ce.findMethod("method5").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method5").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+        ce.findMethod("method5").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
 
-            ce.findMethod("method6").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-            ce.findMethod("method6").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method6").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method6").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
 
-            ce.findMethod("method7").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-            ce.findMethod("method7").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method7").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method7").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
 
-            ce.findMethod("method8").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-            ce.findMethod("method8").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method8").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method8").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
 
-            ce.findMethod("method9").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-            ce.findMethod("method9").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method9").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method9").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
 
-            ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-            ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+        ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
     }
 
     void "test inherit parameter annotation"() {
@@ -2852,7 +2850,7 @@ class UserController implements MyApi {
 
 ''')
         expect:
-            ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
+        ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
     }
 
     void "test interface placeholder"() {
@@ -2885,17 +2883,17 @@ class MyBean {
 ''')
 
         when:
-            def repo = ce.getTypeArguments("test.Repo")
+        def repo = ce.getTypeArguments("test.Repo")
         then:
-            repo.get("E").simpleName == "MyBean"
-            repo.get("E").getMethods().size() == 2
-            repo.get("E").getFields().size() == 1
+        repo.get("E").simpleName == "MyBean"
+        repo.get("E").getMethods().size() == 2
+        repo.get("E").getFields().size() == 1
         when:
-            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        def genRepo = ce.getTypeArguments("test.GenericRepository")
         then:
-            genRepo.get("E").simpleName == "MyBean"
-            genRepo.get("E").getMethods().size() == 2
-            genRepo.get("E").getFields().size() == 1
+        genRepo.get("E").simpleName == "MyBean"
+        genRepo.get("E").getMethods().size() == 2
+        genRepo.get("E").getFields().size() == 1
     }
 
     void "test interface type annotations"() {
@@ -2932,10 +2930,28 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("save").get()
-            def type = method.parameters[0].getGenericType()
+        def method = ce.findMethod("save").get()
+        def type = method.parameters[0].getGenericType()
         then:
-            type.hasAnnotation(Valid)
+        type.hasAnnotation(Valid)
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/10042')
+    void "private record"() {
+        given:
+        def outerElement = buildClassElement("""
+package test;
+
+class Outer {
+    private record Rec(String foo) {
+
+    }
+}
+""")
+        def recordElement = outerElement.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get()
+
+        expect:
+        recordElement.getPrimaryConstructor().isEmpty()
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method"() {
@@ -2972,13 +2988,13 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
-            def type = method.getGenericReturnType()
+        def method = ce.findMethod("findById").get()
+        def type = method.getGenericReturnType()
         then:
-            method.getAnnotationNames().isEmpty()
-            method.getReturnType().isEmpty()
-            type.hasAnnotation(NotNull)
-            !type.hasAnnotation(Null)
+        method.getAnnotationNames().isEmpty()
+        method.getReturnType().isEmpty()
+        type.hasAnnotation(NotNull)
+        !type.hasAnnotation(Null)
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method different order"() {
@@ -3015,13 +3031,13 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
-            def type = method.getGenericReturnType()
+        def method = ce.findMethod("findById").get()
+        def type = method.getGenericReturnType()
         then:
-            method.getAnnotationNames().isEmpty()
-            method.getReturnType().isEmpty()
-            !type.hasAnnotation(NotNull)
-            type.hasAnnotation(Null)
+        method.getAnnotationNames().isEmpty()
+        method.getReturnType().isEmpty()
+        !type.hasAnnotation(NotNull)
+        type.hasAnnotation(Null)
     }
 
     void "test interface with conflicting method having not inherited method annotations"() {
@@ -3058,12 +3074,12 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
+        def method = ce.findMethod("findById").get()
         then:
-            method.getReturnType().isEmpty()
-            method.getGenericReturnType().isEmpty()
-            method.hasAnnotation(NotNull)
-            !method.hasAnnotation(Null)
+        method.getReturnType().isEmpty()
+        method.getGenericReturnType().isEmpty()
+        method.hasAnnotation(NotNull)
+        !method.hasAnnotation(Null)
     }
 
     void "test interface with type with inherited generic annotations and conflicting method"() {
@@ -3128,13 +3144,13 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
-            def type = method.getGenericReturnType()
+        def method = ce.findMethod("findById").get()
+        def type = method.getGenericReturnType()
         then:
-            method.getAnnotationNames().isEmpty()
-            method.getReturnType().isEmpty()
-            type.hasAnnotation("test.MyAnnotation1")
-            !type.hasAnnotation("test.MyAnnotation2")
+        method.getAnnotationNames().isEmpty()
+        method.getReturnType().isEmpty()
+        type.hasAnnotation("test.MyAnnotation1")
+        !type.hasAnnotation("test.MyAnnotation2")
     }
 
     void "test interface with conflicting method having inherited method annotations"() {
@@ -3199,13 +3215,13 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
+        def method = ce.findMethod("findById").get()
         then:
-            method.getAnnotationNames() == ["test.MyAnnotation1"] as Set
-            method.getGenericReturnType().isEmpty()
-            method.getReturnType().isEmpty()
-            method.getGenericReturnType().getType().isEmpty()
-            method.getReturnType().getGenericType().isEmpty()
+        method.getAnnotationNames() == ["test.MyAnnotation1"] as Set
+        method.getGenericReturnType().isEmpty()
+        method.getReturnType().isEmpty()
+        method.getGenericReturnType().getType().isEmpty()
+        method.getReturnType().getGenericType().isEmpty()
     }
 
     void "test interface with conflicting method having inherited method parameter annotations"() {
@@ -3270,11 +3286,37 @@ class MyBean {
 ''')
 
         when:
-            def method = ce.findMethod("findById").get()
+        def method = ce.findMethod("findById").get()
         then:
-            method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
-            method.getParameters()[0].getType().getAnnotationNames().isEmpty()
-            method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+        method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
+        method.getParameters()[0].getType().getAnnotationNames().isEmpty()
+        method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+    }
+
+    void "test similar methods with arrays"() {
+        ClassElement ce = buildClassElement('''
+package test;
+
+import io.micronaut.aop.Introduction;
+
+@Introduction
+interface MyInterface {
+
+    String process(String str);
+
+    String process(String str, int intParam);
+
+    String process2(String str, int intParam);
+
+    String process(String str, int intArrayParam[]);
+}
+
+''')
+
+        when:
+        def methods = ce.getMethods();
+        then:
+        methods.size() == 4
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

@@ -1,7 +1,6 @@
 package io.micronaut.inject.context.register
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -9,7 +8,7 @@ class RegisterASingletonWithDifferentQualifierSpec extends Specification {
 
     def "test registering the same singleton class with a different qualifier"() {
         given:
-            def ctx = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run()
 
         when:
             def q1 = ctx.createBean(Abc, Qualifiers.none())

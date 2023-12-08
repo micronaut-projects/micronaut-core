@@ -15,13 +15,10 @@
  */
 package io.micronaut.inject.constructor
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 25/05/2017.
  */
@@ -29,8 +26,7 @@ class ConstructorWithInterfaceSpec extends Specification {
 
     void "test injection with constructor with an interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"
         B b =  context.getBean(B)
@@ -38,6 +34,9 @@ class ConstructorWithInterfaceSpec extends Specification {
         then:"The implementation is injected"
         b.a != null
         b.a instanceof AImpl
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

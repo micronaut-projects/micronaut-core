@@ -16,17 +16,17 @@
 package io.micronaut.docs.server.uris;
 
 import io.micronaut.http.uri.UriMatchTemplate;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class UriTemplateTest {
+class UriTemplateTest {
 
     @Test
-    public void testUriTemplate() {
+    void testUriTemplate() {
 
         // tag::match[]
         UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}");

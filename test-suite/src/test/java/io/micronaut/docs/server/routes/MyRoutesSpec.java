@@ -18,28 +18,28 @@ package io.micronaut.docs.server.routes;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class MyRoutesSpec {
+class MyRoutesSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -49,7 +49,7 @@ public class MyRoutesSpec {
     }
 
     @Test
-    public void testCustomRoute() throws Exception {
+    void testCustomRoute() {
         String body = client.toBlocking().retrieve("/issues/show/12"); // <3>
 
         assertNotNull(body);

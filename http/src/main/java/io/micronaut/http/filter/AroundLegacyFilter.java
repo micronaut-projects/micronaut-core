@@ -53,6 +53,11 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
     }
 
     @Override
+    public boolean hasContinuation() {
+        return true;
+    }
+
+    @Override
     public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
         // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended

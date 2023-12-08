@@ -15,19 +15,19 @@
  */
 package io.micronaut.docs.config.env;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class EnvironmentTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class EnvironmentTest {
 
     @Test
-    public void testRunEnvironment() {
+    void testRunEnvironment() {
         // tag::env[]
         ApplicationContext applicationContext = ApplicationContext.run("test", "android");
         Environment environment = applicationContext.getEnvironment();
@@ -40,7 +40,7 @@ public class EnvironmentTest {
     }
 
     @Test
-    public void testRunEnvironmentWithProperties() {
+    void testRunEnvironmentWithProperties() {
         // tag::envProps[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 PropertySource.of(
@@ -53,10 +53,7 @@ public class EnvironmentTest {
                 "test", "android");
         Environment environment = applicationContext.getEnvironment();
 
-        assertEquals(
-                "foo",
-                environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
-        );
+        assertEquals("foo", environment.getProperty("micronaut.server.host", String.class).orElse("localhost"));
         // end::envProps[]
 
         applicationContext.close();

@@ -30,9 +30,9 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import spock.lang.Retry;
 
@@ -42,10 +42,11 @@ import java.util.Map;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Retry
-public class ThirdPartyClientFilterSpec {
+class ThirdPartyClientFilterSpec {
+
     private static final String token = "XXXX";
     private static final String username = "john";
 
@@ -55,8 +56,8 @@ public class ThirdPartyClientFilterSpec {
 
     private String result;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", ThirdPartyClientFilterSpec.class.getSimpleName());
         map.put("bintray.username", username);
@@ -67,8 +68,8 @@ public class ThirdPartyClientFilterSpec {
         client = context.createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if (server != null) {
             server.stop();
         }
@@ -78,7 +79,7 @@ public class ThirdPartyClientFilterSpec {
     }
 
     @Test
-    public void aClientFilterIsAppliedToTheRequestAndAddsTheAuthroizationHeader() {
+    void aClientFilterIsAppliedToTheRequestAndAddsTheAuthroizationHeader() {
 
         BintrayService bintrayService = context.getBean(BintrayService.class);
 
@@ -98,7 +99,7 @@ public class ThirdPartyClientFilterSpec {
     @Controller("/repos")
     static class HeaderController {
 
-        @Get(value = "/grails")
+        @Get("/grails")
         String echoAuthorization(@Header String authorization) {
             return authorization;
         }

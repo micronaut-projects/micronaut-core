@@ -59,7 +59,7 @@ class Foo {
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (element.hasAnnotation(AnnotationUtil.SINGLETON)){
+            if (element.hasAnnotation(AnnotationUtil.SINGLETON)) {
 
                 context.getClassElement(TestBeanScheduled.class)
                         .ifPresent((scheduled) -> {

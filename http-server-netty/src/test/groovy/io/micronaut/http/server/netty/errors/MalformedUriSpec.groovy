@@ -10,6 +10,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.RequestFilter
+import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
@@ -54,6 +56,14 @@ class MalformedUriSpec extends Specification {
         result == 'Exception: Illegal character in path at index 11: /malformed/[]'
     }
 
+    void "test normal filter is not called for invalid uri"() {
+        when:
+        def result = new URL("$embeddedServer.URL/malformed-proxy/[]").text
+
+        then:
+        result == 'Exception: Illegal character in path at index 17: /malformed-proxy/[]'
+    }
+
     @Requires(property = "spec.name", value = "MalformedUriSpec")
     @Controller('/malformed')
     static class SomeController {
@@ -80,6 +90,17 @@ class MalformedUriSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             filterCalled = true
             return chain.proceed(request)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "MalformedUriSpec")
+    @Singleton
+    @ServerFilter("/malformed-proxy/**")
+    static class MalformedUriFilter {
+
+        @RequestFilter
+        HttpResponse<?> filter(HttpRequest<?> request) {
+            return HttpResponse.ok("ok: " + request.path)
         }
     }
 }

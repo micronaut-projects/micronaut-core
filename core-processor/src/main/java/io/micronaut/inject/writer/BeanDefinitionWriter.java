@@ -3124,7 +3124,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         methodVisitor.loadArg(0);
         // load BeanContext arg 2
         methodVisitor.loadArg(1);
-        // load object being inject arg 3
+        // load object being injected arg 3
         methodVisitor.loadArg(2);
         pushInvokeMethodOnSuperClass(methodVisitor, methodToInvoke);
     }
@@ -3136,7 +3136,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         methodVisitor.loadArg(0);
         // load BeanContext arg 2
         methodVisitor.loadArg(1);
-        // load object being inject arg 3
+        // load object being injected arg 3
         methodVisitor.loadArg(2);
         pushInvokeMethodOnSuperClass(methodVisitor, methodToInvoke);
     }
@@ -3244,7 +3244,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private int pushGetFactoryBean(ClassElement factoryClass, Type factoryType, GeneratorAdapter buildMethodVisitor) {
         invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
-        // for Factory beans first we need to lookup the factory bean
+        // for Factory beans first we need to look up the factory bean
         // before invoking the method to instantiate
         // the below code looks up the factory bean.
 

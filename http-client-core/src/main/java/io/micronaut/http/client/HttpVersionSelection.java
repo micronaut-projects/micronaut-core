@@ -23,6 +23,7 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.annotation.Client;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * This class collects information about HTTP client protocol version settings, such as the
@@ -194,6 +195,25 @@ public final class HttpVersionSelection {
     @Internal
     public boolean isHttp3() {
         return http3;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        HttpVersionSelection that = (HttpVersionSelection) o;
+        return alpn == that.alpn && http2CipherSuites == that.http2CipherSuites && http3 == that.http3 && plaintextMode == that.plaintextMode && Arrays.equals(alpnSupportedProtocols, that.alpnSupportedProtocols);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(plaintextMode, alpn, http2CipherSuites, http3);
+        result = 31 * result + Arrays.hashCode(alpnSupportedProtocols);
+        return result;
     }
 
     /**

@@ -31,9 +31,6 @@ dependencies {
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
-    if (!JavaVersion.current().isJava9Compatible()) {
-        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    }
     testImplementation libs.systemlambda
 }
 

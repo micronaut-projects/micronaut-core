@@ -2,8 +2,12 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.type.Argument
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpAttributes
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
@@ -23,7 +27,7 @@ class OptionsRequestAttributesSpec extends Specification {
 
     def 'test OPTIONS requests attributes'() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'OptionsRequestAttributesSpec'])
-        def ctx = server.applicationContext
+        ApplicationContext ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
@@ -32,6 +36,36 @@ class OptionsRequestAttributesSpec extends Specification {
         then:
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
+
+        cleanup:
+        ctx.close()
+        server.close()
+    }
+
+    def 'test OPTIONS requests attributes with micronaut.server.dispatch-options-requests enabled'() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'OptionsRequestAttributesSpec', 'micronaut.server.dispatch-options-requests': StringUtils.TRUE])
+        ApplicationContext ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
+
+        when:
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.OPTIONS('/foo'), String)
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+
+        when:
+        List<String> allowedMethods = response.getHeaders().get(HttpHeaders.ALLOW, Argument.of(List.class, Argument.of(String.class))).orElse(new ArrayList<>())
+
+        then:
+        3 == allowedMethods.size()
+        allowedMethods.contains('GET')
+        allowedMethods.contains('OPTIONS')
+        allowedMethods.contains('HEAD')
+
+        cleanup:
+        ctx.close()
+        server.close()
     }
 
     @Singleton

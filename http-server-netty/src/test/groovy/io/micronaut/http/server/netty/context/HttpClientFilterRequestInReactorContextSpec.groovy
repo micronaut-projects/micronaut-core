@@ -23,6 +23,8 @@ import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Specification
@@ -116,6 +118,7 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Get("/foo")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
+        @ExecuteOn(TaskExecutors.BLOCKING)
         String foo() {
             fooClient.hello()
         }
@@ -123,6 +126,7 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Get("/bar")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
+        @ExecuteOn(TaskExecutors.BLOCKING)
         String bar() {
             fooClient.hello()
         }

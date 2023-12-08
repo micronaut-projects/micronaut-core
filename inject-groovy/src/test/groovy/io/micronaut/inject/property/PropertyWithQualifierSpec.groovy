@@ -16,6 +16,7 @@
 package io.micronaut.inject.property
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
@@ -64,8 +65,7 @@ interface SomeInterface {
 
     void "test that a property with a qualifier is injected correctly"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b = context.getBean(B)
@@ -73,6 +73,9 @@ interface SomeInterface {
         then:
         b.a instanceof OneA
         b.a2 instanceof TwoA
+
+        cleanup:
+        context.close()
     }
 
     static class B {

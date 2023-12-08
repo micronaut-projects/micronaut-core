@@ -30,6 +30,9 @@ import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.codec.http.LastHttpContent
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
+import io.netty.handler.codec.http.LastHttpContent
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import spock.lang.Issue
@@ -514,6 +517,106 @@ class PipeliningServerHandlerSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+    }
+
+    def 'read backpressure for streaming requests'() {
+        given:
+        def mon = new MonitorHandler()
+        Subscription subscription = null
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                ((StreamedHttpRequest) request).subscribe(new Subscriber<HttpContent>() {
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        subscription = s
+                    }
+
+                    @Override
+                    void onNext(HttpContent httpContent) {
+                        httpContent.release()
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                        t.printStackTrace()
+                    }
+
+                    @Override
+                    void onComplete() {
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                    }
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        expect:
+        mon.read == 1
+        mon.flush == 0
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        req.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        ch.writeInbound(req)
+        then:
+        // no read call until request
+        mon.read == 1
+
+        when:
+        subscription.request(1)
+        then:
+        mon.read == 2
+
+        when:
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))))
+        then:
+        // read call for the next request
+        mon.read == 3
+        ch.checkException()
+    }
+
+    def 'empty streaming response while in queue'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<HttpContent>onBackpressureBuffer()
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            int i = 0
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                if (i++ == 0) {
+                    outboundAccess.writeStreamed(resp, sink.asFlux())
+                } else {
+                    outboundAccess.writeStreamed(resp, Flux.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        then:
+        ch.readOutbound() == null
+
+        when:
+        sink.tryEmitComplete()
+        then:
+        ch.readOutbound() == resp
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == resp
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == null
     }
 
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {

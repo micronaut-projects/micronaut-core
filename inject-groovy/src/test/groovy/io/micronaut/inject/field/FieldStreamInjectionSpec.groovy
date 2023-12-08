@@ -16,23 +16,20 @@
 package io.micronaut.inject.field
 
 import groovy.transform.PackageScope
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
-
+import io.micronaut.context.ApplicationContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Specification
+
 import java.util.stream.Collectors
 import java.util.stream.Stream
-
 /**
  * Created by graemerocher on 26/05/2017.
  */
 class FieldStreamInjectionSpec extends Specification {
     void "test injection via field that takes a stream"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         B b =  context.getBean(B)
@@ -43,6 +40,9 @@ class FieldStreamInjectionSpec extends Specification {
         b.all.contains(context.getBean(AImpl))
         b.another.count() == 2
         b.another2.count() == 2
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

@@ -276,7 +276,7 @@ public interface ApplicationContextBuilder {
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.
      *
      * @param type         The type of the bean to run
-     * @param <T>          The type, a subclass of {@link AutoCloseable}. The close method of the implementation should shutdown the context.
+     * @param <T>          The type, a subclass of {@link AutoCloseable}. The close method of the implementation should shut down the context.
      * @return The running bean
      */
     default @NonNull <T extends AutoCloseable> T run(@NonNull Class<T> type) {

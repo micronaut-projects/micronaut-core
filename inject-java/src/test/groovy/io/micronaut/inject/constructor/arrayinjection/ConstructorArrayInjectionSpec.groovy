@@ -15,18 +15,15 @@
  */
 package io.micronaut.inject.constructor.arrayinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
 
 class ConstructorArrayInjectionSpec extends AbstractTypeElementSpec {
 
     void "test array injection with constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)
@@ -36,6 +33,9 @@ class ConstructorArrayInjectionSpec extends AbstractTypeElementSpec {
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
         b.all.contains(context.getBean(AnotherImpl))
+
+        cleanup:
+        context.close()
     }
 
 

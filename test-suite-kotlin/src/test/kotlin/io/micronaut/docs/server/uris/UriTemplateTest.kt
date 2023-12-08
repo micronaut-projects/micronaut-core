@@ -1,19 +1,19 @@
 package io.micronaut.docs.server.uris
 
+import io.kotest.core.spec.style.AnnotationSpec
+import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.shouldBe
 import io.micronaut.http.uri.UriMatchTemplate
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
-class UriTemplateTest {
+class UriTemplateTest: AnnotationSpec() {
 
     @Test
     fun testUriTemplate() {
         // tag::match[]
         val template = UriMatchTemplate.of("/hello/{name}")
 
-        assertTrue(template.match("/hello/John").isPresent) // <1>
-        assertEquals("/hello/John", template.expand(mapOf("name" to "John")))  // <2>
+        template.match("/hello/John").isPresent.shouldBeTrue() // <1>
+        template.expand(mapOf("name" to "John")) shouldBe "/hello/John"  // <2>
         // end::match[]
     }
 }

@@ -54,6 +54,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final ExecutorSelector executorSelector;
     private boolean noExecutor;
 
+    @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
                                UriMatchTemplate uriMatchTemplate,
                                Charset defaultCharset,
@@ -88,7 +89,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public Optional<UriRouteMatch<T, R>> match(String uri) {
-        return uriMatchTemplate.match(uri).map(info -> new DefaultUriRouteMatch<>(info, this, defaultCharset, conversionService));
+        return Optional.ofNullable(tryMatch(uri));
     }
 
     @Override

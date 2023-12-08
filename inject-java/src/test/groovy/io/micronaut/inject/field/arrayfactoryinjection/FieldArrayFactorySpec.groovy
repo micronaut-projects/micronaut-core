@@ -15,15 +15,14 @@
  */
 package io.micronaut.inject.field.arrayfactoryinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 class FieldArrayFactorySpec extends Specification {
 
-    @Shared @AutoCleanup BeanContext context = BeanContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
 
     void "test injection with field supplied by a provider"() {
         when:"A bean is obtained which has a field that depends on a bean provided by a provider"

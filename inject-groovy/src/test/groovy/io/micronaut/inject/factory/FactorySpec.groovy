@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.factory
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Bean
@@ -35,16 +36,18 @@ class FactorySpec extends Specification {
 
     void "test factory definition"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
-        beanContext.getBean(BFactory)
-        beanContext.getBean(B) != null
-        beanContext.getBean(B) == beanContext.getBean(B)
-        beanContext.getBean(C) != beanContext.getBean(C)
-        beanContext.getBean(C).b == beanContext.getBean(B)
-        beanContext.getBean(B).name == "FROMFACTORY"
+        context.getBean(BFactory)
+        context.getBean(B) != null
+        context.getBean(B) == context.getBean(B)
+        context.getBean(C) != context.getBean(C)
+        context.getBean(C).b == context.getBean(B)
+        context.getBean(B).name == "FROMFACTORY"
 
+        cleanup:
+        context.close()
     }
 
     static class B {

@@ -17,20 +17,20 @@ package io.micronaut.docs.inject.generated;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
 public class VerifyDefinitionInjectionSpec {
 
     @Test
     public void test() {
-        BeanContext beanContext = BeanContext.run();
+        ApplicationContext context = ApplicationContext.run();
 
-        MainBean mainBean = beanContext.getBean(MainBean.class);
+        MainBean mainBean = context.getBean(MainBean.class);
 
         assertTrue(mainBean.check());
 
-        beanContext.stop();
+        context.stop();
     }
 
 }

@@ -201,7 +201,7 @@ class CircuitBreakerRetry implements MutableRetryState {
                     eventPublisher.publishEvent(new CircuitOpenEvent(method, childState, cause));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing CircuitOpen event: " + e.getMessage(), e);
+                        LOG.error("Error publishing CircuitOpen event: {}", e.getMessage(), e);
                     }
                 }
             }
@@ -229,7 +229,7 @@ class CircuitBreakerRetry implements MutableRetryState {
                     eventPublisher.publishEvent(new CircuitClosedEvent(method));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing CircuitClosedEvent: " + e.getMessage(), e);
+                        LOG.error("Error publishing CircuitClosedEvent: {}", e.getMessage(), e);
                     }
                 }
             }

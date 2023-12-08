@@ -70,6 +70,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static io.micronaut.inject.annotation.AnnotationMetadataWriter.isSupportedMapValue;
 
@@ -1880,6 +1881,18 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     private static void invokeInterfaceStatic(GeneratorAdapter methodVisitor, Type type, org.objectweb.asm.commons.Method method) {
         methodVisitor.visitMethodInsn(INVOKESTATIC, type.getInternalName(), method.getName(), method.getDescriptor(), true);
+    }
+
+    /**
+     * @param p The class element
+     * @return The string representation
+     */
+    protected static String toTypeString(ClassElement p) {
+        String name = p.getName();
+        if (p.isArray()) {
+            return name + IntStream.range(0, p.getArrayDimensions()).mapToObj(ignore -> "[]").collect(Collectors.joining());
+        }
+        return name;
     }
 
 }

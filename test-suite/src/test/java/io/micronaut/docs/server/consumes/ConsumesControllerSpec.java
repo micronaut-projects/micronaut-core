@@ -23,28 +23,30 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-public class ConsumesControllerSpec {
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+class ConsumesControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass
-    public static void setupServer() {
+    @BeforeAll
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "consumesspec"));
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass
-    public static void stopServer() {
+    @AfterAll
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -54,28 +56,28 @@ public class ConsumesControllerSpec {
     }
 
     @Test
-    public void testConsumes() {
+    void testConsumes() {
         Book book = new Book();
         book.title = "The Stand";
         book.pages = 1000;
 
-        Assertions.assertThrows(HttpClientResponseException.class, () ->
+        assertThrows(HttpClientResponseException.class, () ->
             client.toBlocking().exchange(HttpRequest.POST("/consumes", book)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)));
 
-        Assertions.assertDoesNotThrow(() ->
+        assertDoesNotThrow(() ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes", book)
                         .contentType(MediaType.APPLICATION_JSON)));
 
-        Assertions.assertDoesNotThrow(() ->
+        assertDoesNotThrow(() ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/multiple", book)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)));
 
-        Assertions.assertDoesNotThrow(() ->
+        assertDoesNotThrow(() ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/multiple", book)
                 .contentType(MediaType.APPLICATION_JSON)));
 
-        Assertions.assertThrows(CodecException.class, () ->
+        assertThrows(CodecException.class, () ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/member", book)
                 .contentType(MediaType.TEXT_PLAIN)));
     }

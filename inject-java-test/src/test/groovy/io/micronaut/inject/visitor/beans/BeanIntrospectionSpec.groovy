@@ -973,18 +973,13 @@ public class CopyMe {
         result.another == 'CHANGED'
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test secondary constructor for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test;
 
-import io.micronaut.core.annotation.Creator;
-import java.util.List;
-import jakarta.validation.constraints.Min;
-
 @io.micronaut.core.annotation.Introspected
-public record Foo(int x, int y){
+public record Foo(int x, int y) {
     public Foo(int x) {
         this(x, 20);
     }
@@ -1001,19 +996,14 @@ public record Foo(int x, int y){
         obj.y() == 10
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/8187')
     void "test secondary constructor for Java 14+ records with initializer"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test;
 
-import io.micronaut.core.annotation.Creator;
-import java.util.List;
-import jakarta.validation.constraints.Min;
-
 @io.micronaut.core.annotation.Introspected
-public record Foo(int x, int y){
+public record Foo(int x, int y) {
     public Foo {
         if (x < 0) {
             throw new IllegalArgumentException("Invalid argument");
@@ -1061,7 +1051,6 @@ public record Foo(@JsonProperty("other") String name, @JsonIgnore int y) {
         result == '{"other":"test"}'
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test secondary constructor with @Creator for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
@@ -1072,7 +1061,7 @@ import java.util.List;
 import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(int x, int y){
+public record Foo(int x, int y) {
     @Creator
     public Foo(int x) {
         this(x, 20);
@@ -1090,18 +1079,17 @@ public record Foo(int x, int y){
         obj.y() == 20
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test;
 
-import io.micronaut.core.annotation.Creator;
-import java.util.List;
 import jakarta.validation.constraints.Min;
 
+import java.util.List;
+
 @io.micronaut.core.annotation.Introspected
-public record Foo(List<@Min(10) Long> value){
+public record Foo(List<@Min(10) Long> value) {
 }
 ''')
         when:
@@ -1115,7 +1103,6 @@ public record Foo(List<@Min(10) Long> value){
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
 
-    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on generic type arguments'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
@@ -1158,16 +1145,13 @@ public class Foo {
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
 
-    @IgnoreIf({ !jvm.isJava14Compatible() })
     void "test bean introspection on a Java 14+ record"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test;
 
-import io.micronaut.core.annotation.Creator;
-
 @io.micronaut.core.annotation.Introspected
-public record Foo(@jakarta.validation.constraints.NotBlank String name, int age){
+public record Foo(@jakarta.validation.constraints.NotBlank String name, int age) {
 }
 ''')
         when:
@@ -4644,7 +4628,6 @@ class MyConfig {
         beanIntrospection.propertyNames as List<String> == ["deleted", "updated", "name"]
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test records with is in the property name"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''\

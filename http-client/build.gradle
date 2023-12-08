@@ -45,10 +45,8 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation libs.wiremock
     testImplementation libs.logback.classic
+    testImplementation libs.bcpkix
 
-    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation libs.bcpkix
-    }
     testRuntimeOnly(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"

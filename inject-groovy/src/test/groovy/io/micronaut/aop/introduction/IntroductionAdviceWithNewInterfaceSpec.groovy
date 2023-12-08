@@ -16,6 +16,7 @@
 package io.micronaut.aop.introduction
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
@@ -54,8 +55,7 @@ class MyBean  {
         ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
 
@@ -65,6 +65,8 @@ class MyBean  {
         instance.onApplicationEvent(new Object()) == null
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
 
+        cleanup:
+        context.close()
     }
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on abstract classes"() {
@@ -94,8 +96,7 @@ abstract class MyBean2 {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
 
@@ -105,6 +106,8 @@ abstract class MyBean2 {
         instance.onApplicationEvent(new Object()) == null
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
 
+        cleanup:
+        context.close()
     }
 
 
@@ -138,8 +141,7 @@ interface MyBean3  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
 
@@ -150,6 +152,8 @@ interface MyBean3  {
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
         listenerAdviceInterceptor.recievedMessages.size() == 1
 
+        cleanup:
+        context.close()
     }
 
     void "test an interface with non overriding but subclass return type method"() {
@@ -183,14 +187,16 @@ interface SpecificInterface {
         beanDefinition != null
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
         instance.$proxyMethods.length == 1
+
+        cleanup:
+        context.close()
     }
 
     void "test interface multiple inheritance"() {
@@ -262,8 +268,7 @@ interface MyInterface4 {
             beanDefinition != null
 
         when:
-            def context = new DefaultBeanContext()
-            context.start()
+        ApplicationContext context = ApplicationContext.run()
             def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
             def introducer = context.getBean(StubIntroducer)
         then:

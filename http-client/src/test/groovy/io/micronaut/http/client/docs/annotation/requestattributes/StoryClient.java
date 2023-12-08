@@ -21,7 +21,6 @@ import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestAttributes;
 import io.micronaut.http.client.annotation.Client;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 // tag::class[]
 @Client("/story")

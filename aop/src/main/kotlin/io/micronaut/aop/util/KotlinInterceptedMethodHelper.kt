@@ -35,8 +35,8 @@ internal object KotlinInterceptedMethodHelper {
     suspend fun handleResult(result: CompletionStage<*>, isUnitValueType: Boolean): Any? = suspendCoroutine { continuation ->
         result.whenComplete { value: Any?, throwable: Throwable? ->
             if (throwable == null) {
-                val result = Result.success(value ?: if (isUnitValueType) Unit else null)
-                continuation.resumeWith(result)
+                val res = Result.success(value ?: if (isUnitValueType) Unit else null)
+                continuation.resumeWith(res)
             } else {
                 val exception = if (throwable is CompletionException) { throwable.cause ?: throwable } else throwable
                 continuation.resumeWithException(exception)

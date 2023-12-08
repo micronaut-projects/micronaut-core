@@ -1,7 +1,7 @@
 package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.aop.exceptions.UnimplementedAdviceException
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -28,7 +28,7 @@ interface MyBean {
     fun test()
 }
 ''')
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         when:
@@ -67,7 +67,7 @@ abstract class MyBean {
     }
 }
 ''')
-        def context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         def notImplementedAdvice = context.getBean(NotImplementedAdvice)
 

@@ -141,7 +141,6 @@ class Foo {
             noExceptionThrown()
     }
 
-    @IgnoreIf({ !jvm.isJava14Compatible() })
     void "test RequestBean compiles with record"() {
         when:
             buildTypeElement("""

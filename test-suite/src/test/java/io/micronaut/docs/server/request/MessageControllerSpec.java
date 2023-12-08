@@ -18,28 +18,28 @@ package io.micronaut.docs.server.request;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class MessageControllerSpec {
+class MessageControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;
 
-    @BeforeClass // <1>
-    public static void setupServer() {
+    @BeforeAll // <1>
+    static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
     }
 
-    @AfterClass // <2>
-    public static void stopServer() {
+    @AfterAll // <2>
+    static void stopServer() {
         if(server != null) {
             server.stop();
         }
@@ -49,7 +49,7 @@ public class MessageControllerSpec {
     }
 
     @Test
-    public void testIssue() throws Exception {
+    void testIssue() {
         String body = client.toBlocking().retrieve("/request/hello?name=John");
 
         assertNotNull(body);

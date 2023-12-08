@@ -16,6 +16,7 @@
 package io.micronaut.aop.itfce
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -29,11 +30,14 @@ class InterfaceTypeLevelSpec extends Specification {
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
+        ApplicationContext context = ApplicationContext.run()
+        InterfaceTypeLevel foo = context.getBean(InterfaceTypeLevel)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+
+        cleanup:
+        context.close()
 
         where:
         method                        | args                   | result
@@ -60,10 +64,10 @@ class InterfaceTypeLevelSpec extends Specification {
 
     void "test AOP setup"() {
         given:
-        BeanContext beanContext = new DefaultBeanContext().start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:
-        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
+        InterfaceTypeLevel foo = context.getBean(InterfaceTypeLevel)
 
 
         then:
@@ -71,8 +75,7 @@ class InterfaceTypeLevelSpec extends Specification {
         foo.test("test") == "Name is changed"
 
         cleanup:
-        beanContext.close()
-
+        context.close()
     }
 }
 

@@ -10,6 +10,7 @@ quickStart:
     title: Setting up an IDE
     ideaSetup: IntelliJ IDEA
     eclipseSetup: Eclipse
+    netbeansSetup: Apache NetBeans
     vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
@@ -346,6 +347,8 @@ i18n:
   title: Internationalization
   bundle: Resource Bundles
   localizedMessageSource: Localized Message Source
+resources:
+  title: Resources
 appendix:
   title: Appendices
   architecture:

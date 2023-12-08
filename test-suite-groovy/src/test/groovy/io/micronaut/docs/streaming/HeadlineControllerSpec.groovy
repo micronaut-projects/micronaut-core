@@ -15,17 +15,19 @@ import java.util.concurrent.CompletableFuture
 
 import static io.micronaut.http.HttpRequest.GET
 import static java.util.concurrent.TimeUnit.SECONDS
-import static org.junit.Assert.fail
+import static org.spockframework.util.Assert.fail
 
 class HeadlineControllerSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     // tag::streamingClient[]
     void "test client annotation streaming"() throws Exception {
         when:
         def headlineClient = embeddedServer.applicationContext
-                                           .getBean(HeadlineClient) // <1>
+                .getBean(HeadlineClient) // <1>
 
         Mono<Headline> firstHeadline = Mono.from(headlineClient.streamHeadlines()) // <2>
 
@@ -37,10 +39,10 @@ class HeadlineControllerSpec extends Specification {
     }
     // end::streamingClient[]
 
-    void "test streaming client" () {
+    void "test streaming client"() {
         when:
         StreamingHttpClient client = embeddedServer.applicationContext
-                                                     .createBean(StreamingHttpClient, embeddedServer.URL)
+                .createBean(StreamingHttpClient, embeddedServer.URL)
 
         // tag::streaming[]
         Flux<Headline> headlineStream = Flux.from(client.jsonStream(

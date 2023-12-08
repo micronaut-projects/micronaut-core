@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.inject.configproperties
 
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationProperties
-import org.neo4j.driver.v1.Config
+import org.neo4j.driver.Config
 import java.net.URI
 
 @ConfigurationProperties("neo4j.test")
@@ -13,5 +13,5 @@ class Neo4jProperties {
             prefixes=["with"],
             allowZeroArgs=true
     )
-    val options: Config.ConfigBuilder = Config.build()
+    val options: Config.ConfigBuilder = Config.builder()
 }

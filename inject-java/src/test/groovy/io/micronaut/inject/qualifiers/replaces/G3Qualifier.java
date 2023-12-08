@@ -16,7 +16,6 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.inject.qualifiers.replaces.qualifier.Three;
-import io.micronaut.inject.qualifiers.replaces.qualifier.Two;
 import jakarta.inject.Singleton;
 
 @Singleton

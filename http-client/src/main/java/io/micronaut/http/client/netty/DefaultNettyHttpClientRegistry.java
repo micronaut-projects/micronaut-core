@@ -225,7 +225,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 httpClient.close();
             } catch (Throwable e) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
+                    LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
                 }
             }
         }
@@ -590,7 +590,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 return false;
             }
             ClientKey clientKey = (ClientKey) o;
-            return httpVersion == clientKey.httpVersion &&
+            return Objects.equals(httpVersion, clientKey.httpVersion) &&
                     Objects.equals(clientId, clientKey.clientId) &&
                     Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
                     Objects.equals(path, clientKey.path) &&

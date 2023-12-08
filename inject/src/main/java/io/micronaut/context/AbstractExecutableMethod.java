@@ -160,7 +160,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public final Object invoke(Object instance, Object... arguments) {
-        ArgumentUtils.validateArguments(this, getArguments(), arguments);
+        if (arguments.length > 0) {
+            ArgumentUtils.validateArguments(this, getArguments(), arguments);
+        }
         return invokeInternal(instance, arguments);
     }
 

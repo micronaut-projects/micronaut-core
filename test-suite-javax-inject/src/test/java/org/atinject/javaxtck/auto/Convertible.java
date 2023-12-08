@@ -15,14 +15,11 @@
  */
 package org.atinject.javaxtck.auto;
 
+import io.micronaut.context.ApplicationContext;
 import junit.framework.TestCase;
 import org.atinject.javaxtck.auto.accessories.Cupholder;
 import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -171,7 +168,7 @@ public class Convertible implements Car {
      * value to avoid null checks for omitted provider injections.
      */
     private static <T> Provider<T> nullProvider() {
-        return new NullProvider<T>();
+        return new NullProvider<>();
     }
 
     static class NullProvider<T> implements Provider<T> {
@@ -182,13 +179,13 @@ public class Convertible implements Car {
         }
     }
 
-    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<Convertible>();
+    public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<>();
 
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     public static class Tests {
 
-        private final BeanContext context = BeanContext.run();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Cupholder cupholder = car.cupholder;
         private final SpareTire spareTire = car.spareTire;
@@ -497,7 +494,7 @@ public class Convertible implements Car {
     }
 
     public static class PrivateTests extends TestCase {
-        private final BeanContext context = new DefaultBeanContext().start();
+        private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Engine engine = car.engineProvider.get();
         private final SpareTire spareTire = car.spareTire;

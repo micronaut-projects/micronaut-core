@@ -213,6 +213,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
         if (annotationClass == null) {

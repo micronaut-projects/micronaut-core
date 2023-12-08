@@ -55,7 +55,7 @@ public class MapPropertySource implements PropertySource {
     public Iterator<String> iterator() {
         Iterator i = map.keySet().iterator();
 
-        return new Iterator<String>() {
+        return new Iterator<>() {
             @Override
             public boolean hasNext() {
                 return i.hasNext();

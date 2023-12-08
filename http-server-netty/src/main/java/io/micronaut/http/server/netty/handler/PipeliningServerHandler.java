@@ -39,6 +39,7 @@ import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -71,6 +72,16 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
+
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -906,6 +917,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private final OutboundAccess outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;
+        private boolean earlyComplete = false;
         private boolean writtenLast = false;
 
         StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
@@ -923,7 +935,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 write(initialMessage, false, false);
                 initialMessage = null;
             }
-            subscription.request(1);
+            if (earlyComplete) {
+                // onComplete has been called before the first writeSome. Trigger onComplete
+                // handling again.
+                onComplete();
+            } else {
+                subscription.request(1);
+            }
         }
 
         @Override
@@ -990,7 +1008,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (outboundHandler != this) {
-                throw new IllegalStateException("onComplete before request?");
+                // onComplete can be called immediately after onSubscribe, before request.
+                earlyComplete = true;
+                return;
             }
 
             outboundHandler = null;

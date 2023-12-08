@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
@@ -18,14 +19,18 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 class GenericsJacksonSerdeSpec extends Specification {
-    @Shared @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext
-                                                        .createBean(HttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'GenericsJacksonSerdeSpec',
+    ])
+
+    @Shared
+    @AutoCleanup
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test ser/deser body with generics"() {
-
         when:
         def response = Flux.from(client.exchange(HttpRequest.POST("/generics-test", new WrappedData<Token>("1", new Token("test"))), Token))
                 .blockFirst()
@@ -35,16 +40,16 @@ class GenericsJacksonSerdeSpec extends Specification {
     }
 
     void "test deser body controller with generics - Issue #3202"() {
+        when:
+        def response = Flux.from(client.exchange(HttpRequest.POST("/generics-inherited/body", new Demo("value")), Demo))
+                .blockFirst()
 
-                when:
-                def response = Flux.from(client.exchange(HttpRequest.POST("/generics-inherited/body", new Demo("value")), Demo))
-                        .blockFirst()
-
-                then:
-                response.body().name == 'value'
-     }
+        then:
+        response.body().name == 'value'
+    }
 
     @Controller("/generics-test")
+    @Requires(property = 'spec.name', value = 'GenericsJacksonSerdeSpec')
     static final class GenericsController {
         @Post(consumes = "application/json", produces = "application/json")
         Token create(@Body WrappedData<Token> value) {
@@ -98,6 +103,7 @@ class GenericsJacksonSerdeSpec extends Specification {
     }
 
     @Controller("/generics-inherited")
+    @Requires(property = 'spec.name', value = 'GenericsJacksonSerdeSpec')
     static class DemoController extends AbstractOperations<Demo> {
 
         @Get("/hello")

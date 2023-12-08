@@ -17,7 +17,6 @@ package io.micronaut.inject.constructor.mapinjection;
 
 import jakarta.inject.Inject;
 
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

@@ -32,6 +32,7 @@ public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage, H
     /**
      * Releases the stream if there is no subscriber.
      */
+    @Override
     default void closeIfNoSubscriber() { }
 
     /**

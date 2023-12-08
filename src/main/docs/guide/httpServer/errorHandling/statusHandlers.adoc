@@ -1,4 +1,4 @@
-The ann:http.annotation.Error[] annotation supports defining either an exception class or an HTTP status. Methods annotated with ann:http.annotation.Error[] must be defined with in a class annotated with ann:http.annotation.Controller[]. The annotation also supports the notion of global and local, local being the default.
+The ann:http.annotation.Error[] annotation supports defining either an exception class or an HTTP status. Methods annotated with ann:http.annotation.Error[] must be defined within a class annotated with ann:http.annotation.Controller[]. The annotation also supports the notion of global and local, local being the default.
 
 Local error handlers only respond to exceptions thrown as a result of the route being matched to another method in the same controller. Global error handlers can be invoked as a result of any thrown exception. A local error handler is always searched for first when resolving which handler to execute.
 

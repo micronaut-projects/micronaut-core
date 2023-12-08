@@ -146,7 +146,7 @@ class StreamPostSpec extends Specification {
                 Argument.of(User),
                 Argument.of(User)
         ))
-        User user = flowable.onErrorResume((Function){ t ->
+        User user = flowable.onErrorResume((Function) { t ->
             Flux.just(((HttpClientResponseException) t).response.getBody(User).get())
         }).blockFirst()
 
@@ -154,7 +154,7 @@ class StreamPostSpec extends Specification {
         user.userName == "edwin"
     }
 
-    @IgnoreIf({env["GITHUB_WORKFLOW"]})
+    @IgnoreIf({ env["GITHUB_WORKFLOW"] })
     // investigate intermitten issues with this test on Github Actions
     void "test reactive post error handling without specifying error body type"() {
         when:
@@ -164,7 +164,7 @@ class StreamPostSpec extends Specification {
 
                 Argument.of(User)
         ))
-        User user = flowable.onErrorResume((Function){ t ->
+        User user = flowable.onErrorResume((Function) { t ->
             if (t instanceof HttpClientResponseException) {
                 try {
                     return Flux.just(((HttpClientResponseException) t).response.getBody(User).get())
@@ -273,7 +273,7 @@ class StreamPostSpec extends Specification {
         @Post("/user")
         @SingleResult
         Publisher<HttpResponse<User>> postUser(@Body Publisher<User> user) {
-            return Mono.from(user).map({ User u->
+            return Mono.from(user).map({ User u ->
                 return HttpResponse.ok(u)
             })
         }
@@ -281,7 +281,7 @@ class StreamPostSpec extends Specification {
         @Post("/user/param{?queryParam}")
         @SingleResult
         Publisher<HttpResponse<User>> postUser(@Body Publisher<User> user, @QueryValue @Nullable String queryParam) {
-            return Mono.from(user).map({ User u->
+            return Mono.from(user).map({ User u ->
                 return HttpResponse.ok(u).header("QueryParam", queryParam ?: "null")
             })
         }
@@ -289,7 +289,7 @@ class StreamPostSpec extends Specification {
         @Post("/user-error")
         @SingleResult
         Publisher<HttpResponse<User>> postUserError(@Body Publisher<User> user) {
-            return Mono.from(user).map({ User u->
+            return Mono.from(user).map({ User u ->
                 return HttpResponse.badRequest(u)
             })
         }
@@ -301,13 +301,13 @@ class StreamPostSpec extends Specification {
 
         @Post(uri = "/person", consumes = MediaType.APPLICATION_FORM_URLENCODED)
         @SingleResult
-        Publisher<HttpResponse<Person>> createPerson(@Valid @Body Person person)  {
+        Publisher<HttpResponse<Person>> createPerson(@Valid @Body Person person) {
             return Mono.just(HttpResponse.created(person))
         }
 
         @Post(uri = "/error")
         @SingleResult
-        Publisher<HttpResponse<Person>> emitError(@Body Person person)  {
+        Publisher<HttpResponse<Person>> emitError(@Body Person person) {
             return Mono.error(new IllegalArgumentException())
         }
 

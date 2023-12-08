@@ -319,7 +319,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             return super.build();
                         } catch (RuntimeException e) {
                             if (LOG.isErrorEnabled()) {
-                                LOG.error("Error building bean serializer for type [" + beanClass + "]: " + e.getMessage(), e);
+                                LOG.error("Error building bean serializer for type [{}]: {}", beanClass, e.getMessage(), e);
                             }
                             throw e;
                         }

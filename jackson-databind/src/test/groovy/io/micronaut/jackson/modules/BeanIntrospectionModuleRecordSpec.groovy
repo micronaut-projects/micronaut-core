@@ -12,7 +12,6 @@ import spock.lang.Issue
 
 import java.time.LocalDateTime
 
-@IgnoreIf({ !jvm.isJava14Compatible() })
 class BeanIntrospectionModuleRecordSpec extends AbstractTypeElementSpec {
     def 'test record support'() {
         given:

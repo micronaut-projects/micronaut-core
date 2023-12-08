@@ -117,7 +117,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     }
 
     /**
-     * @param serviceID The service Id
+     * @param serviceID The service ID
      * @return An {@link Optional} with the load balancer
      */
     protected Optional<? extends LoadBalancer> resolveLoadBalancerForServiceID(String serviceID) {

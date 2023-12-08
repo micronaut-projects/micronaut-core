@@ -16,8 +16,7 @@
 package io.micronaut.inject.constructor
 
 import groovy.transform.PackageScope
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 import jakarta.inject.Inject
@@ -31,8 +30,7 @@ class ConstructorSimpleInjectionSpec extends Specification {
 
     void "test injection with constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)
@@ -42,6 +40,9 @@ class ConstructorSimpleInjectionSpec extends Specification {
         b.a != null
         b2.a != null
         b2.a2 != null
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

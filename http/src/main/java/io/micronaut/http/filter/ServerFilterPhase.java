@@ -20,7 +20,7 @@ package io.micronaut.http.filter;
  * There are gaps between phases to account for additions of future phases. Filters
  * relying on phases must ensure the order is within the selected phases range. For example
  * {@code ServerFilterPhase.TRACING.before() - 500} is considered an invalid usage of the TRACING
- * phase because that would place the order at 18251, which is outside of the range of the
+ * phase because that would place the order at 18251, which is outside the range of the
  * phase (18501-19500).
  *
  * @author James Kleeh

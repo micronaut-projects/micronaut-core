@@ -120,7 +120,7 @@ public interface HealthResult {
             final String message = ex.getClass().getName() + ": " + ex.getMessage();
             error.put("error", message);
             if (LOG.isErrorEnabled()) {
-                LOG.error("Health indicator [" + name + "] reported exception: " + message, ex);
+                LOG.error("Health indicator [{}] reported exception: {}", name, message, ex);
             }
             return details(error);
         }
