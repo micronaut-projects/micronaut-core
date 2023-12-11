@@ -65,7 +65,7 @@ internal open class KotlinClassElement(
         kotlinType.starProjection().makeNullable()
     }
 
-    private val asType: KotlinClassElement by lazy {
+    open val asType: KotlinClassElement by lazy {
         if (definedType == null) {
             this
         } else {

@@ -2512,7 +2512,7 @@ class TestNamed2 {
             returnType.getType().isEnum()
             returnType.getType() instanceof EnumElement
             returnType.getGenericType().isEnum()
-            returnType..getType()() instanceof EnumElement
+            returnType.getType() instanceof EnumElement
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
