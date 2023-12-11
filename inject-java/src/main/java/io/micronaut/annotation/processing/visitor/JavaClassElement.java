@@ -809,7 +809,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 ee = classNode.getEnclosedElements();
             }
             EnumSet<ElementKind> elementKinds = getElementKind(result);
-            List<Element> list = new ArrayList<>(elementKinds.size());
+            List<Element> list = new ArrayList<>(ee.size());
             for (Element element : ee) {
                 Set<Modifier> modifiers = element.getModifiers();
                 if (elementKinds.contains(element.getKind()) && (includeAbstract || isNonAbstractMethod(modifiers, classNode))) {

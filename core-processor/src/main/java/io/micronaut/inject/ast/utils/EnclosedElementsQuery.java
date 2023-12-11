@@ -234,13 +234,7 @@ public abstract class EnclosedElementsQuery<C, N> {
             boolean includeAbstract = isAbstractClass(classNode) || result.isIncludeOverriddenMethods();
             processClassHierarchy(classNode, reduce, result, addedFromClassElements, elements, includeAbstract);
         }
-        Iterator<T> iterator = elements.iterator();
-        while (iterator.hasNext()) {
-            T element = iterator.next();
-            if (!filter.test(element)) {
-                iterator.remove();
-            }
-        }
+        elements.removeIf(element -> !filter.test(element));
         return elements;
     }
 
