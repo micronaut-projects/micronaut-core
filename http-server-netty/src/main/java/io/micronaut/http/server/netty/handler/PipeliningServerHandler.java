@@ -340,7 +340,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             HttpHeaders headers = request.headers();
             String contentEncoding = getContentEncoding(headers);
             EmbeddedChannel decompressionChannel;
-            if (contentEncoding == null || !hasBody(request)) {
+            if (contentEncoding == null) {
                 decompressionChannel = null;
             } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                 HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
@@ -372,6 +372,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 inboundHandler = droppingInboundHandler;
                 if (message instanceof HttpContent) {
                     inboundHandler.read(message);
+                }
+                if (decompressionChannel != null) {
+                    decompressionChannel.finish();
                 }
                 requestHandler.accept(ctx, new EmptyHttpRequest(request), outboundAccess);
             } else {
