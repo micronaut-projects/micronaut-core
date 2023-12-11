@@ -65,7 +65,7 @@ internal open class KotlinClassElement(
         kotlinType.starProjection().makeNullable()
     }
 
-    private val asType: KotlinClassElement by lazy {
+    open val asType: KotlinClassElement by lazy {
         if (definedType == null) {
             this
         } else {
@@ -358,6 +358,9 @@ internal open class KotlinClassElement(
                 )
             }
             .modifiers {
+                if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
+                    return@modifiers false
+                }
                 val visibility = propertyElementQuery.visibility
                 if (visibility == BeanProperties.Visibility.PUBLIC) {
                     it.contains(ElementModifier.PUBLIC)
