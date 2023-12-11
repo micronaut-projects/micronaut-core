@@ -358,6 +358,9 @@ internal open class KotlinClassElement(
                 )
             }
             .modifiers {
+                if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
+                    return@modifiers false
+                }
                 val visibility = propertyElementQuery.visibility
                 if (visibility == BeanProperties.Visibility.PUBLIC) {
                     it.contains(ElementModifier.PUBLIC)
