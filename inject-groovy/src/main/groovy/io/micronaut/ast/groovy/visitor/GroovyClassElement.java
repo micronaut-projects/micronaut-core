@@ -771,7 +771,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 return false;
             }
             if (methodNode.isPrivate() && classNode.isInterface()) {
-                return false;
+                return true;
             }
             if (!methodNode.isAbstract() && classNode.isInterface()) {
                 return false;
