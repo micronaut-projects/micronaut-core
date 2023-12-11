@@ -329,6 +329,10 @@ public interface MethodElement extends MemberElement {
                     return false;
                 }
             }
+            if (!getDeclaringType().isAssignable(memberElement.getDeclaringType())) {
+                // not a parent class
+                return false;
+            }
             ClassElement existingReturnType = hidden.getReturnType().getGenericType();
             ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
             if (!newTypeReturn.isAssignable(existingReturnType)) {
@@ -337,7 +341,7 @@ public interface MethodElement extends MemberElement {
             if (hidden.isPackagePrivate()) {
                 return newMethod.getDeclaringType().getPackageName().equals(hidden.getDeclaringType().getPackageName());
             }
-            return true;
+            return memberElement.isAccessible(getDeclaringType());
         }
         return false;
     }

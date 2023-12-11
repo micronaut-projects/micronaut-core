@@ -51,6 +51,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ConstructorNode;
@@ -720,21 +721,25 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         @Override
         protected List<AnnotatedNode> getEnclosedElements(ClassNode classNode,
-                                                          ElementQuery.Result<?> result) {
+                                                          ElementQuery.Result<?> result,
+                                                          boolean includeAbstract) {
             Class<?> elementType = result.getElementType();
-            return getEnclosedElements(classNode, result, elementType);
+            return getEnclosedElements(classNode, result, elementType, includeAbstract);
         }
 
-        private List<AnnotatedNode> getEnclosedElements(ClassNode classNode, ElementQuery.Result<?> result, Class<?> elementType) {
+        private List<AnnotatedNode> getEnclosedElements(ClassNode classNode,
+                                                        ElementQuery.Result<?> result,
+                                                        Class<?> elementType,
+                                                        boolean includeAbstract) {
             if (elementType == MemberElement.class) {
                 return Stream.concat(
-                        getEnclosedElements(classNode, result, FieldElement.class).stream(),
-                        getEnclosedElements(classNode, result, MethodElement.class).stream()
+                        getEnclosedElements(classNode, result, FieldElement.class, includeAbstract).stream(),
+                        getEnclosedElements(classNode, result, MethodElement.class, includeAbstract).stream()
                 ).toList();
             } else if (elementType == MethodElement.class) {
                 return classNode.getMethods()
                         .stream()
-                        .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0)
+                        .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0 && (includeAbstract || isNonAbstract(classNode, methodNode)))
                         .<AnnotatedNode>map(m -> m)
                         .toList();
             } else if (elementType == FieldElement.class) {
@@ -761,6 +766,19 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             }
         }
 
+        private boolean isNonAbstract(ClassNode classNode, MethodNode methodNode) {
+            if (methodNode.isDefault()) {
+                return false;
+            }
+            if (methodNode.isPrivate() && classNode.isInterface()) {
+                return true;
+            }
+            if (!methodNode.isAbstract() && classNode.isInterface()) {
+                return false;
+            }
+            return !methodNode.isAbstract();
+        }
+
         @Override
         protected boolean excludeClass(ClassNode classNode) {
             String packageName = Objects.requireNonNullElse(classNode.getPackageName(), "");
@@ -773,6 +791,23 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     || Enum.class.getName().equals(className)
                     || GroovyObjectSupport.class.getName().equals(className)
                     || Script.class.getName().equals(className);
+        }
+
+        @Override
+        protected boolean isAbstractClass(ClassNode classNode) {
+            return classNode.isAbstract();
+        }
+
+        @Override
+        protected boolean isInterface(ClassNode classNode) {
+            if (classNode.isInterface()) {
+                return true;
+            }
+            List<AnnotationNode> annotations = classNode.getAnnotations();
+            if (annotations != null) {
+                return annotations.stream().anyMatch(a -> a.getClassNode().getName().equals(groovy.transform.Trait.class.getName()));
+            }
+            return false;
         }
 
         @Override
