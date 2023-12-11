@@ -2475,6 +2475,17 @@ class TestNamed {
                     .findFirst()
                     .get()
                     .getType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType()
+                    .isEnum()
     }
 
     void "test nested enum"() {
@@ -2498,6 +2509,10 @@ class TestNamed2 {
         expect:
             returnType.isEnum()
             returnType instanceof EnumElement
+            returnType.getType().isEnum()
+            returnType.getType() instanceof EnumElement
+            returnType.getGenericType().isEnum()
+            returnType..getType()() instanceof EnumElement
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
