@@ -812,18 +812,18 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             List<Element> list = new ArrayList<>(ee.size());
             for (Element element : ee) {
                 Set<Modifier> modifiers = element.getModifiers();
-                if (elementKinds.contains(element.getKind()) && (includeAbstract || isNonAbstractMethod(modifiers, classNode))) {
+                if (elementKinds.contains(element.getKind()) && (includeAbstract || isNonAbstractMethod(modifiers))) {
                     list.add(element);
                 }
             }
             return list;
         }
 
-        private boolean isNonAbstractMethod(Set<Modifier> modifiers, TypeElement classNode) {
+        private boolean isNonAbstractMethod(Set<Modifier> modifiers) {
             if (modifiers.contains(Modifier.DEFAULT)) {
                 return true;
             }
-            if (modifiers.contains(Modifier.PRIVATE) && isInterface(classNode)) {
+            if (modifiers.contains(Modifier.PRIVATE)) {
                 return true;
             }
             return !modifiers.contains(Modifier.ABSTRACT);
