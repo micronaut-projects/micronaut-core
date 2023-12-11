@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
@@ -1212,5 +1213,35 @@ annotation class NotNull
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+    }
+
+    void "test java class value annotation"() {
+        given:
+            AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+            AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.banner.MicronautBanner
+import jakarta.inject.Singleton
+
+@Requires(classes = [ColorEnum::class], bean = ColorEnum::class)
+@Singleton
+class Test
+
+
+enum class ColorEnum {
+    BLUE
+}
+''').getAnnotationMetadata()
+
+        when:
+            def requires = metadata.getAnnotation(Requires)
+            def classes = requires.annotationClassValues("classes")
+            def bean = requires.annotationClassValue("bean").get()
+
+        then:
+            classes[0].name == "test.ColorEnum"
+            bean.name == "test.ColorEnum"
     }
 }
