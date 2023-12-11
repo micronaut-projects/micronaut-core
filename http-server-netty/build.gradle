@@ -32,6 +32,7 @@ dependencies {
     compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
     compileOnly libs.managed.netty.incubator.codec.http3
+    compileOnly libs.brotli4j
 
     testImplementation libs.jmh.core
     testAnnotationProcessor libs.jmh.generator.annprocess
