@@ -785,7 +785,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void writeContinue() {
             if (handler == null) {
-                write(new ContinueOutboundHandler());
+                write(new ContinueOutboundHandler(this));
             }
         }
 
@@ -983,8 +983,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         boolean written = false;
         OutboundHandler next;
 
-        private ContinueOutboundHandler() {
-            super(null);
+        private ContinueOutboundHandler(OutboundAccess outboundAccess) {
+            super(outboundAccess);
         }
 
         @Override
