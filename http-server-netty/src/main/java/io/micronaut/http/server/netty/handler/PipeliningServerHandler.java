@@ -742,6 +742,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void preprocess(HttpResponse message) {
+            if (!message.protocolVersion().equals(request.protocolVersion())) {
+                // if the response includes features not supported by http/1.0, well that's just too bad, isn't it?
+                // we'll at least handle the connection state properly.
+                message.setProtocolVersion(request.protocolVersion());
+            }
+            if (request.protocolVersion().isKeepAliveDefault()) {
+                if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
+                    closeAfterWrite();
+                }
+            } else {
+                if (!request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
+                    closeAfterWrite();
+                }
+            }
+
             if (message.protocolVersion().isKeepAliveDefault()) {
                 if (message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                     closeAfterWrite();
@@ -770,7 +785,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void writeContinue() {
             if (handler == null) {
-                write(new ContinueOutboundHandler());
+                write(new ContinueOutboundHandler(this));
             }
         }
 
@@ -960,20 +975,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
      */
     private final class ContinueOutboundHandler extends OutboundHandler {
-        private static final FullHttpResponse CONTINUE =
+        private static final FullHttpResponse CONTINUE_11 =
+            new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
+        private static final FullHttpResponse CONTINUE_10 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
         boolean written = false;
         OutboundHandler next;
 
-        private ContinueOutboundHandler() {
-            super(null);
+        private ContinueOutboundHandler(OutboundAccess outboundAccess) {
+            super(outboundAccess);
         }
 
         @Override
         void writeSome() {
             if (!written) {
-                write(CONTINUE, true, false);
+                write(outboundAccess.request.protocolVersion().equals(HttpVersion.HTTP_1_0) ? CONTINUE_10 : CONTINUE_11, true, false);
                 written = true;
             }
             if (next != null) {
@@ -1077,10 +1094,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
-                if (httpContent instanceof LastHttpContent) {
+                boolean last = httpContent instanceof LastHttpContent;
+                if (last) {
                     writtenLast = true;
                 }
-                writeCompressing(httpContent, true, false);
+                writeCompressing(httpContent, true, last && outboundAccess.closeAfterWrite);
                 if (ctx.channel().isWritable()) {
                     subscription.request(1);
                 }
@@ -1197,7 +1215,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 if (msg == null) {
                     // this.done == true inside the synchronized block
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, false);
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
 
                     outboundHandler = null;
                     requestHandler.responseWritten(outboundAccess.attachment);

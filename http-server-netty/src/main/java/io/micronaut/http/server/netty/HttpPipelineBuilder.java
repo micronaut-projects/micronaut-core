@@ -39,7 +39,6 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
@@ -71,6 +70,11 @@ import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -84,10 +88,6 @@ import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -634,7 +634,6 @@ final class HttpPipelineBuilder implements Closeable {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
             registerMicronautChannelHandlers();
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
             insertMicronautHandlers();
         }
