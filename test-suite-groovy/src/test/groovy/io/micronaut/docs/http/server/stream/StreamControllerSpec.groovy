@@ -12,7 +12,7 @@ import spock.lang.Specification
 class StreamControllerSpec extends Specification {
 
     @Shared @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.port':'8080'])
 
     @Shared @AutoCleanup
     HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())

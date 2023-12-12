@@ -1094,10 +1094,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
-                if (httpContent instanceof LastHttpContent) {
+                boolean last = httpContent instanceof LastHttpContent;
+                if (last) {
                     writtenLast = true;
                 }
-                writeCompressing(httpContent, true, false);
+                writeCompressing(httpContent, true, last && outboundAccess.closeAfterWrite);
                 if (ctx.channel().isWritable()) {
                     subscription.request(1);
                 }
@@ -1214,7 +1215,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 if (msg == null) {
                     // this.done == true inside the synchronized block
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, false);
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
 
                     outboundHandler = null;
                     requestHandler.responseWritten(outboundAccess.attachment);
