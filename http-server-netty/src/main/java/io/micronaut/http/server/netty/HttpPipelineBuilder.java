@@ -597,9 +597,6 @@ final class HttpPipelineBuilder implements Closeable {
                 channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(sslHandler.findPeerCert());
             }
 
-            SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
-
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
             if (webSocketUpgradeHandler.isPresent()) {
                 pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
@@ -621,7 +618,9 @@ final class HttpPipelineBuilder implements Closeable {
             if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && sslHandler == null) {
                 requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
             }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, new PipeliningServerHandler(requestHandler));
+            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
+            pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
         }
 
         /**

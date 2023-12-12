@@ -3,6 +3,7 @@ asm = "9.6"
 awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.10"
+brotli4j = "1.13.0"
 caffeine = "2.9.3"
 compile-testing = "0.21.0"
 
@@ -164,6 +165,8 @@ aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk15on", version.ref = "bcpkix" }
 
 blaze-persistence-core = { module = "com.blazebit:blaze-persistence-core-impl", version.ref = "blaze" }
+
+brotli4j = { module = "com.aayushatharva.brotli4j:brotli4j", version.ref = "brotli4j" }
 
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
