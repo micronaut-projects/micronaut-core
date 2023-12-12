@@ -67,6 +67,7 @@ import java.util.function.Predicate;
  * @param filtersException    The filter exception
  * @param waitForBody         Should it wait for the body
  * @param returnHandler       The return handler
+ * @param isConditional       Is conditional filter
  * @param <T>                 The bean type
  * @author Jonas Konrad
  * @author Denis Stepanov
@@ -87,7 +88,8 @@ record MethodFilter<T>(FilterOrder order,
                        ContinuationCreator continuationCreator,
                        boolean filtersException,
                        boolean waitForBody,
-                       FilterReturnHandler returnHandler
+                       FilterReturnHandler returnHandler,
+                       boolean isConditional
 ) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
@@ -223,13 +225,22 @@ record MethodFilter<T>(FilterOrder order,
             continuationCreator,
             filtersException,
             waitForBody,
-            returnHandler
+            returnHandler,
+            bean instanceof ConditionalFilter
         );
     }
 
     private static boolean isReactive(Argument<?> continuationReturnType) {
         // Argument.isReactive doesn't work in http-validation, this is a workaround
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
+    }
+
+    @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        if (isConditional) {
+            return ((ConditionalFilter) bean).isEnabled(request);
+        }
+        return true;
     }
 
     @Override

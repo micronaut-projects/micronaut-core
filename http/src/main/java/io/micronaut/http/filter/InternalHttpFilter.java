@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.http.HttpRequest;
 
 import java.util.function.Function;
 
@@ -32,6 +33,13 @@ import java.util.function.Function;
  */
 @Internal
 sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter {
+
+    /**
+     * Checks the filter is implementing {@link ConditionalFilter} and is enabled.
+     * @param request The request
+     * @return true if enabled
+     */
+    boolean isEnabled(HttpRequest<?> request);
 
     /**
      * If the filter supports filtering a request.

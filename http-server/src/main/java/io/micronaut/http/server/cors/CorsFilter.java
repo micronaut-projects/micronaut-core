@@ -33,6 +33,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.ConditionalFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.HttpHostResolver;
@@ -69,7 +70,7 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  * @since 1.0
  */
 @ServerFilter(MATCH_ALL_PATTERN)
-public class CorsFilter implements Ordered {
+public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
@@ -88,6 +89,18 @@ public class CorsFilter implements Ordered {
                       @Nullable HttpHostResolver httpHostResolver) {
         this.corsConfiguration = corsConfiguration;
         this.httpHostResolver = httpHostResolver;
+    }
+
+    @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        String origin = request.getOrigin().orElse(null);
+        if (origin == null) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
+            }
+            return false;
+        }
+        return true;
     }
 
     @RequestFilter
