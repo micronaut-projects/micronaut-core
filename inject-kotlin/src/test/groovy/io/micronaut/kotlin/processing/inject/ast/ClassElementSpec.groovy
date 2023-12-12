@@ -2515,6 +2515,35 @@ class TestNamed2 {
             returnType.getType() instanceof EnumElement
     }
 
+    void "test inner class not failing"() {
+        def field = buildClassElementMapped('test.TestNamed3', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import io.micronaut.kotlin.processing.Sort.Order.Direction
+import jakarta.inject.Singleton
+
+class TestNamed3 {
+    fun method() : SomeInner? {
+        return null
+    }
+
+}
+
+class SomeInner {
+    private val xyz = object {}
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getFields().get(0)})
+        expect:
+            field.getType().getName() == "java.lang.Object"
+            field.getGenericType().getName() == "java.lang.Object"
+            field.getType().getType().getName() == "java.lang.Object"
+            field.getGenericType().getType().getName() == "java.lang.Object"
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
