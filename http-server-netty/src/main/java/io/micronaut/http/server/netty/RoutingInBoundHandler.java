@@ -104,6 +104,9 @@ import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -362,6 +365,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 return ExecutionFlow.just(HttpResponse.ok(result));
             }
         };
+        String serverHeader = serverConfiguration.getServerHeader().orElse(null);
+        boolean dateHeader = serverConfiguration.isDateHeader();
         return new ExecutionLeaf.Route<>(new RequestHandler() {
             @Override
             public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
@@ -376,6 +381,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             HttpHeaders responseHeaders = ((NettyHttpHeaders) response.getHeaders()).getNettyHeaders();
                             if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
                                 responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                            }
+                            if (serverHeader != null && !responseHeaders.contains(HttpHeaderNames.SERVER)) {
+                                responseHeaders.set(HttpHeaderNames.SERVER, serverHeader);
+                            }
+                            if (dateHeader && !responseHeaders.contains(HttpHeaderNames.DATE)) {
+                                responseHeaders.set(HttpHeaderNames.DATE, ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.RFC_1123_DATE_TIME));
                             }
                             HttpResponseStatus status = HttpResponseStatus.valueOf(response.code(), response.reason());
                             if (scWriter != null) {
