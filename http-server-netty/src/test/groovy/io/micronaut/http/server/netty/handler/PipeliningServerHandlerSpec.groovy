@@ -1,14 +1,20 @@
 package io.micronaut.http.server.netty.handler
 
-
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.body.ByteBody
 import io.micronaut.http.server.netty.body.ImmediateByteBody
+import io.micronaut.http.server.netty.body.StreamingByteBody
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
+import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.compression.SnappyFrameEncoder
+import io.netty.handler.codec.compression.ZlibCodecFactory
+import io.netty.handler.codec.compression.ZlibWrapper
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -25,12 +31,15 @@ import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.codec.http.LastHttpContent
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import spock.lang.Issue
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 
 class PipeliningServerHandlerSpec extends Specification {
     def 'pipelined requests have their responses batched'() {
@@ -292,6 +301,228 @@ class PipeliningServerHandlerSpec extends Specification {
 
         where:
         completeOnCancel << [true, false]
+    }
+
+    def 'read backpressure for streaming requests'() {
+        given:
+        def mon = new MonitorHandler()
+        Subscription subscription = null
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                ((StreamingByteBody) body).rawContent(new HttpServerConfiguration()).asPublisher().subscribe(new Subscriber<ByteBuf>() {
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        subscription = s
+                    }
+
+                    @Override
+                    void onNext(ByteBuf httpContent) {
+                        httpContent.release()
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                        t.printStackTrace()
+                    }
+
+                    @Override
+                    void onComplete() {
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                    }
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        expect:
+        mon.read == 1
+        mon.flush == 0
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        req.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        ch.writeInbound(req)
+        then:
+        // no read call until request
+        mon.read == 1
+
+        when:
+        subscription.request(1)
+        then:
+        mon.read == 2
+
+        when:
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))))
+        then:
+        // read call for the next request
+        mon.read == 3
+        ch.checkException()
+    }
+
+    def 'decompression parts to full'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        HttpRequest req = null
+        ImmediateByteBody ibb = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                req = request
+                ibb = body
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+        def compChannel = new EmbeddedChannel(compressor)
+        byte[] uncompressed = new byte[1024]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        compChannel.writeOutbound(Unpooled.copiedBuffer(uncompressed))
+        compChannel.finish()
+
+        when:
+        def r = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        r.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(r)
+        while (true) {
+            ByteBuf o = compChannel.readOutbound()
+            if (o == null) {
+                break
+            }
+            ch.writeOneInbound(new DefaultHttpContent(o))
+        }
+        ch.writeOneInbound(LastHttpContent.EMPTY_LAST_CONTENT)
+        ch.flushInbound()
+        then:
+        !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
+        ibb.contentUnclaimed().equals(Unpooled.wrappedBuffer(uncompressed))
+
+        cleanup:
+        ibb.release()
+
+        where:
+        contentEncoding            | compressor
+        HttpHeaderValues.GZIP      | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.X_GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+    }
+
+    def 'decompression full to full'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        HttpRequest req = null
+        ImmediateByteBody ibb = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                req = request
+                ibb = body
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+        def compChannel = new EmbeddedChannel(compressor)
+        byte[] uncompressed = new byte[1024]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        compChannel.writeOutbound(Unpooled.copiedBuffer(uncompressed))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        while (true) {
+            ByteBuf o = compChannel.readOutbound()
+            if (o == null) {
+                break
+            }
+            compressed.addComponent(true, o)
+        }
+
+        when:
+        def r = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", compressed)
+        r.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeInbound(r)
+        then:
+        !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
+        ibb.contentUnclaimed().equals(Unpooled.wrappedBuffer(uncompressed))
+
+        cleanup:
+        ibb.release()
+
+        where:
+        contentEncoding            | compressor
+        HttpHeaderValues.GZIP      | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.X_GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+    }
+
+    def 'decompression parts to stream'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        HttpRequest req = null
+        StreamingByteBody sbb = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                req = request
+                sbb = body
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+        def compChannel = new EmbeddedChannel(compressor)
+        byte[] uncompressed = new byte[1024]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        compChannel.writeOutbound(Unpooled.copiedBuffer(uncompressed))
+        compChannel.finish()
+
+        when:
+        def r = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        r.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(r)
+        ch.flushInbound()
+        while (true) {
+            ByteBuf o = compChannel.readOutbound()
+            if (o == null) {
+                break
+            }
+            ch.writeOneInbound(new DefaultHttpContent(o))
+            ch.flushInbound()
+        }
+        ch.writeOneInbound(LastHttpContent.EMPTY_LAST_CONTENT)
+        ch.flushInbound()
+        then:
+        !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
+        CompositeByteBuf decompressed = Unpooled.compositeBuffer()
+        for (ByteBuf c : Flux.from(sbb.rawContent(new HttpServerConfiguration()).asPublisher()).toIterable()) {
+            decompressed.addComponent(true, c)
+        }
+        decompressed.equals(Unpooled.wrappedBuffer(uncompressed))
+
+        cleanup:
+        decompressed.release()
+
+        where:
+        contentEncoding            | compressor
+        HttpHeaderValues.GZIP      | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.X_GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
     }
 
     def 'empty streaming response while in queue'() {

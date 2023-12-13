@@ -151,10 +151,11 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         }
     }
 
-    private void log(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, AccessLog accessLog) {
+    private void log(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, AccessLog accessLog, AccessLogHolder accessLogHolder) {
         ctx.write(msg, promise.unvoid()).addListener(future -> {
             if (future.isSuccess()) {
                 accessLog.log(logger);
+                accessLogHolder.logForReuse = accessLog;
             }
         });
     }
@@ -171,7 +172,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                 }
                 if (msg instanceof LastHttpContent content) {
                     accessLogger.onLastResponseWrite(content.content().readableBytes());
-                    log(ctx, msg, promise, accessLogger);
+                    log(ctx, msg, promise, accessLogger, accessLogHolder);
                     return;
                 } else if (msg instanceof ByteBufHolder holder) {
                     accessLogger.onResponseWrite(holder.content().readableBytes());
@@ -224,9 +225,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         @Nullable
         AccessLog getLogForResponse(boolean finishResponse) {
             if (finishResponse) {
-                AccessLog accessLog = liveLogs.poll();
-                logForReuse = accessLog;
-                return accessLog;
+                return liveLogs.poll();
             } else {
                 return liveLogs.peek();
             }

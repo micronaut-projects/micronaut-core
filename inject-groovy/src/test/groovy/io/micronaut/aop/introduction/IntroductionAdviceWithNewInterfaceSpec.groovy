@@ -17,7 +17,6 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -193,7 +192,7 @@ interface SpecificInterface {
         then:
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
-        instance.$proxyMethods.length == 1
+        instance.$proxyMethods.length == 2
 
         cleanup:
         context.close()

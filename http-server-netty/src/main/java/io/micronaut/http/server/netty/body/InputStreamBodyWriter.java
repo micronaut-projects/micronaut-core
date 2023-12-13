@@ -27,13 +27,14 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.scheduling.TaskExecutors;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.stream.ChunkedStream;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Body writer for {@link InputStream}s.
@@ -45,9 +46,11 @@ import java.io.OutputStream;
 @Experimental
 @Singleton
 public final class InputStreamBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<InputStream> {
+    private final ExecutorService executorService;
 
-    InputStreamBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
+    InputStreamBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
         super(configuration);
+        this.executorService = executorService;
     }
 
     @Override
@@ -59,7 +62,7 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
                 nettyResponse.getNettyHeaders()
             );
             //  can be null if the stream was closed
-            nettyContext.writeChunked(finalResponse, new HttpChunkedInput(new ChunkedStream(object)));
+            nettyContext.writeStream(finalResponse, object, executorService);
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
         }

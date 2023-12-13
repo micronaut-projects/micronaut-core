@@ -25,6 +25,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.function.BiFunction;
@@ -156,7 +157,16 @@ public class FilterRunner {
      */
     public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request,
                                                     PropagatedContext propagatedContext) {
-        ListIterator<InternalHttpFilter> iterator = filters.listIterator();
+        List<InternalHttpFilter> filtersToRun = new ArrayList<>(filters.size());
+        for (InternalHttpFilter filter : filters) {
+            if (filter.isEnabled(request)) {
+                filtersToRun.add(filter);
+            }
+        }
+        if (filtersToRun.isEmpty()) {
+            return responseProvider.apply(request, propagatedContext);
+        }
+        ListIterator<InternalHttpFilter> iterator = filtersToRun.listIterator();
         ExecutionFlow<FilterContext> flow = filterRequest(new FilterContext(request, propagatedContext), iterator);
         FilterContext flowContext = flow.tryCompleteValue();
         if (flowContext != null) {

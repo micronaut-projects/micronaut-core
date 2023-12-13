@@ -15,8 +15,18 @@
  */
 package io.micronaut.core.propagation;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.util.concurrent.FastThreadLocal;
 
+/**
+ * This class holds the {@link ThreadLocal} for the propagated context, or the
+ * {@link FastThreadLocal netty alternative} for better performance on netty event loops, if
+ * available.
+ *
+ * @since 4.3.0
+ * @author Jonas Konrad
+ */
+@Internal
 @SuppressWarnings("unchecked")
 final class ThreadContext {
     private static final Object FAST;

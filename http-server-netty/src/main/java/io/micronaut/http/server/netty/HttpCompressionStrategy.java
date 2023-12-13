@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.http.HttpResponse;
 
 /**
@@ -36,6 +37,6 @@ public interface HttpCompressionStrategy {
      * @return The compression level (0-9)
      */
     default int getCompressionLevel() {
-        return 6;
+        return StandardCompressionOptions.gzip().compressionLevel();
     }
 }

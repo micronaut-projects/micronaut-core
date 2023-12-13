@@ -3319,6 +3319,42 @@ interface MyInterface {
         methods.size() == 4
     }
 
+    void "test unrecognized default method"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+interface MyBean extends GenericInterface, SpecificInterface {
+
+    default Specific getObject() {
+        return null;
+    }
+
+}
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {
+    Generic getObject();
+}
+interface SpecificInterface {
+    Specific getObject();
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            allMethods.size() == 2
+        when:
+            def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+            declaredMethods.size() == 1
+            declaredMethods.get(0).isDefault() == true
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")

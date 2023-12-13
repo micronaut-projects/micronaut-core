@@ -20,12 +20,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;
 
-import java.io.RandomAccessFile;
+import java.io.InputStream;
+import java.util.concurrent.ExecutorService;
 
 /**
  * This interface is used to write the different kinds of netty responses.
@@ -68,20 +68,11 @@ public interface NettyWriteContext {
     void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
 
     /**
-     * Write a response with a {@link HttpChunkedInput} body.
+     * Write a response with a body that is a blocking stream.
      *
-     * @param response     The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param chunkedInput The response body
+     * @param response        The response. <b>Must not</b> be a {@link FullHttpResponse}
+     * @param stream          The stream to read from
+     * @param executorService The executor for IO operations
      */
-    void writeChunked(@NonNull HttpResponse response, @NonNull HttpChunkedInput chunkedInput);
-
-    /**
-     * Write a response with a body that is a section of a {@link RandomAccessFile}.
-     *
-     * @param response         The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param randomAccessFile File to read from
-     * @param position         Start position
-     * @param contentLength    Length of the section to send
-     */
-    void writeFile(@NonNull HttpResponse response, @NonNull RandomAccessFile randomAccessFile, long position, long contentLength);
+    void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService);
 }

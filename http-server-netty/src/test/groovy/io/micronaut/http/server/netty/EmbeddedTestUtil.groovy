@@ -23,7 +23,10 @@ class EmbeddedTestUtil {
 
     static void connect(EmbeddedChannel server, EmbeddedChannel client) {
         new ConnectionDirection(server, client).register()
-        new ConnectionDirection(client, server).register()
+        def csDir = new ConnectionDirection(client, server)
+        csDir.register()
+        // PipeliningServerHandler fires a read() before this method is called, so we don't see it.
+        csDir.readPending = true
     }
 
     private static class ConnectionDirection {
@@ -40,7 +43,7 @@ class EmbeddedTestUtil {
         }
 
         private void forwardLater(Object msg) {
-            if (readPending || dest.config().isAutoRead()) {
+            if (readPending || dest.config().isAutoRead() || msg == FLUSH) {
                 dest.eventLoop().execute(() -> forwardNow(msg))
                 readPending = false
             } else {

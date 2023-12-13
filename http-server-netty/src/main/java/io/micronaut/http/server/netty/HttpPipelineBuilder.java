@@ -36,11 +36,9 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
@@ -61,7 +59,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.incubator.codec.http3.Http3;
 import io.netty.incubator.codec.http3.Http3FrameToHttpObjectCodec;
@@ -587,25 +584,18 @@ final class HttpPipelineBuilder implements Closeable {
 
             registerMicronautChannelHandlers();
 
-            insertMicronautHandlers(false);
+            insertMicronautHandlers();
         }
 
         /**
          * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
          * and netty requests, and routing.
          */
-        private void insertMicronautHandlers(boolean zeroCopySupported) {
+        private void insertMicronautHandlers() {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
                 channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(sslHandler.findPeerCert());
             }
-
-            SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
-            if (zeroCopySupported) {
-                channel.attr(PipeliningServerHandler.ZERO_COPY_PREDICATE.get()).set(contentCompressor);
-            }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
             if (webSocketUpgradeHandler.isPresent()) {
@@ -619,7 +609,6 @@ final class HttpPipelineBuilder implements Closeable {
                     )
                 );
             }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler()); // todo: move to PipeliningServerHandler
 
             RequestHandler requestHandler = routingInBoundHandler;
             if (webSocketUpgradeHandler.isPresent()) {
@@ -629,7 +618,9 @@ final class HttpPipelineBuilder implements Closeable {
             if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && sslHandler == null) {
                 requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
             }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, new PipeliningServerHandler(requestHandler));
+            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
+            pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
         }
 
         /**
@@ -643,9 +634,8 @@ final class HttpPipelineBuilder implements Closeable {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
             registerMicronautChannelHandlers();
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
-            insertMicronautHandlers(sslHandler == null);
+            insertMicronautHandlers();
         }
 
         /**

@@ -44,7 +44,6 @@ final class PropagatedContextImpl implements PropagatedContext {
     static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false);
 
     private static final Scope CLEANUP = ThreadContext::remove;
-    private static final Scope NOOP = () -> {};
 
     private final PropagatedContextElement[] elements;
     private final boolean containsThreadElements;
@@ -182,7 +181,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextImpl prevCtx = ThreadContext.get();
         Scope restore;
         if (prevCtx == null && elements.length == 0) {
-            return NOOP;
+            return CLEANUP;
         } else if (prevCtx == null) {
             restore = CLEANUP;
         } else { // elements.length == 0
