@@ -73,7 +73,7 @@ managed-reactive-streams = "1.0.4"
 managed-reactor = "3.5.11"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.25.7"
-managed-ksp = "1.9.21-1.0.15"
+managed-ksp = "1.9.21-1.0.16"
 micronaut-docs = "2.0.0"
 
 [libraries]
