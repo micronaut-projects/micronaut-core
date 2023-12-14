@@ -64,26 +64,26 @@ public class JavaModelUtils {
     }
 
     // Primitives
-    public static final Type DOUBLE = Type.DOUBLE_TYPE;
-    public static final Type FLOAT = Type.FLOAT_TYPE;
-    public static final Type INT = Type.INT_TYPE;
-    public static final Type LONG = Type.LONG_TYPE;
-    public static final Type BOOLEAN = Type.BOOLEAN_TYPE;
-    public static final Type CHAR = Type.CHAR_TYPE;
-    public static final Type SHORT = Type.SHORT_TYPE;
-    public static final Type BYTE = Type.BYTE_TYPE;
+    private static final Type DOUBLE = Type.DOUBLE_TYPE;
+    private static final Type FLOAT = Type.FLOAT_TYPE;
+    private static final Type INT = Type.INT_TYPE;
+    private static final Type LONG = Type.LONG_TYPE;
+    private static final Type BOOLEAN = Type.BOOLEAN_TYPE;
+    private static final Type CHAR = Type.CHAR_TYPE;
+    private static final Type SHORT = Type.SHORT_TYPE;
+    private static final Type BYTE = Type.BYTE_TYPE;
 
     // Wrappers
-    public static final Type BOOLEAN_WRAPPER = Type.getType(Boolean.class);
-    public static final Type INT_WRAPPER = Type.getType(Integer.class);
-    public static final Type LONG_WRAPPER = Type.getType(Long.class);
-    public static final Type DOUBLE_WRAPPER = Type.getType(Double.class);
-    public static final Type FLOAT_WRAPPER = Type.getType(Float.class);
-    public static final Type SHORT_WRAPPER = Type.getType(Short.class);
-    public static final Type BYTE_WRAPPER = Type.getType(Byte.class);
-    public static final Type CHAR_WRAPPER = Type.getType(Character.class);
+    private static final Type BOOLEAN_WRAPPER = Type.getType(Boolean.class);
+    private static final Type INT_WRAPPER = Type.getType(Integer.class);
+    private static final Type LONG_WRAPPER = Type.getType(Long.class);
+    private static final Type DOUBLE_WRAPPER = Type.getType(Double.class);
+    private static final Type FLOAT_WRAPPER = Type.getType(Float.class);
+    private static final Type SHORT_WRAPPER = Type.getType(Short.class);
+    private static final Type BYTE_WRAPPER = Type.getType(Byte.class);
+    private static final Type CHAR_WRAPPER = Type.getType(Character.class);
 
-    public static final Map<Type, Type> PRIMITIVE_TO_WRAPPER = Map.of(
+    private static final Map<Type, Type> PRIMITIVE_TO_WRAPPER = Map.of(
         BOOLEAN, BOOLEAN_WRAPPER,
         INT, INT_WRAPPER,
         DOUBLE, DOUBLE_WRAPPER,
