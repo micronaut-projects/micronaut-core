@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -56,7 +57,7 @@ public abstract class EnclosedElementsQuery<C, N> {
     private static final int MAX_ITEMS_IN_CACHE = 200;
     private static final int MAX_RESULTS = 20;
     private final Map<CacheKey, Element> elementsCache = new LinkedHashMap<>();
-    private final Map<QueryResultKey, List<?>> resultsCache = new LinkedHashMap<>();
+    private final Map<QueryResultKey, EnclosedElementsResult<?>> resultsCache = new LinkedHashMap<>();
 
     /**
      * Get native class element.
@@ -84,16 +85,31 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param classElement The class element
      * @param query        The query to use.
      * @param <T>          The element type
-     * @return The fields
+     * @return The enclosed elements
      */
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ClassElement classElement, @NonNull ElementQuery<T> query) {
+        return getEnclosedElementsResult(classElement, query, false, false).elements;
+    }
+
+    /**
+     * Return the elements that match the given query.
+     *
+     * @param classElement The class element
+     * @param query        The query to use.
+     * @param <T>          The element type
+     * @return The result
+     */
+    public <T extends io.micronaut.inject.ast.Element> EnclosedElementsResult<T> getEnclosedElementsResult(ClassElement classElement,
+                                                                                                           @NonNull ElementQuery<T> query,
+                                                                                                           boolean includeHiddenElements,
+                                                                                                           boolean includeOverriddenElements) {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
 
         QueryResultKey queryResultKey = new QueryResultKey(result, classElement.getNativeType());
-        List<T> values = (List<T>) resultsCache.get(queryResultKey);
-        if (values != null) {
-            return values;
+        EnclosedElementsResult<T> cachedElements = (EnclosedElementsResult<T>) resultsCache.get(queryResultKey);
+        if (cachedElements != null) {
+            return cachedElements;
         }
 
         Set<N> excludeElements = getExcludedNativeElements(result);
@@ -173,11 +189,67 @@ public abstract class EnclosedElementsQuery<C, N> {
         };
 
         C nativeClassType = getNativeClassType(classElement);
-        List<T> elements;
+        EnclosedElementsResult<T> elements;
         if (result.isOnlyDeclared() || classElement.getSuperType().isEmpty() && classElement.getInterfaces().isEmpty()) {
-            elements = getElements(nativeClassType, result, filter);
+            elements = new EnclosedElementsResult<>(
+                getElements(nativeClassType, result, filter), null, null
+            );
+        } else if (result.isIncludeHiddenElements() && result.isIncludeOverriddenMethods()) {
+            elements = new EnclosedElementsResult<>(
+                getAllElements(nativeClassType, null, result, filter), null, null
+            );
         } else {
-            elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result, filter);
+            Map<T, T> hiddenElements;
+            Map<T, T> overriddenElements;
+            BiPredicate<T, T> reduce;
+            if (!result.isIncludeHiddenElements() && !result.isIncludeOverriddenMethods()) {
+                hiddenElements = new HashMap<>();
+                overriddenElements = new HashMap<>();
+                reduce = (newElement, existingElement) -> {
+                    if (hides(newElement, existingElement)) {
+                        if (includeHiddenElements) {
+                            hiddenElements.put(newElement, existingElement);
+                        }
+                        return true;
+                    }
+                    if (overrides(newElement, existingElement)) {
+                        if (includeOverriddenElements) {
+                            overriddenElements.put(newElement, existingElement);
+                        }
+                        return true;
+                    }
+                    return false;
+                };
+            } else if (!result.isIncludeOverriddenMethods()) {
+                hiddenElements = null;
+                overriddenElements = new HashMap<>();
+                reduce = (newElement, existingElement) -> {
+                    if (overrides(newElement, existingElement)) {
+                        if (includeOverriddenElements) {
+                            overriddenElements.put(newElement, existingElement);
+                        }
+                        return true;
+                    }
+                    return false;
+                };
+            } else if (!result.isIncludeHiddenElements()) {
+                hiddenElements = new HashMap<>();
+                overriddenElements = null;
+                reduce = (newElement, existingElement) -> {
+                    if (hides(newElement, existingElement)) {
+                        if (includeHiddenElements) {
+                            hiddenElements.put(newElement, existingElement);
+                        }
+                        return true;
+                    }
+                    return false;
+                };
+            } else {
+                throw new IllegalStateException();
+            }
+            elements = new EnclosedElementsResult<>(
+                getAllElements(nativeClassType, reduce, result, filter), hiddenElements, overriddenElements
+            );
         }
         resultsCache.put(queryResultKey, elements);
         adjustMapCapacity(resultsCache, MAX_RESULTS);
@@ -198,31 +270,28 @@ public abstract class EnclosedElementsQuery<C, N> {
         }
     }
 
-    private boolean reduceElements(io.micronaut.inject.ast.Element newElement,
-                                   io.micronaut.inject.ast.Element existingElement,
-                                   ElementQuery.Result<?> result) {
-        if (!result.isIncludeHiddenElements()) {
-            if (newElement instanceof FieldElement newFiledElement && existingElement instanceof FieldElement existingFieldElement) {
-                return newFiledElement.hides(existingFieldElement);
-            }
-            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
-                if (newMethodElement.hides(existingMethodElement)) {
-                    return true;
-                }
-            }
+    private boolean hides(io.micronaut.inject.ast.Element newElement, io.micronaut.inject.ast.Element existingElement) {
+        if (newElement instanceof FieldElement newFiledElement && existingElement instanceof FieldElement existingFieldElement) {
+            return newFiledElement.hides(existingFieldElement);
         }
-        if (!result.isIncludeOverriddenMethods()) {
-            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
-                return newMethodElement.overrides(existingMethodElement);
-            } else if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
-                return newPropertyElement.overrides(existingPropertyElement);
-            }
+        if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+            return newMethodElement.hides(existingMethodElement);
+        }
+        return false;
+    }
+
+    private boolean overrides(io.micronaut.inject.ast.Element newElement, io.micronaut.inject.ast.Element existingElement) {
+        if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+            return newMethodElement.overrides(existingMethodElement);
+        }
+        if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
+            return newPropertyElement.overrides(existingPropertyElement);
         }
         return false;
     }
 
     private <T extends io.micronaut.inject.ast.Element> List<T> getAllElements(C classNode,
-                                                                               BiPredicate<T, T> reduce,
+                                                                               @Nullable BiPredicate<T, T> reduce,
                                                                                ElementQuery.Result<?> result,
                                                                                Predicate<T> filter) {
 
@@ -239,7 +308,7 @@ public abstract class EnclosedElementsQuery<C, N> {
     }
 
     private <T extends Element> void processClassHierarchy(C classNode,
-                                                           BiPredicate<T, T> reduce,
+                                                           @Nullable BiPredicate<T, T> reduce,
                                                            ElementQuery.Result<?> result,
                                                            List<T> addedFromClassElements,
                                                            List<T> collectedElements,
@@ -258,7 +327,7 @@ public abstract class EnclosedElementsQuery<C, N> {
     }
 
     private <T extends Element> void processInterfaceHierarchy(C classNode,
-                                                               BiPredicate<T, T> reduce,
+                                                               @Nullable BiPredicate<T, T> reduce,
                                                                ElementQuery.Result<?> result,
                                                                List<T> addedFromClassElements,
                                                                Collection<T> collectedElements,
@@ -274,7 +343,7 @@ public abstract class EnclosedElementsQuery<C, N> {
 
     private <T extends Element> void reduce(Collection<T> collectedElements,
                                             List<N> classElements,
-                                            BiPredicate<T, T> reduce,
+                                            @Nullable BiPredicate<T, T> reduce,
                                             ElementQuery.Result<?> result,
                                             List<T> addedFromClassElements,
                                             boolean isInterface,
@@ -293,9 +362,14 @@ public abstract class EnclosedElementsQuery<C, N> {
                 }
             }
             T newElement = convertElement(result, element);
-
             for (Iterator<T> iterator = collectedElements.iterator(); iterator.hasNext(); ) {
                 T existingElement = iterator.next();
+                if (reduce == null) {
+                    if (existingElement == newElement) {
+                        continue classElements;
+                    }
+                    continue;
+                }
                 if (!existingElement.getName().equals(newElement.getName())) {
                     continue;
                 }
@@ -315,7 +389,6 @@ public abstract class EnclosedElementsQuery<C, N> {
                     addedFromClassElements.add(newElement);
                     continue classElements;
                 }
-
             }
             addedFromClassElements.add(newElement);
         }
@@ -487,6 +560,13 @@ public abstract class EnclosedElementsQuery<C, N> {
      */
     @NonNull
     protected abstract io.micronaut.inject.ast.Element toAstElement(N nativeType, Class<?> elementType);
+
+    public record EnclosedElementsResult<T>(List<T> elements,
+                                            @Nullable
+                                            Map<T, T> hiddenElements,
+                                            @Nullable
+                                            Map<T, T> overriddenElements) {
+    }
 
     private record CacheKey(Class<?> elementType, Object nativeType) {
     }
