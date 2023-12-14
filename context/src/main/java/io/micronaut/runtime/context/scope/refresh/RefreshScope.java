@@ -54,7 +54,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @since 1.0
  */
 @Singleton
-@Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
+@Requires(condition = RefreshScopeCondition.class)
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
 
     public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;
