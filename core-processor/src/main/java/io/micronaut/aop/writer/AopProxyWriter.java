@@ -574,9 +574,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     }
                     String desc = getMethodDescriptor(returnType, argumentTypeList);
                     bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, desc, this.isInterface && methodElement.isDefault());
-                    pushReturnValue(bridgeWriter, returnType);
-                    bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
-                    bridgeWriter.visitEnd();
+                    bridgeGenerator.returnValue();
+                    bridgeGenerator.endMethod();
                 }
             }
 
@@ -677,13 +676,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         overriddenMethodGenerator.visitMethodInsn(INVOKEVIRTUAL, TYPE_INTERCEPTOR_CHAIN.getInternalName(), "proceed", getMethodDescriptor(Object.class.getName()), false);
         if (isVoidReturn) {
-            returnVoid(overriddenMethodGenerator);
+            overriddenMethodGenerator.pop();
         } else {
             pushCastToType(overriddenMethodGenerator, returnType);
-            pushReturnValue(overriddenMethodGenerator, returnType);
         }
-        overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, chainVar);
-        overriddenMethodGenerator.visitEnd();
+        overriddenMethodGenerator.returnValue();
+        overriddenMethodGenerator.endMethod();
     }
 
     private void buildMethodDelegate(MethodElement methodElement, MethodElement overriddenBy, boolean isVoidReturn) {
@@ -702,15 +700,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
                 this.isInterface && overriddenBy.isDefault());
 
-        if (isVoidReturn) {
-            overriddenMethodGenerator.returnValue();
-        } else {
+        if (!isVoidReturn) {
             ClassElement returnType = overriddenBy.getReturnType();
             pushCastToType(overriddenMethodGenerator, returnType);
-            pushReturnValue(overriddenMethodGenerator, overriddenBy.getReturnType());
         }
-        overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, 1);
-        overriddenMethodGenerator.visitEnd();
+        overriddenMethodGenerator.returnValue();
+        overriddenMethodGenerator.endMethod();
     }
 
     /**
