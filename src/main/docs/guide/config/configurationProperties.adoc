@@ -240,3 +240,5 @@ Now a map of properties can be supplied to the `my.engine.sensors` configuration
 snippet::io.micronaut.docs.config.mapFormat.VehicleSpec[tags="start",indent=0,title="Use Map Configuration"]
 
 The above example prints: `"Engine Starting V8 [sensors=2]"`
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-configuration.html[@Configuration and @ConfigurationBuilder] to learn more.
