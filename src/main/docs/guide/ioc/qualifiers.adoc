@@ -120,6 +120,8 @@ If multiple possible candidates are present and no `@Primary` is defined a api:c
 
 In addition to `@Primary`, there is also a api:context.annotation.Secondary[] annotation which causes the opposite effect and allows de-prioritizing a bean.
 
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-patterns-composite.html[Micronaut Patterns - Composite] to learn more.
+
 == Injecting Any Bean
 
 If you are not particular about which bean gets injected then you can use the ann:context.annotation.Any[] qualifier which will inject the first available bean, for example:

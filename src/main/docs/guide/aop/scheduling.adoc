@@ -1,5 +1,7 @@
 Like Spring and Grails, the Micronaut framework features a api:scheduling.annotation.Scheduled[] annotation for scheduling background tasks.
 
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-scheduled.html[Schedule Periodic Tasks inside your Micronaut Applications] to learn more.
+
 == Using the @Scheduled Annotation
 
 The api:scheduling.annotation.Scheduled[] annotation can be added to any method of a bean, and you should set one of the `fixedRate`, `fixedDelay`, or `cron` members.
