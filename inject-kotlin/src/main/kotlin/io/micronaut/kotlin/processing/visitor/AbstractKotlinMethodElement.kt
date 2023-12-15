@@ -110,7 +110,7 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         if (name != overridden.getName() || parameters.size != overridden.parameters.size) {
             return false // Fast escape
         }
-        if (declaration != null) {
+        if (declaration != null && overridden.declaration != null) {
             return visitorContext.resolver.overrides(declaration!!, overridden.declaration!!)
         }
         return false

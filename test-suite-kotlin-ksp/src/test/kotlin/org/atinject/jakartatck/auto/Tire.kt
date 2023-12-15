@@ -31,18 +31,14 @@ constructor(constructorInjection: FuelTank) : RoundThing() {
     internal var constructorInjected: Boolean = false
 
     var superPrivateMethodInjected: Boolean = false
-    var superPackagePrivateMethodInjected: Boolean = false
     var superProtectedMethodInjected: Boolean = false
     var superPublicMethodInjected: Boolean = false
     var subPrivateMethodInjected: Boolean = false
-    var subPackagePrivateMethodInjected: Boolean = false
     var subProtectedMethodInjected: Boolean = false
     var subPublicMethodInjected: Boolean = false
 
     var superPrivateMethodForOverrideInjected: Boolean = false
-    var superPackagePrivateMethodForOverrideInjected: Boolean = false
     var subPrivateMethodForOverrideInjected: Boolean = false
-    var subPackagePrivateMethodForOverrideInjected: Boolean = false
     var protectedMethodForOverrideInjected: Boolean = false
     var publicMethodForOverrideInjected: Boolean = false
 
@@ -50,15 +46,8 @@ constructor(constructorInjection: FuelTank) : RoundThing() {
     var subtypeFieldInjectedBeforeSupertypeMethods: Boolean = false
     var subtypeMethodInjectedBeforeSupertypeMethods: Boolean = false
     var similarPrivateMethodInjectedTwice: Boolean = false
-    var similarPackagePrivateMethodInjectedTwice: Boolean = false
     var overriddenProtectedMethodInjectedTwice: Boolean = false
     var overriddenPublicMethodInjectedTwice: Boolean = false
-
-    var tirePackagePrivateMethod2Injected: Boolean = false
-
-    var tirePackagePrivateMethod3Injected: Boolean = false
-
-    var tirePackagePrivateMethod4Injected: Boolean = false
 
     init {
         this.constructorInjection = constructorInjection
@@ -84,13 +73,6 @@ constructor(constructorInjection: FuelTank) : RoundThing() {
         superPrivateMethodInjected = true
     }
 
-    @Inject internal open fun injectPackagePrivateMethod() {
-        if (superPackagePrivateMethodInjected) {
-            similarPackagePrivateMethodInjectedTwice = true
-        }
-        superPackagePrivateMethodInjected = true
-    }
-
     @Inject protected open fun injectProtectedMethod() {
         if (superProtectedMethodInjected) {
             overriddenProtectedMethodInjectedTwice = true
@@ -108,10 +90,6 @@ constructor(constructorInjection: FuelTank) : RoundThing() {
 
     @Inject private fun injectPrivateMethodForOverride() {
         subPrivateMethodForOverrideInjected = true
-    }
-
-    @Inject internal open fun injectPackagePrivateMethodForOverride() {
-        subPackagePrivateMethodForOverrideInjected = true
     }
 
     @Inject protected open fun injectProtectedMethodForOverride() {
@@ -137,18 +115,6 @@ constructor(constructorInjection: FuelTank) : RoundThing() {
 
     protected open fun hasSpareTireBeenMethodInjected(): Boolean {
         return false
-    }
-
-    @Inject override fun injectPackagePrivateMethod2() {
-        tirePackagePrivateMethod2Injected = true
-    }
-
-    @Inject override fun injectPackagePrivateMethod3() {
-        tirePackagePrivateMethod3Injected = true
-    }
-
-    override fun injectPackagePrivateMethod4() {
-        tirePackagePrivateMethod4Injected = true
     }
 
     companion object {
