@@ -68,7 +68,6 @@ import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -779,7 +778,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             ChannelPromise closePromise;
 
             @Override
-            public void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+            public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                 reading = true;
                 ctx.fireChannelRead(msg);
                 reading = false;
