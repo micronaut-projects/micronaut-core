@@ -177,7 +177,7 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
-     * Obtain a {@link BeanDefinition} for the given bean.
+     * Obtain a {@link BeanRegistration} for the given bean.
      *
      * @param bean The bean
      * @param <T>       The concrete type
@@ -186,6 +186,21 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      */
     @NonNull <T> Optional<BeanRegistration<T>> findBeanRegistration(@NonNull T bean);
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given bean.
+     *
+     * @param bean The bean
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @since 4.3.0
+     */
+    @NonNull
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull T bean) {
+        return findBeanRegistration(bean).map(BeanRegistration::getBeanDefinition);
+    }
 
 
     /**

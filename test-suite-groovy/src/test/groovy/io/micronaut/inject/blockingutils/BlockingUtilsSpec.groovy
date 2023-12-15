@@ -4,7 +4,6 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Blocking
-import io.micronaut.inject.BlockingUtils
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -21,8 +20,9 @@ class BlockingUtilsSpec extends Specification {
                                                       Class<? extends AuthenticationProvider> clazz,
                                                       String description) {
         expect:
-        isBlocking == BlockingUtils.isMethodBlocking(beanContext, beanContext.getBean(clazz), "authenticate", String.class, String.class)
-
+        isBlocking == beanContext.findBeanDefinition(beanContext.getBean(clazz))
+                .map(bd -> bd.existsMethodAnnotatedWithBlocking("authenticate", String.class, String.class))
+                .orElse(false)
         where:
         isBlocking | clazz
         true       | BlockingAuthenticationProvider.class
@@ -48,5 +48,4 @@ class BlockingUtilsSpec extends Specification {
             return false
         }
     }
-
 }
