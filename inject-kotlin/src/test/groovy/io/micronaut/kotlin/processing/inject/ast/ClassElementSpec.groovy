@@ -2164,7 +2164,6 @@ interface MyInterface {
             result
     }
 
-    @PendingFeature
     void "test abstract and interface and overridden methods"() {
         when:
             def result = buildClassElementMapped('test.MyBean2', '''

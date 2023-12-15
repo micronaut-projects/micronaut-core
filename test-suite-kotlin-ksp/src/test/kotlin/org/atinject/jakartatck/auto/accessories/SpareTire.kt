@@ -27,12 +27,6 @@ constructor(forSupertype: FuelTank, forSubtype: FuelTank) : Tire(forSupertype) {
     @Inject override var fieldInjection = Tire.NEVER_INJECTED
     override var methodInjection = Tire.NEVER_INJECTED
 
-    var spareTirePackagePrivateMethod2Injected: Boolean = false
-        private set
-
-    var spareTirePackagePrivateMethod3Injected: Boolean = false
-        private set
-
     init {
         this.constructorInjection = forSubtype
     }
@@ -49,13 +43,6 @@ constructor(forSupertype: FuelTank, forSubtype: FuelTank) : Tire(forSupertype) {
             similarPrivateMethodInjectedTwice = true
         }
         subPrivateMethodInjected = true
-    }
-
-    @Inject override fun injectPackagePrivateMethod() {
-        if (subPackagePrivateMethodInjected) {
-            similarPackagePrivateMethodInjectedTwice = true
-        }
-        subPackagePrivateMethodInjected = true
     }
 
     @Inject override fun injectProtectedMethod() {
@@ -77,10 +64,6 @@ constructor(forSupertype: FuelTank, forSubtype: FuelTank) : Tire(forSupertype) {
         superPrivateMethodForOverrideInjected = true
     }
 
-    override fun injectPackagePrivateMethodForOverride() {
-        superPackagePrivateMethodForOverrideInjected = true
-    }
-
     override fun injectProtectedMethodForOverride() {
         protectedMethodForOverrideInjected = true
     }
@@ -96,14 +79,6 @@ constructor(forSupertype: FuelTank, forSubtype: FuelTank) : Tire(forSupertype) {
     @Override
     public override fun hasSpareTireBeenMethodInjected(): Boolean {
         return methodInjection !== Tire.NEVER_INJECTED
-    }
-
-    @Inject override fun injectPackagePrivateMethod2() {
-        spareTirePackagePrivateMethod2Injected = true
-    }
-
-    override fun injectPackagePrivateMethod3() {
-        spareTirePackagePrivateMethod3Injected = true
     }
 
     companion object {
