@@ -53,10 +53,13 @@ import io.micronaut.web.router.Router;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
@@ -65,6 +68,7 @@ import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -768,7 +772,33 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
-        EmbeddedChannel channel = new EmbeddedChannel();
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelDuplexHandler() {
+            // work around https://github.com/netty/netty/pull/13730
+
+            boolean reading = false;
+            ChannelPromise closePromise;
+
+            @Override
+            public void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                reading = true;
+                ctx.fireChannelRead(msg);
+                reading = false;
+                ChannelPromise closePromise = this.closePromise;
+                if (closePromise != null) {
+                    this.closePromise = null;
+                    ctx.close(closePromise);
+                }
+            }
+
+            @Override
+            public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+                if (reading) {
+                    closePromise = promise;
+                } else {
+                    ctx.close(promise);
+                }
+            }
+        });
         buildEmbeddedChannel(channel, ssl);
         return channel;
     }
