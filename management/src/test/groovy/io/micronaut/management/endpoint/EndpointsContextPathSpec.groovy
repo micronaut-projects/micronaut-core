@@ -63,7 +63,7 @@ class EndpointsContextPathSpec extends Specification {
     void "test routes with a server context path and endpoints context path"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'micronaut.server.context-path': '/myapp',
+                'micronaut.server.context-path': '/any',
                 'endpoints.all.context-path': '/test',
         ])
         HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
@@ -144,7 +144,7 @@ class EndpointsContextPathSpec extends Specification {
     static class MyEndpoint {
 
         @Read
-        String name(@Selector String name) {
+        String anyMethodNameForTest(@Selector String name) {
             name
         }
     }
