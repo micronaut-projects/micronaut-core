@@ -49,7 +49,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration: KSClassDeclaration ->
                 declaration.annotations.none { ksAnnotation ->
-                    ksAnnotation.shortName.asString() == Generated::class.simpleName || isVetoed(ksAnnotation)
+                    ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
                 }
             }
             .toList()
@@ -63,7 +63,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
     }
 
     private fun isVetoed(ksAnnotation: KSAnnotation) =
-        ksAnnotation.shortName.asString() == Vetoed::class.simpleName
+        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Vetoed::class.java.name
 
     private fun processClassDeclarations(
         elements: List<KSClassDeclaration>,

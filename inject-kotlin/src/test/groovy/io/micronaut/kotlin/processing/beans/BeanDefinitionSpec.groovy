@@ -1247,4 +1247,44 @@ enum class ColorEnum {
             classes[0].name == "test.ColorEnum"
             bean.name == "test.ColorEnum"
     }
+
+    void "test Jakarta Generated bean is created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+@jakarta.annotation.Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition
+    }
+
+    void "test Micronaut Generated bean is not created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+import io.micronaut.core.annotation.Generated
+
+@Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition == null
+    }
 }
