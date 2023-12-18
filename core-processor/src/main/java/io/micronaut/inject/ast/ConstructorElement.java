@@ -42,6 +42,11 @@ public interface ConstructorElement extends MethodElement {
     }
 
     @Override
+    default boolean hides(MethodElement hiddenMethod) {
+        return false;
+    }
+
+    @Override
     default boolean overrides(MethodElement overridden) {
         return false;
     }

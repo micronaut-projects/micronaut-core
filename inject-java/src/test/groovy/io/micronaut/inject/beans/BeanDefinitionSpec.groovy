@@ -10,6 +10,7 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
+import test.another.BeanWithPackagePrivate
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -666,6 +667,40 @@ interface AInterface<K, V> {
         then:
             arguments[0].type == Long
             arguments[1].type == Long
+    }
+
+    void "test package-private methods with different package are marked as overridden"() {
+        when:
+            def ctx = ApplicationContext.builder().build().start()
+            BeanDefinition definition = buildBeanDefinition('test.another.Test', '''
+package test.another;
+
+import test.Middle;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test extends Middle {
+    public boolean root;
+    void injectPackagePrivateMethod() {
+        root = true;
+    }
+}
+
+''')
+
+            def bean1 = ctx.getBean(BeanWithPackagePrivate)
+            def bean2 = ctx.getBean(definition)
+        then: """By Java rules the base method is not overriden and should have been injected too, but it's not possible to invoked using the reflection,
+so we mark it as overridden
+"""
+            !bean1.@root
+            bean1.@middle
+            !bean1.@base
+            !bean2.@root
+            bean2.@middle
+            !bean2.@base
+        cleanup:
+            ctx.close()
     }
 
     void "test repeatable inner type annotation 1"() {

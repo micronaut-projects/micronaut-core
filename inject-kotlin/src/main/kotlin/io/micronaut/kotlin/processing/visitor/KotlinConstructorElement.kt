@@ -50,6 +50,10 @@ internal class KotlinConstructorElement(
         return false
     }
 
+    override fun hides(hiddenMethod: MethodElement?): Boolean {
+        return false
+    }
+
     override fun getName() = "<init>"
 
     override fun getReturnType(): ClassElement = declaringType

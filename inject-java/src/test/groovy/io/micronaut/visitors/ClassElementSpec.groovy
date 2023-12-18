@@ -48,6 +48,27 @@ import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
 
+    void "test package-private methods with broken different package"() {
+        when:
+        ClassElement classElement = buildClassElement('''
+package test.another;
+
+import test.Middle;
+
+class Test extends Middle {
+   private boolean testInjected;
+    void injectPackagePrivateMethod() {
+        testInjected = true;
+    }
+}
+
+''')
+
+            def elements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then: "A special case for the indentical methods with package-private access and broken package access in between"
+            elements.size() == 2
+    }
+
     void "test class element generics"() {
         given:
         ClassElement classElement = buildClassElement('''

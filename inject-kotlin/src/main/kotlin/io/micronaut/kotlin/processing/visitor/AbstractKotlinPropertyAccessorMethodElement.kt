@@ -62,4 +62,8 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
         // not sure how to implement this correctly for Kotlin
         false
 
+    override fun hides(hiddenMethod: MethodElement?) =
+        // not sure how to implement this correctly for Kotlin
+        false
+
 }

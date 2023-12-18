@@ -22,7 +22,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -36,6 +35,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
@@ -162,28 +162,43 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public boolean overrides(MethodElement overridden) {
-        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+        if (equals(overridden) || isStatic() || overridden.isStatic() || isPrivate() || overridden.isPrivate()) {
             return false;
         }
         if (overridden instanceof JavaMethodElement javaMethodElement) {
-            boolean overrides = visitorContext.getElements().overrides(
+            if (isPackagePrivate() && overridden.isPackagePrivate()) {
+                // Test special case of the default methods
+                return MethodElement.super.overrides(overridden);
+            }
+            return visitorContext.getElements().overrides(
                 executableElement,
                 javaMethodElement.executableElement,
                 owningType.classElement
             );
-            if (overrides) {
-                return true;
-            }
         }
         return MethodElement.super.overrides(overridden);
     }
 
     @Override
-    public boolean hides(MemberElement hidden) {
+    public boolean isSubSignature(MethodElement element) {
+        if (element instanceof JavaMethodElement javaMethodElement) {
+            return visitorContext.getTypes().isSubsignature(
+                    (ExecutableType) executableElement.asType(),
+                    (ExecutableType) javaMethodElement.executableElement.asType()
+            );
+        }
+        return MethodElement.super.isSubSignature(element);
+    }
+
+    @Override
+    public boolean hides(MethodElement hiddenMethod) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }
-        return visitorContext.getElements().hides(getNativeType().element(), ((JavaNativeElement.Method) hidden.getNativeType()).element());
+        if (hiddenMethod instanceof JavaMethodElement javaMethodElement) {
+            return visitorContext.getElements().hides(getNativeType().element(), javaMethodElement.getNativeType().element());
+        }
+        return MethodElement.super.hides(hiddenMethod);
     }
 
     @NonNull
