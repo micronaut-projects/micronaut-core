@@ -96,7 +96,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 .filterIsInstance<KSClassDeclaration>()
                 .filter { declaration: KSClassDeclaration ->
                     declaration.annotations.none { ksAnnotation ->
-                        ksAnnotation.shortName.getQualifier() == Generated::class.simpleName
+                        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
                     }
                 }
                 .toList()
