@@ -25,13 +25,6 @@ class V8Engine : GasEngine() {
         publicNoArgsConstructorInjected = true
     }
 
-    @Inject override fun injectPackagePrivateMethod() {
-        if (subPackagePrivateMethodInjected) {
-            overriddenPackagePrivateMethodInjectedTwice = true
-        }
-        subPackagePrivateMethodInjected = true
-    }
-
     /**
      * Qualifiers are swapped from how they appear in the superclass.
      */
@@ -44,10 +37,6 @@ class V8Engine : GasEngine() {
                 || tireB !is SpareTire) {
             qualifiersInheritedFromOverriddenMethod = true
         }
-    }
-
-    override fun injectPackagePrivateMethodForOverride() {
-        subPackagePrivateMethodForOverrideInjected = true
     }
 
     @Inject

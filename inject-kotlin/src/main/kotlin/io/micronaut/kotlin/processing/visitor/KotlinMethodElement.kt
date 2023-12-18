@@ -48,10 +48,6 @@ internal open class KotlinMethodElement(
         visitorContext
     )
 
-    override val overridee: KSDeclaration? by lazy {
-        declaration.findOverridee()
-    }
-
     override val internalDeclaringType: ClassElement by lazy {
         resolveDeclaringType(declaration, owningType)
     }

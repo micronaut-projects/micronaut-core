@@ -40,10 +40,6 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
         accessor.receiver
     }
 
-    override val overridee: KSDeclaration? by lazy {
-        accessor.receiver.findOverridee()
-    }
-
     override val internalDeclaringType: ClassElement by lazy {
         resolveDeclaringType(accessor.receiver, owningType)
     }
