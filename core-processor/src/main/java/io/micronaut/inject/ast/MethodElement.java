@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
@@ -266,84 +267,83 @@ public interface MethodElement extends MemberElement {
      * @return true if this overrides passed method element
      * @since 3.1
      */
+    @NextMajorVersion("Review the package-private methods with broken access, those might need to be excluded completely")
     default boolean overrides(@NonNull MethodElement overridden) {
-        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+        if (equals(overridden) || isStatic() || overridden.isStatic() || isPrivate() || overridden.isPrivate()) {
             return false;
         }
-        ClassElement thisType = getDeclaringType();
-        ClassElement thatType = overridden.getDeclaringType();
-        if (thisType.getName().equals(thatType.getName())) {
-            return false;
-        }
-        if (!thisType.isAssignable(thatType)) {
-            // not a parent class
+        if (!isSubSignature(overridden)) {
             return false;
         }
         MethodElement newMethod = this;
         if (newMethod.isAbstract() && !newMethod.isDefault() && (!overridden.isAbstract() || overridden.isDefault())) {
             return false;
         }
-        if (!newMethod.getName().equals(overridden.getName()) || overridden.getParameters().length != newMethod.getParameters().length) {
-            return false;
-        }
-        for (int i = 0; i < overridden.getParameters().length; i++) {
-            ParameterElement existingParameter = overridden.getParameters()[i];
-            ParameterElement newParameter = newMethod.getParameters()[i];
-            ClassElement existingType = existingParameter.getGenericType();
-            ClassElement newType = newParameter.getGenericType();
-            if (!newType.isAssignable(existingType)) {
+        if (isPackagePrivate() && overridden.isPackagePrivate()) {
+            // This is a special case for identical package-private methods from the same package
+            // if the package is changed in the subclass in between; by Java rules those methods aren't overridden
+            // But this kind of non-overridden method in the subclass CANNOT be called by the reflection,
+            // it will always call the subclass method!
+            // In Micronaut 4 we mark this method as overridden, in the future we might want to exclude them completely
+            if (!getDeclaringType().getPackageName().equals(overridden.getDeclaringType().getPackageName())) {
                 return false;
             }
         }
-        ClassElement existingReturnType = overridden.getReturnType().getGenericType();
-        ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
-        if (!newTypeReturn.isAssignable(existingReturnType)) {
-            return false;
-        }
-        // Cannot override existing private/package private methods even if the signature is the same
-        if (overridden.isPrivate()) {
-            return false;
-        }
-        if (overridden.isPackagePrivate()) {
-            return newMethod.getDeclaringType().getPackageName().equals(overridden.getDeclaringType().getPackageName());
-        }
-        return true;
+        // Check if a parent class
+        return getDeclaringType().isAssignable(overridden.getDeclaringType());
     }
 
     @Override
     default boolean hides(@NonNull MemberElement memberElement) {
         if (memberElement instanceof MethodElement hidden) {
-            if (equals(hidden) || isStatic() || hidden.isStatic() || hidden.isPrivate()) {
-                return false;
-            }
-            MethodElement newMethod = this;
-            if (!newMethod.getName().equals(hidden.getName()) || hidden.getParameters().length != newMethod.getParameters().length) {
-                return false;
-            }
-            for (int i = 0; i < hidden.getParameters().length; i++) {
-                ParameterElement existingParameter = hidden.getParameters()[i];
-                ParameterElement newParameter = newMethod.getParameters()[i];
-                ClassElement existingType = existingParameter.getGenericType();
-                ClassElement newType = newParameter.getGenericType();
-                if (!newType.isAssignable(existingType)) {
-                    return false;
-                }
-            }
-            if (!getDeclaringType().isAssignable(memberElement.getDeclaringType())) {
-                // not a parent class
-                return false;
-            }
-            ClassElement existingReturnType = hidden.getReturnType().getGenericType();
-            ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
-            if (!newTypeReturn.isAssignable(existingReturnType)) {
-                return false;
-            }
-            if (hidden.isPackagePrivate()) {
-                return newMethod.getDeclaringType().getPackageName().equals(hidden.getDeclaringType().getPackageName());
-            }
-            return memberElement.isAccessible(getDeclaringType());
+            return hides(hidden);
         }
         return false;
+    }
+
+    /**
+     * Checks if this member element hides another.
+     *
+     * @param hiddenMethod The possibly hidden method
+     * @return true if this member element hides passed field element
+     * @since 4.3.0
+     */
+    default boolean hides(@NonNull MethodElement hiddenMethod) {
+        if (equals(hiddenMethod) || isStatic() || hiddenMethod.isStatic() || hiddenMethod.isPrivate()) {
+            return false;
+        }
+        if (!isSubSignature(hiddenMethod)) {
+            return false;
+        }
+        if (!getDeclaringType().isAssignable(hiddenMethod.getDeclaringType())) {
+            // not a parent class
+            return false;
+        }
+        if (hiddenMethod.isPackagePrivate()) {
+            return getDeclaringType().getPackageName().equals(hiddenMethod.getDeclaringType().getPackageName());
+        }
+        return hiddenMethod.isAccessible(getDeclaringType(), false);
+    }
+
+    /**
+     * Is this method a sub signature of another.
+     * @param element The other method
+     * @return true if a sub signature
+     * @since 4.3.0
+     */
+    default boolean isSubSignature(MethodElement element) {
+        if (!getName().equals(element.getName()) || element.getParameters().length != this.getParameters().length) {
+            return false;
+        }
+        for (int i = 0; i < element.getParameters().length; i++) {
+            ParameterElement existingParameter = element.getParameters()[i];
+            ParameterElement newParameter = getParameters()[i];
+            ClassElement existingType = existingParameter.getGenericType();
+            if (!newParameter.getGenericType().isAssignable(existingType)) {
+                return false;
+            }
+        }
+        return getReturnType().getGenericType().isAssignable(element.getReturnType().getGenericType());
     }
 
     /**

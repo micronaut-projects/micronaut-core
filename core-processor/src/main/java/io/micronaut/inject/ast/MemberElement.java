@@ -76,17 +76,7 @@ public interface MemberElement extends Element {
      * @since 3.4.0
      */
     default boolean isReflectionRequired(@NonNull ClassElement callingType) {
-        if (isPublic()) {
-            return false;
-        }
-        if (isPackagePrivate() || isProtected()) {
-            // the declaring type might be a super class in which
-            // case if the super class is in a different package then
-            // the method or field is not visible and hence reflection is required
-            final ClassElement declaringType = getDeclaringType();
-            return !declaringType.getPackageName().equals(callingType.getPackageName());
-        }
-        return isPrivate();
+        return !isAccessible(callingType, false);
     }
 
     /**
@@ -106,6 +96,61 @@ public interface MemberElement extends Element {
 
     /**
      * Returns whether this member element can be invoked or retrieved at runtime.
+     * It can be accessible by a simple invocation
+     *
+     * <p>This method uses {@link #isReflectionRequired()} with a checks if the reflection access is allowed.
+     * By checking for {@link io.micronaut.core.annotation.ReflectiveAccess} annotation.
+     * </p>
+     *
+     * @param callingType The calling type
+     * @param allowReflection If reflection invocation can be used
+     * @return Will return {@code true} if is accessible.
+     * @since 4.3.0
+     */
+    default boolean isAccessible(@NonNull ClassElement callingType, boolean allowReflection) {
+        if (isPublic()) {
+            return true;
+        }
+        if (isProtected()) {
+            // the declaring type might be a super class in which
+            // case if the super class is in a different package then
+            // the method or field is not visible and hence reflection is required
+            final ClassElement declaringType = getDeclaringType();
+            String packageName = declaringType.getPackageName();
+            if (!packageName.equals(callingType.getPackageName())) {
+                return allowReflection && hasAnnotation(ReflectiveAccess.class);
+            }
+            return true;
+        }
+        if (isPackagePrivate()) {
+            // the declaring type might be a super class in which
+            // case if the super class is in a different package then
+            // the method or field is not visible and hence reflection is required
+            final ClassElement declaringType = getDeclaringType();
+            String packageName = declaringType.getPackageName();
+            if (!packageName.equals(callingType.getPackageName())) {
+                return allowReflection && hasAnnotation(ReflectiveAccess.class);
+            }
+            if (isPackagePrivate()) {
+                // Check if there is a subtype that breaks the package friendship
+                ClassElement superClass = getOwningType();
+                while (superClass != null && !superClass.equals(declaringType)) {
+                    if (!packageName.equals(superClass.getPackageName())) {
+                        return allowReflection && hasAnnotation(ReflectiveAccess.class);
+                    }
+                    superClass = superClass.getSuperType().orElse(null);
+                }
+            }
+            return true;
+        }
+        if (isPrivate()) {
+            return allowReflection && hasAnnotation(ReflectiveAccess.class);
+        }
+        return true;
+    }
+
+    /**
+     * Returns whether this member element can be invoked or retrieved at runtime.
      * It can be accessible by a simple invocation or a reflection invocation.
      *
      * <p>This method uses {@link #isReflectionRequired()} with a checks if the reflection access is allowed.
@@ -117,7 +162,7 @@ public interface MemberElement extends Element {
      * @since 3.7.0
      */
     default boolean isAccessible(@NonNull ClassElement callingType) {
-        return !isReflectionRequired(callingType) || hasAnnotation(ReflectiveAccess.class);
+        return isAccessible(callingType, true);
     }
 
     @Override
