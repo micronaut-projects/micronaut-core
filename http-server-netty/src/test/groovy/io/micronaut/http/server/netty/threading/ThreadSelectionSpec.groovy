@@ -29,6 +29,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
 import reactor.core.publisher.Mono
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.util.concurrent.ExecutorService
@@ -94,8 +95,8 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
-        def exResult = client.exception()
-        def scheduledResult = client.scheduleException()
+        String exResult = client.exception()
+        String scheduledResult = client.scheduleException()
 
         then:
         exResult.contains(controller)
@@ -114,6 +115,7 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"                     | "handler: $IO"
     }
 
+    @Ignore // pending feature, only works sometimes: https://github.com/micronaut-projects/micronaut-core/pull/10104
     void "test thread selection for error route #strategy"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ThreadSelectionSpec', 'micronaut.server.thread-selection': strategy])

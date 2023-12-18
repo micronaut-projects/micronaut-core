@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
@@ -1119,13 +1120,13 @@ interface Deserializer<T> {
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
@@ -1159,15 +1160,15 @@ interface Deserializer<T> {
             // Arrays are not resolved as KotlinClassElements or placeholders
         then: "The first is a placeholder"
             serdeTypeParam.simpleName == "String[]"
-            serdeTypeParam.isTypeVariable()
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
             serializerTypeParam.simpleName == "String[]"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
             deserializerTypeParam.simpleName == "String[]"
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test inline class return type"() {
@@ -1215,5 +1216,35 @@ annotation class NotNull
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+    }
+
+    void "test java class value annotation"() {
+        given:
+            AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+            AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.banner.MicronautBanner
+import jakarta.inject.Singleton
+
+@Requires(classes = [ColorEnum::class], bean = ColorEnum::class)
+@Singleton
+class Test
+
+
+enum class ColorEnum {
+    BLUE
+}
+''').getAnnotationMetadata()
+
+        when:
+            def requires = metadata.getAnnotation(Requires)
+            def classes = requires.annotationClassValues("classes")
+            def bean = requires.annotationClassValue("bean").get()
+
+        then:
+            classes[0].name == "test.ColorEnum"
+            bean.name == "test.ColorEnum"
     }
 }

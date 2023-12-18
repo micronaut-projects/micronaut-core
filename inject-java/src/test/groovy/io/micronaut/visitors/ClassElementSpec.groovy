@@ -3355,6 +3355,77 @@ interface SpecificInterface {
             declaredMethods.get(0).isDefault() == true
     }
 
+    void "test bean properties interfaces"() {
+        def ce = buildClassElement('''
+package test;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.visitors.data.Pageable;
+import jakarta.inject.Singleton;
+
+class TestNamed {
+    Pageable method() {
+        return null;
+    }
+}
+
+''')
+        def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
+        expect:
+            properties.stream().map {it.getName()}.sorted().toList() == [
+                    "sorted",
+                    "orderBy",
+                    "number",
+                    "size",
+                    "offset",
+                    "sort",
+                    "unpaged"
+            ].sort()
+    }
+
+    void "test bean properties 2"() {
+        def ce = buildClassElement('''
+package test;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.visitors.data.Pageable;
+import jakarta.inject.Singleton;
+
+class TestNamed {
+    Pageable method() {
+        return null;
+    }
+}
+
+''')
+        def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
+                .stream()
+                .filter {it.getName() == "orderBy"}.findFirst()
+                .get()
+                .getGenericType()
+                .getFirstTypeArgument()
+                .get()
+                .getBeanProperties()
+        expect:
+            properties.stream().map {it.getName()}.sorted().toList() == [
+                    "ignoreCase",
+                    "direction",
+                    "property",
+                    "ascending"
+            ].sort()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType()
+                    .isEnum()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType() instanceof EnumElement
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")

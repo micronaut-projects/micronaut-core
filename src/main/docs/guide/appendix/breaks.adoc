@@ -218,3 +218,7 @@ Micronaut Framework 4 changes `@CrossOrigin`  behavior to match configuration-ba
 ==== Manual Context Propagation
 
 In Micronaut Framework 4, users need to extend the <<contextPropagation, propagation context>> manually.
+
+==== Micronaut 3 libraries not compatible with Micronaut 4 applications
+
+In order for Micronaut 3 library beans to be discoverable in an application running Micronaut 4, the library must be recompiled with Micronaut 4 - https://github.com/micronaut-projects/micronaut-core/discussions/9758 

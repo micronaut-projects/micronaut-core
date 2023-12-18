@@ -595,6 +595,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 }
                 if (declaration.classKind == ClassKind.CLASS ||
                     declaration.classKind == ClassKind.INTERFACE ||
+                    declaration.classKind == ClassKind.ENUM_CLASS ||
                     declaration.classKind == ClassKind.ANNOTATION_CLASS) {
                     return AnnotationClassValue<Any>(declaration.getBinaryName(resolver, visitorContext))
                 }

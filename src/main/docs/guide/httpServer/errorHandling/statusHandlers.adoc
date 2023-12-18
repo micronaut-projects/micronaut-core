@@ -3,3 +3,6 @@ The ann:http.annotation.Error[] annotation supports defining either an exception
 Local error handlers only respond to exceptions thrown as a result of the route being matched to another method in the same controller. Global error handlers can be invoked as a result of any thrown exception. A local error handler is always searched for first when resolving which handler to execute.
 
 TIP: When defining an error handler for an exception, you can specify the exception instance as an argument to the method and omit the exception property of the annotation.
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-error-handling.html[Error Handling] to learn more.
+

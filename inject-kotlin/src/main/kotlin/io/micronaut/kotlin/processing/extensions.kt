@@ -35,6 +35,9 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
     if (binaryName != null) {
         return binaryName
     }
+    if (declaration.qualifiedName == null) {
+        return "java.lang.Object" // Anonymous
+    }
     val classDeclaration = declaration.getClassDeclaration(visitorContext)
     val qn = classDeclaration.qualifiedName
     if (qn != null) {

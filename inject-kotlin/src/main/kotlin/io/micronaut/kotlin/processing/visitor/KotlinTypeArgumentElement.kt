@@ -36,7 +36,7 @@ internal class KotlinTypeArgumentElement(
     resolved.resolvedTypeArguments,
     visitorContext,
     internalArrayDimensions,
-    true
+    false
 ), GenericElement {
 
     private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {

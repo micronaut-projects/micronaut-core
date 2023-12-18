@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.conventions.PropertyConvention;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import jakarta.inject.Singleton;
 
@@ -69,11 +70,13 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
     }
 
     private String normalizeContextPath(String contextPath) {
-        if (contextPath.charAt(0) != '/') {
-            contextPath = '/' + contextPath;
-        }
-        if (contextPath.charAt(contextPath.length() - 1) == '/') {
-            contextPath = contextPath.substring(0, contextPath.length() - 1);
+        if (StringUtils.isNotEmpty(contextPath)) {
+            if (contextPath.charAt(0) != '/') {
+                contextPath = '/' + contextPath;
+            }
+            if (contextPath.charAt(contextPath.length() - 1) == '/') {
+                contextPath = contextPath.substring(0, contextPath.length() - 1);
+            }
         }
         return contextPath;
     }
