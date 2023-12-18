@@ -19,7 +19,7 @@ You can use api:http.uri.UriTemplate[] to build paths to include in your respons
 
 == URI Path Variables
 
-URI variables can be referenced via method arguments. For example:
+URI variables can be referenced via method arguments. When the path variable matches the method argument name, they are bound together automatically. If you want to use different names the link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable] annotation can be used. The following example illustrates these options:
 
 snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", indent=0, title="URI Variables Example"]
 
