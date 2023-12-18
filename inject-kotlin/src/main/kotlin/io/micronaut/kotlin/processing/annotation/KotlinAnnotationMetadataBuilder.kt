@@ -40,7 +40,7 @@ import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.util.ArrayUtils
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
@@ -400,7 +400,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
                 if (argument?.value != null && argument.isDefault()) {
                     val value = argument.value!!
-                    map[prop] = value
+                    if (value !is String || !StringUtils.isEmpty(value)) {
+                        map[prop] = value
+                    }
                 }
             }
             map
