@@ -785,6 +785,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discard() {
+            // pretend we wrote to clean up resources
+            requestHandler.responseWritten(outboundAccess.attachment);
             message.release();
             outboundHandler = null;
         }
