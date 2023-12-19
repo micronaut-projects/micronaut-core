@@ -111,7 +111,8 @@ public interface MemberElement extends Element {
         if (isPublic()) {
             return true;
         }
-        if (isProtected()) {
+        boolean packagePrivate = isPackagePrivate();
+        if (isProtected() || packagePrivate) {
             // the declaring type might be a super class in which
             // case if the super class is in a different package then
             // the method or field is not visible and hence reflection is required
@@ -120,18 +121,7 @@ public interface MemberElement extends Element {
             if (!packageName.equals(callingType.getPackageName())) {
                 return allowReflection && hasAnnotation(ReflectiveAccess.class);
             }
-            return true;
-        }
-        if (isPackagePrivate()) {
-            // the declaring type might be a super class in which
-            // case if the super class is in a different package then
-            // the method or field is not visible and hence reflection is required
-            final ClassElement declaringType = getDeclaringType();
-            String packageName = declaringType.getPackageName();
-            if (!packageName.equals(callingType.getPackageName())) {
-                return allowReflection && hasAnnotation(ReflectiveAccess.class);
-            }
-            if (isPackagePrivate()) {
+            if (packagePrivate) {
                 // Check if there is a subtype that breaks the package friendship
                 ClassElement superClass = getOwningType();
                 while (superClass != null && !superClass.equals(declaringType)) {
