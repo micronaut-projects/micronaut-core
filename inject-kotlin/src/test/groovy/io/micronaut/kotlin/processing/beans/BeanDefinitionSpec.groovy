@@ -419,6 +419,7 @@ class Test
         then:
         defaults["num"] == 10
         defaults["bool"] == false
+        defaults["value"] == null
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
         defaults["intArray3"] == null

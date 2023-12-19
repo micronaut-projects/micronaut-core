@@ -565,6 +565,45 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == null
     }
 
+    def 'responseWritten always called'() {
+        given:
+        int unwritten = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                unwritten++
+                request.release()
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                unwritten--
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        // note: this relies on channelReadComplete never being called, which is a bit unrealistic. channelReadComplete
+        // causes a flush, which for EmbeddedChannel, clears the outbound buffer and thus clears the backlog.
+        while (true) {
+            boolean writableBefore = ch.writable
+            ch.writeOneInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+            ch.checkException()
+            ch.runPendingTasks()
+            if (!writableBefore) {
+                break
+            }
+        }
+        ch.finishAndReleaseAll()
+        then:
+        unwritten == 0
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0
