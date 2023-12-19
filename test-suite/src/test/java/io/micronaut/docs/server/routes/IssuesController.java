@@ -26,8 +26,13 @@ import io.micronaut.http.annotation.PathVariable;
 public class IssuesController {
 
     @Get("/{number}") // <2>
-    public String issue(@PathVariable Integer number) { // <3>
+    public String issue(Integer number) { // <3>
         return "Issue # " + number + "!"; // <4>
+    }
+
+    @Get("/issue/{number}")
+    public String issueFromId(@PathVariable("number") Integer id) { // <5>
+        return "Issue # " + id + "!";
     }
 }
 // end::class[]

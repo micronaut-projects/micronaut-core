@@ -63,11 +63,19 @@ class IssuesControllerTest {
     }
 
     @Test
+    void testIssueFromId() {
+        String body = client.toBlocking().retrieve("/issues/issue/13");
+
+        assertNotNull(body);
+        assertEquals("Issue # 13!", body); // <5>
+    }
+
+    @Test
     void testShowWithInvalidInteger() {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/hello"));
 
-        assertEquals(400, e.getStatus().getCode()); // <5>
+        assertEquals(400, e.getStatus().getCode()); // <6>
     }
 
     @Test
@@ -75,7 +83,7 @@ class IssuesControllerTest {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/"));
 
-        assertEquals(404, e.getStatus().getCode()); // <6>
+        assertEquals(404, e.getStatus().getCode()); // <7>
     }
 }
 // end::class[]
