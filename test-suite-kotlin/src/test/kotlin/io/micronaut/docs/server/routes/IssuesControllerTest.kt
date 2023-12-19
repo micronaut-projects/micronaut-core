@@ -11,7 +11,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 // end::imports[]
 
-// tag::class[]
+// tag::startclass[]
 class IssuesControllerTest: StringSpec() {
 
     val embeddedServer = autoClose( // <2>
@@ -23,7 +23,9 @@ class IssuesControllerTest: StringSpec() {
             HttpClient::class.java,
             embeddedServer.url) // <1>
     )
+    // end::startclass[]
 
+    // tag::normal[]
     init {
         "test issue" {
             val body = client.toBlocking().retrieve("/issues/12") // <3>
@@ -54,6 +56,25 @@ class IssuesControllerTest: StringSpec() {
 
             e.status.code shouldBe 404 // <7>
         }
+        // end::normal[]
+
+        // tag::defaultvalue[]
+        "test issue from id" {
+            val body = client.toBlocking().retrieve("/issues/default")
+
+            body shouldNotBe null
+            body shouldBe "Issue # 0!" // <1>
+        }
+
+        "test issue from id" {
+            val body = client.toBlocking().retrieve("/issues/default/1")
+
+            body shouldNotBe null
+            body shouldBe "Issue # 1!" // <2>
+        }
+        // end::defaultvalue[]
+
+// tag::endclass[]
     }
 }
-// end::class[]
+// end::endclass[]

@@ -19,9 +19,9 @@ You can use api:http.uri.UriTemplate[] to build paths to include in your respons
 
 == URI Path Variables
 
-URI variables can be referenced via method arguments. When the path variable matches the method argument name, they are bound together automatically. If you want to use different names the link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable] annotation can be used. The following example illustrates these options:
+URI variables can be referenced via method arguments. When the path variable matches the method argument name, they are bound together automatically. If you want to use different names or specify a default value for a missing URI Variable, the link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable] annotation can be used. The following example illustrates these options:
 
-snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", indent=0, title="URI Variables Example"]
+snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,startclass,normal,endclass", title="URI Variables Example"]
 
 <1> The `@Controller` annotation is specified with a base URI of `/issues`
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation maps the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI named `number`
@@ -31,7 +31,7 @@ snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", 
 
 The Micronaut framework maps the URI `/issues/{number}` for the above controller. We can assert this is the case by writing unit tests:
 
-snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,class", indent=0, title="Testing URI Variables"]
+snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,startclass,normal,endclass", title="Testing URI Variables"]
 
 <1> The embedded server and HTTP client are started
 <2> The server and client are cleaned up after the tests finish
@@ -41,7 +41,17 @@ snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,clas
 <6> Another test asserts a 400 response is returned when an invalid number is sent in the URL
 <7> Another test asserts a 404 response is returned when no number is provided in the URL. The variable being present is required for the route to be executed.
 
-Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}` and by annotating the `number` parameter with `@Nullable`.
+Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}` and by annotating the `number` parameter with `@Nullable`. Alternatively, you can use the `defaultValue` element of the link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable] annotation to specify a default value when the URI variable is missing. For example:
+
+snippet::io.micronaut.docs.server.routes.IssuesController[tags="defaultvalue", indent=0 title="Default Value Example"]
+
+<1> The forward slash inside the braces designates `number` as an optional URI variable
+<2> The `defaultValue` attribute specifies the default value for `number` when the URI variable is missing
+
+snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="defaultvalue", indent=0 title="Testing Default Value"]
+
+<1> This test illustrates the substitution of a default `PathVariable' value when the URI variable is missing
+<2> And another test to illustrate when the optional URI variable is provided
 
 The following table provides examples of URI templates and what they match:
 
