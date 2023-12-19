@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
@@ -262,20 +261,10 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return Whether an {@link ExecutableMethod} exists which is annotated with the supplied annotation
      * @since 4.3.0
      */
-    default boolean existsMethodWithAnnotation(Class<? extends Annotation> annotationClass, String methodName, Class<?>... argumentTypes) {
+    default boolean hasAnnotatedMethod(@NonNull Class<? extends Annotation> annotationClass,
+                                       @NonNull String methodName,
+                                       @NonNull Class<?>... argumentTypes) {
         return findMethod(methodName, argumentTypes).map(method -> method.hasAnnotation(annotationClass)).orElse(false);
-    }
-
-    /**
-     * Whether an {@link ExecutableMethod} exists which is annotated with {@link Blocking}.
-     *
-     * @param methodName          The method name
-     * @param argumentTypes The argument types
-     * @return Whether an {@link ExecutableMethod} exists which is annotated with with {@link Blocking}.
-     * @since 4.3.0
-     */
-    default boolean existsMethodAnnotatedWithBlocking(String methodName, Class<?>... argumentTypes) {
-        return findMethod(methodName, argumentTypes).map(method -> method.hasAnnotation(Blocking.class)).orElse(false);
     }
 
     /**

@@ -21,7 +21,7 @@ class BlockingUtilsSpec extends Specification {
                                                       String description) {
         expect:
         isBlocking == beanContext.findBeanDefinition(beanContext.getBean(clazz))
-                .map(bd -> bd.existsMethodAnnotatedWithBlocking("authenticate", String.class, String.class))
+                .map(bd -> bd.hasAnnotatedMethod(Blocking.class,"authenticate", String.class, String.class))
                 .orElse(false)
         where:
         isBlocking | clazz
