@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,37 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
+package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.server.cors.CorsOriginConfiguration;
+import io.micronaut.http.server.cors.CorsOriginConverter;
 
-import java.util.Optional;
+import java.util.Map;
 
 /**
- * The media type converters registrar.
+ * The HTTP server type converters registrar.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.3.0
  */
 @Internal
-public final class MediaTypeConvertersRegistrar implements TypeConverterRegistrar {
+public final class ConvertersRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {
-        conversionService.addConverter(CharSequence.class, MediaType.class, (object, targetType, context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            } else {
-                try {
-                    return Optional.of(MediaType.of(object.toString()));
-                } catch (IllegalArgumentException e) {
-                    context.reject(e);
-                    return Optional.empty();
-                }
-            }
-        });
+        conversionService.addConverter(Map.class, CorsOriginConfiguration.class, (TypeConverter) new CorsOriginConverter());
     }
 }
