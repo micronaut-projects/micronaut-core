@@ -385,7 +385,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                                              Set<TypeMirror> visitedTypes,
                                              TypeVariable tv,
                                              boolean isRawType) {
-        String variableName = tv.toString();
+        String variableName = tv.asElement().getSimpleName().toString();
         ClassElement resolvedBound = parentTypeArguments.get(variableName);
         List<JavaClassElement> bounds = null;
         io.micronaut.inject.ast.Element declaredElement = this;
