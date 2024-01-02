@@ -35,6 +35,7 @@ public final class ConvertersRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {
-        conversionService.addConverter(Map.class, CorsOriginConfiguration.class, (TypeConverter) new CorsOriginConverter());
+        CorsOriginConverter corsOriginConverter = new CorsOriginConverter();
+        conversionService.addConverter(Map.class, CorsOriginConfiguration.class, (TypeConverter) corsOriginConverter);
     }
 }
