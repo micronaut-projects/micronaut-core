@@ -35,9 +35,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated The converter is not needed
  */
-@Deprecated(forRemoval = true, since = "4.3.0")
 @Internal
 public class CorsOriginConverter implements TypeConverter<Map<String, Object>, CorsOriginConfiguration> {
 
