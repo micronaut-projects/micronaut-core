@@ -7,4 +7,5 @@ dependencies {
     compileOnly libs.vertx
 
     api projects.core
+    api projects.context
 }
