@@ -1,1 +1,1 @@
-io.micronaut.http.server.ConvertersRegistrar
+io.micronaut.http.server.HttpServerTypeConvertersRegistrar

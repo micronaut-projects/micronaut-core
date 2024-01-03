@@ -31,7 +31,7 @@ import java.util.Map;
  * @since 4.3.0
  */
 @Internal
-public final class ConvertersRegistrar implements TypeConverterRegistrar {
+public final class HttpServerTypeConvertersRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {

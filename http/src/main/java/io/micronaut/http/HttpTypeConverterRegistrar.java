@@ -31,7 +31,7 @@ import java.util.Optional;
  * @since 3.6.0
  */
 @Internal
-public final class ConvertersRegistrar implements TypeConverterRegistrar {
+public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {
