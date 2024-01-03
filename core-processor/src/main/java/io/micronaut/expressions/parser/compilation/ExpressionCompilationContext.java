@@ -19,17 +19,31 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.objectweb.asm.commons.GeneratorAdapter;
 
 /**
  * Context class used for compiling expressions.
  *
- * @param evaluationContext expression compilation context
- * @param visitorContext     visitor context
- *
+ * @param evaluationVisitorContext evaluation visitor context
+ * @param methodVisitor            method visitor for compiled expression class
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
-public record ExpressionVisitorContext(@NonNull ExpressionEvaluationContext evaluationContext,
-                                       @NonNull VisitorContext visitorContext) {
+public record ExpressionCompilationContext(@NonNull ExpressionVisitorContext evaluationVisitorContext,
+                                           @NonNull GeneratorAdapter methodVisitor) {
+
+    /**
+     * @return The evaluation context
+     */
+    public ExpressionEvaluationContext evaluationContext() {
+        return evaluationVisitorContext.evaluationContext();
+    }
+
+    /**
+     * @return The visitor context
+     */
+    public VisitorContext visitorContext() {
+        return evaluationVisitorContext.visitorContext();
+    }
 }

@@ -37,8 +37,8 @@ public interface ExpressionCompilationContextFactory {
      * @return evaluation context for method
      */
     @NonNull
-    ExpressionCompilationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
-                                                       @NonNull MethodElement methodElement);
+    ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
+                                                      @NonNull MethodElement methodElement);
 
     /**
      * Builds expression evaluation context for expression reference.
@@ -48,7 +48,7 @@ public interface ExpressionCompilationContextFactory {
      * @return evaluation context for method
      */
     @NonNull
-    ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement);
+    ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement);
 
     /**
      * Adds evaluated expression context class element to context loader

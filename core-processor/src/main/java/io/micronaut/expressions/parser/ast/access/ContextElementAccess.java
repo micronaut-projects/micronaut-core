@@ -16,8 +16,10 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionCompilationContext;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -53,7 +55,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         contextOperation.compile(ctx);
     }
 
@@ -63,7 +65,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    public Type doResolveType(ExpressionVisitorContext ctx) {
+    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return resolveContextOperation(ctx).resolveType(ctx);
     }
 
@@ -72,7 +74,7 @@ public final class ContextElementAccess extends ExpressionNode {
             return contextOperation;
         }
 
-        ExpressionCompilationContext evaluationContext = ctx.compilationContext();
+        ExpressionEvaluationContext evaluationContext = ctx.evaluationContext();
 
         List<PropertyElement> propertyElements = evaluationContext.findProperties(name);
         List<ParameterElement> parameterElements = evaluationContext.findParameters(name);

@@ -16,11 +16,13 @@
 package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -46,7 +48,7 @@ public final class EmptyOperator extends UnaryOperator {
     }
 
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         ClassElement type = operand.resolveClassElement(ctx);
 
         GeneratorAdapter mv = ctx.methodVisitor();
@@ -124,7 +126,7 @@ public final class EmptyOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(ExpressionVisitorContext ctx) {
+    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return Type.BOOLEAN_TYPE;
     }
 

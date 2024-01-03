@@ -16,9 +16,11 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -68,7 +70,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         // resolving non-primitive class elements is necessary to handle cases
         // when one of expression nodes is of primitive type, but other expression node
         // is comparable to respective boxed type
@@ -119,7 +121,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
         Label elseLabel = new Label();
@@ -142,7 +144,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
 
     private void pushCompareToMethodCall(ExpressionNode comparableNode,
                                          ExpressionNode comparedNode,
-                                         ExpressionVisitorContext ctx) {
+                                         ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         ClassElement comparableClass = comparableNode.resolveClassElement(ctx);
 

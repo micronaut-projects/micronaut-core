@@ -16,7 +16,9 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -49,7 +51,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
         propertyName.compile(ctx);
@@ -64,7 +66,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type propertyNameType = propertyName.resolveType(ctx);
         if (!propertyNameType.equals(STRING)) {
             throw new ExpressionCompilationException("Invalid environment access operation. The expression inside environment " +

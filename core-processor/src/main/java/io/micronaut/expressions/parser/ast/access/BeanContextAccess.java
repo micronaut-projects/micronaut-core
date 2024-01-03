@@ -16,8 +16,10 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
@@ -47,7 +49,7 @@ public class BeanContextAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
 
@@ -67,7 +69,7 @@ public class BeanContextAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return typeIdentifier.doResolveType(ctx);
     }
 }

@@ -18,7 +18,7 @@ package io.micronaut.annotation.processing.test
 import io.micronaut.context.expressions.AbstractEvaluatedExpression
 import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.core.expressions.EvaluatedExpressionReference
+import io.micronaut.inject.annotation.EvaluatedExpressionReferenceCounter
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import org.intellij.lang.annotations.Language
@@ -55,7 +55,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReference.nextIndex(exprClassName) - expressions.length
+        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
 
         List<Object> result = new ArrayList<>()
         for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
@@ -96,7 +96,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         try {
-            def index = EvaluatedExpressionReference.nextIndex(exprFullName)
+            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
             exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null))
         } catch (ClassNotFoundException e) {
@@ -133,7 +133,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReference.nextIndex(exprClassName) - expressions.length
+        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
 
         List<Object> result = new ArrayList<>()
         for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
@@ -168,7 +168,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         try {
-            def index = EvaluatedExpressionReference.nextIndex(exprFullName)
+            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
             return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null))
         } catch (ClassNotFoundException e) {
