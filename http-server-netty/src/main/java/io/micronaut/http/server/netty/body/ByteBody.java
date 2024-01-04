@@ -18,13 +18,16 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpUtil;
 
 /**
  * Base class for a raw {@link HttpBody} with just bytes.
@@ -77,17 +80,33 @@ public sealed interface ByteBody extends HttpBody permits ImmediateByteBody, Str
     HttpRequest claimForReuse(HttpRequest request);
 
     /**
-     * Create a byte body for the given request. The request must be either a
-     * {@link FullHttpRequest} or a {@link StreamedHttpRequest}.
+     * Create a new byte body containing the given immediate content. Release ownership is
+     * transferred to the returned body.
      *
-     * @param request The request
-     * @return The {@link ByteBody} for the body data
+     * @param content The content
+     * @return The ByteBody with the content
      */
-    static ByteBody of(HttpRequest request) {
-        if (request instanceof FullHttpRequest full) {
-            return new ImmediateByteBody(full.content());
-        } else {
-            return new StreamingByteBody((StreamedHttpRequest) request, HttpUtil.getContentLength(request, -1L));
-        }
+    static ByteBody of(ByteBuf content) {
+        return new ImmediateByteBody(content);
+    }
+
+    /**
+     * Create a new byte body containing the given streamed content.
+     *
+     * @param content The publisher of HttpContent
+     * @param contentLength The advertised content length, or -1 if unknown
+     * @return The streaming body
+     */
+    static ByteBody of(HotObservable<HttpContent> content, long contentLength) {
+        return new StreamingByteBody(content, contentLength);
+    }
+
+    /**
+     * Create an empty byte body.
+     *
+     * @return An empty body
+     */
+    static ByteBody empty() {
+        return of(Unpooled.EMPTY_BUFFER);
     }
 }

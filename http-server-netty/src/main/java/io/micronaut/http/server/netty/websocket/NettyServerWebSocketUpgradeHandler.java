@@ -39,6 +39,7 @@ import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.RoutingInBoundHandler;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -132,9 +133,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
         if (isWebSocketUpgrade(request)) {
-            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
+            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
@@ -152,7 +153,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
             });
         } else {
-            next.accept(ctx, request, outboundAccess);
+            next.accept(ctx, request, body, outboundAccess);
         }
     }
 
@@ -260,7 +261,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         } else {
             return handshaker.handshake(
                     channel,
-                    req.getNativeRequest(),
+                    req.toFullHttpRequest(),
                     nettyHeaders,
                     channel.newPromise()
             );

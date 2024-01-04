@@ -173,6 +173,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
+                            ByteBody body,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
                             HttpServerConfiguration serverConfiguration) throws IllegalArgumentException {
@@ -183,7 +184,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        this.body = ByteBody.of(nettyRequest);
+        this.body = body;
     }
 
     /**
