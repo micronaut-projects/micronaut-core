@@ -30,7 +30,6 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.runtime.server.event.ServerShutdownEvent
 import io.micronaut.runtime.server.event.ServerStartupEvent
 import jakarta.inject.Singleton
-import spock.lang.RepeatUntilFailure
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
