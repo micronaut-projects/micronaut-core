@@ -22,6 +22,6 @@ class MalformedUriSpec extends Specification {
         then:
         connection.getResponseCode() == 400
         connection.getResponseMessage() == HttpStatus.BAD_REQUEST.reason
-        connection.getErrorStream().getText().contains('"message":"Malformed URI')
+        connection.getErrorStream().getText().contains('"message":"Malformed URI"')
     }
 }
