@@ -570,9 +570,9 @@ class PipeliningServerHandlerSpec extends Specification {
         int unwritten = 0
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
                 unwritten++
-                request.release()
+                body.release()
                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
             }
 

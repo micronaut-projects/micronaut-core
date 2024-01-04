@@ -229,7 +229,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             return Optional.empty();
         }
         if (isRoot) {
-            return Optional.of("/");
+            return Optional.of("");
         } else {
             return Optional.of(templateString);
         }
