@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -23,7 +24,6 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.Map;
@@ -36,7 +36,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@Internal
 public class CorsOriginConverter implements TypeConverter<Map<String, Object>, CorsOriginConfiguration> {
 
     private static final String ALLOWED_ORIGINS = "allowed-origins";

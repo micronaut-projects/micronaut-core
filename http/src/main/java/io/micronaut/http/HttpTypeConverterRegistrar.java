@@ -19,17 +19,19 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.cookie.SameSite;
+import io.micronaut.http.cookie.SameSiteConverter;
 
 import java.util.Optional;
 
 /**
- * The media type converters registrar.
+ * The HTTP converters registrar.
  *
  * @author Denis Stepanov
  * @since 3.6.0
  */
 @Internal
-public final class MediaTypeConvertersRegistrar implements TypeConverterRegistrar {
+public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {
@@ -45,5 +47,6 @@ public final class MediaTypeConvertersRegistrar implements TypeConverterRegistra
                 }
             }
         });
+        conversionService.addConverter(CharSequence.class, SameSite.class, new SameSiteConverter());
     }
 }
