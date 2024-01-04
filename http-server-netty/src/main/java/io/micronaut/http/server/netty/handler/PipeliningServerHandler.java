@@ -35,6 +35,7 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
+import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.SnappyFrameDecoder;
 import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
@@ -668,7 +669,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         void dispose() {
-            channel.finishAndReleaseAll();
+            try {
+                channel.finishAndReleaseAll();
+            } catch (DecompressionException ignored) {
+            }
         }
 
         @Override
@@ -965,7 +969,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discard() {
             EmbeddedChannel compressionChannel = this.compressionChannel;
             if (compressionChannel != null) {
-                compressionChannel.finishAndReleaseAll();
+                try {
+                    compressionChannel.finishAndReleaseAll();
+                } catch (DecompressionException ignored) {
+                }
                 this.compressionChannel = null;
             }
         }
@@ -1030,8 +1037,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void discard() {
             super.discard();
-            message.release();
             outboundHandler = null;
+            // pretend we wrote to clean up resources
+            requestHandler.responseWritten(outboundAccess.attachment);
+            message.release();
         }
     }
 
@@ -1242,6 +1251,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     } // else worker is still setting up and will see the discard flag in due time
                 }
             }
+            // pretend we wrote to clean up resources
+            requestHandler.responseWritten(outboundAccess.attachment);
         }
 
         private void work() {
