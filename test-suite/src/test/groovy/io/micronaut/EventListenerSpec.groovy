@@ -36,7 +36,6 @@ import spock.util.concurrent.PollingConditions
 
 class EventListenerSpec extends Specification {
 
-    @RepeatUntilFailure(maxAttempts = 100) // Retry the test multiple times to test the listeners order
     void "test all events listener is invoked"() {
         given:
         PollingConditions conditions = new PollingConditions(timeout: 10)
