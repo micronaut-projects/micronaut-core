@@ -1242,6 +1242,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     } // else worker is still setting up and will see the discard flag in due time
                 }
             }
+            // pretend we wrote to clean up resources
+            requestHandler.responseWritten(outboundAccess.attachment);
         }
 
         private void work() {
