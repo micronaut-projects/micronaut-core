@@ -68,9 +68,8 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
         }
         try {
             error.link(Link.SELF, Link.of(errorContext.getRequest().getUri()));
-        } catch (Exception e) {
-            // Invalid URL
-            error.link(Link.SELF, Link.of(errorContext.getRequest().getPath()));
+        } catch (IllegalArgumentException ignored) {
+            // invalid URI, don't include it
         }
 
         return response.body(error).contentType(MediaType.APPLICATION_JSON_TYPE);

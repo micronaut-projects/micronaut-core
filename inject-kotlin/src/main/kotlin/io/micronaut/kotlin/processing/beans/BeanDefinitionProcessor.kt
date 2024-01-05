@@ -21,6 +21,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
+import io.micronaut.core.annotation.Vetoed
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
@@ -48,7 +49,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration: KSClassDeclaration ->
                 declaration.annotations.none { ksAnnotation ->
-                    ksAnnotation.shortName.getQualifier() == Generated::class.simpleName
+                    ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
                 }
             }
             .toList()
@@ -60,6 +61,9 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         }
         return emptyList()
     }
+
+    private fun isVetoed(ksAnnotation: KSAnnotation) =
+        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Vetoed::class.java.name
 
     private fun processClassDeclarations(
         elements: List<KSClassDeclaration>,
@@ -73,6 +77,11 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     classDeclaration.declarations
                         .filter { it is KSClassDeclaration }
                         .map { it as KSClassDeclaration }
+                        .filter { declaration: KSClassDeclaration ->
+                            declaration.annotations.none { ksAnnotation ->
+                                isVetoed(ksAnnotation)
+                            }
+                        }
                         .filter { !it.modifiers.contains(Modifier.INNER) }
                         .toList()
                 if (innerClasses.isNotEmpty()) {

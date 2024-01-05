@@ -24,7 +24,7 @@ jobs:
           distribution: 'corretto'
           java-version: ${{ matrix.java }}
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2.10.0
+        uses: gradle/gradle-build-action@v2.11.0
       - name: Optional setup step
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}

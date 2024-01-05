@@ -57,3 +57,5 @@ If you start the application and send a `GET` request to the `/hello` URI, the t
 $ curl http://localhost:8080/hello
 Hello World
 ----
+
+TIP: See the guide for https://guides.micronaut.io/latest/creating-your-first-micronaut-app.html[Creating your First Micronaut Application] to learn more.

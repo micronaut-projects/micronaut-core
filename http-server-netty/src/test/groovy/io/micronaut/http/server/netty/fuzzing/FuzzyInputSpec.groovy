@@ -73,6 +73,7 @@ class FuzzyInputSpec extends Specification {
 
     def 'http1 cleartext embedded channel'() {
         given:
+        FlagAppender.clear()
         BufferLeakDetection.startTracking()
 
         ApplicationContext ctx = ApplicationContext.run([
@@ -97,6 +98,7 @@ class FuzzyInputSpec extends Specification {
         embeddedChannel.checkException()
 
         BufferLeakDetection.stopTrackingAndReportLeaks()
+        FlagAppender.checkTriggered()
 
         where:
         input << [

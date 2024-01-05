@@ -58,7 +58,11 @@ final class ContextMethodParameterAccess extends ExpressionNode {
         // invoke getArgument method
         mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_ARGUMENT_METHOD);
         if (nodeType != null) {
-            mv.checkCast(nodeType);
+            if (TypeDescriptors.isPrimitive(nodeType)) {
+                mv.unbox(nodeType);
+            } else {
+                mv.checkCast(nodeType);
+            }
         }
     }
 

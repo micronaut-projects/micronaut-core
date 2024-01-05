@@ -524,28 +524,31 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 )
             }
         }
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val primitiveArray = primitiveArrays[qualifiedName]
-        if (primitiveArray != null) {
-            return primitiveArray
-        }
-        val canBePrimitive =
-            type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
-        if (allowPrimitive && canBePrimitive) {
-            val element = primitives[qualifiedName]
-            if (element != null) {
-                return element
+        val qualifiedName = declaration.qualifiedName
+        if (qualifiedName != null) {
+            val qualifiedNameString = qualifiedName.asString()
+            val primitiveArray = primitiveArrays[qualifiedNameString]
+            if (primitiveArray != null) {
+                return primitiveArray
             }
-        }
-        if (type != null && qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            return newTypeArgument(
-                owner,
-                component,
-                parentTypeArguments,
-                visitedTypes,
-                false
-            ).toArray()
+            val canBePrimitive =
+                type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
+            if (allowPrimitive && canBePrimitive) {
+                val element = primitives[qualifiedNameString]
+                if (element != null) {
+                    return element
+                }
+            }
+            if (type != null && qualifiedNameString == "kotlin.Array") {
+                val component = type.arguments[0].type!!.resolve()
+                return newTypeArgument(
+                    owner,
+                    component,
+                    parentTypeArguments,
+                    visitedTypes,
+                    false
+                ).toArray()
+            }
         }
         val typeArguments = if (stripTypeArguments) {
             resolveEmptyTypeArguments(declaration)

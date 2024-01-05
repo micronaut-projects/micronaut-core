@@ -22,3 +22,5 @@ The Micronaut framework supports the following types of dependency injection:
 * Method parameter injection
 
 NOTE: Classes or particular fields, methods can be excluded by adding an annotation ann:core.annotation.Vetoed[]
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-dependency-injection-types.html[Micronaut Dependency Injection Types] to learn more.

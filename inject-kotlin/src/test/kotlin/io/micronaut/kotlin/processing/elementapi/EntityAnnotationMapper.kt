@@ -33,9 +33,8 @@ class EntityAnnotationMapper : NamedAnnotationMapper {
     ): List<AnnotationValue<*>> {
         val builder = AnnotationValue.builder(
             Introspected::class.java
-        ) // don't bother with transients properties
-            .member("excludedAnnotations", "javax.persistence.Transient") // following are indexed for fast lookups
-            .member(
+        )
+            .member( // following are indexed for fast lookups
                 "indexed",
                 AnnotationValue.builder(
                     Introspected.IndexedAnnotation::class.java

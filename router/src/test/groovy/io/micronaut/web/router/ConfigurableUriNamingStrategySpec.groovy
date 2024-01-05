@@ -59,6 +59,8 @@ class ConfigurableUriNamingStrategySpec extends Specification {
         applicationContext.close()
     }
 
+
+
     @Unroll
     void "Test 'micronaut.server.context-path' matches with #route"() {
         given:
@@ -161,6 +163,32 @@ class ConfigurableUriNamingStrategySpec extends Specification {
         GET    | '/test/city'               | 'Hello city'
         GET    | '/test/city/Madrid'        | 'City Madrid'
         GET    | '/test/city/country/Spain' | 'Country Spain'
+    }
+
+    @Unroll
+    void "Test 'micronaut.server.context-path' set to empty String matches with #route"() {
+        given:
+        def applicationContext = ApplicationContext.run(
+                PropertySource.of(
+                        'test',
+                        ['micronaut.server.context-path': '']
+                )
+        )
+                .start()
+        def router = applicationContext.getBean(Router)
+
+        expect:
+        router."$method"(route).isPresent()
+        router."$method"(route).get().invoke() == result
+
+        cleanup:
+        applicationContext.close()
+
+        where:
+        method | route                 | result
+        GET    | '/city'               | 'Hello city'
+        GET    | '/city/Madrid'        | 'City Madrid'
+        GET    | '/city/country/Spain' | 'Country Spain'
     }
 
     @Controller('/city')

@@ -64,15 +64,21 @@ internal class KotlinSimplePropertyElement(
     override val resolvedType = type
 
     override val resolvedGenericType: ClassElement by lazy {
-        if (type is KotlinClassElement) {
-            val newCE = newClassElement(
-                nativeType,
-                type.kotlinType,
-                declaringType.typeArguments
-            ) as ArrayableClassElement
-            newCE.withArrayDimensions(type.arrayDimensions)
-        } else {
-            type
+        when (type) {
+            is KotlinEnumElement -> {
+                type
+            }
+            is KotlinClassElement -> {
+                val newCE = newClassElement(
+                    nativeType,
+                    type.kotlinType,
+                    declaringType.typeArguments
+                ) as ArrayableClassElement
+                newCE.withArrayDimensions(type.arrayDimensions)
+            }
+            else -> {
+                type
+            }
         }
     }
     override val setter = Optional.ofNullable(setterMethod)

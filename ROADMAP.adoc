@@ -1,3 +1,3 @@
 = Micronaut ROADMAP
 
-See https://github.com/micronaut-projects/micronaut-core/projects/5[Micronaut ROADMAP] for Roadmap project planning.
+Micronaut Foundation uses https://github.com/orgs/micronaut-projects/projects[GitHub projects] for planning.
