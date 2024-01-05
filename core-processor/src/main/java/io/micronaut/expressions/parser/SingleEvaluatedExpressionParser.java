@@ -74,7 +74,7 @@ import static io.micronaut.expressions.parser.token.TokenType.*;
  * @since 4.0.0
  */
 @Internal
-public final class SingleEvaluatedEvaluatedExpressionParser implements EvaluatedExpressionParser {
+public final class SingleEvaluatedExpressionParser implements EvaluatedExpressionParser {
     private final Tokenizer tokenizer;
     private Token lookahead;
 
@@ -84,7 +84,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
      *
      * @param expression expression to parse
      */
-    public SingleEvaluatedEvaluatedExpressionParser(String expression) {
+    public SingleEvaluatedExpressionParser(String expression) {
         this.tokenizer = new Tokenizer(expression);
         this.lookahead = tokenizer.getNextToken();
     }

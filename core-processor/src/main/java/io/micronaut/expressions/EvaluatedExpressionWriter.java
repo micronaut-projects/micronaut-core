@@ -19,7 +19,7 @@ import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.expressions.parser.CompoundEvaluatedEvaluatedExpressionParser;
+import io.micronaut.expressions.parser.CompoundEvaluatedExpressionParser;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
@@ -106,7 +106,7 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         Object annotationValue = expressionMetadata.annotationValue();
 
         try {
-            ExpressionNode ast = new CompoundEvaluatedEvaluatedExpressionParser(annotationValue).parse();
+            ExpressionNode ast = new CompoundEvaluatedExpressionParser(annotationValue).parse();
             ast.compile(ctx);
             pushBoxPrimitiveIfNecessary(ast.resolveType(ctx), evaluateMethodVisitor);
         } catch (ExpressionParsingException | ExpressionCompilationException ex) {
