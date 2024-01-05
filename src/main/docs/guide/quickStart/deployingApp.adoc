@@ -55,3 +55,11 @@ Then invoke the `deploy` lifecycle phase specifying the packaging type as either
 ----
 $ ./mvnw deploy -Dpackaging=docker
 ----
+
+=== Deployment Guides
+
+See the following guides to learn more about deploying Micronaut Applications:
+
+- https://guides.micronaut.io/latest/executable-jar.html[Create an Executable Jar of a Micronaut Application]
+- https://guides.micronaut.io/latest/micronaut-creating-first-graal-app.html[Creating Your First Micronaut Graal Application]
+- https://guides.micronaut.io/latest/micronaut-docker-image.html[Building a Docker Image of your Micronaut Application]

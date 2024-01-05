@@ -18,6 +18,13 @@ After that, all the thread-local propagated elements can restore their thread-lo
 
 NOTE: The thread-local values are read-only. To modify them, the `PropagatedContext` instance needs to be changed and put into the Reactor's context.
 
+To add the context in the middle of the reactive chain, do something like the following:
+
+snippet::io.micronaut.docs.propagation.reactor.HelloController[tags="imports,example", indent=0]
+
+<1> Obtain the current context that has been modified, e.g. with `PropagatedContext.get().plus(...)`, etc.
+<2> Add the context into the reactive chain.
+
 If you have Micrometer Context Propagation on the classpath but don't want to use it, apply the following configuration:
 
 .Disable Micrometer Context Propagation in Reactor

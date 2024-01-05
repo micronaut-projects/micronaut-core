@@ -36,6 +36,10 @@ internal class KotlinEnumElement(
         visitorContext
     ), EnumElement {
 
+    override val asType: KotlinClassElement by lazy {
+        this
+    }
+
     override fun values() = declaration.declarations
         .filterIsInstance<KSClassDeclaration>()
         .map { ksClassDeclaration -> ksClassDeclaration.simpleName.asString() }
