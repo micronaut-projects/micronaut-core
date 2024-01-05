@@ -15,10 +15,11 @@
  */
 package io.micronaut.http.cookie;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Singleton;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Sergio del Amo
  * @since 3.0.1
  */
-@Singleton
+@Internal
 public class SameSiteConverter implements TypeConverter<CharSequence, SameSite> {
     private static final Map<CharSequence, SameSite> CONVERSIONS = new ConcurrentHashMap<>();
 

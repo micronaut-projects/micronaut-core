@@ -14,14 +14,14 @@ class MalformedUriSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer);
 
-    void testMalformedUriReturns400() {
+    void testMalformedUriReturns400AndUserInputNotPrintedInLogs() {
         when:
-        HttpURLConnection connection = (HttpURLConnection) new URL("$embeddedServer.URL/malformed/[]").openConnection()
+        HttpURLConnection connection = (HttpURLConnection) new URL("$embeddedServer.URL?\"><tag>=/malformed[]").openConnection()
         connection.connect()
 
         then:
         connection.getResponseCode() == 400
         connection.getResponseMessage() == HttpStatus.BAD_REQUEST.reason
-        connection.getErrorStream().getText().contains('"message":"Malformed URI:')
+        connection.getErrorStream().getText().contains('"message":"Malformed URI"')
     }
 }
