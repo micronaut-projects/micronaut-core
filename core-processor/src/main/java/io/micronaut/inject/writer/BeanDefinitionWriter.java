@@ -713,7 +713,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         validateExposedTypes(annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
         this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
-        evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata, null);
+        evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata,
+            beanTypeElement.getName().contains(BeanDefinitionVisitor.PROXY_SUFFIX) ? null : beanTypeElement);
 
         beanTypeInnerClasses = beanTypeElement.getEnclosedElements(ElementQuery.of(ClassElement.class))
                 .stream()
