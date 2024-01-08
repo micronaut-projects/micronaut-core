@@ -243,7 +243,8 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(MediaType mediaType, Object object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public ByteBuffer<?> writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            addContentType(outgoingHeaders, mediaType);
             return bufferFactory.wrap(object.toString().getBytes(getCharset(mediaType)));
         }
 
@@ -294,7 +295,8 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(MediaType mediaType, byte[] object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public ByteBuffer<?> writeTo(Argument<byte[]> type, MediaType mediaType, byte[] object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            addContentType(outgoingHeaders, mediaType);
             return bufferFactory.wrap(object);
         }
 
@@ -352,7 +354,8 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(MediaType mediaType, ByteBuffer<?> object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public ByteBuffer<?> writeTo(Argument<ByteBuffer<?>> type, MediaType mediaType, ByteBuffer<?> object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            addContentType(outgoingHeaders, mediaType);
             return object;
         }
 

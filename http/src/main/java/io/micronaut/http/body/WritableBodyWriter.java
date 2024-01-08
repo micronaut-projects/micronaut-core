@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
@@ -77,26 +76,6 @@ public final class WritableBodyWriter implements RawMessageBodyHandler<Writable>
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
-    }
-
-    @Override
-    public ByteBuffer<?> writeTo(MediaType mediaType, Writable object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        ByteBuffer<?> buffer = bufferFactory.buffer();
-        try {
-            try {
-                OutputStream outputStream = buffer.toOutputStream();
-                object.writeTo(outputStream);
-                outputStream.flush();
-            } catch (IOException e) {
-                throw new CodecException("Error writing body text: " + e.getMessage(), e);
-            }
-        } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted rc) {
-                rc.release();
-            }
-            throw t;
-        }
-        return buffer;
     }
 
     private Writable read0(ByteBuffer<?> byteBuffer) {

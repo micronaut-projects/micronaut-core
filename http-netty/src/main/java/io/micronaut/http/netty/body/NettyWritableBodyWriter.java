@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -96,11 +95,6 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
     @Override
     public void writeTo(Argument<Writable> type, MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         defaultWritable.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
-    }
-
-    @Override
-    public ByteBuffer<?> writeTo(MediaType mediaType, Writable object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        return defaultWritable.writeTo(mediaType, object, bufferFactory);
     }
 
     @Override

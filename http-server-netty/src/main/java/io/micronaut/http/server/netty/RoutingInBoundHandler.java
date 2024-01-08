@@ -396,7 +396,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             if (scWriter != null) {
                                 scWriter.writeTo(nhr, (MutableHttpResponse<Object>) response, (Argument<Object>) responseBodyType, responseMediaType, response.body(), outboundAccess);
                             } else {
-                                ByteBuf buf = (ByteBuf) rawWriter.writeTo(responseMediaType, response.body(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
+                                ByteBuf buf = (ByteBuf) rawWriter.writeTo((Argument<Object>) responseBodyType, responseMediaType, response.body(), (MutableHeaders) response.getHeaders(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
                                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
                             }
                         }

@@ -18,13 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.CodecException;
 
 import java.util.Collection;
 
@@ -49,24 +42,4 @@ public interface RawMessageBodyHandler<T> extends MessageBodyHandler<T>, Chunked
      */
     @NonNull
     Collection<? extends Class<?>> getTypes();
-
-    /**
-     * Same as {@link #writeTo(Argument, MediaType, Object, MutableHeaders, ByteBufferFactory)} but
-     * with fewer parameters.
-     *
-     * @param mediaType       The media type
-     * @param object          The object to write
-     * @param bufferFactory   A byte buffer factory
-     * @throws CodecException If an error occurs decoding
-     * @return The encoded byte buffer
-     */
-    ByteBuffer<?> writeTo(MediaType mediaType, T object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException;
-
-    @Override
-    default ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-        }
-        return writeTo(mediaType, object, bufferFactory);
-    }
 }

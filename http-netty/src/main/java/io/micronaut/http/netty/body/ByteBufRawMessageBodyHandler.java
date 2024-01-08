@@ -83,7 +83,7 @@ public final class ByteBufRawMessageBodyHandler implements RawMessageBodyHandler
     }
 
     @Override
-    public ByteBuffer<?> writeTo(MediaType mediaType, ByteBuf object, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+    public ByteBuffer<?> writeTo(Argument<ByteBuf> type, MediaType mediaType, ByteBuf object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
         return NettyByteBufferFactory.DEFAULT.wrap(object);
     }
 
