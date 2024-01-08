@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 
@@ -31,10 +32,11 @@ public interface RequestHandler {
      * Handle a request.
      *
      * @param ctx            The context this request came in on
-     * @param request        The request, either a {@link io.netty.handler.codec.http.FullHttpRequest} or a {@link io.micronaut.http.netty.stream.StreamedHttpRequest}
-     * @param outboundAccess The {@link io.micronaut.http.server.netty.handler.PipeliningServerHandler.OutboundAccess} to use for writing the response
+     * @param request        The request line and headers
+     * @param body           The request body
+     * @param outboundAccess The {@link PipeliningServerHandler.OutboundAccess} to use for writing the response
      */
-    void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess);
+    void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess);
 
     /**
      * Handle an error that is not bound to a request, i.e. happens outside a

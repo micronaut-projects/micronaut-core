@@ -19,10 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.body.NettyWriteContext;
-import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
-import io.micronaut.http.netty.stream.EmptyHttpRequest;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -39,7 +39,6 @@ import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.SnappyFrameDecoder;
 import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -377,7 +376,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             boolean full = request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, outboundAccess);
+                requestHandler.accept(ctx, request, ByteBody.of(((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (message instanceof HttpContent) {
@@ -386,7 +385,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, new EmptyHttpRequest(request), outboundAccess);
+                requestHandler.accept(ctx, request, ByteBody.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -468,19 +467,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     fullBody = composite;
                 }
                 buffer.clear();
-                FullHttpRequest fullRequest = new DefaultFullHttpRequest(
-                    request.protocolVersion(),
-                    request.method(),
-                    request.uri(),
-                    fullBody,
-                    request.headers(),
-                    last.trailingHeaders()
-                );
-                fullRequest.setDecoderResult(request.decoderResult());
-                request = null;
+                HttpRequest request = this.request;
+                this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, fullRequest, outboundAccess);
+                requestHandler.accept(ctx, request, ByteBody.of(fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }
@@ -514,16 +505,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
             }
-            Flux<HttpContent> flux = streamingInboundHandler.flux();
+            Flux<HttpContent> flux;
             if (HttpUtil.is100ContinueExpected(request)) {
-                flux = flux.doOnSubscribe(s -> outboundAccess.writeContinue());
+                flux = streamingInboundHandler.flux().doOnSubscribe(s -> outboundAccess.writeContinue());
+            } else {
+                flux = streamingInboundHandler.flux();
             }
-            requestHandler.accept(ctx, new DelegateStreamedHttpRequest(request, flux) {
+            requestHandler.accept(ctx, request, ByteBody.of(new HotObservable<>() {
                 @Override
                 public void closeIfNoSubscriber() {
                     streamingInboundHandler.closeIfNoSubscriber();
                 }
-            }, outboundAccess);
+
+                @Override
+                public void subscribe(Subscriber<? super HttpContent> s) {
+                    flux.subscribe(s);
+                }
+            }, HttpUtil.getContentLength(request, -1L)), outboundAccess);
         }
     }
 
