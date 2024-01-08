@@ -65,7 +65,7 @@ internal open class KotlinClassElement(
         kotlinType.starProjection().makeNullable()
     }
 
-    private val asType: KotlinClassElement by lazy {
+    open val asType: KotlinClassElement by lazy {
         if (definedType == null) {
             this
         } else {
@@ -358,6 +358,9 @@ internal open class KotlinClassElement(
                 )
             }
             .modifiers {
+                if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
+                    return@modifiers false
+                }
                 val visibility = propertyElementQuery.visibility
                 if (visibility == BeanProperties.Visibility.PUBLIC) {
                     it.contains(ElementModifier.PUBLIC)
@@ -473,6 +476,9 @@ internal open class KotlinClassElement(
     override fun isTypeVariable() = typeVariable
 
     override fun isAssignable(type: String): Boolean {
+        if (internalName == type) {
+            return true // Same type
+        }
         val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
         if (otherDeclaration != null) {
             if (declaration == otherDeclaration) {
@@ -512,6 +518,9 @@ internal open class KotlinClassElement(
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
+        if (equals(type)) {
+            return true // Same type
+        }
         if (type is KotlinClassElement) {
             return type.plainKotlinType.isAssignableFrom(plainKotlinType)
         }

@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
@@ -418,6 +419,7 @@ class Test
         then:
         defaults["num"] == 10
         defaults["bool"] == false
+        defaults["value"] == null
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
         defaults["intArray3"] == null
@@ -1119,13 +1121,13 @@ interface Deserializer<T> {
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
@@ -1159,15 +1161,15 @@ interface Deserializer<T> {
             // Arrays are not resolved as KotlinClassElements or placeholders
         then: "The first is a placeholder"
             serdeTypeParam.simpleName == "String[]"
-            serdeTypeParam.isTypeVariable()
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
             serializerTypeParam.simpleName == "String[]"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
             deserializerTypeParam.simpleName == "String[]"
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test inline class return type"() {
@@ -1215,5 +1217,75 @@ annotation class NotNull
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+    }
+
+    void "test java class value annotation"() {
+        given:
+            AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+            AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.banner.MicronautBanner
+import jakarta.inject.Singleton
+
+@Requires(classes = [ColorEnum::class], bean = ColorEnum::class)
+@Singleton
+class Test
+
+
+enum class ColorEnum {
+    BLUE
+}
+''').getAnnotationMetadata()
+
+        when:
+            def requires = metadata.getAnnotation(Requires)
+            def classes = requires.annotationClassValues("classes")
+            def bean = requires.annotationClassValue("bean").get()
+
+        then:
+            classes[0].name == "test.ColorEnum"
+            bean.name == "test.ColorEnum"
+    }
+
+    void "test Jakarta Generated bean is created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+@jakarta.annotation.Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition
+    }
+
+    void "test Micronaut Generated bean is not created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+import io.micronaut.core.annotation.Generated
+
+@Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition == null
     }
 }

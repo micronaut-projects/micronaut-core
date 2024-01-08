@@ -10,6 +10,7 @@ import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.GenericElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
@@ -2401,6 +2402,145 @@ data class TestEntity3(val firstName: String = "Denis",
 ''', {})
         expect:
             !result.component2().component2().messages.contains("@Nullable on primitive types")
+    }
+
+    void "test bean properties interfaces"() {
+        def properties = buildClassElementMapped('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import jakarta.inject.Singleton
+
+class TestNamed {
+    fun method() : Pageable? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getBeanProperties()})
+        expect:
+            properties.stream().map {it.getName()}.toList() == [
+                    "sorted",
+                    "orderBy",
+                    "number",
+                    "size",
+                    "offset",
+                    "sort",
+                    "unpaged"
+            ]
+    }
+
+    void "test bean properties 2"() {
+        def properties = buildClassElementMapped('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import jakarta.inject.Singleton
+
+class TestNamed {
+    fun method() : Pageable? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getBeanProperties()
+                .stream()
+                .filter {it.getName() == "orderBy"}.findFirst()
+                .get()
+                .getGenericType()
+                .getFirstTypeArgument()
+                .get()
+                .getBeanProperties()})
+        expect:
+            properties.stream().map {it.getName()}.toList() == [
+                    "ignoreCase",
+                    "direction",
+                    "property",
+                    "ascending"
+            ]
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType()
+                    .isEnum()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType()
+                    .isEnum()
+    }
+
+    void "test nested enum"() {
+        def returnType = buildClassElementMapped('test.TestNamed2', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import io.micronaut.kotlin.processing.Sort.Order.Direction
+import jakarta.inject.Singleton
+
+class TestNamed2 {
+    fun method() : Direction? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType()})
+        expect:
+            returnType.isEnum()
+            returnType instanceof EnumElement
+            returnType.getType().isEnum()
+            returnType.getType() instanceof EnumElement
+            returnType.getGenericType().isEnum()
+            returnType.getType() instanceof EnumElement
+    }
+
+    void "test inner class not failing"() {
+        def field = buildClassElementMapped('test.TestNamed3', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import io.micronaut.kotlin.processing.Sort.Order.Direction
+import jakarta.inject.Singleton
+
+class TestNamed3 {
+    fun method() : SomeInner? {
+        return null
+    }
+
+}
+
+class SomeInner {
+    private val xyz = object {}
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getFields().get(0)})
+        expect:
+            field.getType().getName() == "java.lang.Object"
+            field.getGenericType().getName() == "java.lang.Object"
+            field.getType().getType().getName() == "java.lang.Object"
+            field.getGenericType().getType().getName() == "java.lang.Object"
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

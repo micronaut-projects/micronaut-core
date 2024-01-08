@@ -2,10 +2,7 @@ package io.micronaut.inject.visitor.beans.builder
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.exceptions.IntrospectionException
-import org.junit.jupiter.api.Test
 import spock.lang.Specification
-
-import static org.junit.jupiter.api.Assertions.assertEquals
 
 class BeanIntrospectionBuilderSpec extends Specification {
 
@@ -157,6 +154,19 @@ class BeanIntrospectionBuilderSpec extends Specification {
         def builder = introspection.builder()
         def result = builder.with("name", "Fred").with("age", 20).build()
 
+
+        expect:
+        introspection.hasBuilder()
+        introspection.isBuildable()
+        result.name == "Fred"
+        result.age == 20
+    }
+
+    void 'test build type with builder with duplicate methods'() {
+        given:
+        def introspection = BeanIntrospection.getIntrospection(TestBuildMe9)
+        def builder = introspection.builder()
+        def result = builder.with("name", "Fred").with("age", 20).build()
 
         expect:
         introspection.hasBuilder()

@@ -869,9 +869,13 @@ public class MediaType implements CharSequence {
         }
         mediaTypes.sort((o1, o2) -> {
             //The */* type is always last
-            if (o1.type.equals("*")) {
+            boolean fullWildcard1 = o1.type.equals("*");
+            boolean fullWildcard2 = o2.type.equals("*");
+            if (fullWildcard1 && fullWildcard2) {
+                return 0;
+            } else if (fullWildcard1) {
                 return 1;
-            } else if (o2.type.equals("*")) {
+            } else if (fullWildcard2) {
                 return -1;
             }
             if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {

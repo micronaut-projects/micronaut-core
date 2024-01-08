@@ -5,3 +5,6 @@ For IntelliJ IDEA, if you plan to use the IntelliJ compiler, enable annotation p
 image::intellij-annotation-processors.png[Intellij Settings,1024,768]
 
 Once you have enabled annotation processing in IntelliJ you can run the application and tests directly within the IDE without the need of an external build tool such as Gradle or Maven.
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-intellij-idea-ide-setup.html[Using IntelliJ IDEA to Develop Micronaut Applications] to learn more.
+
