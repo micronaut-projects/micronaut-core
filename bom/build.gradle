@@ -24,6 +24,28 @@ micronautBom {
         // https://github.com/micronaut-projects/micronaut-serialization/issues/167
         dependencies.add("io.micronaut.serde:micronaut-serde-tck:1.0.0")
 
+        // ChatBots module removed from 3.10.4 can be removed after this is released
+        acceptedVersionRegressions.add("micronaut-chatbots")
+        acceptedLibraryRegressions.addAll(
+                "micronaut-chatbots-basecamp-api",
+                "micronaut-chatbots-basecamp-lambda",
+                "micronaut-chatbots-telegram-gcp-function",
+                "micronaut-chatbots-telegram-lambda",
+                "micronaut-chatbots-telegram-http",
+                "micronaut-chatbots-basecamp-azure-function",
+                "micronaut-chatbots-basecamp-http",
+                "micronaut-chatbots-http",
+                "micronaut-chatbots-basecamp-core",
+                "micronaut-chatbots-core",
+                "micronaut-chatbots-telegram-azure-function",
+                "micronaut-chatbots-bom",
+                "micronaut-chatbots-google-api",
+                "micronaut-chatbots-telegram-api",
+                "micronaut-chatbots-lambda",
+                "micronaut-chatbots-telegram-core",
+                "micronaut-chatbots-basecamp-gcp-function"
+        )
+
         // https://github.com/micronaut-projects/micronaut-oracle-cloud/issues/359
         dependencies.add("io.micronaut.oraclecloud:micronaut-oraclecloud-sdk-processor:2.1.1")
         dependencies.add("io.micronaut.oraclecloud:micronaut-oraclecloud-atp-hikari-test:2.1.1")
@@ -55,7 +77,7 @@ micronautBom {
 
         // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
         bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
-        
+
         // Tracing
         bomAuthorizedGroupIds.put(
                 "io.zipkin.brave:brave-bom",
