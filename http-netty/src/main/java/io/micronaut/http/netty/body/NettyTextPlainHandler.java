@@ -21,18 +21,23 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.TextPlainHandler;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import jakarta.inject.Singleton;
@@ -45,17 +50,24 @@ import java.io.OutputStream;
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Internal
-final class NettyTextPlainHandler implements MessageBodyHandler<CharSequence>, ShortCircuitNettyBodyWriter<CharSequence> {
+final class NettyTextPlainHandler implements MessageBodyHandler<CharSequence>, NettyBodyWriter<CharSequence> {
     private final TextPlainHandler defaultHandler = new TextPlainHandler();
 
     @Override
-    public void writeTo(HttpHeaders requestHeaders, HttpResponseStatus status, io.netty.handler.codec.http.HttpHeaders responseHeaders, CharSequence object, NettyWriteContext nettyContext) {
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.toString().getBytes(MessageBodyWriter.getCharset(requestHeaders)));
+    public void writeTo(HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) throws CodecException {
+        MutableHttpHeaders headers = outgoingResponse.getHeaders();
+        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.toString().getBytes(MessageBodyWriter.getCharset(headers)));
+        NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
+        io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
+        if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+            nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, byteBuf.readableBytes());
         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
             HttpVersion.HTTP_1_1,
-            status,
+            HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
             byteBuf,
-            responseHeaders,
+            nettyHeaders,
             EmptyHttpHeaders.INSTANCE
         );
         nettyContext.writeFull(fullHttpResponse);

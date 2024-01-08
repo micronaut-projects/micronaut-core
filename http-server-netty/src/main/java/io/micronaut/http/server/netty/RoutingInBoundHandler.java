@@ -54,7 +54,6 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
-import io.micronaut.http.netty.body.ShortCircuitNettyBodyWriter;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -341,17 +340,21 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
         @SuppressWarnings("unchecked")
         MessageBodyWriter<Object> messageBodyWriter = (MessageBodyWriter<Object>) routeInfo.getMessageBodyWriter();
-        ShortCircuitNettyBodyWriter<Object> scWriter ;
+        NettyBodyWriter<Object> scWriter ;
         RawMessageBodyHandler<Object> rawWriter ;
-        if (messageBodyWriter instanceof ShortCircuitNettyBodyWriter<Object> scw) {
+        if (messageBodyWriter instanceof NettyBodyWriter<Object> scw) {
             rawWriter = null;
             scWriter = scw;
         } else if (messageBodyWriter instanceof RawMessageBodyHandler<Object> raw) {
             rawWriter = raw;
             scWriter = null;
+        } else if (!messageBodyWriter.isBlocking()) {
+            rawWriter = null;
+            scWriter = new CompatNettyWriteClosure<>(messageBodyWriter);
         } else {
             return ExecutionLeaf.indeterminate();
         }
+        Argument<?> responseBodyType = routeInfo.getResponseBodyType();
         List<GenericHttpFilter> finalFixedFilters = fixedFilters;
         BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> exec = (httpRequest, propagatedContext) -> {
             Object[] arguments = shortCircuitBinders.length == 0 ? ArrayUtils.EMPTY_OBJECT_ARRAY : new Object[shortCircuitBinders.length];
@@ -391,7 +394,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             }
                             HttpResponseStatus status = HttpResponseStatus.valueOf(response.code(), response.reason());
                             if (scWriter != null) {
-                                scWriter.writeTo(nhr.getHeaders(), status, responseHeaders, response.body(), outboundAccess);
+                                scWriter.writeTo(nhr, (MutableHttpResponse<Object>) response, (Argument<Object>) responseBodyType, responseMediaType, response.body(), outboundAccess);
                             } else {
                                 ByteBuf buf = (ByteBuf) rawWriter.writeTo(responseMediaType, response.body(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
                                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
