@@ -33,13 +33,10 @@ import javax.lang.model.util.Types;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.STATIC;
-import static javax.lang.model.type.TypeKind.NONE;
 
 /**
  * Provides utility method for working with the annotation processor AST.
@@ -110,31 +107,6 @@ public class ModelUtils {
     }
 
     /**
-     * Return whether the given element is the java.lang.Object class.
-     *
-     * @param element The element
-     * @return True if it is java.lang.Object
-     */
-    public boolean isObjectClass(TypeElement element) {
-        return element.getSuperclass().getKind() == NONE;
-    }
-
-    /**
-     * Obtains the super type element for a given type element.
-     *
-     * @param element The type element
-     * @return The super type element or null if none exists
-     */
-    TypeElement superClassFor(TypeElement element) {
-        TypeMirror superclass = element.getSuperclass();
-        if (superclass.getKind() == TypeKind.NONE) {
-            return null;
-        }
-        DeclaredType kind = (DeclaredType) superclass;
-        return (TypeElement) kind.asElement();
-    }
-
-    /**
      * Resolves a type name for the given name.
      *
      * @param type The type
@@ -174,54 +146,6 @@ public class ModelUtils {
         } else {
             return typeUtils.erasure(type);
         }
-    }
-
-    /**
-     * @param aClass A class
-     * @return All the interfaces
-     */
-    public Set<TypeElement> getAllInterfaces(TypeElement aClass) {
-        SortedSet<TypeElement> interfaces = new TreeSet<>((o1, o2) -> {
-            if (typeUtils.isSubtype(o1.asType(), o2.asType())) {
-                return -1;
-            } else if (o1.equals(o2)) {
-                return 0;
-            } else {
-                return 1;
-            }
-        });
-        return populateInterfaces(aClass, interfaces);
-    }
-
-    /**
-     * @param aClass     A class
-     * @param interfaces The interfaces
-     * @return A set with the interfaces
-     */
-    @SuppressWarnings("Duplicates")
-    private Set<TypeElement> populateInterfaces(TypeElement aClass, Set<TypeElement> interfaces) {
-        for (TypeMirror anInterface : aClass.getInterfaces()) {
-            final Element e = typeUtils.asElement(anInterface);
-            if (e instanceof TypeElement te) {
-                if (!interfaces.contains(te)) {
-                    interfaces.add(te);
-                    populateInterfaces(te, interfaces);
-                }
-            }
-        }
-        if (aClass.getKind() != ElementKind.INTERFACE) {
-            TypeMirror superclass = aClass.getSuperclass();
-            while (superclass != null) {
-                final Element e = typeUtils.asElement(superclass);
-                if (e instanceof TypeElement superTypeElement) {
-                    populateInterfaces(superTypeElement, interfaces);
-                    superclass = superTypeElement.getSuperclass();
-                } else {
-                    break;
-                }
-            }
-        }
-        return interfaces;
     }
 
     /**

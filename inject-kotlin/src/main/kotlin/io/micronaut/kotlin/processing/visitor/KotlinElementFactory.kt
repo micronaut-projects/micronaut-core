@@ -86,7 +86,7 @@ internal class KotlinElementFactory(
     ): MethodElement {
 
         val kotlinMethodElement = KotlinMethodElement(
-            owningClass,
+            owningClass as KotlinClassElement,
             method,
             elementAnnotationMetadataFactory,
             visitorContext
@@ -103,7 +103,7 @@ internal class KotlinElementFactory(
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
         return KotlinConstructorElement(
-            owningClass,
+            owningClass as KotlinClassElement,
             constructor,
             elementAnnotationMetadataFactory,
             visitorContext

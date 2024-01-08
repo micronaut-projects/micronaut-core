@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
+import io.micronaut.annotation.processing.JavaNativeElementsHelper;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -99,6 +100,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     JavaFileManager standardFileManager;
     private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
     private final JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final JavaNativeElementsHelper nativeElementsHelper;
 
     /**
      * The default constructor.
@@ -136,7 +138,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.processingEnv = processingEnv;
         this.elementFactory = new JavaElementFactory(this);
         this.visitorKind = visitorKind;
-        this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils);
+        this.nativeElementsHelper = new JavaNativeElementsHelper(elements, types);
+        this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils, nativeElementsHelper);
         this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
@@ -388,6 +391,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public GenericUtils getGenericUtils() {
         return genericUtils;
+    }
+
+    /**
+     * @return The elements helper
+     */
+    public JavaNativeElementsHelper getNativeElementsHelper() {
+        return nativeElementsHelper;
     }
 
     /**

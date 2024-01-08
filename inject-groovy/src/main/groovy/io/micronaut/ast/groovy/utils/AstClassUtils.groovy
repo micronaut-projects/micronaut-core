@@ -29,18 +29,6 @@ import static org.codehaus.groovy.ast.ClassHelper.make
 @CompileStatic
 class AstClassUtils {
 
-    /**
-     * Return whether the given child class is a subclass or or implements the given class
-     *
-     * @param childClass The child class
-     * @param superClass The super class or interface
-     * @return
-     */
-    static boolean isSubclassOfOrImplementsInterface(ClassNode childClass, ClassNode superClass) {
-        String superClassName = superClass.getName()
-        return isSubclassOfOrImplementsInterface(childClass, superClassName)
-    }
-
     static boolean isSubclassOfOrImplementsInterface(ClassNode childClass, String superClassName) {
         return isSubclassOf(childClass, superClassName) || implementsInterface(childClass, superClassName)
     }
@@ -90,17 +78,7 @@ class AstClassUtils {
      * @return True if it does
      */
     static boolean implementsInterface(ClassNode classNode, ClassNode interfaceNode) {
-        if (classNode.getAllInterfaces().contains(interfaceNode)) {
-            return true
-        }
-        ClassNode superClass = classNode.getSuperClass()
-        while (superClass != null) {
-            if (superClass.getAllInterfaces().contains(interfaceNode)) {
-                return true
-            }
-            superClass = superClass.getSuperClass()
-        }
-        return false
+        return classNode.implementsInterface(interfaceNode)
     }
 
 }

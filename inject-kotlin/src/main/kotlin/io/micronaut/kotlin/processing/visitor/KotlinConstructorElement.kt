@@ -27,7 +27,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 internal class KotlinConstructorElement(
-    owningType: ClassElement,
+    owningType: KotlinClassElement,
     method: KSFunctionDeclaration,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,

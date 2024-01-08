@@ -50,9 +50,11 @@ import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
-internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
-                                      private val resolver: Resolver,
-                                      private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+internal class KotlinAnnotationMetadataBuilder(
+    private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
+    private val resolver: Resolver,
+    private val visitorContext: KotlinVisitorContext
+) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     companion object {
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
@@ -270,20 +272,18 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
 
             is KSClassDeclaration -> {
-                val hierarchy = mutableListOf<KSAnnotated>()
-                hierarchy.add(annotated)
+                val hierarchy = mutableListOf<KSClassDeclaration>()
                 if (annotated.classKind == ClassKind.ANNOTATION_CLASS) {
-                    return hierarchy
+                    hierarchy.add(annotated)
+                } else {
+                    visitorContext.nativeElementsHelper.populateTypeHierarchy(annotated, hierarchy)
                 }
-                populateTypeHierarchy(annotated, hierarchy)
-                hierarchy.reverse()
-                return hierarchy
+                return hierarchy as MutableList<KSAnnotated>
             }
 
             is KSFunctionDeclaration -> {
-                val methodsHierarchy = methodsHierarchy(annotated)
                 val hierarchy = mutableListOf<KSAnnotated>()
-                hierarchy.addAll(methodsHierarchy)
+                hierarchy.addAll(methodsHierarchy(annotated))
                 return hierarchy
             }
 
@@ -297,13 +297,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         if (element.isConstructor()) {
             listOf(element)
         } else {
-            val hierarchy = mutableListOf(element)
-            var overriden = element.findOverridee() as KSFunctionDeclaration?
-            while (overriden != null) {
-                hierarchy.add(overriden)
-                overriden = overriden.findOverridee() as KSFunctionDeclaration?
-            }
-            hierarchy.reverse()
+            val hierarchy = mutableListOf<KSFunctionDeclaration>()
+            hierarchy.addAll(visitorContext.nativeElementsHelper.findOverriddenMethods(element))
+            hierarchy.add(element)
             hierarchy
         }
 
@@ -570,19 +566,6 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             AnnotationRetention.BINARY -> {
                 RetentionPolicy.CLASS
             }
-    }
-
-    private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
-        element.superTypes.forEach {
-            val t = it.resolve()
-            if (t != resolver.builtIns.anyType) {
-                val declaration = t.declaration
-                if (!hierarchy.contains(declaration)) {
-                    hierarchy.add(declaration)
-                    populateTypeHierarchy(declaration.getClassDeclaration(visitorContext), hierarchy)
-                }
-            }
-        }
     }
 
     private fun readAnnotationValue(originatingElement: KSAnnotated, value: Any?): Any? {

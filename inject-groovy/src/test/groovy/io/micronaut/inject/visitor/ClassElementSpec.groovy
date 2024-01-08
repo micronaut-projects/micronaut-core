@@ -1917,6 +1917,7 @@ class UserController implements MyApi {
 ''')
         expect:
             ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
+            ce.getMethods().get(0).overriddenMethods.size() == 1
     }
 
     void "test how the annotations from the type are propagated"() {
