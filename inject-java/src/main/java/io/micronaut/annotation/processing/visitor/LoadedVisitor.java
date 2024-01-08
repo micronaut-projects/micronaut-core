@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
@@ -23,8 +22,11 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -46,18 +48,16 @@ public class LoadedVisitor implements Ordered {
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
-     * @param genericUtils          The generic utils
      * @param processingEnvironment The {@link ProcessingEnvironment}
      */
     public LoadedVisitor(TypeElementVisitor visitor,
-                         GenericUtils genericUtils,
                          ProcessingEnvironment processingEnvironment) {
         this.visitor = visitor;
         Class<? extends TypeElementVisitor> aClass = visitor.getClass();
 
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
         if (typeElement != null) {
-            List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
+            List<? extends TypeMirror> generics = interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
             if (generics.size() == 2) {
                 String typeName = generics.get(0).toString();
                 if (typeName.equals(OBJECT_CLASS)) {
@@ -111,6 +111,26 @@ public class LoadedVisitor implements Ordered {
                 elementAnnotation = Object.class.getName();
             }
         }
+    }
+
+    /**
+     * Finds the generic types for the given interface for the given class element.
+     *
+     * @param element       The class element
+     * @param interfaceName The interface
+     * @return The generic types or an empty list
+     */
+    private List<? extends TypeMirror> interfaceGenericTypesFor(TypeElement element, String interfaceName) {
+        for (TypeMirror tm : element.getInterfaces()) {
+            DeclaredType declaredType = (DeclaredType) tm;
+            Element declaredElement = declaredType.asElement();
+            if (declaredElement instanceof TypeElement te) {
+                if (interfaceName.equals(te.getQualifiedName().toString())) {
+                    return declaredType.getTypeArguments();
+                }
+            }
+        }
+        return Collections.emptyList();
     }
 
     @Override

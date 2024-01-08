@@ -19,7 +19,6 @@ import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.AnnotationUtils
-import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
@@ -94,8 +93,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         def processingEnv = typeElementInfo.javaParser.processingEnv
         def messager = processingEnv.messager
         ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, processingEnv.filer) {
         }
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(
@@ -105,7 +103,6 @@ abstract class AbstractTypeElementSpec extends Specification {
                 annotationUtils,
                 types,
                 modelUtils,
-                genericUtils,
                 processingEnv.filer,
                 new MutableConvertibleValuesMap<Object>(),
                 TypeElementVisitor.VisitorKind.ISOLATING
@@ -518,8 +515,7 @@ class Test {
         def processingEnv = parser.processingEnv
         def messager = processingEnv.messager
         ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, parser.filer) {
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, parser.filer) {
             @Override
             JavaAnnotationMetadataBuilder newAnnotationBuilder() {
                 return super.newAnnotationBuilder()
