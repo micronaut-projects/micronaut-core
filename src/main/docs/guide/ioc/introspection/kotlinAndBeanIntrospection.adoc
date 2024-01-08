@@ -1,0 +1,17 @@
+You can annotate a https://kotlinlang.org/docs/data-classes.html[Kotlin Data Class] with ann:core.annotation.Introspected[]:
+
+.Kotlin Data Class annotated with @Introspected
+[source, kotlin]
+----
+include::{testsuitekotlin}/core/beans/UserDataClass.kt[tags="dataclass", indent=0]
+----
+
+and instantiate it with the BeanIntrospection API:
+
+.Kotlin Data Class instantiated via BeanIntrospection API
+[source, kotlin]
+----
+include::{testsuitekotlin}/core/beans/UserDataClassTest.kt[tags="dataclassbeanintrospectioninstantiate", indent=0]
+----
+
+WARNING: https://kotlinlang.org/docs/inline-classes.html[Kotlin Inline Value Classes] are not supported yet by the api:core.beans.BeanIntrospection[] API.
