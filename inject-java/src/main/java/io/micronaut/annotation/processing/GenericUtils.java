@@ -133,8 +133,9 @@ public class GenericUtils {
                     break;
                     case TYPEVAR:
                         TypeVariable tv = (TypeVariable) mirror;
-                        if (boundTypes.containsKey(tv.toString())) {
-                            resolvedParameters.put(parameterName, boundTypes.get(tv.toString()));
+                        String variableName = tv.asElement().getSimpleName().toString();
+                        if (boundTypes.containsKey(variableName)) {
+                            resolvedParameters.put(parameterName, boundTypes.get(variableName));
                         } else {
                             TypeMirror upperBound = tv.getUpperBound();
                             TypeMirror lowerBound = tv.getLowerBound();
@@ -195,7 +196,7 @@ public class GenericUtils {
         switch (kind) {
             case TYPEVAR:
                 TypeVariable tv = (TypeVariable) mirror;
-                String name = tv.toString();
+                String name = tv.asElement().getSimpleName().toString();
                 if (boundTypes.containsKey(name)) {
                     return boundTypes.get(name);
                 } else {
@@ -251,7 +252,7 @@ public class GenericUtils {
                     mirror
             );
         } else if (mirror instanceof TypeVariable tv) {
-            String variableName = tv.toString();
+            String variableName = tv.asElement().getSimpleName().toString();
             if (boundTypes.containsKey(variableName)) {
                 resolvedParameters.put(
                         parameterName,

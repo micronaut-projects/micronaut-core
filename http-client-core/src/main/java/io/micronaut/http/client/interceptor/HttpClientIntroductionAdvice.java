@@ -380,8 +380,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                         return;
                                     }
                                 }
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
                                 }
                                 future.completeExceptionally(t);
                             }

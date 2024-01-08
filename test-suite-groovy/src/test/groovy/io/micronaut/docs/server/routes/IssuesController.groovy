@@ -21,13 +21,30 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.PathVariable
 // end::imports[]
 
-// tag::class[]
+// tag::startclass[]
 @Controller("/issues") // <1>
 class IssuesController {
+// end::startclass[]
 
+    // tag::normal[]
     @Get("/{number}") // <2>
-    String issue(@PathVariable Integer number) { // <3>
+    String issue(Integer number) { // <3>
         "Issue # " + number + "!" // <4>
     }
+
+    @Get("/issue/{number}")
+    String issueFromId(@PathVariable("number") Integer id) { // <5>
+        "Issue # " + id + "!"
+    }
+    // end::normal[]
+
+    // tag::defaultvalue[]
+    @Get("/default{/number}") // <1>
+    String issueFromIdOrDefault(@PathVariable(defaultValue = "0") Integer number) { // <2>
+        "Issue # " + number + "!"
+    }
+    // end::defaultvalue[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

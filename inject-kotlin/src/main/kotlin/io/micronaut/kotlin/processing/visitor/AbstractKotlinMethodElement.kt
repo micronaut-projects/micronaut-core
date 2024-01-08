@@ -120,6 +120,10 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         // not sure how to implement this correctly for Kotlin
         false
 
+    override fun hides(hiddenMethod: MethodElement?) =
+        // not sure how to implement this correctly for Kotlin
+        false
+
     override fun getName() = name
 
     override fun getOwningType() = owningType

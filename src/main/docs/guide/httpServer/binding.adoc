@@ -90,7 +90,7 @@ WARNING: Since Java does not retain argument names in bytecode, you must compile
 
 Generally any type that can be converted from a String representation to a Java type via the link:{api}/io/micronaut/core/convert/ConversionService.html[ConversionService] API can be bound to.
 
-This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered via the service loader or by creating beans of type `TypeConverter`,
+This includes most common Java types. However, you can simply add additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] either by defining it as a bean or by registering it in a api:core.convert.TypeConverterRegistrar[] via the service loader.
 
 The handling of nullability deserves special mention. Consider for example the following example:
 

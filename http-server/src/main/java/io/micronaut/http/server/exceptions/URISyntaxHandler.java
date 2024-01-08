@@ -55,7 +55,7 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
                 .error(new Error() {
                     @Override
                     public String getMessage() {
-                        return "Malformed URI: " + exception.getMessage();
+                        return "Malformed URI";
                     }
 
                     @Override

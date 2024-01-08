@@ -10,6 +10,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 import java.util.concurrent.ThreadLocalRandom
@@ -36,6 +37,7 @@ class StreamPressureSpec extends Specification {
         ctx.close()
     }
 
+    @IgnoreIf(value = { os.macOs }, reason = "seems to hang on macos")
     def 'consumer pressure'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': 'StreamPressureSpec'])

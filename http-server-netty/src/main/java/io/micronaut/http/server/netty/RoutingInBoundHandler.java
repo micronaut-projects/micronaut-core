@@ -80,6 +80,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -217,7 +218,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
 
-        if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
+        if (cause instanceof SSLException || cause.getCause() instanceof SSLException || cause instanceof DecompressionException) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Micronaut Server Error - No request state present. Cause: {}", cause.getMessage(), cause);
             }

@@ -166,6 +166,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param body                The request body
      * @param ctx                 The {@link ChannelHandlerContext}
      * @param environment         The Environment
      * @param serverConfiguration The {@link HttpServerConfiguration}

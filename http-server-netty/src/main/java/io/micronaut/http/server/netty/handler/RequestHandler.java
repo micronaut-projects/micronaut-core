@@ -32,8 +32,8 @@ public interface RequestHandler {
      * Handle a request.
      *
      * @param ctx            The context this request came in on
-     * @param request        The request, either a {@link io.netty.handler.codec.http.FullHttpRequest} or a {@link io.micronaut.http.netty.stream.StreamedHttpRequest}
-     * @param body
+     * @param request        The request line and headers
+     * @param body           The request body
      * @param outboundAccess The {@link PipeliningServerHandler.OutboundAccess} to use for writing the response
      */
     void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess);
