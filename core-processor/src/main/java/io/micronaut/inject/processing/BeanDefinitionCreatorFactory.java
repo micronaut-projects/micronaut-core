@@ -66,6 +66,9 @@ public abstract class BeanDefinitionCreatorFactory {
             }
             return new AopIntroductionProxySupportedBeanElementCreator(classElement, visitorContext, false);
         }
+        if (classElement.isInterface()) {
+            return Collections::emptyList;
+        }
         // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
             if (classElement.hasStereotype("groovy.lang.Singleton")) {
