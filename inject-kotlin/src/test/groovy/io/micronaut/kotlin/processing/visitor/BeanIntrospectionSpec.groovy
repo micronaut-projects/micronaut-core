@@ -77,6 +77,43 @@ data class Test(val firstName: String = "Denis",
             !introspection.getProperty("age").get().isNullable()
     }
 
+    void "test default introspection instantiate failure"() {
+        when:
+            def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(val firstName: String = "Denis",
+               val lastName: String,
+               val job: String? = "IT",
+               val age: Int)
+""")
+            introspection.instantiate()
+        then:
+            def e = thrown(Exception)
+            e.message == "No default constructor exists"
+    }
+
+    void "test default introspection instantiate no failure"() {
+        when:
+            def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(val firstName: String = "Denis",
+               val lastName: String = "Stepanov",
+               val job: String? = "IT",
+               val age: Int = 99)
+""")
+            def bean = introspection.instantiate()
+        then:
+            bean.getFirstName() == "Denis"
+    }
+
     void "test data class introspection"() {
         when:
         def introspection = buildBeanIntrospection("test.ContactEntity", """
