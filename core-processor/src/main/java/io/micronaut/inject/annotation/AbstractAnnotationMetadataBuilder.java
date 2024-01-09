@@ -74,6 +74,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
      */
+    protected static final AnnotatedElementValidator ELEMENT_VALIDATOR;
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
@@ -130,6 +131,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 // mapper, missing dependencies, continue
             }
         }
+        ELEMENT_VALIDATOR = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
     }
 
     private boolean validating = true;
@@ -438,7 +440,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Nullable
     protected AnnotatedElementValidator getElementValidator() {
-        return null;
+        return ELEMENT_VALIDATOR;
     }
 
     /**
@@ -675,11 +677,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Creates the visitor context for this implementation.
+     * Returns the visitor context for this implementation.
      *
      * @return The visitor context
      */
-    protected abstract VisitorContext createVisitorContext();
+    protected abstract VisitorContext getVisitorContext();
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement,
                                                             String annotationName,
@@ -971,7 +973,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 boolean isDeclared,
                                 boolean alwaysIncludeAnnotation) {
 
-        ProcessingContext processingContext = new ProcessingContext(createVisitorContext());
+        ProcessingContext processingContext = new ProcessingContext(getVisitorContext());
 
         List<AnnotationValue<?>> annotationValues = stream
                 .flatMap(processedAnnotation -> processAnnotation(processingContext, processedAnnotation))

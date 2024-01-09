@@ -33,7 +33,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
     private val name: String,
-    private val owningType: ClassElement,
+    private val owningType: KotlinClassElement,
     annotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<T>(nativeType, annotationMetadataFactory, visitorContext), MethodElement {

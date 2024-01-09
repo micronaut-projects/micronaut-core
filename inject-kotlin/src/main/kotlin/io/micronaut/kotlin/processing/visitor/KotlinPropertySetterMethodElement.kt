@@ -24,7 +24,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
 
 internal class KotlinPropertySetterMethodElement(
-    private val owningType: ClassElement,
+    private val owningType: KotlinClassElement,
     private val propertyElement: KotlinPropertyElement,
     private val propertySetter: KSPropertySetter,
     private val presetParameters: List<ParameterElement>?,
@@ -40,7 +40,7 @@ internal class KotlinPropertySetterMethodElement(
 ), MethodElement {
 
     constructor(
-        owningType: ClassElement,
+        owningType: KotlinClassElement,
         propertyElement: KotlinPropertyElement,
         method: KSPropertySetter,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -78,7 +78,7 @@ internal class KotlinPropertySetterMethodElement(
 
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
         val newMethod = KotlinPropertySetterMethodElement(
-            owningType,
+            owningType as KotlinClassElement,
             propertyElement,
             propertySetter,
             presetParameters,

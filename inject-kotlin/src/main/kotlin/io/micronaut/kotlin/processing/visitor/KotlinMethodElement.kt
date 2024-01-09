@@ -19,10 +19,12 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import java.util.function.Function
+import java.util.stream.Collectors
 
 @OptIn(KspExperimental::class)
 internal open class KotlinMethodElement(
-    owningType: ClassElement,
+    owningType: KotlinClassElement,
     override val declaration: KSFunctionDeclaration,
     private val presetParameters: List<ParameterElement>?,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -36,7 +38,7 @@ internal open class KotlinMethodElement(
 ), MethodElement {
 
     constructor(
-        owningType: ClassElement,
+        owningType: KotlinClassElement,
         declaration: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
         visitorContext: KotlinVisitorContext
@@ -90,9 +92,23 @@ internal open class KotlinMethodElement(
 
     override fun isSuspend() = declaration.modifiers.contains(Modifier.SUSPEND)
 
+    override fun getOverriddenMethods(): Collection<MethodElement> {
+        return visitorContext.nativeElementsHelper
+            .findOverriddenMethods(owningType.declaration, declaration)
+            .stream()
+            .map { KotlinMethodElement(
+                    owningType,
+                    it,
+                    presetParameters,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            }.collect(Collectors.toList())
+    }
+
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
         val newMethod = KotlinMethodElement(
-            owningType,
+            owningType as KotlinClassElement,
             declaration,
             presetParameters,
             elementAnnotationMetadataFactory,

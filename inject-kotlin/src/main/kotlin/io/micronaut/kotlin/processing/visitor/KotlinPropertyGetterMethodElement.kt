@@ -23,7 +23,7 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 internal class KotlinPropertyGetterMethodElement(
-    private val owningType: ClassElement,
+    private val owningType: KotlinClassElement,
     private val propertyElement: KotlinPropertyElement,
     private val propertyGetter: KSPropertyGetter,
     private val presetParameters: List<ParameterElement>,
@@ -45,7 +45,7 @@ internal class KotlinPropertyGetterMethodElement(
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
         visitorContext: KotlinVisitorContext
     ) : this(
-        owningType,
+        owningType as KotlinClassElement,
         propertyElement,
         method,
         emptyList(),
@@ -61,7 +61,7 @@ internal class KotlinPropertyGetterMethodElement(
 
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
         val newMethod = KotlinPropertyGetterMethodElement(
-            owningType,
+            owningType as KotlinClassElement,
             propertyElement,
             propertyGetter,
             presetParameters,

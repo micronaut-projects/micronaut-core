@@ -33,7 +33,9 @@ import java.util.*;
  * Utility methods for dealing with generic type signatures.
  *
  * @author Graeme Rocher
+ * @deprecated No longer needed
  */
+@Deprecated(forRemoval = true, since = "4.3.0")
 @Internal
 public class GenericUtils {
 
@@ -46,7 +48,7 @@ public class GenericUtils {
      * @param typeUtils    The {@link Types}
      * @param modelUtils   The {@link ModelUtils}
      */
-    protected GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
+    public GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
         this.modelUtils = modelUtils;

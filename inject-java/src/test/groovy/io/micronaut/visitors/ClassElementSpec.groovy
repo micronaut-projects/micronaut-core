@@ -15,6 +15,7 @@
  */
 package io.micronaut.visitors
 
+
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.context.annotation.Replaces
@@ -1360,7 +1361,7 @@ enum Test {
     // private static Since Java 9
     void "test inherited methods using ElementQuery"() {
         given:
-        ClassElement classElement = buildClassElement('''
+        JavaClassElement classElement = buildClassElement('''
 package elementquery;
 
 class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWithMethods {
@@ -1473,6 +1474,20 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
             assert expected.contains(name)
         }
         expected.size() == methods.size()
+        methods[0].overriddenMethods.size() == 0
+        methods[1].overriddenMethods.size() == 0
+        methods[2].overriddenMethods.size() == 0
+        methods[3].overriddenMethods.size() == 1
+        methods[4].overriddenMethods.size() == 0
+        methods[5].overriddenMethods.size() == 0
+        methods[6].overriddenMethods.size() == 0
+        methods[7].overriddenMethods.size() == 2
+        methods[8].overriddenMethods.size() == 2
+        methods[9].overriddenMethods.size() == 0
+        methods[10].overriddenMethods.size() == 0
+        methods[11].overriddenMethods.size() == 0
+        methods[12].overriddenMethods.size() == 0
+        classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods()).size() == 13 + 1 + 2 + 2
 
         when:
         List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenElements())

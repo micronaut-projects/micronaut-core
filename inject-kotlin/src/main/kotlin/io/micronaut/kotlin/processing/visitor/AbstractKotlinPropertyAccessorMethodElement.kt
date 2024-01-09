@@ -25,7 +25,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     nativeType: T,
     private val accessor: KSPropertyAccessor,
     private val visibility: Visibility,
-    owningType: ClassElement,
+    owningType: KotlinClassElement,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
 ) : AbstractKotlinMethodElement<T>(

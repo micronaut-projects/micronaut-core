@@ -35,10 +35,12 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link MethodNode}.
@@ -273,6 +275,21 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return Arrays.stream(genericsTypes)
             .map(gt -> (GenericPlaceholderElement) newClassElement(gt))
             .toList();
+    }
+
+    @Override
+    public Collection<MethodElement> getOverriddenMethods() {
+        return visitorContext.getNativeElementHelper()
+            .findOverriddenMethods(owningType.classNode, methodNode)
+            .stream()
+            .map(overriddenMethod -> new GroovyMethodElement(
+                    owningType,
+                    visitorContext,
+                    new GroovyNativeElement.Method(methodNode),
+                    methodNode,
+                    elementAnnotationMetadataFactory
+                )
+            ).collect(Collectors.toList());
     }
 
 }

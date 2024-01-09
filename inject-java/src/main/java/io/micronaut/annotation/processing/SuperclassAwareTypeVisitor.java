@@ -33,7 +33,9 @@ import java.util.stream.Collectors;
  *
  * @param <R>
  * @param <P>
+ * @deprecated No longer used
  */
+@Deprecated(forRemoval = true, since = "4.3.0")
 public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisitor8<R, P> {
     private final Set<String> processed = new HashSet<>();
 

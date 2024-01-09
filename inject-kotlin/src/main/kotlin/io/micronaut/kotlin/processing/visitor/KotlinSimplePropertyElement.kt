@@ -26,7 +26,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 internal class KotlinSimplePropertyElement(
-    ownerType: ClassElement,
+    ownerType: KotlinClassElement,
     private val type: ClassElement,
     name: String,
     private val internalFieldElement: FieldElement?,

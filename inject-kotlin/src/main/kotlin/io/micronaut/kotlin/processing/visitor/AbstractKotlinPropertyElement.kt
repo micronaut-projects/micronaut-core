@@ -31,7 +31,7 @@ import java.util.*
 
 internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
     nativeTypeDef: T,
-    val ownerType: ClassElement,
+    val ownerType: KotlinClassElement,
     private val name: String,
     private val excluded: Boolean,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,

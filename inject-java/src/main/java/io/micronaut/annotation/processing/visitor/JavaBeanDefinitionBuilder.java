@@ -15,7 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
@@ -28,10 +28,10 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -53,6 +53,7 @@ import java.util.function.Predicate;
 @Internal
 class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final JavaVisitorContext javaVisitorContext;
+    private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
 
     /**
      * Default constructor.
@@ -77,6 +78,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         } else {
             visitorContext.fail("Cannot add bean definition using addAssociatedBean(..) from a AGGREGATING TypeElementVisitor, consider overriding getVisitorKind()", originatingElement);
         }
+        this.annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();
     }
 
     @Override
@@ -190,57 +192,35 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
         ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, annotationValue);
+        annotationMetadataBuilder.annotate(annotationMetadata, annotationValue);
     }
 
     @Override
     protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
-
         final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         consumer.accept(builder);
         final AnnotationValue<T> av = builder.build();
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, av);
+        annotationMetadataBuilder.annotate(annotationMetadata, av);
     }
 
     @Override
     protected void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeStereotype(annotationMetadata, annotationType);
+        annotationMetadataBuilder.removeStereotype(annotationMetadata, annotationType);
     }
 
     @Override
     protected <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate) {
         ArgumentUtils.requireNonNull("predicate", predicate);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeAnnotationIf(annotationMetadata, predicate);
+        annotationMetadataBuilder.removeAnnotationIf(annotationMetadata, predicate);
     }
 
     @Override
     protected void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeAnnotation(annotationMetadata, annotationType);
+        annotationMetadataBuilder.removeAnnotation(annotationMetadata, annotationType);
     }
 
 }
