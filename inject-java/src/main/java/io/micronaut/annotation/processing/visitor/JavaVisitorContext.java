@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.JavaNativeElementsHelper;
@@ -88,6 +89,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
+    private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
     private final List<String> generatedResources = new ArrayList<>();
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
@@ -109,6 +111,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * @param annotationUtils   The annotation utils
      * @param types             Type types
      * @param modelUtils        The model utils
+     * @param genericUtils      The generic type utils
      * @param filer             The filer
      * @param visitorAttributes The attributes
      * @param visitorKind       The visitor kind
@@ -120,6 +123,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         AnnotationUtils annotationUtils,
         Types types,
         ModelUtils modelUtils,
+        GenericUtils genericUtils,
         Filer filer,
         MutableConvertibleValues<Object> visitorAttributes,
         TypeElementVisitor.VisitorKind visitorKind) {
@@ -128,6 +132,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
@@ -377,6 +382,15 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public Types getTypes() {
         return types;
+    }
+
+    /**
+     * The generic utils object.
+     *
+     * @return The generic utils
+     */
+    public GenericUtils getGenericUtils() {
+        return genericUtils;
     }
 
     /**

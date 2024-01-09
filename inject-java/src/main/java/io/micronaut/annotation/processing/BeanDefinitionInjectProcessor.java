@@ -17,11 +17,13 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -109,6 +111,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
         }
+    }
+
+    @NonNull
+    @Override
+    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+        return new JavaVisitorContext(
+            processingEnv,
+            messager,
+            elementUtils,
+            annotationUtils,
+            typeUtils,
+            modelUtils,
+            genericUtils,
+            filer,
+            visitorAttributes,
+            getVisitorKind()
+        );
     }
 
     @Override

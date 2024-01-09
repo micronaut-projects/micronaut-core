@@ -134,7 +134,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (incrementalProcessorKind == visitorKind) {
                 try {
-                    loadedVisitors.add(new LoadedVisitor(visitor, processingEnv));
+                    loadedVisitors.add(new LoadedVisitor(visitor, genericUtils, processingEnv));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
                     // ignored, means annotations referenced are not on the classpath
                 }

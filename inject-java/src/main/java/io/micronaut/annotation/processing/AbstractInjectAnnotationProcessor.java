@@ -66,6 +66,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected Elements elementUtils;
     protected Types typeUtils;
     protected AnnotationUtils annotationUtils;
+    protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
@@ -183,6 +184,11 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
+        this.genericUtils = new GenericUtils(
+                elementUtils,
+                typeUtils,
+                modelUtils
+        );
 
         this.annotationUtils = new AnnotationUtils(
                 processingEnv,
@@ -190,6 +196,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 messager,
                 typeUtils,
                 modelUtils,
+                genericUtils,
                 filer,
                 visitorAttributes
         );
@@ -221,6 +228,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 annotationUtils,
                 typeUtils,
                 modelUtils,
+                genericUtils,
                 filer,
                 visitorAttributes,
                 getVisitorKind()
