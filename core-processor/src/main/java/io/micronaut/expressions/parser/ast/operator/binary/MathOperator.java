@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -42,7 +42,7 @@ public abstract sealed class MathOperator extends BinaryOperator permits DivOper
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type targetType = resolveType(ctx);
 
@@ -64,5 +64,5 @@ public abstract sealed class MathOperator extends BinaryOperator permits DivOper
         return computeNumericOperationTargetType(leftOperandType, rightOperandType);
     }
 
-    protected abstract int getMathOperationOpcode(ExpressionVisitorContext ctx);
+    protected abstract int getMathOperationOpcode(ExpressionCompilationContext ctx);
 }

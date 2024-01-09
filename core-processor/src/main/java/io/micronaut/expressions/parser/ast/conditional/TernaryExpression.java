@@ -16,9 +16,11 @@
 package io.micronaut.expressions.parser.ast.conditional;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -65,7 +67,7 @@ public class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Label falseLabel = new Label();
         Label returnLabel = new Label();
@@ -129,7 +131,7 @@ public class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (!shouldCoerceConditionToBoolean() && !isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
             throw new ExpressionCompilationException("Invalid ternary operator. Condition should resolve to boolean type");
         }

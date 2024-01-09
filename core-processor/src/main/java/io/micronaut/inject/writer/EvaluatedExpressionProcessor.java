@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
-import io.micronaut.expressions.context.ExpressionCompilationContext;
+import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -79,7 +79,7 @@ public final class EvaluatedExpressionProcessor {
 
         expressionReferences.stream()
             .map(expressionReference -> {
-                ExpressionCompilationContext evaluationContext = expressionCompilationContextFactory.buildContext(expressionReference, thisElement);
+                ExpressionEvaluationContext evaluationContext = expressionCompilationContextFactory.buildContext(expressionReference, thisElement);
                 return new ExpressionWithContext(expressionReference, evaluationContext);
             })
             .forEach(this::addExpression);
@@ -91,7 +91,7 @@ public final class EvaluatedExpressionProcessor {
 
         expressionReferences.stream()
             .map(expression -> {
-                ExpressionCompilationContext evaluationContext = expressionCompilationContextFactory.buildContextForMethod(expression, methodElement);
+                ExpressionEvaluationContext evaluationContext = expressionCompilationContextFactory.buildContextForMethod(expression, methodElement);
                 return new ExpressionWithContext(expression, evaluationContext);
             })
             .forEach(this::addExpression);

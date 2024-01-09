@@ -34,14 +34,14 @@ import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_P
 /**
  * This parser is used to split complex expression into multiple
  * single expressions if necessary and delegate each atomic expression
- * parsing to separate instance of {@link SingleEvaluatedEvaluatedExpressionParser},
+ * parsing to separate instance of {@link SingleEvaluatedExpressionParser},
  * then combining single expressions parsing results.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
-public final class CompoundEvaluatedEvaluatedExpressionParser implements EvaluatedExpressionParser {
+public final class CompoundEvaluatedExpressionParser implements EvaluatedExpressionParser {
 
     private final Object expression;
 
@@ -50,7 +50,7 @@ public final class CompoundEvaluatedEvaluatedExpressionParser implements Evaluat
      *
      * @param expression either string or string[]
      */
-    public CompoundEvaluatedEvaluatedExpressionParser(@NonNull Object expression) {
+    public CompoundEvaluatedExpressionParser(@NonNull Object expression) {
         if (!(expression instanceof String || expression instanceof String[])) {
             throw new ExpressionParsingException("Can not parse expression: " + expression);
         }
@@ -62,7 +62,7 @@ public final class CompoundEvaluatedEvaluatedExpressionParser implements Evaluat
     public ExpressionNode parse() throws ExpressionParsingException {
         // if expression doesn't have prefix, the whole string is treated as expression
         if (expression instanceof String str && !str.contains(EXPRESSION_PREFIX)) {
-            return new SingleEvaluatedEvaluatedExpressionParser(str).parse();
+            return new SingleEvaluatedExpressionParser(str).parse();
         }
 
         return parseTemplateExpression(expression);
@@ -73,8 +73,8 @@ public final class CompoundEvaluatedEvaluatedExpressionParser implements Evaluat
             List<ExpressionNode> expressionParts =
                 splitExpressionParts(str).stream()
                     .map(this::prepareExpressionPart)
-                    .map(SingleEvaluatedEvaluatedExpressionParser::new)
-                    .map(SingleEvaluatedEvaluatedExpressionParser::parse)
+                    .map(SingleEvaluatedExpressionParser::new)
+                    .map(SingleEvaluatedExpressionParser::parse)
                     .toList();
 
             if (expressionParts.size() == 1) {

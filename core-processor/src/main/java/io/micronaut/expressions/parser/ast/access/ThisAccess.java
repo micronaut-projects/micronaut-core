@@ -16,7 +16,9 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -33,7 +35,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATIO
 @Internal
 public final class ThisAccess extends ExpressionNode {
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
         mv.invokeInterface(EVALUATION_CONTEXT_TYPE, new Method("getThis", Type.getType(Object.class), new Type[0]));
@@ -42,7 +44,7 @@ public final class ThisAccess extends ExpressionNode {
 
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        ClassElement thisType = ctx.compilationContext().findThis();
+        ClassElement thisType = ctx.evaluationContext().findThis();
         if (thisType == null) {
             throw new ExpressionCompilationException(
                 "Cannot reference 'this' from the current context.");
@@ -52,7 +54,7 @@ public final class ThisAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return JavaModelUtils.getTypeReference(doResolveClassElement(ctx));
     }
 }

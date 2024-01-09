@@ -36,35 +36,35 @@ import static io.micronaut.inject.ast.ElementQuery.ALL_METHODS;
 import static java.util.function.Predicate.not;
 
 /**
- * Default implementation of {@link ExtensibleExpressionCompilationContext}. Extending
+ * Default implementation of {@link ExtensibleExpressionEvaluationContext}. Extending
  * this context will always return new instance instead of modifying the existing one.
  *
  * @since 4.0.0
  * @author Sergey Gavrilov
  */
 @Internal
-public class DefaultExpressionCompilationContext implements ExtensibleExpressionCompilationContext {
+public class DefaultExpressionEvaluationContext implements ExtensibleExpressionEvaluationContext {
 
     private final Collection<ClassElement> classElements;
     private final MethodElement methodElement;
 
     private final ClassElement thisType;
 
-    DefaultExpressionCompilationContext(ClassElement... classElements) {
+    DefaultExpressionEvaluationContext(ClassElement... classElements) {
         this(null, null, classElements);
     }
 
-    private DefaultExpressionCompilationContext(ClassElement thisType,
-                                                MethodElement methodElement,
-                                                ClassElement... classElements) {
+    private DefaultExpressionEvaluationContext(ClassElement thisType,
+                                               MethodElement methodElement,
+                                               ClassElement... classElements) {
         this.thisType = thisType;
         this.methodElement = methodElement;
         this.classElements = Arrays.asList(classElements);
     }
 
     @Override
-    public ExtensibleExpressionCompilationContext withThis(ClassElement classElement) {
-        return new DefaultExpressionCompilationContext(
+    public ExtensibleExpressionEvaluationContext withThis(ClassElement classElement) {
+        return new DefaultExpressionEvaluationContext(
             classElement,
             methodElement,
             classElements.toArray(ClassElement[]::new)
@@ -72,9 +72,9 @@ public class DefaultExpressionCompilationContext implements ExtensibleExpression
     }
 
     @Override
-    public DefaultExpressionCompilationContext extendWith(MethodElement methodElement) {
+    public DefaultExpressionEvaluationContext extendWith(MethodElement methodElement) {
         ClassElement resolvedThis = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
-        return new DefaultExpressionCompilationContext(
+        return new DefaultExpressionEvaluationContext(
             resolvedThis,
             methodElement,
             classElements.toArray(ClassElement[]::new)
@@ -82,8 +82,8 @@ public class DefaultExpressionCompilationContext implements ExtensibleExpression
     }
 
     @Override
-    public DefaultExpressionCompilationContext extendWith(ClassElement classElement) {
-        return new DefaultExpressionCompilationContext(
+    public DefaultExpressionEvaluationContext extendWith(ClassElement classElement) {
+        return new DefaultExpressionEvaluationContext(
             this.thisType,
             this.methodElement,
             ArrayUtils.concat(classElements.toArray(ClassElement[]::new), classElement)

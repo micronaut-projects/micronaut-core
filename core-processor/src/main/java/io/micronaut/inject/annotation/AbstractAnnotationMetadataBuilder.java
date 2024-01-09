@@ -57,7 +57,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static io.micronaut.core.expressions.EvaluatedExpressionReference.EXPR_SUFFIX;
 import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PATTERN;
 
 /**
@@ -627,9 +626,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (originatingClassName != null) {
             String packageName = NameUtils.getPackageName(originatingClassName);
             String simpleClassName = NameUtils.getSimpleName(originatingClassName);
-            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
+            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EvaluatedExpressionReferenceCounter.EXPR_SUFFIX);
 
-            Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
+            Integer expressionIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName);
 
             return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
         } else {

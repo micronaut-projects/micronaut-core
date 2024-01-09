@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -69,7 +70,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     }
 
     @Override
-    protected void generateBytecode(ExpressionVisitorContext ctx) {
+    protected void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         ClassElement calleeClass = callee.resolveClassElement(ctx);
         Method method = usedMethod.toAsmMethod();
@@ -124,7 +125,6 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
             // safe navigate optional
             classElement = classElement.getFirstTypeArgument().orElse(classElement);
         }
-
 
         ElementQuery<MethodElement> methodQuery = buildMethodQuery();
         List<CandidateMethod> candidateMethods = classElement.getEnclosedElements(methodQuery).stream()

@@ -21,6 +21,7 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -59,7 +60,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (usedMethod == null) {
             usedMethod = resolveUsedMethod(ctx);
         }
@@ -156,7 +157,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      *
      * @param ctx expression evaluation context
      */
-    protected void compileArguments(ExpressionVisitorContext ctx) {
+    protected void compileArguments(ExpressionCompilationContext ctx) {
         List<ExpressionNode> arguments = this.arguments;
         if (usedMethod.isVarArgs()) {
             arguments = prepareVarargsArguments();
@@ -174,7 +175,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @param argumentIndex argument index
      * @param argument      compiled argument
      */
-    private void compileArgument(ExpressionVisitorContext ctx,
+    private void compileArgument(ExpressionCompilationContext ctx,
                                  int argumentIndex,
                                  ExpressionNode argument) {
         GeneratorAdapter mv = ctx.methodVisitor();

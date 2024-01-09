@@ -33,7 +33,7 @@ import java.util.Objects;
  */
 @Internal
 public record ExpressionWithContext(@NonNull EvaluatedExpressionReference expressionReference,
-                                    @NonNull ExpressionCompilationContext evaluationContext) {
+                                    @NonNull ExpressionEvaluationContext evaluationContext) {
 
     /**
      * Provides initial annotation value treated as evaluated expression.
