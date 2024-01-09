@@ -125,42 +125,19 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
             TypeConverter typeConverter = converterCache.get(pair);
             if (typeConverter == null) {
-                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
-                if (typeConverter == null) {
-                    return Optional.empty();
-                } else {
-                    converterCache.put(pair, typeConverter);
-                    if (typeConverter == UNCONVERTIBLE) {
-                        return Optional.empty();
-                    } else {
-                        return typeConverter.convert(object, targetType, context);
-                    }
-                }
-            } else if (typeConverter != UNCONVERTIBLE) {
-                return typeConverter.convert(object, targetType, context);
+                typeConverter = findTypeConverter(pair.source, pair.target, pair.formattingAnnotation);
+                converterCache.put(pair, typeConverter);
             }
+           return typeConverter.convert(object, targetType, context);
         } else {
             ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
             TypeConverter typeConverter = converterCache.get(pair);
             if (typeConverter == null) {
-                typeConverter = findTypeConverter(sourceType, targetType, null);
-                if (typeConverter == null) {
-                    converterCache.put(pair, UNCONVERTIBLE);
-                    return Optional.empty();
-                } else {
-                    converterCache.put(pair, typeConverter);
-                    if (typeConverter == UNCONVERTIBLE) {
-                        return Optional.empty();
-                    } else {
-                        return typeConverter.convert(object, targetType, context);
-                    }
-                }
-            } else if (typeConverter != UNCONVERTIBLE) {
-                return typeConverter.convert(object, targetType, context);
+                typeConverter = findTypeConverter(pair.source, pair.target, pair.formattingAnnotation);
+                converterCache.put(pair, typeConverter);
             }
+            return typeConverter.convert(object, targetType, context);
         }
-
-        return Optional.empty();
     }
 
     @Override
@@ -168,12 +145,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
         TypeConverter typeConverter = converterCache.get(pair);
         if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, null);
-            if (typeConverter != null) {
-                converterCache.put(pair, typeConverter);
-                return typeConverter != UNCONVERTIBLE;
-            }
-            return false;
+            typeConverter = findTypeConverter(pair.source, pair.target, pair.formattingAnnotation);
+            converterCache.put(pair, typeConverter);
         }
         return typeConverter != UNCONVERTIBLE;
     }
@@ -202,7 +175,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      * @since 3.5.3
      */
     @Internal
-    public void reset() {
+    public synchronized void reset() {
         typeConverters.clear();
         converterCache.clear();
         registerDefaultConverters();
@@ -212,7 +185,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      * Default Converters.
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
-    protected void registerDefaultConverters() {
+    protected synchronized void registerDefaultConverters() {
         // primitive array to wrapper array
         @SuppressWarnings("rawtypes")
         Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
@@ -974,8 +947,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      * @param <T> Generic type
      * @return type converter
      */
-    protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
-        TypeConverter typeConverter = UNCONVERTIBLE;
+    protected synchronized  <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
+        TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
         for (Class sourceSuperType : sourceHierarchy) {
@@ -988,6 +961,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
         }
+
         boolean hasFormatting = formattingAnnotation != null;
         if (hasFormatting) {
             for (Class sourceSuperType : sourceHierarchy) {
@@ -1001,7 +975,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
         }
-        return typeConverter;
+
+        return UNCONVERTIBLE;
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
