@@ -82,4 +82,58 @@ class KotlinBeanIntrospectionSpec {
         assertEquals("88", test4.invoke(instance3, null))
         assertEquals("99", test4.invoke(instance3, 99))
     }
+
+    @Test
+    fun testAllDefaultsConstructor() {
+        val introspection = BeanIntrospection.getIntrospection(TestEntity4::class.java)
+
+        val instance0 = introspection.instantiate()
+
+        assertEquals("Denis", instance0.firstName)
+        assertEquals("Stepanov", instance0.lastName)
+        assertEquals("IT", instance0.job)
+        assertEquals(99, instance0.age)
+
+        val instance1 = introspection.instantiate(null, "Stepanov", null, 123)
+
+        assertEquals("Denis", instance1.firstName)
+        assertEquals("Stepanov", instance1.lastName)
+        assertEquals("IT", instance1.job)
+        assertEquals(123, instance1.age)
+
+        val instance2 = introspection.instantiate("Jeff", "Hello", null, 123)
+
+        assertEquals("Jeff", instance2.firstName)
+        assertEquals("Hello", instance2.lastName)
+        assertEquals("IT", instance2.job)
+        assertEquals(123, instance2.age)
+
+        val instance3 = introspection.instantiate(null, "Hello", "HR", 22)
+
+        assertEquals("Denis", instance3.firstName)
+        assertEquals("Hello", instance3.lastName)
+        assertEquals("HR", instance3.job)
+        assertEquals(22, instance3.age)
+
+        val test1 = introspection.beanMethods.stream().filter { m -> m.name.equals("test1") }.findFirst().get()
+        assertEquals("Z B 3", test1.invoke(instance3, "Z", "B", 3))
+        assertEquals("A B 99", test1.invoke(instance3, null, "B", 99))
+        assertEquals("A Z 99", test1.invoke(instance3, null, "Z", 99))
+
+        val test2 = introspection.beanMethods.stream().filter { m -> m.name.equals("test2") }.findFirst().get()
+        assertEquals("A", test2.invoke(instance3, null))
+        assertEquals("B", test2.invoke(instance3, "B"))
+
+        val test3 = introspection.beanMethods.stream().filter { m -> m.name.equals("test3") }.findFirst().get()
+        assertEquals("678", test3.invoke(instance3, 678))
+        assertTrue {
+            assertFails {
+                test3.invoke(instance3, null)
+            } is NullPointerException
+        }
+
+        val test4 = introspection.beanMethods.stream().filter { m -> m.name.equals("test4") }.findFirst().get()
+        assertEquals("88", test4.invoke(instance3, null))
+        assertEquals("99", test4.invoke(instance3, 99))
+    }
 }
