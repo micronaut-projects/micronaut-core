@@ -37,6 +37,8 @@ import org.objectweb.asm.commons.Method;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
@@ -59,6 +61,8 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
     private final VisitorContext visitorContext;
     private final Element originatingElement;
 
+    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
+
     public EvaluatedExpressionWriter(ExpressionWithContext expressionMetadata,
                                      VisitorContext visitorContext,
                                      Element originatingElement) {
@@ -70,10 +74,14 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
     @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         String expressionClassName = expressionMetadata.expressionClassName();
+        if (WRITTEN_CLASSES.contains(expressionClassName)) {
+            return;
+        }
         try (OutputStream outputStream = outputVisitor.visitClass(expressionClassName,
             getOriginatingElements())) {
             ClassWriter classWriter = generateClassBytes(expressionClassName);
             outputStream.write(classWriter.toByteArray());
+            WRITTEN_CLASSES.add(expressionClassName);
         }
     }
 
