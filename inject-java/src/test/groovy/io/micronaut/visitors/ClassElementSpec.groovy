@@ -295,6 +295,42 @@ class Test {
         PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
     }
 
+    void "test primitive nullability"() {
+        given:
+        def element = buildClassElement("""
+package test;
+
+class Test {
+    boolean test1;
+    boolean[] test2;
+    void method1() {
+    }
+    boolean method2() {
+        return true;
+    }
+}
+""")
+
+        expect:
+        element.getFields().get(0).getType().isNonNull()
+        !element.getFields().get(0).getType().isNullable()
+
+        !element.getFields().get(1).getType().isNonNull()
+        !element.getFields().get(1).getType().isNullable()
+
+        !element.getMethods().get(0).getReturnType().isNonNull()
+        !element.getMethods().get(0).getReturnType().isNullable()
+
+        !element.getMethods().get(0).getReturnType().getType().isNonNull()
+        !element.getMethods().get(0).getReturnType().getType().isNullable()
+
+        element.getMethods().get(1).getReturnType().isNonNull()
+        !element.getMethods().get(1).getReturnType().isNullable()
+
+        element.getMethods().get(1).getReturnType().getType().isNonNull()
+        !element.getMethods().get(1).getReturnType().getType().isNullable()
+    }
+
     void "test resolve receiver type on method"() {
         given:
         def element = buildClassElement("""

@@ -125,6 +125,22 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return true;
     }
 
+    @Override
+    public boolean isNonNull() {
+        if (this == PrimitiveElement.VOID || isArray()) {
+            return ArrayableClassElement.super.isNonNull();
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isNullable() {
+        if (this == PrimitiveElement.VOID || isArray()) {
+            return ArrayableClassElement.super.isNullable();
+        }
+        return false;
+    }
+
     public static PrimitiveElement valueOf(String name) {
         for (PrimitiveElement element: PRIMITIVES) {
             if (element.getName().equalsIgnoreCase(name)) {
