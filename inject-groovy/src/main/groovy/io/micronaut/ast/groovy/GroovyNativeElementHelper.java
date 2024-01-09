@@ -58,12 +58,6 @@ public final class GroovyNativeElementHelper extends NativeElementsHelper<ClassN
         if (c1.equals(c2)) {
             return true;
         }
-//        if (subDeclaringClass.isInterface()) {
-//            if (!superDeclaringClass.isInterface()) {
-//                return false;
-//            }
-//            return subDeclaringClass.declaresInterface(superDeclaringClass);
-//        }
         if (c2.isInterface()) {
             return c1.implementsInterface(c2);
         }

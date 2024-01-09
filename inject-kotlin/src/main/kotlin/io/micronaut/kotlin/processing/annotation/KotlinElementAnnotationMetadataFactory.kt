@@ -141,7 +141,7 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata? {
         val kotlinParameterElement = parameterElement as KotlinParameterElement
-        val owner = kotlinParameterElement.methodElement.owningType as KotlinClassElement
+        val owner = kotlinParameterElement.methodElement.owningType
         return metadataBuilder.lookupOrBuild(
             Key3(
                 getClassDefinitionCacheKey(owner),
@@ -173,7 +173,7 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForMethod(methodElement: MethodElement): CachedAnnotationMetadata? {
         val kotlinMethodElement = methodElement as AbstractKotlinMethodElement<*>
-        val owner = kotlinMethodElement.owningType as KotlinClassElement
+        val owner = kotlinMethodElement.owningType
         return metadataBuilder.lookupOrBuild(
             Key2(
                 getClassDefinitionCacheKey(owner),

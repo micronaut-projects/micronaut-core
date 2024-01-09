@@ -523,8 +523,8 @@ internal class KotlinAnnotationMetadataBuilder(
         throw IllegalStateException("Unknown annotation member element: $annotated")
     }
 
-    override fun createVisitorContext(): VisitorContext {
-        return KotlinVisitorContext(symbolProcessorEnvironment, resolver)
+    override fun getVisitorContext(): VisitorContext {
+        return visitorContext
     }
 
     override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {

@@ -87,12 +87,16 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     final AnnotatedElementValidator elementValidator;
     final CompilationUnit compilationUnit;
     final GroovyNativeElementHelper nativeElementHelper;
+    final GroovyVisitorContext visitorContext;
 
     public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
-        this(sourceUnit, compilationUnit, new GroovyNativeElementHelper());
+        this(sourceUnit, compilationUnit, new GroovyNativeElementHelper(), new GroovyVisitorContext(sourceUnit, compilationUnit));
     }
 
-    public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit, GroovyNativeElementHelper nativeElementHelper) {
+    public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit,
+                                           CompilationUnit compilationUnit,
+                                           GroovyNativeElementHelper nativeElementHelper,
+                                           GroovyVisitorContext visitorContext) {
         this.compilationUnit = compilationUnit;
         this.sourceUnit = sourceUnit;
         if (sourceUnit != null) {
@@ -112,6 +116,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             this.elementValidator = null;
         }
         this.nativeElementHelper = nativeElementHelper;
+        this.visitorContext = visitorContext;
     }
 
     @Override
@@ -228,8 +233,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected VisitorContext createVisitorContext() {
-        return new GroovyVisitorContext(sourceUnit, compilationUnit);
+    protected VisitorContext getVisitorContext() {
+        return visitorContext;
     }
 
     @Override

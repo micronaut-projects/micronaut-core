@@ -100,11 +100,11 @@ public class GroovyVisitorContext implements VisitorContext {
         this.compilationUnit = compilationUnit;
         this.outputVisitor = outputVisitor;
         this.attributes = VISITOR_ATTRIBUTES;
+        this.nativeElementHelper = new GroovyNativeElementHelper();
         this.groovyElementFactory = new GroovyElementFactory(this);
-        this.annotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
+        this.annotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit, nativeElementHelper, this);
         this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
-        this.nativeElementHelper = new GroovyNativeElementHelper();
     }
 
     @Override

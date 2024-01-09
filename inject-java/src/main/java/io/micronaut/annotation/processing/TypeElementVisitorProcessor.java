@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
@@ -134,7 +133,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (incrementalProcessorKind == visitorKind) {
                 try {
-                    loadedVisitors.add(new LoadedVisitor(visitor, genericUtils, processingEnv));
+                    loadedVisitors.add(new LoadedVisitor(visitor, processingEnv));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
                     // ignored, means annotations referenced are not on the classpath
                 }

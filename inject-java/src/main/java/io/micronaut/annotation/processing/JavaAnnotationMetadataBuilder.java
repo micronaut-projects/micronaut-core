@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
@@ -25,7 +26,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -69,9 +69,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     private final Elements elementUtils;
     private final Messager messager;
-    private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
     private final JavaNativeElementsHelper nativeElementsHelper;
+    private final JavaVisitorContext visitorContext;
 
     /**
      * Default constructor.
@@ -80,13 +80,15 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param messager        The messager
      * @param annotationUtils The annotation utils
      * @param modelUtils      The model utils
+     * @deprecated Not needed
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public JavaAnnotationMetadataBuilder(
         Elements elements,
         Messager messager,
         AnnotationUtils annotationUtils,
         ModelUtils modelUtils) {
-        this(elements, messager, annotationUtils, modelUtils, new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils()));
+        this(elements, messager, modelUtils, new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils()), annotationUtils.newVisitorContext());
     }
 
     /**
@@ -94,27 +96,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      *
      * @param elements             The elementUtils
      * @param messager             The messager
-     * @param annotationUtils      The annotation utils
      * @param modelUtils           The model utils
      * @param nativeElementsHelper The native elements helper
+     * @param visitorContext       The visitor context
      */
     public JavaAnnotationMetadataBuilder(
         Elements elements,
         Messager messager,
-        AnnotationUtils annotationUtils,
         ModelUtils modelUtils,
-        JavaNativeElementsHelper nativeElementsHelper) {
+        JavaNativeElementsHelper nativeElementsHelper,
+        JavaVisitorContext visitorContext) {
         this.elementUtils = elements;
         this.messager = messager;
-        this.annotationUtils = annotationUtils;
         this.modelUtils = modelUtils;
         this.nativeElementsHelper = nativeElementsHelper;
-    }
-
-    @Nullable
-    @Override
-    protected AnnotatedElementValidator getElementValidator() {
-        return annotationUtils.getElementValidator();
+        this.visitorContext = visitorContext;
     }
 
     @Override
@@ -173,8 +169,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected VisitorContext createVisitorContext() {
-        return annotationUtils.newVisitorContext();
+    protected VisitorContext getVisitorContext() {
+        return visitorContext;
     }
 
     @NonNull
