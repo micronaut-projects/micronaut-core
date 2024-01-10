@@ -376,10 +376,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     if (err != null) {
                         RoutingInBoundHandler.this.handleUnboundError(err);
                     } else {
-                        HttpHeaders responseHeaders = ((NettyHttpHeaders) response.getHeaders()).getNettyHeaders();
-                        if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
-                            responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
+                        NettyHttpHeaders responseHeadersMn = (NettyHttpHeaders) response.getHeaders();
+                        if (responseHeadersMn.contentType().isEmpty()) {
+                            responseHeadersMn.contentType(responseMediaType);
                         }
+                        HttpHeaders responseHeaders = responseHeadersMn.getNettyHeaders();
                         if (serverHeader != null && !responseHeaders.contains(HttpHeaderNames.SERVER)) {
                             responseHeaders.set(HttpHeaderNames.SERVER, serverHeader);
                         }
