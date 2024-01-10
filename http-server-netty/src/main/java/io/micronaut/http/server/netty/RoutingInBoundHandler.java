@@ -73,9 +73,8 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.web.router.shortcircuit.ExecutionLeaf;
-import io.micronaut.web.router.shortcircuit.MatchPlan;
 import io.micronaut.web.router.shortcircuit.MatchRule;
-import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
+import io.micronaut.web.router.shortcircuit.PreparedMatchResult;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -129,6 +128,7 @@ import java.util.regex.Pattern;
 @SuppressWarnings("FileLength")
 public final class RoutingInBoundHandler implements RequestHandler {
 
+    private static final PreparedMatchResult.HandlerKey<ExecutionLeaf<PreparedHandler>> PREPARED_HANDLER_KEY = new PreparedMatchResult.HandlerKey<>();
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
@@ -146,7 +146,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
-    final MatchPlan<PreparedHandler> shortCircuitMatchPlan;
 
     /**
      * @param serverConfiguration          The Netty HTTP server configuration
@@ -174,14 +173,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
         this.conversionService = conversionService;
-
-        if (serverConfiguration.isOptimizedRouting()) {
-            ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new ShortCircuitRouterBuilder<>();
-            routeExecutor.getRouter().collectRoutes(scrb);
-            this.shortCircuitMatchPlan = scrb.transform(this::shortCircuitHandler).plan();
-        } else {
-            this.shortCircuitMatchPlan = null;
-        }
     }
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
@@ -254,16 +245,23 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }
         }
         outboundAccess.attachment(mnRequest);
-        if (shortCircuitMatchPlan != null &&
+        if (serverConfiguration.isOptimizedRouting() &&
             request.decoderResult().isSuccess() &&
             // origin needs to be checked by CorsFilter
             !request.headers().contains(HttpHeaderNames.ORIGIN) &&
             body instanceof ImmediateByteBody) {
 
-            ExecutionLeaf<PreparedHandler> instantResult = shortCircuitMatchPlan.execute(mnRequest);
-            if (instantResult instanceof ExecutionLeaf.Route<PreparedHandler> route) {
-                route.routeMatch().accept(mnRequest, outboundAccess);
-                return;
+            PreparedMatchResult preparedMatchResult = routeExecutor.getRouter().findPreparedMatchResult(mnRequest);
+            if (preparedMatchResult != null) {
+                ExecutionLeaf<PreparedHandler> handler = preparedMatchResult.getHandler(PREPARED_HANDLER_KEY);
+                if (handler == null) {
+                    handler = shortCircuitHandler(preparedMatchResult.getRule(), preparedMatchResult.getRouteInfo());
+                    preparedMatchResult.setHandler(PREPARED_HANDLER_KEY, handler);
+                }
+                if (handler instanceof ExecutionLeaf.Route<PreparedHandler> route) {
+                    route.routeMatch().accept(mnRequest, outboundAccess);
+                    return;
+                }
             }
         }
         if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {

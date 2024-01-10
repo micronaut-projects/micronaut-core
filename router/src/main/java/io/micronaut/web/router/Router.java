@@ -23,7 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
-import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
+import io.micronaut.web.router.shortcircuit.PreparedMatchResult;
 
 import java.net.URI;
 import java.util.List;
@@ -163,14 +163,10 @@ public interface Router {
         return null;
     }
 
-    /**
-     * Collect all routes in this router into the given {@link ShortCircuitRouterBuilder}.
-     *
-     * @param builder The builder to write routes to
-     */
     @Internal
-    default void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
-        builder.addLegacyFallbackRouting();
+    @Nullable
+    default PreparedMatchResult findPreparedMatchResult(@NonNull HttpRequest<?> request) {
+        return null;
     }
 
     /**

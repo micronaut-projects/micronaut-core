@@ -1,30 +1,25 @@
-package io.micronaut.http.server.netty.shortcircuit
+package io.micronaut.web.router.shortcircuit
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
-import io.micronaut.http.server.RouteExecutor
+import io.micronaut.web.router.DefaultRouter
 import io.micronaut.web.router.UriRouteInfo
-import io.micronaut.web.router.shortcircuit.ExecutionLeaf
-import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder
-import io.netty.handler.codec.http.DefaultHttpRequest
-import io.netty.handler.codec.http.HttpMethod
-import io.netty.handler.codec.http.HttpRequest
-import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
 
-class NettyShortCircuitRouterBuilderSpec extends Specification {
-    def 'route builder'(HttpRequest request, @Nullable String methodName) {
+class ShortCircuitRouterBuilderSpec extends Specification {
+    def 'route builder'(HttpRequest<?> request, @Nullable String methodName) {
         given:
         def ctx = ApplicationContext.run(['spec.name': "NettyShortCircuitRouterBuilderSpec"])
         def scb = new ShortCircuitRouterBuilder<UriRouteInfo<?, ?>>()
-        ctx.getBean(RouteExecutor).getRouter().collectRoutes(scb)
+        ctx.getBean(DefaultRouter).collectRoutes(scb)
         def plan = scb.plan()
 
         when:
@@ -43,35 +38,35 @@ class NettyShortCircuitRouterBuilderSpec extends Specification {
         get("/simple")                                                       | "simple"
         get("/pattern-collision/exact")                                      | null
         get("/produces")                                                     | "produces"
-        get("/produces", ['accept': 'application/json'])                     | "produces"
-        get("/produces", ['accept': '*/*'])                                  | "produces"
-        get("/produces", ['accept': 'text/plain, */*'])                      | "produces"
-        get("/produces", ['accept': 'text/plain'])                           | null
-        get("/produces-overlap", ['accept': 'text/plain'])                   | "producesOverlapText"
-        get("/produces-overlap", ['accept': 'application/json'])             | "producesOverlapJson"
-        get("/produces-overlap", ['accept': '*/*'])                          | null
+        get("/produces", ['Accept': 'application/json'])                     | "produces"
+        get("/produces", ['Accept': '*/*'])                                  | "produces"
+        get("/produces", ['Accept': 'text/plain, */*'])                      | "produces"
+        get("/produces", ['Accept': 'text/plain'])                           | null
+        get("/produces-overlap", ['Accept': 'text/plain'])                   | "producesOverlapText"
+        get("/produces-overlap", ['Accept': 'application/json'])             | "producesOverlapJson"
+        get("/produces-overlap", ['Accept': '*/*'])                          | null
         get("/produces-overlap")                                             | null
-        get("/produces-overlap", ['accept': 'text/plain, application/json']) | null
-        post("/consumes", ['content-type': 'application/json'])              | "consumes"
-        post("/consumes", ['content-type': 'text/plain'])                    | null
+        get("/produces-overlap", ['Accept': 'text/plain, application/json']) | null
+        post("/consumes", ['Content-Type': 'application/json'])              | "consumes"
+        post("/consumes", ['Content-Type': 'text/plain'])                    | null
         post("/consumes")                                                    | "consumes"
-        post("/consumes-overlap", ['content-type': 'application/json'])      | "consumesOverlapJson"
-        post("/consumes-overlap", ['content-type': 'text/plain'])            | "consumesOverlapText"
+        post("/consumes-overlap", ['Content-Type': 'application/json'])      | "consumesOverlapJson"
+        post("/consumes-overlap", ['Content-Type': 'text/plain'])            | "consumesOverlapText"
         post("/consumes-overlap")                                            | null
     }
 
-    private static HttpRequest get(String path, Map<String, String> headers = [:]) {
-        def request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path)
+    private static HttpRequest<?> get(String path, Map<String, String> headers = [:]) {
+        def request = HttpRequest.GET(path)
         for (Map.Entry<String, String> entry : headers.entrySet()) {
-            request.headers().add(entry.key, entry.value)
+            request.getHeaders().add(entry.key, entry.value)
         }
         return request
     }
 
-    private static HttpRequest post(String path, Map<String, String> headers = [:]) {
-        def request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, path)
+    private static HttpRequest<?> post(String path, Map<String, String> headers = [:]) {
+        def request = HttpRequest.POST(path, null)
         for (Map.Entry<String, String> entry : headers.entrySet()) {
-            request.headers().add(entry.key, entry.value)
+            request.getHeaders().add(entry.key, entry.value)
         }
         return request
     }

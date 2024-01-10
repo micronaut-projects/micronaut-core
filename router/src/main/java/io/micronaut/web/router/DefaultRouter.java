@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
@@ -36,7 +37,10 @@ import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.shortcircuit.ExecutionLeaf;
+import io.micronaut.web.router.shortcircuit.MatchPlan;
 import io.micronaut.web.router.shortcircuit.MatchRule;
+import io.micronaut.web.router.shortcircuit.PreparedMatchResult;
 import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -88,6 +92,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         FilterRunner.sort(httpFilters);
         return httpFilters;
     });
+    private volatile MatchPlan<PreparedMatchResult> preparedMatchPlan = null;
 
     /**
      * Construct a new router for the given route builders.
@@ -692,7 +697,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return false;
     }
 
-    @Override
+    @Internal
     public void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             HttpMethod parsed = HttpMethod.parse(entry.getKey());
@@ -714,6 +719,28 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
 
         builder.addLegacyFallbackRouting();
+    }
+
+    @Override
+    public @Nullable PreparedMatchResult findPreparedMatchResult(@NonNull HttpRequest<?> request) {
+        MatchPlan<PreparedMatchResult> preparedMatchPlan = this.preparedMatchPlan;
+        if (preparedMatchPlan == null) {
+            preparedMatchPlan = prepareMatchPlan();
+        }
+        ExecutionLeaf<PreparedMatchResult> result = preparedMatchPlan.execute(request);
+        return result instanceof ExecutionLeaf.Route<PreparedMatchResult> r ? r.routeMatch() : null;
+    }
+
+    private MatchPlan<PreparedMatchResult> prepareMatchPlan() {
+        synchronized (this) {
+            if (preparedMatchPlan == null) {
+                ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new ShortCircuitRouterBuilder<>();
+                collectRoutes(scrb);
+                return preparedMatchPlan = scrb.transform((rule, info) -> new ExecutionLeaf.Route<>(new PreparedMatchResult(rule, info))).plan();
+            } else {
+                return preparedMatchPlan;
+            }
+        }
     }
 
     /**
