@@ -271,7 +271,8 @@ class BinaryWebSocketSpec extends Specification {
                 'micronaut.server.port': -1,
                 'micronaut.http.client.ws.compression.enabled': false
         ])
-        def compressionDetectionCustomizer = ctx.getBean(CompressionDetectionCustomizer)
+        def cdcServer = ctx.getBean(CompressionDetectionCustomizerServer)
+        def cdcClient = ctx.getBean(CompressionDetectionCustomizerClient)
         EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer)
         embeddedServer.start()
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
@@ -290,11 +291,12 @@ class BinaryWebSocketSpec extends Specification {
             fred.replies.size() == 1
         }
 
-        compressionDetectionCustomizer.getPipelines().size() == 4
+        cdcServer.getPipelines().size() == 2
+        cdcClient.getPipelines().size() == 2
 
         when: "A message is sent"
         List<MessageInterceptor> interceptors = new ArrayList<>()
-        for (ChannelPipeline pipeline : compressionDetectionCustomizer.getPipelines()) {
+        for (ChannelPipeline pipeline : cdcServer.getPipelines() + cdcClient.getPipelines()) {
             def interceptor = new MessageInterceptor()
             if (pipeline.get('ws-encoder') != null) {
                 pipeline.addAfter('ws-encoder', 'MessageInterceptor', interceptor)
