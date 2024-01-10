@@ -24,6 +24,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * This class represents the result of a {@link io.micronaut.web.router.Router} match operation. It
+ * is shared between multiple requests with the same parameters. However, it includes additional
+ * request information that is not present in {@link UriRouteInfo}, such as the request path and
+ * certain headers.
+ */
 @Internal
 public final class PreparedMatchResult {
     private final MatchRule rule;
@@ -46,6 +52,13 @@ public final class PreparedMatchResult {
         return routeInfo;
     }
 
+    /**
+     * Get a handler that has been previously set using {@link #setHandler}.
+     *
+     * @param key The handler key
+     * @return The handler, or {@code null if unset}
+     * @param <H> The handler type
+     */
     @SuppressWarnings("unchecked")
     @Nullable
     public <H> H getHandler(@NonNull HandlerKey<H> key) {
@@ -59,6 +72,13 @@ public final class PreparedMatchResult {
         return (H) handler;
     }
 
+    /**
+     * Set a handler for future retrieval with {@link #getHandler}.
+     *
+     * @param key The handler key
+     * @param handler The handler
+     * @param <H> The handler type
+     */
     public <H> void setHandler(@NonNull HandlerKey<H> key, @NonNull H handler) {
         multipleHandlers.put(key, handler);
         fastEntry = new FastEntry<>(key, handler);
@@ -67,6 +87,7 @@ public final class PreparedMatchResult {
     private record FastEntry<H>(HandlerKey<H> key, H value) {
     }
 
+    @SuppressWarnings("unused")
     public static final class HandlerKey<H> {
     }
 }
