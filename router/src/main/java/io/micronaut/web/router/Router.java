@@ -169,7 +169,7 @@ public interface Router {
      * @param builder The builder to write routes to
      */
     @Internal
-    default void collectRoutes(@NonNull ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
+    default void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
         builder.addLegacyFallbackRouting();
     }
 

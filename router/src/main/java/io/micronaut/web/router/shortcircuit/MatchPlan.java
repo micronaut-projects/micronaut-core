@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.shortcircuit;
+package io.micronaut.web.router.shortcircuit;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.netty.handler.codec.http.HttpRequest;
+import io.micronaut.http.HttpRequest;
 
 /**
  * This class matches a set of routes against their match rules and returns either a successful
@@ -36,5 +36,5 @@ public interface MatchPlan<R> {
      * @return The match result
      */
     @NonNull
-    ExecutionLeaf<R> execute(@NonNull HttpRequest request);
+    ExecutionLeaf<R> execute(@NonNull HttpRequest<?> request);
 }

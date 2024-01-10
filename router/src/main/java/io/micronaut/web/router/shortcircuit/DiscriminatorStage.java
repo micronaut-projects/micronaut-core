@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.shortcircuit;
+package io.micronaut.web.router.shortcircuit;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
-import io.micronaut.web.router.shortcircuit.MatchRule;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.QueryStringDecoder;
 
-import java.net.URI;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,14 +44,7 @@ enum DiscriminatorStage {
                 .filter(e -> e.getKey() instanceof MatchRule.PathMatchExact)
                 .collect(Collectors.toMap(e -> ((MatchRule.PathMatchExact) e.getKey()).path(), Map.Entry::getValue));
             return request -> {
-                // this replicates AbstractNettyHttpRequest.getPath but not exactly :(
-                URI uri;
-                try {
-                    uri = URI.create(request.uri());
-                } catch (IllegalArgumentException iae) {
-                    return ExecutionLeaf.indeterminate();
-                }
-                String rawPath = new QueryStringDecoder(uri).rawPath();
+                String rawPath = request.getPath();
                 if (!rawPath.isEmpty() && rawPath.charAt(rawPath.length() - 1) == '/') {
                     rawPath = rawPath.substring(0, rawPath.length() - 1);
                 }
@@ -66,10 +56,12 @@ enum DiscriminatorStage {
     METHOD {
         @Override
         <R> MatchPlan<R> planDiscriminate(Map<MatchRule, MatchPlan<R>> nextPlans) {
-            Map<HttpMethod, MatchPlan<R>> byMethod = coerceRules(MatchRule.Method.class, nextPlans)
-                .entrySet().stream().collect(Collectors.toMap(e -> HttpMethod.valueOf(e.getKey().method().name()), Map.Entry::getValue));
+            Map<HttpMethod, MatchPlan<R>> byMethod = new EnumMap<>(HttpMethod.class);
+            for (Map.Entry<MatchRule.Method, MatchPlan<R>> entry : coerceRules(MatchRule.Method.class, nextPlans).entrySet()) {
+                byMethod.put(entry.getKey().method(), entry.getValue());
+            }
             return request -> {
-                MatchPlan<R> plan = byMethod.get(request.method());
+                MatchPlan<R> plan = byMethod.get(request.getMethod());
                 return plan == null ? ExecutionLeaf.indeterminate() : plan.execute(request);
             };
         }
@@ -83,7 +75,7 @@ enum DiscriminatorStage {
                     return expectedType == null ? null : expectedType.getName();
                 }, Map.Entry::getValue));
             return request -> {
-                MatchPlan<R> plan = byContentType.get(request.headers().get(HttpHeaderNames.CONTENT_TYPE));
+                MatchPlan<R> plan = byContentType.get(request.getHeaders().getContentType().orElse(null));
                 return plan == null ? ExecutionLeaf.indeterminate() : plan.execute(request);
             };
         }
@@ -93,7 +85,7 @@ enum DiscriminatorStage {
         <R> MatchPlan<R> planDiscriminate(Map<MatchRule, MatchPlan<R>> nextPlans) {
             Map<MatchRule.Accept, MatchPlan<R>> rules = coerceRules(MatchRule.Accept.class, nextPlans);
             return request -> {
-                List<MediaType> accept = MediaType.orderedOf(request.headers().getAll(HttpHeaderNames.ACCEPT));
+                List<MediaType> accept = request.getHeaders().accept();
                 if (accept.isEmpty() || accept.contains(MediaType.ALL_TYPE)) {
                     if (rules.size() == 1) {
                         return rules.values().iterator().next().execute(request);

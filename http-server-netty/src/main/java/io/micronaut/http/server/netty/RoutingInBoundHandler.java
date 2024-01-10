@@ -65,16 +65,17 @@ import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
-import io.micronaut.http.server.netty.shortcircuit.ExecutionLeaf;
-import io.micronaut.http.server.netty.shortcircuit.MatchPlan;
-import io.micronaut.http.server.netty.shortcircuit.NettyShortCircuitRouterBuilder;
+import io.micronaut.http.server.netty.shortcircuit.PreparedHandler;
 import io.micronaut.http.server.netty.shortcircuit.ShortCircuitArgumentBinder;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.micronaut.web.router.shortcircuit.ExecutionLeaf;
+import io.micronaut.web.router.shortcircuit.MatchPlan;
 import io.micronaut.web.router.shortcircuit.MatchRule;
+import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -145,7 +146,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
-    final MatchPlan<RequestHandler> shortCircuitMatchPlan;
+    final MatchPlan<PreparedHandler> shortCircuitMatchPlan;
 
     /**
      * @param serverConfiguration          The Netty HTTP server configuration
@@ -175,7 +176,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.conversionService = conversionService;
 
         if (serverConfiguration.isOptimizedRouting()) {
-            NettyShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new NettyShortCircuitRouterBuilder<>();
+            ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> scrb = new ShortCircuitRouterBuilder<>();
             routeExecutor.getRouter().collectRoutes(scrb);
             this.shortCircuitMatchPlan = scrb.transform(this::shortCircuitHandler).plan();
         } else {
@@ -230,29 +231,17 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
-        if (shortCircuitMatchPlan != null &&
-            request.decoderResult().isSuccess() &&
-            // origin needs to be checked by CorsFilter
-            !request.headers().contains(HttpHeaderNames.ORIGIN) &&
-            body instanceof ImmediateByteBody) {
-
-            ExecutionLeaf<RequestHandler> instantResult = shortCircuitMatchPlan.execute(request);
-            if (instantResult instanceof ExecutionLeaf.Route<RequestHandler> route) {
-                route.routeMatch().accept(ctx, request, body, outboundAccess);
-                return;
-            }
-        }
-
-        NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);if (serverConfiguration.isValidateUrl()) {
+        NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        if (serverConfiguration.isValidateUrl()) {
             try {
                 mnRequest.getUri();
             } catch (IllegalArgumentException e) {
                 body.release();
 
-            // invalid URI
-            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
-                new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                ByteBody.empty(),
+                // invalid URI
+                NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                    new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
+                    ByteBody.empty(),
                     ctx,
                     conversionService,
                     serverConfiguration
@@ -264,12 +253,24 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 return;
             }
         }
+        outboundAccess.attachment(mnRequest);
+        if (shortCircuitMatchPlan != null &&
+            request.decoderResult().isSuccess() &&
+            // origin needs to be checked by CorsFilter
+            !request.headers().contains(HttpHeaderNames.ORIGIN) &&
+            body instanceof ImmediateByteBody) {
+
+            ExecutionLeaf<PreparedHandler> instantResult = shortCircuitMatchPlan.execute(mnRequest);
+            if (instantResult instanceof ExecutionLeaf.Route<PreparedHandler> route) {
+                route.routeMatch().accept(mnRequest, outboundAccess);
+                return;
+            }
+        }
         if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
             ctx.channel().attr(KEY).set(mnRequest);
         }
-        outboundAccess.attachment(mnRequest);
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
             new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest);
         }
@@ -289,7 +290,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private ExecutionLeaf<RequestHandler> shortCircuitHandler(MatchRule rule, UriRouteInfo<?, ?> routeInfo) {
+    private ExecutionLeaf<PreparedHandler> shortCircuitHandler(MatchRule rule, UriRouteInfo<?, ?> routeInfo) {
         if (routeInfo.isWebSocketRoute()) {
             return ExecutionLeaf.indeterminate();
         }
@@ -371,45 +372,34 @@ public final class RoutingInBoundHandler implements RequestHandler {
         };
         String serverHeader = serverConfiguration.getServerHeader().orElse(null);
         boolean dateHeader = serverConfiguration.isDateHeader();
-        return new ExecutionLeaf.Route<>(new RequestHandler() {
-            @Override
-            public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
-                try {
-                    NettyHttpRequest<Object> nhr = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
-                    outboundAccess.attachment(nhr);
-
-                    new FilterRunner(finalFixedFilters, exec).run(nhr, PropagatedContext.empty()).onComplete((response, err) -> {
-                        if (err != null) {
-                            RoutingInBoundHandler.this.handleUnboundError(err);
-                        } else {
-                            HttpHeaders responseHeaders = ((NettyHttpHeaders) response.getHeaders()).getNettyHeaders();
-                            if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
-                                responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
-                            }
-                            if (serverHeader != null && !responseHeaders.contains(HttpHeaderNames.SERVER)) {
-                                responseHeaders.set(HttpHeaderNames.SERVER, serverHeader);
-                            }
-                            if (dateHeader && !responseHeaders.contains(HttpHeaderNames.DATE)) {
-                                responseHeaders.set(HttpHeaderNames.DATE, ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.RFC_1123_DATE_TIME));
-                            }
-                            HttpResponseStatus status = HttpResponseStatus.valueOf(response.code(), response.reason());
-                            if (scWriter != null) {
-                                scWriter.writeTo(nhr, (MutableHttpResponse<Object>) response, (Argument<Object>) responseBodyType, responseMediaType, response.body(), outboundAccess);
-                            } else {
-                                ByteBuf buf = (ByteBuf) rawWriter.writeTo((Argument<Object>) responseBodyType, responseMediaType, response.body(), (MutableHeaders) response.getHeaders(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
-                                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
-                            }
+        return new ExecutionLeaf.Route<>((nhr, outboundAccess) -> {
+            try {
+                new FilterRunner(finalFixedFilters, exec).run(nhr, PropagatedContext.empty()).onComplete((response, err) -> {
+                    if (err != null) {
+                        RoutingInBoundHandler.this.handleUnboundError(err);
+                    } else {
+                        HttpHeaders responseHeaders = ((NettyHttpHeaders) response.getHeaders()).getNettyHeaders();
+                        if (!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                            responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, responseMediaType.toString());
                         }
-                    });
+                        if (serverHeader != null && !responseHeaders.contains(HttpHeaderNames.SERVER)) {
+                            responseHeaders.set(HttpHeaderNames.SERVER, serverHeader);
+                        }
+                        if (dateHeader && !responseHeaders.contains(HttpHeaderNames.DATE)) {
+                            responseHeaders.set(HttpHeaderNames.DATE, ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+                        }
+                        HttpResponseStatus status = HttpResponseStatus.valueOf(response.code(), response.reason());
+                        if (scWriter != null) {
+                            scWriter.writeTo(nhr, (MutableHttpResponse<Object>) response, (Argument<Object>) responseBodyType, responseMediaType, response.body(), outboundAccess);
+                        } else {
+                            ByteBuf buf = (ByteBuf) rawWriter.writeTo((Argument<Object>) responseBodyType, responseMediaType, response.body(), (MutableHeaders) response.getHeaders(), NettyByteBufferFactory.DEFAULT).asNativeBuffer();
+                            outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buf, responseHeaders, EmptyHttpHeaders.INSTANCE));
+                        }
+                    }
+                });
 
-                } catch (Exception e) {
-                    RoutingInBoundHandler.this.handleUnboundError(e);
-                }
-            }
-
-            @Override
-            public void handleUnboundError(Throwable cause) {
-                throw new UnsupportedOperationException();
+            } catch (Exception e) {
+                RoutingInBoundHandler.this.handleUnboundError(e);
             }
         });
     }

@@ -11,6 +11,8 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.RouteExecutor
 import io.micronaut.web.router.UriRouteInfo
+import io.micronaut.web.router.shortcircuit.ExecutionLeaf
+import io.micronaut.web.router.shortcircuit.ShortCircuitRouterBuilder
 import io.netty.handler.codec.http.DefaultHttpRequest
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
@@ -21,7 +23,7 @@ class NettyShortCircuitRouterBuilderSpec extends Specification {
     def 'route builder'(HttpRequest request, @Nullable String methodName) {
         given:
         def ctx = ApplicationContext.run(['spec.name': "NettyShortCircuitRouterBuilderSpec"])
-        def scb = new NettyShortCircuitRouterBuilder<UriRouteInfo<?, ?>>()
+        def scb = new ShortCircuitRouterBuilder<UriRouteInfo<?, ?>>()
         ctx.getBean(RouteExecutor).getRouter().collectRoutes(scb)
         def plan = scb.plan()
 
