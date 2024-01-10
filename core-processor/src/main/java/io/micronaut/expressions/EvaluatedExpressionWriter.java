@@ -57,11 +57,11 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
     private static final Type EVALUATED_EXPRESSION_TYPE =
         Type.getType(AbstractEvaluatedExpression.class);
 
+    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
+
     private final ExpressionWithContext expressionMetadata;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
-
-    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
 
     public EvaluatedExpressionWriter(ExpressionWithContext expressionMetadata,
                                      VisitorContext visitorContext,
