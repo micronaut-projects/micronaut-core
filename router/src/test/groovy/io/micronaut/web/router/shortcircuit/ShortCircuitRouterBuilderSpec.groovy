@@ -23,10 +23,10 @@ class ShortCircuitRouterBuilderSpec extends Specification {
         def plan = scb.plan()
 
         when:
-        def leaf = plan.execute(request)
+        def leaf = ctx.getBean(DefaultRouter).findPreparedMatchResult(request)
         def actualName
-        if (leaf instanceof ExecutionLeaf.Route) {
-            actualName = ((UriRouteInfo<?, ?>) leaf.routeMatch()).targetMethod.name
+        if (leaf != null) {
+            actualName = leaf.routeInfo.targetMethod.name
         } else {
             actualName = null
         }

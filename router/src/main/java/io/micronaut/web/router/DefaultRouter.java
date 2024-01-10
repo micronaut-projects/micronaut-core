@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
@@ -697,8 +696,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return false;
     }
 
-    @Internal
-    public void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
+    private void collectRoutes(ShortCircuitRouterBuilder<UriRouteInfo<?, ?>> builder) {
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             HttpMethod parsed = HttpMethod.parse(entry.getKey());
             if (parsed == HttpMethod.CUSTOM) {
