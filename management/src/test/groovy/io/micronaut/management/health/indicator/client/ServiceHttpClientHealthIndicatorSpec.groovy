@@ -13,7 +13,7 @@ class ServiceHttpClientHealthIndicatorSpec extends Specification {
     def static uri2 = new URI("http://localhost:8081")
     def instanceList = new StaticServiceInstanceList("some-http-service", [uri1, uri2])
 
-    def serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", null, null, GroovyMock(ApplicationConfiguration))
+    def serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", null, null, null, GroovyMock(ApplicationConfiguration))
 
     def "Health Indicator is set to true and is healthy"() {
         given:
