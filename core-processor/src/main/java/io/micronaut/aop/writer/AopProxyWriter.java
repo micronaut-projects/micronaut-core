@@ -97,17 +97,9 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor, Toggleable {
-    public static final int MAX_LOCALS = 3;
+    private static final int MAX_LOCALS = 3;
 
-    public static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_CONTEXT = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-            DefaultBeanContext.class,
-            "getProxyTargetBean",
-            BeanResolutionContext.class,
-            Argument.class,
-            Qualifier.class
-    ));
-
-    public static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+    private static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             DefaultBeanContext.class,
             "getProxyTargetBean",
             BeanResolutionContext.class,
@@ -116,39 +108,39 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Qualifier.class
     ));
 
-    public static final Method METHOD_GET_PROXY_BEAN_DEFINITION = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+    private static final Method METHOD_GET_PROXY_BEAN_DEFINITION = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             BeanDefinitionRegistry.class,
             "getProxyTargetBeanDefinition",
             Argument.class,
             Qualifier.class
     ));
 
-    public static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+    private static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             InterceptedProxy.class,
             "hasCachedInterceptedTarget"
     ));
 
-    public static final Method METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+    private static final Method METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
         BeanDefinition.class,
         "getRequiredMethod",
         String.class,
         Class[].class
     ));
 
-    public static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
-    public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
-    public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
-    public static final String FIELD_TARGET = "$target";
-    public static final String FIELD_BEAN_RESOLUTION_CONTEXT = "$beanResolutionContext";
-    public static final String FIELD_READ_WRITE_LOCK = "$target_rwl";
-    public static final Type TYPE_READ_WRITE_LOCK = Type.getType(ReentrantReadWriteLock.class);
-    public static final String FIELD_READ_LOCK = "$target_rl";
-    public static final String FIELD_WRITE_LOCK = "$target_wl";
-    public static final Type TYPE_LOCK = Type.getType(Lock.class);
-    public static final Type TYPE_BEAN_DEFINITION = Type.getType(BeanDefinition.class);
-    public static final Type TYPE_BEAN_LOCATOR = Type.getType(BeanLocator.class);
-    public static final Type TYPE_DEFAULT_BEAN_CONTEXT = Type.getType(DefaultBeanContext.class);
-    public static final Type TYPE_BEAN_DEFINITION_REGISTRY = Type.getType(BeanDefinitionRegistry.class);
+    private static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
+    private static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
+    private static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
+    private static final String FIELD_TARGET = "$target";
+    private static final String FIELD_BEAN_RESOLUTION_CONTEXT = "$beanResolutionContext";
+    private static final String FIELD_READ_WRITE_LOCK = "$target_rwl";
+    private static final Type TYPE_READ_WRITE_LOCK = Type.getType(ReentrantReadWriteLock.class);
+    private static final String FIELD_READ_LOCK = "$target_rl";
+    private static final String FIELD_WRITE_LOCK = "$target_wl";
+    private static final Type TYPE_LOCK = Type.getType(Lock.class);
+    private static final Type TYPE_BEAN_DEFINITION = Type.getType(BeanDefinition.class);
+    private static final Type TYPE_BEAN_LOCATOR = Type.getType(BeanLocator.class);
+    private static final Type TYPE_DEFAULT_BEAN_CONTEXT = Type.getType(DefaultBeanContext.class);
+    private static final Type TYPE_BEAN_DEFINITION_REGISTRY = Type.getType(BeanDefinitionRegistry.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
@@ -166,7 +158,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
 
-    private final java.lang.reflect.Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
+    private static final java.lang.reflect.Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
