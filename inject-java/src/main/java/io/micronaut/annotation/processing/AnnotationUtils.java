@@ -35,7 +35,9 @@ import javax.lang.model.util.Types;
  *
  * @author Graeme Rocher
  * @author Dean Wette
+ * @deprecated No longer needed
  */
+@Deprecated(forRemoval = true, since = "4.3.0")
 @SuppressWarnings("ConstantName")
 @Internal
 public class AnnotationUtils {
@@ -48,7 +50,6 @@ public class AnnotationUtils {
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final ProcessingEnvironment processingEnv;
     private final AnnotatedElementValidator elementValidator;
-    private final GenericUtils genericUtils;
 
     /**
      * Default constructor.
@@ -75,7 +76,6 @@ public class AnnotationUtils {
         this.messager = messager;
         this.types = types;
         this.modelUtils = modelUtils;
-        this.genericUtils = genericUtils;
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
@@ -93,7 +93,7 @@ public class AnnotationUtils {
      * @param genericUtils      The generic utils
      * @param filer             The filer
      */
-    protected AnnotationUtils(
+    public AnnotationUtils(
             ProcessingEnvironment processingEnv,
             Elements elementUtils,
             Messager messager,
@@ -116,7 +116,9 @@ public class AnnotationUtils {
      * Creates a new annotation builder.
      *
      * @return The builder
+     * @deprecated Access the builder from the visitor
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public JavaAnnotationMetadataBuilder newAnnotationBuilder() {
         return new JavaAnnotationMetadataBuilder(
                 elementUtils,
@@ -136,10 +138,8 @@ public class AnnotationUtils {
                 processingEnv,
                 messager,
                 elementUtils,
-                this,
                 types,
                 modelUtils,
-                genericUtils,
                 filer,
                 visitorAttributes,
                 TypeElementVisitor.VisitorKind.ISOLATING

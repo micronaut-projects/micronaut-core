@@ -40,11 +40,13 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -350,4 +352,17 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return false;
     }
 
+    @Override
+    public Collection<MethodElement> getOverriddenMethods() {
+        return visitorContext.getNativeElementsHelper()
+            .findOverriddenMethods(owningType.classElement, executableElement)
+            .stream()
+            .map(overriddenMethod -> new JavaMethodElement(
+                    owningType,
+                    new JavaNativeElement.Method(executableElement),
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            ).collect(Collectors.toList());
+    }
 }

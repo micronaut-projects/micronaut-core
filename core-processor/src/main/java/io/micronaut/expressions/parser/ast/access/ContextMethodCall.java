@@ -16,8 +16,9 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionCompilationContext;
+import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -53,7 +54,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
 
-        ExpressionCompilationContext evaluationContext = ctx.compilationContext();
+        ExpressionEvaluationContext evaluationContext = ctx.evaluationContext();
         List<CandidateMethod> candidateMethods =
             evaluationContext.findMethods(name)
                 .stream()
@@ -74,7 +75,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type calleeType = usedMethod.getOwningType();
 

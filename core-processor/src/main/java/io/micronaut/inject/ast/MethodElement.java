@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -344,6 +345,16 @@ public interface MethodElement extends MemberElement {
             }
         }
         return getReturnType().getGenericType().isAssignable(element.getReturnType().getGenericType());
+    }
+
+    /**
+     * Get overridden methods by this method.
+     *
+     * @return The overridden method by this method.
+     * @since 4.3.0
+     */
+    default Collection<MethodElement> getOverriddenMethods() {
+        return List.of();
     }
 
     /**

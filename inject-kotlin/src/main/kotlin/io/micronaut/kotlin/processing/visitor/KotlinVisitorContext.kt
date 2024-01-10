@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.GeneratedFile
+import io.micronaut.kotlin.processing.KotlinNativeElementsHelper
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
@@ -58,6 +59,7 @@ internal open class KotlinVisitorContext(
     val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
     private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
     private val expressionCompilationContextFactory : ExpressionCompilationContextFactory
+    val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()

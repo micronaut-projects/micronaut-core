@@ -33,7 +33,7 @@ import java.util.List;
  * @author Sergey Gavrilov
  */
 @Internal
-public interface ExpressionCompilationContext {
+public interface ExpressionEvaluationContext {
 
     /**
      * @return Find the type that represents this.

@@ -16,8 +16,10 @@
 package io.micronaut.expressions.parser.ast.types;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -58,7 +60,7 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(resolveType(ctx));
     }
 
@@ -77,7 +79,7 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public Type doResolveType(ExpressionVisitorContext ctx) {
+    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         String name = this.toString();
         if (PRIMITIVES.containsKey(name)) {
             return PRIMITIVES.get(name);

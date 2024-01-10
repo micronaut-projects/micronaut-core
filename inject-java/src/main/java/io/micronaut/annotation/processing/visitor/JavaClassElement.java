@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
@@ -367,90 +366,49 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     private List<MethodElement> getRecordMethods() {
+        Set<String> recordComponents = new HashSet<>();
         List<MethodElement> methodElements = new ArrayList<>();
-        classElement.asType().accept(new SuperclassAwareTypeVisitor<>(visitorContext) {
-
-            private final Set<String> recordComponents = new HashSet<>();
-
-            @Override
-            protected boolean isAcceptable(Element element) {
-                return JavaModelUtils.isRecord(element);
-            }
-
-            @Override
-            public Object visitDeclared(DeclaredType type, Object o) {
-                Element element = type.asElement();
-                if (isAcceptable(element)) {
-                    for (Element enclosedElement : element.getEnclosedElements()) {
-                        if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                            if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
-                                accept(type, enclosedElement, o);
-                            }
-                        }
+        if (JavaModelUtils.isRecord(classElement)) {
+            for (Element enclosedElement : classElement.getEnclosedElements()) {
+                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                    if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
+                        continue;
                     }
-                }
-                return o;
-            }
-
-            @Override
-            protected void accept(DeclaredType type, Element element, Object o) {
-                String name = element.getSimpleName().toString();
-                if (element instanceof ExecutableElement executableElement) {
-                    if (recordComponents.contains(name)) {
-                        methodElements.add(
+                    String name = enclosedElement.getSimpleName().toString();
+                    if (enclosedElement instanceof ExecutableElement executableElement) {
+                        if (recordComponents.contains(name)) {
+                            methodElements.add(
                                 new JavaMethodElement(
-                                        JavaClassElement.this,
-                                        new JavaNativeElement.Method(executableElement),
-                                        elementAnnotationMetadataFactory,
-                                        visitorContext)
-                        );
+                                    JavaClassElement.this,
+                                    new JavaNativeElement.Method(executableElement),
+                                    elementAnnotationMetadataFactory,
+                                    visitorContext)
+                            );
+                        }
+                    } else if (enclosedElement instanceof VariableElement) {
+                        recordComponents.add(name);
                     }
-                } else if (element instanceof VariableElement) {
-                    recordComponents.add(name);
                 }
             }
-
-        }, null);
+        }
         return methodElements;
     }
 
     private List<FieldElement> getRecordFields() {
         List<FieldElement> fieldElements = new ArrayList<>();
-        classElement.asType().accept(new SuperclassAwareTypeVisitor<>(visitorContext) {
-
-            @Override
-            protected boolean isAcceptable(Element element) {
-                return JavaModelUtils.isRecord(element);
-            }
-
-            @Override
-            public Object visitDeclared(DeclaredType type, Object o) {
-                Element element = type.asElement();
-                if (isAcceptable(element)) {
-                    List<? extends Element> enclosedElements = element.getEnclosedElements();
-                    for (Element enclosedElement : enclosedElements) {
-                        if (enclosedElement instanceof VariableElement) {
-                            accept(type, enclosedElement, o);
-                        }
-                    }
-                }
-                return o;
-            }
-
-            @Override
-            protected void accept(DeclaredType type, Element element, Object o) {
-                if (element instanceof VariableElement variableElement) {
+        if (JavaModelUtils.isRecord(classElement)) {
+            for (Element enclosedElement : classElement.getEnclosedElements()) {
+                if (!JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof VariableElement variableElement) {
                     fieldElements.add(
-                            new JavaFieldElement(
-                                    JavaClassElement.this,
-                                    new JavaNativeElement.Variable(variableElement),
-                                    elementAnnotationMetadataFactory,
-                                    visitorContext)
+                        new JavaFieldElement(
+                            JavaClassElement.this,
+                            new JavaNativeElement.Variable(variableElement),
+                            elementAnnotationMetadataFactory,
+                            visitorContext)
                     );
                 }
             }
-
-        }, null);
+        }
         return fieldElements;
     }
 

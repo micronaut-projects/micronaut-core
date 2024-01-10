@@ -130,6 +130,38 @@ class F
         definition.injectedFields.size() == 1
     }
 
+    void "test interface bean"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test
+
+import io.micronaut.http.annotation.Controller
+
+@Controller
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
+    void "test interface bean 2"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test
+
+import jakarta.inject.Singleton
+
+@Singleton
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
     @PendingFeature(reason = "difficult to achieve with current design without a significant rewrite or how native properties are handled")
     void "test injection order for inheritance"() {
         given:

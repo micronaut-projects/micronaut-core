@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
+import io.micronaut.annotation.processing.JavaNativeElementsHelper;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -83,22 +84,22 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     private final Messager messager;
     private final Elements elements;
-    private final AnnotationUtils annotationUtils;
     private final Types types;
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
-    private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
     private final List<String> generatedResources = new ArrayList<>();
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final JavaElementFactory elementFactory;
     private final TypeElementVisitor.VisitorKind visitorKind;
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
-    private @Nullable
-    JavaFileManager standardFileManager;
+    @Nullable
+    private JavaFileManager standardFileManager;
     private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
     private final JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final JavaNativeElementsHelper nativeElementsHelper;
+    private final Filer filer;
 
     /**
      * The default constructor.
@@ -113,7 +114,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * @param filer             The filer
      * @param visitorAttributes The attributes
      * @param visitorKind       The visitor kind
+     * @deprecated No longer needed
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public JavaVisitorContext(
         ProcessingEnvironment processingEnv,
         Messager messager,
@@ -125,20 +128,44 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         Filer filer,
         MutableConvertibleValues<Object> visitorAttributes,
         TypeElementVisitor.VisitorKind visitorKind) {
+        this(processingEnv, messager, elements, types, modelUtils, filer, visitorAttributes, visitorKind);
+    }
+
+    /**
+     * The default constructor.
+     *
+     * @param processingEnv     The processing environment
+     * @param messager          The messager
+     * @param elements          The elements
+     * @param types             Type types
+     * @param modelUtils        The model utils
+     * @param filer             The filer
+     * @param visitorAttributes The attributes
+     * @param visitorKind       The visitor kind
+     */
+    public JavaVisitorContext(
+        ProcessingEnvironment processingEnv,
+        Messager messager,
+        Elements elements,
+        Types types,
+        ModelUtils modelUtils,
+        Filer filer,
+        MutableConvertibleValues<Object> visitorAttributes,
+        TypeElementVisitor.VisitorKind visitorKind) {
         this.messager = messager;
         this.elements = elements;
-        this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
-        this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
         this.elementFactory = new JavaElementFactory(this);
         this.visitorKind = visitorKind;
-        this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils);
+        this.nativeElementsHelper = new JavaNativeElementsHelper(elements, types);
+        this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, modelUtils, nativeElementsHelper, this);
         this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
+        this.filer = filer;
     }
 
     @Override
@@ -367,9 +394,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * The annotation utils.
      *
      * @return The annotation utils
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public AnnotationUtils getAnnotationUtils() {
-        return annotationUtils;
+        return new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, getGenericUtils(), filer);
     }
 
     /**
@@ -385,9 +414,18 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * The generic utils object.
      *
      * @return The generic utils
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public GenericUtils getGenericUtils() {
-        return genericUtils;
+        return new GenericUtils(elements, types, modelUtils);
+    }
+
+    /**
+     * @return The elements helper
+     */
+    public JavaNativeElementsHelper getNativeElementsHelper() {
+        return nativeElementsHelper;
     }
 
     /**

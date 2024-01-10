@@ -17,6 +17,7 @@ package io.micronaut.expressions.parser.ast;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -40,7 +41,7 @@ public abstract class ExpressionNode {
      *
      * @param ctx expression compilation context
      */
-    public final void compile(@NonNull ExpressionVisitorContext ctx) {
+    public final void compile(@NonNull ExpressionCompilationContext ctx) {
         resolveType(ctx);
         generateBytecode(ctx);
     }
@@ -50,7 +51,7 @@ public abstract class ExpressionNode {
      *
      * @param ctx expression compilation context
      */
-    protected abstract void generateBytecode(@NonNull ExpressionVisitorContext ctx);
+    protected abstract void generateBytecode(@NonNull ExpressionCompilationContext ctx);
 
     /**
      * On resolution stage type information is collected and node validity is checked. Once type
@@ -77,11 +78,37 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
+    public final Type resolveType(@NonNull ExpressionCompilationContext ctx) {
+        return resolveType(ctx.evaluationVisitorContext());
+    }
+
+    /**
+     * On resolution stage type information is collected and node validity is checked. Once type
+     * is resolved, type resolution result is cached.
+     *
+     * @param ctx expression compilation context
+     *
+     * @return resolved type
+     */
+    @NonNull
     public final ClassElement resolveClassElement(@NonNull ExpressionVisitorContext ctx) {
         if (classElement == null) {
             classElement = doResolveClassElement(ctx);
         }
         return classElement;
+    }
+
+    /**
+     * On resolution stage type information is collected and node validity is checked. Once type
+     * is resolved, type resolution result is cached.
+     *
+     * @param ctx expression compilation context
+     *
+     * @return resolved type
+     */
+    @NonNull
+    public final ClassElement resolveClassElement(@NonNull ExpressionCompilationContext ctx) {
+        return resolveClassElement(ctx.evaluationVisitorContext());
     }
 
     /**
@@ -96,6 +123,15 @@ public abstract class ExpressionNode {
         } catch (IllegalArgumentException e) {
             return ClassElement.of(type.getClassName());
         }
+    }
+
+    /**
+     * Resolves the class element for this node.
+     * @param ctx The expression compilation context
+     * @return The resolved type
+     */
+    protected ClassElement doResolveClassElement(ExpressionCompilationContext ctx) {
+        return doResolveClassElement(ctx.evaluationVisitorContext());
     }
 
     /**

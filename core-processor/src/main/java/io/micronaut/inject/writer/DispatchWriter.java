@@ -361,29 +361,36 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * @param writer          The writer
      * @param argumentsPusher The argument pusher
      * @param parameters      The arguments
+     * @param allValuesAreNull Is all parameters values are null
      * @return The mask
      */
     public static int computeKotlinDefaultsMask(GeneratorAdapter writer,
                                                 BiConsumer<Integer, ParameterElement> argumentsPusher,
-                                                List<ParameterElement> parameters) {
+                                                List<ParameterElement> parameters,
+                                                boolean allValuesAreNull) {
         int maskLocal = writer.newLocal(Type.INT_TYPE);
-        writer.push(0);
-        writer.storeLocal(maskLocal);
-        int maskIndex = 1;
-        int paramIndex = 0;
-        for (ParameterElement parameter : parameters) {
-            if (parameter instanceof KotlinParameterElement kp && kp.hasDefault() && !kp.getType().isPrimitive()) {
-                Label elseLabel = writer.newLabel();
-                argumentsPusher.accept(paramIndex, parameter);
-                writer.ifNonNull(elseLabel);
-                writer.push(maskIndex);
-                writer.loadLocal(maskLocal, Type.INT_TYPE);
-                writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
-                writer.storeLocal(maskLocal);
-                writer.visitLabel(elseLabel);
+        if (allValuesAreNull) {
+            writer.push((int) Math.pow(2, parameters.size()) - 1);
+            writer.storeLocal(maskLocal);
+        } else {
+            writer.push(0);
+            writer.storeLocal(maskLocal);
+            int maskIndex = 1;
+            int paramIndex = 0;
+            for (ParameterElement parameter : parameters) {
+                if (parameter instanceof KotlinParameterElement kp && kp.hasDefault() && (!kp.getType().isPrimitive() || kp.getType().isArray())) {
+                    Label elseLabel = writer.newLabel();
+                    argumentsPusher.accept(paramIndex, parameter);
+                    writer.ifNonNull(elseLabel);
+                    writer.push(maskIndex);
+                    writer.loadLocal(maskLocal, Type.INT_TYPE);
+                    writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
+                    writer.storeLocal(maskLocal);
+                    writer.visitLabel(elseLabel);
+                }
+                maskIndex *= 2;
+                paramIndex++;
             }
-            maskIndex *= 2;
-            paramIndex++;
         }
         return maskLocal;
     }
@@ -676,7 +683,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                             writer.loadArg(2);
                             writer.push(paramIndex);
                             writer.visitInsn(AALOAD);
-                        }, argumentTypes);
+                        }, argumentTypes, false);
                     }
                     if (isMulti) {
                         int argCount = argumentTypes.size();

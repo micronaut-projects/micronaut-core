@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ConstructorNode;
 
@@ -52,5 +53,10 @@ public class GroovyConstructorElement extends GroovyMethodElement implements Con
     @Override
     public ConstructorElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ConstructorElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public boolean overrides(MethodElement overridden) {
+        return false;
     }
 }

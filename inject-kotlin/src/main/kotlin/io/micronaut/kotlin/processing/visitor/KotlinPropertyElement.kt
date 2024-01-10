@@ -28,7 +28,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 internal class KotlinPropertyElement(
-    ownerType: ClassElement,
+    ownerType: KotlinClassElement,
     val property: KSPropertyDeclaration,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,

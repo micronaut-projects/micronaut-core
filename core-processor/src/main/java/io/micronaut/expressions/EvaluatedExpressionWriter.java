@@ -19,8 +19,9 @@ import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.expressions.parser.CompoundEvaluatedEvaluatedExpressionParser;
+import io.micronaut.expressions.parser.CompoundEvaluatedExpressionParser;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
@@ -90,7 +91,7 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
 
         cv.invokeConstructor(EVALUATED_EXPRESSION_TYPE, EVALUATED_EXPRESSIONS_CONSTRUCTOR);
         // RETURN
-        cv.visitInsn(RETURN);
+        cv.returnValue();
         // MAXSTACK = 2
         // MAXLOCALS = 1
         cv.visitMaxs(2, 1);
@@ -98,15 +99,14 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         GeneratorAdapter evaluateMethodVisitor = startProtectedMethod(classWriter, "doEvaluate",
             Object.class.getName(), ExpressionEvaluationContext.class.getName());
 
-        ExpressionVisitorContext ctx = new ExpressionVisitorContext(
-            expressionMetadata.evaluationContext(),
-            visitorContext,
+        ExpressionCompilationContext ctx = new ExpressionCompilationContext(
+            new ExpressionVisitorContext(expressionMetadata.evaluationContext(), visitorContext),
             evaluateMethodVisitor);
 
         Object annotationValue = expressionMetadata.annotationValue();
 
         try {
-            ExpressionNode ast = new CompoundEvaluatedEvaluatedExpressionParser(annotationValue).parse();
+            ExpressionNode ast = new CompoundEvaluatedExpressionParser(annotationValue).parse();
             ast.compile(ctx);
             pushBoxPrimitiveIfNecessary(ast.resolveType(ctx), evaluateMethodVisitor);
         } catch (ExpressionParsingException | ExpressionCompilationException ex) {

@@ -757,4 +757,36 @@ so we mark it as overridden
         cleanup:
             ctx.close()
     }
+
+    void "test interface bean"() {
+        given:
+            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test;
+
+import io.micronaut.http.annotation.Controller;
+
+@Controller
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
+    void "test interface bean 2"() {
+        given:
+            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test;
+
+import jakarta.inject.Singleton;
+
+@Singleton
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
 }

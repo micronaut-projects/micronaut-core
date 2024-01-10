@@ -52,6 +52,7 @@ import java.util.function.Predicate;
 @Internal
 class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final GroovyVisitorContext visitorContext;
+    private final GroovyAnnotationMetadataBuilder annotationBuilder;
 
     /**
      * Default constructor.
@@ -73,6 +74,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             visitorContext.addBeanDefinitionBuilder(this);
         }
         this.visitorContext = visitorContext;
+        this.annotationBuilder = visitorContext.getAnnotationMetadataBuilder();
     }
 
     @Override
@@ -164,13 +166,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
             consumer.accept(builder);
             AnnotationValue<T> av = builder.build();
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.annotate(
-                annotationMetadata,
-                av
-            );
+            annotationBuilder.annotate(annotationMetadata, av);
         }
     }
 
@@ -178,52 +174,27 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
         ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-
-        final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-            visitorContext.getSourceUnit(),
-            visitorContext.getCompilationUnit());
-        annotationBuilder.annotate(
-            annotationMetadata,
-            annotationValue
-        );
+        annotationBuilder.annotate(annotationMetadata, annotationValue);
     }
 
     @Override
     protected void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeStereotype(
-                annotationMetadata,
-                annotationType
-            );
+            annotationBuilder.removeStereotype(annotationMetadata, annotationType);
         }
     }
 
     @Override
     protected <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate) {
         if (annotationMetadata != null && predicate != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeAnnotationIf(
-                annotationMetadata,
-                predicate
-            );
+            annotationBuilder.removeAnnotationIf(annotationMetadata, predicate);
         }
     }
 
     @Override
     protected void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeAnnotation(
-                annotationMetadata,
-                annotationType
-            );
+            annotationBuilder.removeAnnotation(annotationMetadata, annotationType);
         }
     }
 

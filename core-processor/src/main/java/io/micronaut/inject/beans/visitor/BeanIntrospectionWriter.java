@@ -597,8 +597,16 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         if (constructor != null) {
-            if (ArrayUtils.isEmpty(constructor.getParameters())) {
-                writeInstantiateMethod(classWriter, constructor, "instantiate");
+            if (defaultConstructor == null) {
+                if (ArrayUtils.isEmpty(constructor.getParameters())) {
+                    writeInstantiateMethod(classWriter, constructor, "instantiate");
+                } else {
+                    List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
+                    boolean kotlinAllDefault = constructorArguments.stream().allMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+                    if (kotlinAllDefault) {
+                        writeInstantiateMethod(classWriter, constructor, "instantiate");
+                    }
+                }
             }
             writeInstantiateMethod(classWriter, constructor, "instantiateInternal", Object[].class);
             writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
@@ -795,7 +803,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             methodName,
             desc);
 
-        invokeBeanConstructor(instantiateInternal, constructor, true, (index, parameter) -> {
+        invokeBeanConstructor(instantiateInternal, constructor, true, args.length == 0, (index, parameter) -> {
             instantiateInternal.loadArg(0);
             instantiateInternal.push(index);
             instantiateInternal.arrayLoad(TYPE_OBJECT);
@@ -807,7 +815,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         instantiateInternal.visitEnd();
     }
 
-    private void invokeBeanConstructor(GeneratorAdapter writer, MethodElement constructor, boolean allowDefaults, BiConsumer<Integer, ParameterElement> argumentsPusher) {
+    private void invokeBeanConstructor(GeneratorAdapter writer, MethodElement constructor, boolean allowDefaults, boolean allValuesAreNull, BiConsumer<Integer, ParameterElement> argumentsPusher) {
         boolean isConstructor = constructor instanceof ConstructorElement;
         boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
 
@@ -821,7 +829,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         if (isKotlinDefault) {
             // Calculate the Kotlin defaults mask
             // Every bit indicated true/false if the parameter should have the default value set
-            maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, constructorArguments);
+            maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, constructorArguments, allValuesAreNull);
         }
 
         if (isConstructor) {
@@ -831,10 +839,21 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             writer.getStatic(beanType, "Companion", JavaModelUtils.getTypeReference(constructor.getDeclaringType()));
         }
 
-        int index = 0;
-        for (ParameterElement constructorArgument : constructorArguments) {
-            argumentsPusher.accept(index, constructorArgument);
-            index++;
+        if (allValuesAreNull) {
+            for (ParameterElement parameter : constructorArguments) {
+                if (parameter.isPrimitive() && !parameter.isArray()) {
+                    writer.push(0);
+                    writer.cast(Type.INT_TYPE, JavaModelUtils.getTypeReference(parameter.getType()));
+                } else {
+                    writer.push((String) null);
+                }
+            }
+        } else {
+            int index = 0;
+            for (ParameterElement constructorArgument : constructorArguments) {
+                argumentsPusher.accept(index, constructorArgument);
+                index++;
+            }
         }
 
         if (isConstructor) {
@@ -1120,7 +1139,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
                 // NOTE: It doesn't make sense to check defaults for the copy constructor
 
-                invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
+                invokeBeanConstructor(writer, constructor, false, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
                     boolean isPrimitive;
                     if (constructorArgument instanceof MethodElement readMethod) {

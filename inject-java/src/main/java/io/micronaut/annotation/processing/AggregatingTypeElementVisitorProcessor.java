@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.SupportedOptions;

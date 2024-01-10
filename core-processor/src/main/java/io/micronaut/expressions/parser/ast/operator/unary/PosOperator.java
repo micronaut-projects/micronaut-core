@@ -16,7 +16,9 @@
 package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
@@ -36,7 +38,7 @@ public final class PosOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(ExpressionVisitorContext ctx) {
+    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type nodeType = super.doResolveType(ctx);
 
         if (!isNumeric(nodeType)) {
@@ -47,7 +49,7 @@ public final class PosOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         operand.compile(ctx);
     }
 }

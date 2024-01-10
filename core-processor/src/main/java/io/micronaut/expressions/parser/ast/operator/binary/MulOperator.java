@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 
@@ -49,7 +49,7 @@ public final class MulOperator extends MathOperator {
     }
 
     @Override
-    protected int getMathOperationOpcode(ExpressionVisitorContext ctx) {
+    protected int getMathOperationOpcode(ExpressionCompilationContext ctx) {
         Type type = resolveType(ctx);
         String typeDescriptor = type.getDescriptor();
         return Optional.ofNullable(MUL_OPERATION_OPCODES.get(typeDescriptor))

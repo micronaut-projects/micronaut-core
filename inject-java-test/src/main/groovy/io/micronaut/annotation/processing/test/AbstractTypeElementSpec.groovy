@@ -18,9 +18,8 @@ package io.micronaut.annotation.processing.test
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
-import io.micronaut.annotation.processing.AnnotationUtils
-import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaNativeElementsHelper
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
@@ -70,7 +69,6 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
-
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -94,18 +92,13 @@ abstract class AbstractTypeElementSpec extends Specification {
         def processingEnv = typeElementInfo.javaParser.processingEnv
         def messager = processingEnv.messager
         ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
-        }
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(
                 processingEnv,
                 messager,
                 elements,
-                annotationUtils,
                 types,
                 modelUtils,
-                genericUtils,
                 processingEnv.filer,
                 new MutableConvertibleValuesMap<Object>(),
                 TypeElementVisitor.VisitorKind.ISOLATING
@@ -518,14 +511,18 @@ class Test {
         def processingEnv = parser.processingEnv
         def messager = processingEnv.messager
         ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, parser.filer) {
-            @Override
-            JavaAnnotationMetadataBuilder newAnnotationBuilder() {
-                return super.newAnnotationBuilder()
-            }
-        }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils) {
+        JavaVisitorContext visitorContext = new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elements,
+                types,
+                modelUtils,
+                parser.filer,
+                new MutableConvertibleValuesMap<>(),
+                TypeElementVisitor.VisitorKind.ISOLATING
+        );
+        JavaNativeElementsHelper helper = new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils())
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, modelUtils, helper, visitorContext) {
             @Override
             protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
                 def loadedMappers = super.getAnnotationMappers(annotationName)

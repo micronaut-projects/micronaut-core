@@ -27,13 +27,13 @@ import io.micronaut.inject.ast.MethodElement;
  * @author Sergey Gavrilov
  */
 @Internal
-public interface ExtensibleExpressionCompilationContext extends ExpressionCompilationContext {
+public interface ExtensibleExpressionEvaluationContext extends ExpressionEvaluationContext {
 
     /**
      * @param classElement The type that represents this.
      * @return extended context
      */
-    ExtensibleExpressionCompilationContext withThis(@NonNull ClassElement classElement);
+    ExtensibleExpressionEvaluationContext withThis(@NonNull ClassElement classElement);
 
     /**
      * Extends compilation context with method element. Compilation context can only include
@@ -44,7 +44,7 @@ public interface ExtensibleExpressionCompilationContext extends ExpressionCompil
      * @return extended context
      */
     @NonNull
-    ExtensibleExpressionCompilationContext extendWith(@NonNull MethodElement methodElement);
+    ExtensibleExpressionEvaluationContext extendWith(@NonNull MethodElement methodElement);
 
     /**
      * Extends compilation context with class element. Compilation context can include
@@ -54,6 +54,6 @@ public interface ExtensibleExpressionCompilationContext extends ExpressionCompil
      * @return extended context
      */
     @NonNull
-    ExtensibleExpressionCompilationContext extendWith(@NonNull ClassElement classElement);
+    ExtensibleExpressionEvaluationContext extendWith(@NonNull ClassElement classElement);
 
 }
