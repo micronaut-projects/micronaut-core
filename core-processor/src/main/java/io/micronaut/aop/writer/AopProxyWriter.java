@@ -20,6 +20,7 @@ import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
@@ -97,6 +98,9 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor, Toggleable {
+
+    public static final int ADDITIONAL_PARAMETERS_COUNT = 5;
+
     private static final int MAX_LOCALS = 3;
 
     private static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
@@ -146,9 +150,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private static final Method METHOD_PROXY_TARGET_CLASS = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetType"));
 
-    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, List.class);
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
-    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, List.class);
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
@@ -157,6 +161,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
+    private static final String INTERCEPTORS_PARAMETER = "$interceptors";
 
     private static final java.lang.reflect.Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
@@ -194,16 +199,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final List<MethodRef> proxyTargetMethods = new ArrayList<>();
     private int proxyMethodCount = 0;
     private GeneratorAdapter constructorGenerator;
-    private int interceptorArgumentIndex;
+    private int interceptorsListArgumentIndex;
     private int beanResolutionContextArgumentIndex = -1;
     private int beanContextArgumentIndex = -1;
+    private int interceptorRegistryArgumentIndex = -1;
     private int qualifierIndex;
     private final List<Runnable> deferredInjectionPoints = new ArrayList<>();
     private boolean constructorRequiresReflection;
     private MethodElement declaredConstructor;
     private MethodElement newConstructor;
-    private ParameterElement interceptorParameter;
     private ParameterElement qualifierParameter;
+    private ParameterElement interceptorsListParameter;
     private VisitorContext visitorContext;
 
     /**
@@ -332,6 +338,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
         }
         startClass(classWriter, proxyInternalName, getTypeReferenceForName(targetClassFullName));
+    }
+
+    /**
+     * Find the interceptors list constructor parameter index.
+     * @param parameters The constructor parameters
+     * @return the index
+     */
+    public static int findInterceptorsListParameterIndex(List<ParameterElement> parameters) {
+        return parameters.indexOf(parameters.stream().filter(p -> p.getName().equals(INTERCEPTORS_PARAMETER)).findFirst().orElseThrow());
     }
 
     @Override
@@ -468,17 +483,19 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         "T", ClassElement.of(Interceptor.class)
                 ))
         ));
-        this.interceptorParameter = ParameterElement.of(interceptorList, "$interceptors");
         this.qualifierParameter = ParameterElement.of(Qualifier.class, "$qualifier");
+        this.interceptorsListParameter = ParameterElement.of(interceptorList, INTERCEPTORS_PARAMETER);
+        ParameterElement interceptorRegistryParameter = ParameterElement.of(ClassElement.of(InterceptorRegistry.class), "$interceptorRegistry");
         ClassElement proxyClass = ClassElement.of(proxyType.getClassName());
 
         ParameterElement[] constructorParameters = constructor.getParameters();
-        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 4);
+        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 5);
         newConstructorParameters.addAll(Arrays.asList(constructorParameters));
         newConstructorParameters.add(ParameterElement.of(BeanResolutionContext.class, "$beanResolutionContext"));
         newConstructorParameters.add(ParameterElement.of(BeanContext.class, "$beanContext"));
         newConstructorParameters.add(qualifierParameter);
-        newConstructorParameters.add(interceptorParameter);
+        newConstructorParameters.add(interceptorsListParameter);
+        newConstructorParameters.add(interceptorRegistryParameter);
         this.newConstructor = MethodElement.of(
                 proxyClass,
                 constructor.getAnnotationMetadata(),
@@ -490,7 +507,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.beanResolutionContextArgumentIndex = constructorParameters.length;
         this.beanContextArgumentIndex = constructorParameters.length + 1;
         this.qualifierIndex = constructorParameters.length + 2;
-        this.interceptorArgumentIndex = constructorParameters.length + 3;
+        this.interceptorsListArgumentIndex = constructorParameters.length + 3;
+        this.interceptorRegistryArgumentIndex = constructorParameters.length + 4;
     }
 
     @NonNull
@@ -507,8 +525,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public void visitIntroductionMethod(TypedElement declaringBean,
                                         MethodElement methodElement) {
-
-
         visitAroundMethod(
                 declaringBean,
                 methodElement
@@ -721,7 +737,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         }
 
         this.proxyBeanDefinitionWriter.setRequiresMethodProcessing(parentWriter != null && parentWriter.requiresMethodProcessing());
-        interceptorParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
+        interceptorsListParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);
         });
@@ -1598,8 +1614,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyConstructorGenerator.getField(proxyType, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS);
         proxyConstructorGenerator.push(i);
 
-        // First argument. The bean context
-        proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
+        // First argument. The interceptor registry
+        proxyConstructorGenerator.loadArg(interceptorRegistryArgumentIndex);
 
         // Second argument i.e. proxyMethods[0]
         proxyConstructorGenerator.loadThis();
@@ -1608,7 +1624,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyConstructorGenerator.visitInsn(AALOAD);
 
         // Third argument i.e. interceptors
-        proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
+        proxyConstructorGenerator.loadArg(interceptorsListArgumentIndex);
         if (isIntroduction) {
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD));
         } else {
