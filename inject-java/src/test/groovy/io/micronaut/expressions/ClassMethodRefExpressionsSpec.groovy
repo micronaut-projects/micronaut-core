@@ -26,7 +26,10 @@ class ClassMethodRefExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
                 @Override
                 public Object intercept(MethodInvocationContext<Object, Object> context) {
-                    return context.proceed() + " " + context.stringValue("tst.CustomAnnotation").orElseThrow();
+                    if (context.getName().equals("callMe")) {
+                        return context.proceed() + " " + context.stringValue("tst.CustomAnnotation").orElseThrow();
+                    }
+                    return context.proceed();
                 }
             }
 
