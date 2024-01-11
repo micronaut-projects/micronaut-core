@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.context.ApplicationContext
@@ -50,7 +51,7 @@ open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        beanDefinition.constructor.arguments.size() == 5
+        beanDefinition.constructor.arguments.size() == 1 + AopProxyWriter.ADDITIONAL_PARAMETERS_COUNT
         beanDefinition.constructor.arguments[0].name == 'myValue'
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'
@@ -93,7 +94,7 @@ open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
         !beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.constructor.arguments.size() == 5
+        beanDefinition.constructor.arguments.size() == 1 + AopProxyWriter.ADDITIONAL_PARAMETERS_COUNT
         beanDefinition.constructor.arguments[0].name == 'myValue'
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'
