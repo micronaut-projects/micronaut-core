@@ -479,7 +479,7 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
-        return getRepeatableContainerNameForType(annotationMirror.annotationType)
+        return getRepeatableContainerNameForType(annotationMirror.annotationType.getClassDeclaration(visitorContext))
     }
 
     override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
