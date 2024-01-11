@@ -132,12 +132,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getRepeatableName(AnnotationMirror annotationMirror) {
         final Element typeElement = annotationMirror.getAnnotationType().asElement();
-        return getRepeatableNameForType(typeElement);
+        return getRepeatableContainerNameForType(typeElement);
     }
 
     @Nullable
     @Override
-    protected String getRepeatableNameForType(Element annotationType) {
+    protected String getRepeatableContainerNameForType(Element annotationType) {
         List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();

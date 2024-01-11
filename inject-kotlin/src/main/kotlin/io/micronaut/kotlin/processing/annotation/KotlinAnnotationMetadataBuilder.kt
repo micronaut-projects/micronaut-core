@@ -479,12 +479,12 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
-        return getRepeatableNameForType(annotationMirror.annotationType)
+        return getRepeatableContainerNameForType(annotationMirror.annotationType)
     }
 
-    override fun getRepeatableNameForType(annotationType: KSAnnotated): String? {
+    override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
         val name = java.lang.annotation.Repeatable::class.java.name
-        val repeatable = annotationType.getClassDeclaration(visitorContext).annotations.find {
+        val repeatable = annotationType.annotations.find {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == name
         }
         if (repeatable != null) {
