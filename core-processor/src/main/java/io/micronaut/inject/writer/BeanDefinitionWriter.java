@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.AbstractBeanDefinitionBeanConstructor;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
@@ -3384,7 +3385,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // interceptors will be last entry in parameter list for interceptors types
             generatorAdapter.loadLocal(parametersLocalIndex);
             // array index for last parameter
-            generatorAdapter.push(parameters.size() - 1);
+            generatorAdapter.push(AopProxyWriter.findInterceptorsListParameterIndex(parameters));
             generatorAdapter.arrayLoad(TYPE_OBJECT);
             pushCastToType(generatorAdapter, List.class);
         } else {
@@ -3397,7 +3398,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         generatorAdapter.loadLocal(constructorLocalIndex);
         // 6th argument:  additional proxy parameters count
         if (getInterceptedType().isPresent()) {
-            generatorAdapter.push(4);
+            generatorAdapter.push(AopProxyWriter.ADDITIONAL_PARAMETERS_COUNT);
         } else {
             generatorAdapter.push(0);
         }
