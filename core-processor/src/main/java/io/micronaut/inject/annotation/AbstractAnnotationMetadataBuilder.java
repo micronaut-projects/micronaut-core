@@ -1052,10 +1052,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationValue.getAnnotationName()) || context.isProcessed(annotationValue)) {
             return Stream.empty();
         }
-        String repeatableContainer = getRepeatableContainerNameForType(processedAnnotation.getAnnotationType());
-        if (repeatableContainer != null) {
-            // Collect the repeatable container from the annotation mirror for later
-            context.repeatableToContainer.put(annotationValue.getAnnotationName(), repeatableContainer);
+        if (processedAnnotation.getAnnotationType() != null) {
+            String repeatableContainer = getRepeatableContainerNameForType(processedAnnotation.getAnnotationType());
+            if (repeatableContainer != null) {
+                // Collect the repeatable container from the annotation mirror for later
+                context.repeatableToContainer.put(annotationValue.getAnnotationName(), repeatableContainer);
+            }
         }
 
         // Add annotation default values
