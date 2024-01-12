@@ -919,6 +919,16 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
+        public boolean isPackagePrivate() {
+            return element.isPackagePrivate();
+        }
+
+        @Override
+        public boolean isPrivate() {
+            return element.isPrivate();
+        }
+
+        @Override
         public boolean isPublic() {
             return element.isPublic();
         }
