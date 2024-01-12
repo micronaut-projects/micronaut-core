@@ -61,6 +61,11 @@ class ClientLoggerNameSpec extends Specification {
         ConnectionPoolConfiguration getConnectionPoolConfiguration() {
             return null
         }
+
+        @Override
+        WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+            return null
+        }
     }
 
     @Singleton
@@ -73,6 +78,11 @@ class ClientLoggerNameSpec extends Specification {
 
         @Override
         ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+            return null
+        }
+
+        @Override
+        WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
             return null
         }
     }
