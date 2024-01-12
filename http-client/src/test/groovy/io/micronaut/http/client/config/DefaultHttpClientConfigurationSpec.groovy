@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.client.config
 
 import io.micronaut.context.ApplicationContext
@@ -20,22 +5,17 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClientConfiguration
 import spock.lang.Issue
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import java.time.Duration
 
-//required because https://issues.apache.org/jira/browse/GROOVY-9566
-
 class DefaultHttpClientConfigurationSpec extends Specification {
 
-    @Unroll
     void "test config for #key"() {
         given:
         def ctx = ApplicationContext.run(
                 ("micronaut.http.client.$key".toString()): value
         )
         HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
-
 
         expect:
         config[property] == expected
@@ -62,54 +42,44 @@ class DefaultHttpClientConfigurationSpec extends Specification {
     void "test pool config"() {
         given:
         def ctx = ApplicationContext.run(
-                ("micronaut.http.client.pool.$key".toString()): value
+                'micronaut.http.client.pool.enabled': false
         )
         HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
-        HttpClientConfiguration.ConnectionPoolConfiguration poolConfig = config.getConnectionPoolConfiguration()
 
         expect:
-        poolConfig[property] == expected
+        !config.connectionPoolConfiguration.enabled
 
         cleanup:
         ctx.close()
-
-        where:
-        key               | property         | value   | expected
-        'enabled'         | 'enabled'        | 'false' | false
     }
 
     void "test WebSocket compression config"() {
         given:
         def ctx = ApplicationContext.run(
-                ("micronaut.http.client.ws.compression.$key".toString()): value
+                'micronaut.http.client.ws.compression.enabled': false
         )
         HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
         HttpClientConfiguration.WebSocketCompressionConfiguration compressionConfig = config.getWebSocketCompressionConfiguration()
 
         expect:
-        compressionConfig[property] == expected
+        !config.webSocketCompressionConfiguration.enabled
 
         cleanup:
         ctx.close()
-
-        where:
-        key               | property         | value   | expected
-        'enabled'         | 'enabled'        | 'false' | false
     }
 
     void "test overriding logger for the client"() {
         given:
         def ctx = ApplicationContext.run(
-                ("micronaut.http.client.loggerName".toString()): "myclient.custom.logger"
+                'micronaut.http.client.loggerName': 'myclient.custom.logger'
         )
         HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
 
         expect:
-        config['loggerName'] == Optional.of('myclient.custom.logger')
+        config.loggerName == Optional.of('myclient.custom.logger')
 
         cleanup:
         ctx.close()
-
     }
 
     void "test setting a proxy selector" () {
@@ -118,13 +88,10 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
         when: "I register proxy selector that use proxy for addressOne but not for addressTwo"
         config.setProxySelector(new ProxySelector() {
+
             @Override
             List<Proxy> select(URI uri) {
-                if (uri.host == "a") {
-                    return [ new Proxy(Proxy.Type.HTTP, new InetSocketAddress(8080)) ]
-                } else {
-                    return [ Proxy.NO_PROXY ]
-                }
+                uri.host == 'a' ? [ new Proxy(Proxy.Type.HTTP, new InetSocketAddress(8080)) ] : [ Proxy.NO_PROXY ]
             }
 
             @Override
@@ -135,6 +102,7 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
         then: "proxy is used for first address but not for the second"
         def proxyOne = config.resolveProxy(false, "a", 80)
+
         proxyOne.type() == Proxy.Type.HTTP
         proxyOne.address().port == 8080
 
@@ -145,7 +113,8 @@ class DefaultHttpClientConfigurationSpec extends Specification {
     void "default connection pool idle timeout"() {
         given:
         def cfg = new DefaultHttpClientConfiguration()
+
         expect:
-        cfg.connectionPoolIdleTimeout.isEmpty()
+        cfg.connectionPoolIdleTimeout.empty
     }
 }
