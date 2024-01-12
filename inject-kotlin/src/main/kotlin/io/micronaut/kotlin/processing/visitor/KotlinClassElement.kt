@@ -636,6 +636,9 @@ internal open class KotlinClassElement(
 
         @OptIn(KspExperimental::class)
         override fun getElementName(element: KSNode): String {
+            if (element is KSPropertyDeclaration) {
+                return element.simpleName.asString()
+            }
             if (element is KSFunctionDeclaration) {
                 return visitorContext.resolver.getJvmName(element)!!
             }

@@ -244,11 +244,11 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getRepeatableName(AnnotationNode annotationMirror) {
-        return getRepeatableNameForType(annotationMirror.getClassNode());
+        return getRepeatableContainerNameForType(annotationMirror.getClassNode());
     }
 
     @Override
-    protected String getRepeatableNameForType(AnnotatedNode annotationType) {
+    protected String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
         List<AnnotationNode> annotationNodes = annotationType.getAnnotations(ClassHelper.makeCached(Repeatable.class));
         if (CollectionUtils.isNotEmpty(annotationNodes)) {
             Expression expression = annotationNodes.get(0).getMember("value");
@@ -318,7 +318,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (value instanceof ListExpression listExpression) {
                 for (Expression expression : listExpression.getExpressions()) {
                     if (expression instanceof AnnotationConstantExpression annotationConstantExpression) {
-                        String name = getRepeatableNameForType(expression.getType());
+                        String name = getRepeatableContainerNameForType(expression.getType());
                         if (name != null && name.equals(node.getClassNode().getName())) {
                             repeatable = true;
                             expanded.add((AnnotationNode) annotationConstantExpression.getValue());
