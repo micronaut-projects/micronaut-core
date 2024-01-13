@@ -18,6 +18,7 @@ package io.micronaut.inject.beans.external;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+@SuppressWarnings({"DeclarationOrder", "MissingJavadocType", "VisibilityModifier"})
 @Singleton
 public class BeanWithFields {
     public @Named("public") String publicField;
