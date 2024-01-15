@@ -90,3 +90,6 @@ tasks {
     }
 }
 ----
+
+Unfortunately, KSP doesn't see the changes in the classes made by other compiler plugins, which breaks integration with the `allopen` plugin.
+To make the integration work, we have introduced an experimental system property `kotlin.allopen.annotations` for the annotation processor. The property expects a list of annotations that are open, separated by `,`.
