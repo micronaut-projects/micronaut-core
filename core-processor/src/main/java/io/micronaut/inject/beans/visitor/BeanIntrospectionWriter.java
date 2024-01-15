@@ -792,7 +792,16 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             methodName,
             desc);
 
-        invokeBeanConstructor(instantiateInternal, beanType, constructor, true, null);
+        if (args.length == 0) {
+            invokeBeanConstructor(instantiateInternal, constructor, true, null);
+        } else {
+            invokeBeanConstructor(instantiateInternal, constructor, true, (index, parameter) -> {
+                instantiateInternal.loadArg(0);
+                instantiateInternal.push(index);
+                instantiateInternal.arrayLoad(TYPE_OBJECT);
+                pushCastToType(instantiateInternal, JavaModelUtils.getTypeReference(parameter));
+            });
+        }
 
         instantiateInternal.returnValue();
         instantiateInternal.visitMaxs(3, 1);
@@ -1050,7 +1059,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
                 // NOTE: It doesn't make sense to check defaults for the copy constructor
 
-                invokeBeanConstructor(writer, beanType, constructor, false, (paramIndex, parameter) -> {
+                invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
                     boolean isPrimitive;
                     if (constructorArgument instanceof MethodElement readMethod) {

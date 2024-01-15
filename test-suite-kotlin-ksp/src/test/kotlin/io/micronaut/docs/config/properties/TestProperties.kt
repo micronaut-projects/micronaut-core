@@ -5,5 +5,5 @@ import io.micronaut.context.annotation.ConfigurationProperties
 
 @ConfigurationProperties("testing")
 data class TestProperties @ConfigurationInject constructor(
-    val enabled: Boolean = true
+    val enabled: Boolean? = true
 )

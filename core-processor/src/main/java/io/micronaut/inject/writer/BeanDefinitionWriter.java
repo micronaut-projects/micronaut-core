@@ -3263,8 +3263,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
             } else {
-                WriterUtils.invokeBeanConstructor(buildMethodVisitor, beanType, constructor, true, (index, parameter) -> {
-                    pushConstructorArgument(buildMethodVisitor, parameter, index);
+                Map<Integer, Integer> locals = new HashMap<>();
+                boolean isKotlin = constructor.getClass().getSimpleName().startsWith("Kotlin");
+                WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
+                    if (isKotlin) {
+                        int loadedLocal = locals.computeIfAbsent(index, integer -> {
+                            pushConstructorArgument(buildMethodVisitor, parameter, index);
+                            int local = buildMethodVisitor.newLocal(getTypeReference(parameter));
+                            buildMethodVisitor.storeLocal(local);
+                            return local;
+                        });
+                        buildMethodVisitor.loadLocal(loadedLocal);
+                    } else {
+                        pushConstructorArgument(buildMethodVisitor, parameter, index);
+                    }
                 });
             }
 
@@ -3507,7 +3519,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             pushConstructorArgument(
                 buildMethodVisitor,
                 parameter,
-                index
+                index,
+                true
             );
         });
         int local = buildMethodVisitor.newLocal(Type.getType(Object[].class));
@@ -3593,10 +3606,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private boolean pushParametersAsArray(GeneratorAdapter buildMethodVisitor, ParameterElement[] parameters) {
         pushNewArrayIndexed(buildMethodVisitor, Object.class, Arrays.asList(parameters), (index, parameter) -> {
-            pushConstructorArgument(buildMethodVisitor, parameter, index);
-            if (parameter.isPrimitive()) {
-                buildMethodVisitor.unbox(getTypeReference(parameter));
-            }
+            pushConstructorArgument(buildMethodVisitor, parameter, index, true);
         });
         boolean hasInjectScope = false;
         for (ParameterElement parameter : parameters) {
@@ -3610,6 +3620,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,
                                          ParameterElement parameter,
                                          int index) {
+        pushConstructorArgument(buildMethodVisitor, parameter, index, false);
+    }
+
+    private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,
+                                         ParameterElement parameter,
+                                         int index,
+                                         boolean castToObject) {
         AnnotationMetadata annotationMetadata = parameter.getAnnotationMetadata();
         if (isAnnotatedWithParameter(annotationMetadata) && isParametrized) {
             // load the args
@@ -3686,7 +3703,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (isArray && hasGenericType) {
                 convertToArray(parameter.getGenericType().fromArray(), buildMethodVisitor);
             }
-            pushCastToType(buildMethodVisitor, parameter);
+            if (castToObject) {
+                if (parameter.isPrimitive()) {
+                    pushCastToType(buildMethodVisitor, Object.class);
+                }
+            } else {
+                pushCastToType(buildMethodVisitor, parameter);
+            }
         }
     }
 

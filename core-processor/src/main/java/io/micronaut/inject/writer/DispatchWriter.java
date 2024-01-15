@@ -368,6 +368,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             int maskIndex = 1;
             int paramIndex = 0;
             for (ParameterElement parameter : parameters) {
+                // NOTE: We cannot recognize the default from a primitive value
                 if (parameter instanceof KotlinParameterElement kp && kp.hasDefault() && (!kp.getType().isPrimitive() || kp.getType().isArray())) {
                     Label elseLabel = writer.newLabel();
                     argumentsPusher.accept(paramIndex, parameter);

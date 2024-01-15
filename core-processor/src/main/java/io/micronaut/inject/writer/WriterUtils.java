@@ -50,11 +50,11 @@ public final class WriterUtils {
     private static final String METHOD_NAME_INSTANTIATE = "instantiate";
 
     public static void invokeBeanConstructor(GeneratorAdapter writer,
-                                             Type beanType,
                                              MethodElement constructor,
                                              boolean allowKotlinDefaults,
                                              @Nullable
                                              BiConsumer<Integer, ParameterElement> argumentsPusher) {
+        Type beanType = getTypeReference(constructor.getOwningType());
         boolean isConstructor = constructor.getName().equals("<init>");
         boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
 
