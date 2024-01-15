@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -317,19 +318,9 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         builder.push(declaringTypeObject);
         builder.push(methodElement.getName());
         if (!argumentTypes.isEmpty()) {
-            int len = argumentTypes.size();
-            Iterator<ParameterElement> iter = argumentTypes.iterator();
-            pushNewArray(builder, Class.class, len);
-            for (int i = 0; i < len; i++) {
-                ParameterElement type = iter.next();
-                pushStoreInArray(
-                    builder,
-                        i,
-                        len,
-                        () -> builder.push(JavaModelUtils.getTypeReference(type))
-                );
-
-            }
+            pushNewArray(builder, Class.class, argumentTypes, parameterElement -> {
+                builder.push(JavaModelUtils.getTypeReference(parameterElement));
+            });
         } else {
             builder.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
         }
@@ -361,15 +352,14 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * @param writer          The writer
      * @param argumentsPusher The argument pusher
      * @param parameters      The arguments
-     * @param allValuesAreNull Is all parameters values are null
      * @return The mask
      */
     public static int computeKotlinDefaultsMask(GeneratorAdapter writer,
+                                                @Nullable
                                                 BiConsumer<Integer, ParameterElement> argumentsPusher,
-                                                List<ParameterElement> parameters,
-                                                boolean allValuesAreNull) {
+                                                List<ParameterElement> parameters) {
         int maskLocal = writer.newLocal(Type.INT_TYPE);
-        if (allValuesAreNull) {
+        if (argumentsPusher == null) {
             writer.push((int) Math.pow(2, parameters.size()) - 1);
             writer.storeLocal(maskLocal);
         } else {
@@ -683,7 +673,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                             writer.loadArg(2);
                             writer.push(paramIndex);
                             writer.visitInsn(AALOAD);
-                        }, argumentTypes, false);
+                        }, argumentTypes);
                     }
                     if (isMulti) {
                         int argCount = argumentTypes.size();

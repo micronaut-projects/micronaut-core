@@ -51,15 +51,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Array;
 import java.util.AbstractMap;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -271,43 +272,30 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
         }
 
-        int len = types.size();
         // Build calls to Argument.create(...)
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
-            // the array index
-            generatorAdapter.push(i);
+        pushNewArray(generatorAdapter, Argument.class, types.entrySet(), entry -> {
             String argumentName = entry.getKey();
             ClassElement classElement = entry.getValue();
             Type classReference = JavaModelUtils.getTypeReference(classElement);
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
                 buildArgumentWithGenerics(
-                        annotationMetadataWithDefaults,
-                        owningType,
-                        declaringClassWriter,
-                        generatorAdapter,
-                        argumentName,
-                        classReference,
-                        classElement,
-                        typeArguments,
-                        visitedTypes,
-                        defaults,
-                        loadTypeMethods
+                    annotationMetadataWithDefaults,
+                    owningType,
+                    declaringClassWriter,
+                    generatorAdapter,
+                    argumentName,
+                    classReference,
+                    classElement,
+                    typeArguments,
+                    visitedTypes,
+                    defaults,
+                    loadTypeMethods
                 );
             } else {
                 buildArgument(generatorAdapter, argumentName, classElement);
             }
-
-            // store the type reference
-            generatorAdapter.arrayStore(Type.getType(Argument.class));
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.dup();
-            }
-            i++;
-        }
+        });
     }
 
     /**
@@ -501,14 +489,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         );
 
         // 3rd argument, the generics
-        pushNewArray(generatorAdapter, Class.class, generics.length);
-        final int len = generics.length;
-        for (int i = 0; i < len; i++) {
-            ClassElement generic = generics[i];
-            pushStoreInArray(generatorAdapter, i, len, () ->
-                    generatorAdapter.push(getTypeReference(generic))
-            );
-        }
+        pushNewArray(generatorAdapter, Class.class, generics, g -> generatorAdapter.push(getTypeReference(g)));
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
@@ -537,12 +518,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Collection<ParameterElement> argumentTypes,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        int len = argumentTypes.size();
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (ParameterElement entry : argumentTypes) {
-            // the array index position
-            generatorAdapter.push(i);
+        pushNewArray(generatorAdapter, Argument.class, argumentTypes, entry -> {
 
             ClassElement genericType = entry.getGenericType();
 
@@ -569,24 +545,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
             Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             pushCreateArgument(
-                    annotationMetadataWithDefaults,
-                    declaringElementName,
-                    owningType,
-                    declaringClassWriter,
-                    generatorAdapter,
-                    argumentName,
-                    genericType,
-                    annotationMetadata,
-                    typeArguments, defaults, loadTypeMethods
+                annotationMetadataWithDefaults,
+                declaringElementName,
+                owningType,
+                declaringClassWriter,
+                generatorAdapter,
+                argumentName,
+                genericType,
+                annotationMetadata,
+                typeArguments, defaults, loadTypeMethods
             );
-            // store the type reference
-            generatorAdapter.arrayStore(Type.getType(Argument.class));
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.dup();
-            }
-            i++;
-        }
+        });
     }
 
     /**
@@ -920,18 +889,95 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static void pushMethodNameAndTypesArguments(GeneratorAdapter methodVisitor, String methodName, Collection<ClassElement> argumentTypes) {
         // and the method name
         methodVisitor.push(methodName);
+        pushNewArray(methodVisitor, Class.class, argumentTypes, item -> pushType(methodVisitor, item));
+    }
 
-        int argTypeCount = argumentTypes.size();
-        if (!argumentTypes.isEmpty()) {
-            pushNewArray(methodVisitor, Class.class, argTypeCount);
-            Iterator<ClassElement> argIterator = argumentTypes.iterator();
-            for (int i = 0; i < argTypeCount; i++) {
-                pushStoreTypeInArray(methodVisitor, i, argTypeCount, argIterator.next());
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param collection    The collection
+     * @param itemConsumer  The item consumer
+     * @param <T> The type
+     */
+    protected static <T> void pushNewArray(GeneratorAdapter methodVisitor,
+                                           Class<?> arrayType,
+                                           Collection<T> collection,
+                                           Consumer<T> itemConsumer) {
+        final Type type = Type.getType(arrayType);
+        // the size of the array
+        int size = collection.size();
+        methodVisitor.push(size);
+        // define the array
+        methodVisitor.newArray(type);
+        // add a reference to the array on the stack
+        if (size > 0) {
+            methodVisitor.dup();
+            int index = 0;
+            for (T item : collection) {
+                // the array index position
+                methodVisitor.push(index);
+                // Push value
+                itemConsumer.accept(item);
+                // store the value in the position
+                methodVisitor.arrayStore(type);
+                if (index != (size - 1)) {
+                    // if we are not at the end of the array duplicate array onto the stack
+                    methodVisitor.dup();
+                }
+                index++;
             }
-        } else {
-            // no arguments
-            pushNewArray(methodVisitor, Class.class, 0);
         }
+    }
+
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param collection    The collection
+     * @param itemConsumer  The item consumer
+     * @param <T> The type
+     */
+    protected static <T> void pushNewArrayIndexed(GeneratorAdapter methodVisitor,
+                                                  Class<?> arrayType,
+                                                  Collection<T> collection,
+                                                  BiConsumer<Integer, T> itemConsumer) {
+        final Type type = Type.getType(arrayType);
+        // the size of the array
+        int size = collection.size();
+        methodVisitor.push(size);
+        // define the array
+        methodVisitor.newArray(type);
+        // add a reference to the array on the stack
+        if (size > 0) {
+            methodVisitor.dup();
+            int index = 0;
+            for (T item : collection) {
+                // the array index position
+                methodVisitor.push(index);
+                // Push value
+                itemConsumer.accept(index, item);
+                // store the value in the position
+                methodVisitor.arrayStore(type);
+                if (index != (size - 1)) {
+                    // if we are not at the end of the array duplicate array onto the stack
+                    methodVisitor.dup();
+                }
+                index++;
+            }
+        }
+    }
+
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param array    The collection
+     * @param itemConsumer  The item consumer
+     * @param <T> The type
+     */
+    protected static <T> void pushNewArray(GeneratorAdapter methodVisitor,
+                                           Class<?> arrayType,
+                                           T[] array,
+                                           Consumer<T> itemConsumer) {
+        pushNewArray(methodVisitor, arrayType, Arrays.asList(array), itemConsumer);
     }
 
     /**
@@ -961,21 +1007,31 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param index         The index
+     * @param methodVisitor The method visitor as {@link org.objectweb.asm.commons.GeneratorAdapter}
+     * @param arrayType     The array class
      * @param size          The size
-     * @param string        The string
+     * @param itemConsumer  The item consumer
      */
-    protected static void pushStoreStringInArray(GeneratorAdapter methodVisitor, int index, int size, String string) {
-        // the array index position
-        methodVisitor.push(index);
-        // load the constant string
-        methodVisitor.push(string);
-        // store the string in the position
-        methodVisitor.arrayStore(Type.getType(String.class));
-        if (index != (size - 1)) {
-            // if we are not at the end of the array duplicate array onto the stack
+    protected static void pushNewArray(GeneratorAdapter methodVisitor, Type arrayType, int size, Consumer<Integer> itemConsumer) {
+        // the size of the array
+        methodVisitor.push(size);
+        // define the array
+        methodVisitor.newArray(arrayType);
+        // add a reference to the array on the stack
+        if (size > 0) {
             methodVisitor.dup();
+            for (int i = 0; i < size; i++) {
+                // the array index position
+                methodVisitor.push(i);
+                // Push value
+                itemConsumer.accept(i);
+                // store the value in the position
+                methodVisitor.arrayStore(arrayType);
+                if (i != (size - 1)) {
+                    // if we are not at the end of the array duplicate array onto the stack
+                    methodVisitor.dup();
+                }
+            }
         }
     }
 
@@ -1009,16 +1065,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         }
     }
 
-    /**
-     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param index         The index
-     * @param size          The size
-     * @param type          The type
-     */
-    protected static void pushStoreTypeInArray(GeneratorAdapter methodVisitor, int index, int size, ClassElement type) {
-        // the array index position
-        methodVisitor.push(index);
-        // the type reference
+    private static void pushType(GeneratorAdapter methodVisitor, ClassElement type) {
         if (type.isPrimitive()) {
             Class<?> typeClass = ClassUtils.getPrimitiveType(type.getName()).orElse(null);
             if (typeClass != null) {
@@ -1034,12 +1081,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
         } else {
             methodVisitor.push(JavaModelUtils.getTypeReference(type));
-        }
-        // store the type reference
-        methodVisitor.arrayStore(TYPE_CLASS);
-        // if we are not at the end of the array duplicate array onto the stack
-        if (index < (size - 1)) {
-            methodVisitor.dup();
         }
     }
 
@@ -1499,19 +1540,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
             invokeInterfaceStatic(generatorAdapter, MAP_TYPE, MAP_OF[entrySet.size()]);
         } else {
-            int totalSize = entrySet.size();
             // start a new array
-            pushNewArray(generatorAdapter, Map.Entry.class, totalSize);
-            int i = 0;
-            for (Map.Entry<? extends CharSequence, T> entry : entrySet) {
-
-                pushStoreInArray(generatorAdapter, i++, totalSize, () -> {
-                    generatorAdapter.push(entry.getKey().toString());
-                    pushValue.accept(entry.getValue());
-                    invokeInterfaceStatic(generatorAdapter, MAP_TYPE, MAP_ENTRY);
-                });
-
-            }
+            pushNewArray(generatorAdapter, Map.Entry.class, entrySet, entry -> {
+                generatorAdapter.push(entry.getKey());
+                pushValue.accept(entry.getValue());
+                invokeInterfaceStatic(generatorAdapter, MAP_TYPE, MAP_ENTRY);
+            });
             invokeInterfaceStatic(generatorAdapter, MAP_TYPE, MAP_BY_ARRAY);
         }
     }
@@ -1530,13 +1564,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
             invokeInterfaceStatic(methodVisitor, LIST_TYPE, LIST_OF[names.size()]);
         } else {
-            int totalSize = names.size();
-            // start a new array
-            pushNewArray(methodVisitor, String.class, totalSize);
-            int i = 0;
-            for (String name : names) {
-                pushStoreStringInArray(methodVisitor, i++, totalSize, name);
-            }
+            pushNewArray(methodVisitor, String.class, names, methodVisitor::push);
             invokeInterfaceStatic(methodVisitor, LIST_TYPE, LIST_BY_ARRAY);
         }
     }

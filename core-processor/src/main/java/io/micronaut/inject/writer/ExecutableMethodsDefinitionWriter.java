@@ -260,19 +260,15 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private void buildStaticInit(ClassWriter classWriter, Type methodsFieldType) {
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
         classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_METHODS_REFERENCES, methodsFieldType.getDescriptor(), null, null);
-        pushNewArray(staticInit, AbstractExecutableMethodsDefinition.MethodReference.class, methodDispatchWriter.getDispatchTargets().size());
-        int i = 0;
-        for (DispatchWriter.DispatchTarget dispatchTarget : methodDispatchWriter.getDispatchTargets()) {
+        pushNewArray(staticInit, AbstractExecutableMethodsDefinition.MethodReference.class, methodDispatchWriter.getDispatchTargets(), dispatchTarget -> {
             DispatchWriter.MethodDispatchTarget method = (DispatchWriter.MethodDispatchTarget) dispatchTarget;
-            pushStoreInArray(staticInit, i++, methodDispatchWriter.getDispatchTargets().size(), () ->
-                    pushNewMethodReference(
-                            classWriter,
-                            staticInit,
-                            method.declaringType,
-                            method.methodElement
-                    )
+            pushNewMethodReference(
+                classWriter,
+                staticInit,
+                method.declaringType,
+                method.methodElement
             );
-        }
+        });
         staticInit.putStatic(thisType, FIELD_METHODS_REFERENCES, methodsFieldType);
         staticInit.returnValue();
         staticInit.visitMaxs(DEFAULT_MAX_STACK, 1);
