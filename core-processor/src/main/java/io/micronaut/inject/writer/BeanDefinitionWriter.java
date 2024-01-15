@@ -982,7 +982,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.constructor = constructor;
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(constructor);
+            visitBuildMethodDefinition(constructor, requiresReflection);
 
             // now implement the inject method
             visitInjectMethodDefinition();
@@ -1008,7 +1008,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             constructor = defaultConstructor;
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(defaultConstructor);
+            visitBuildMethodDefinition(defaultConstructor, false);
             // now implement the inject method
             visitInjectMethodDefinition();
         }
@@ -3243,7 +3243,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return factoryVar;
     }
 
-    private void visitBuildMethodDefinition(MethodElement constructor) {
+    private void visitBuildMethodDefinition(MethodElement constructor, boolean requiresReflection) {
         if (buildMethodVisitor == null) {
             boolean isIntercepted = isConstructorIntercepted(constructor);
             final ParameterElement[] parameterArray = constructor.getParameters();
@@ -3267,7 +3267,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 if (isKotlin) {
                     Map<Integer, Integer> checksLocals = new HashMap<>();
                     Map<Integer, Integer> valuesLocals = new HashMap<>();
-                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
+                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, requiresReflection, true, (index, parameter) -> {
                         Integer checkLocal = checksLocals.get(index);
                         if (checkLocal != null) {
                             buildMethodVisitor.loadLocal(checkLocal);
@@ -3302,9 +3302,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         return false;
                     });
                 } else {
-                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
+                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, requiresReflection, true, (index, parameter) -> {
                         pushConstructorArgument(buildMethodVisitor, parameter, index);
-                    });
+                    }, null);
                 }
             }
 

@@ -40,6 +40,7 @@ import static io.micronaut.inject.writer.AbstractClassFileWriter.getMethodDescri
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getTypeReference;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArray;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArrayIndexed;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
 /**
  * The writer utils.
@@ -56,11 +57,12 @@ public final class WriterUtils {
                                              boolean allowKotlinDefaults,
                                              @Nullable
                                              BiConsumer<Integer, ParameterElement> argumentsPusher) {
-        invokeBeanConstructor(writer, constructor, allowKotlinDefaults, argumentsPusher, null);
+        invokeBeanConstructor(writer, constructor, constructor.isReflectionRequired(), allowKotlinDefaults, argumentsPusher, null);
     }
 
     public static void invokeBeanConstructor(GeneratorAdapter writer,
                                              MethodElement constructor,
+                                             boolean requiresReflection,
                                              boolean allowKotlinDefaults,
                                              @Nullable
                                              BiConsumer<Integer, ParameterElement> argumentsPusher,
@@ -84,7 +86,7 @@ public final class WriterUtils {
             maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, argumentValueIsPresentPusher, constructorArguments);
         }
 
-        if (constructor.isReflectionRequired() && !isCompanion) { // Companion reflection not implemented
+        if (requiresReflection && !isCompanion) { // Companion reflection not implemented
             writer.push(beanType);
             pushNewArray(writer, Class.class, constructorArguments, arg -> writer.push(getTypeReference(arg)));
             pushNewArrayIndexed(writer, Object.class, constructorArguments, (i, parameter) -> {
@@ -144,11 +146,10 @@ public final class WriterUtils {
         } else if (constructor.isStatic()) {
             final String methodDescriptor = getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
-            if (constructor.getOwningType().isInterface()) {
-                writer.invokeStatic(getTypeReference(declaringType), method);
-            } else {
-                writer.invokeStatic(beanType, method);
-            }
+            boolean isInterface = constructor.getDeclaringType().isInterface();
+            writer.visitMethodInsn(INVOKESTATIC,
+                getTypeReference(declaringType).getInternalName(), method.getName(),
+                method.getDescriptor(), isInterface);
         } else if (isCompanion) {
             if (constructor.isStatic()) {
                 writer.invokeStatic(
