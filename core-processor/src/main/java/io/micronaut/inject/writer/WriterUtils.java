@@ -68,7 +68,8 @@ public final class WriterUtils {
                                              BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher) {
         Type beanType = getTypeReference(constructor.getOwningType());
         boolean isConstructor = constructor.getName().equals("<init>");
-        boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
+        ClassElement declaringType = constructor.getOwningType();
+        boolean isCompanion = declaringType.getSimpleName().endsWith("$Companion");
 
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
@@ -112,11 +113,17 @@ public final class WriterUtils {
             return;
         }
 
-        if (isConstructor) {
-            writer.newInstance(beanType);
-            writer.dup();
-        } else if (isCompanion) {
-            writer.getStatic(beanType, "Companion", JavaModelUtils.getTypeReference(constructor.getDeclaringType()));
+        if (!constructor.isStatic()) {
+            if (isConstructor) {
+                writer.newInstance(beanType);
+                writer.dup();
+            } else if (isCompanion) {
+                writer.getStatic(
+                    getTypeReference(constructor.getReturnType()),
+                    "Companion",
+                    JavaModelUtils.getTypeReference(declaringType)
+                );
+            }
         }
 
         int index = 0;
@@ -138,15 +145,22 @@ public final class WriterUtils {
             final String methodDescriptor = getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
             if (constructor.getOwningType().isInterface()) {
-                writer.invokeStatic(getTypeReference(constructor.getDeclaringType()), method);
+                writer.invokeStatic(getTypeReference(declaringType), method);
             } else {
                 writer.invokeStatic(beanType, method);
             }
         } else if (isCompanion) {
-            writer.invokeVirtual(
-                JavaModelUtils.getTypeReference(constructor.getDeclaringType()),
-                new Method(constructor.getName(), getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes))
-            );
+            if (constructor.isStatic()) {
+                writer.invokeStatic(
+                    JavaModelUtils.getTypeReference(declaringType),
+                    new Method(constructor.getName(), getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes))
+                );
+            } else {
+                writer.invokeVirtual(
+                    JavaModelUtils.getTypeReference(declaringType),
+                    new Method(constructor.getName(), getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes))
+                );
+            }
         }
     }
 
@@ -164,6 +178,7 @@ public final class WriterUtils {
 
     /**
      * Pushed a default value.
+     *
      * @param writer The writer
      * @param type   The type
      */
