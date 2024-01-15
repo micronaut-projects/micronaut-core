@@ -9,9 +9,8 @@ class TestPropertiesSpec: StringSpec({
     "test test properties with defaults" {
         val applicationContext = ApplicationContext.run()
 
-        val props = applicationContext.getBean(TestProperties::class.java)
-
-        props.enabled.shouldBe(true)
+        applicationContext.getBean(TestProperties1::class.java).enabled.shouldBe(true)
+        applicationContext.getBean(TestProperties2::class.java).enabled.shouldBe(true)
 
         applicationContext.close()
     }

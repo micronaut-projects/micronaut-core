@@ -86,7 +86,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     protected static final Type TYPE_OBJECT = Type.getType(Object.class);
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
-    protected static final int DEFAULT_MAX_STACK = 13;
+    protected static final int DEFAULT_MAX_STACK = 23;
     protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
     protected static final Pattern ARRAY_PATTERN = Pattern.compile("(\\[\\])+$");
 

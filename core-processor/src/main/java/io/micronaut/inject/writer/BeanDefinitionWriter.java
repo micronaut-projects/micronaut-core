@@ -3263,21 +3263,49 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
             } else {
-                Map<Integer, Integer> locals = new HashMap<>();
                 boolean isKotlin = constructor.getClass().getSimpleName().startsWith("Kotlin");
-                WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
-                    if (isKotlin) {
-                        int loadedLocal = locals.computeIfAbsent(index, integer -> {
+                if (isKotlin) {
+                    Map<Integer, Integer> checksLocals = new HashMap<>();
+                    Map<Integer, Integer> valuesLocals = new HashMap<>();
+                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
+                        Integer checkLocal = checksLocals.get(index);
+                        if (checkLocal != null) {
+                            buildMethodVisitor.loadLocal(checkLocal);
+                            buildMethodVisitor.push(true);
+                            Label end = new Label();
+                            Label propertyMissingLabel = new Label();
+                            buildMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, propertyMissingLabel);
+                            pushConstructorArgument(buildMethodVisitor, parameter, index);
+                            buildMethodVisitor.goTo(end);
+                            buildMethodVisitor.visitLabel(propertyMissingLabel);
+                            WriterUtils.pushDefaultTypeValue(buildMethodVisitor, parameter.getType());
+                            buildMethodVisitor.goTo(end);
+                            buildMethodVisitor.visitLabel(end);
+                            return;
+                        }
+                        int loadedLocal = valuesLocals.computeIfAbsent(index, integer -> {
                             pushConstructorArgument(buildMethodVisitor, parameter, index);
                             int local = buildMethodVisitor.newLocal(getTypeReference(parameter));
                             buildMethodVisitor.storeLocal(local);
                             return local;
                         });
                         buildMethodVisitor.loadLocal(loadedLocal);
-                    } else {
+                    }, (index, parameterElement) -> {
+                        if (parameterElement.hasAnnotation(Property.class)) {
+                            int local = buildMethodVisitor.newLocal(Type.BOOLEAN_TYPE);
+                            pushContainsPropertyCheck(buildMethodVisitor, parameterElement);
+                            buildMethodVisitor.storeLocal(local);
+                            buildMethodVisitor.loadLocal(local);
+                            checksLocals.put(index, local);
+                            return true;
+                        }
+                        return false;
+                    });
+                } else {
+                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, true, (index, parameter) -> {
                         pushConstructorArgument(buildMethodVisitor, parameter, index);
-                    }
-                });
+                    });
+                }
             }
 
             this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
@@ -3288,6 +3316,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
             pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
+        }
+    }
+
+    private void pushContainsPropertyCheck(GeneratorAdapter writer, ParameterElement parameterElement) {
+        String propertyValue = parameterElement.stringValue(Property.class, "name").orElseThrow();
+        writer.loadThis();
+        // 1st argument load BeanResolutionContext
+        writer.loadArg(0);
+        // 2nd argument load BeanContext
+        writer.loadArg(1);
+        // 3rd argument push property name
+        writer.push(propertyValue);
+        if (isMultiValueProperty(parameterElement.getType())) {
+            writer.invokeVirtual(beanDefinitionType, CONTAINS_PROPERTIES_VALUE_METHOD);
+        } else {
+            writer.invokeVirtual(beanDefinitionType, CONTAINS_PROPERTY_VALUE_METHOD);
         }
     }
 

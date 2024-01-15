@@ -19,9 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -31,13 +33,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getConstructorDescriptor;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getMethodDescriptor;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getTypeReference;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArray;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArrayIndexed;
-import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
 /**
  * The writer utils.
@@ -54,6 +56,16 @@ public final class WriterUtils {
                                              boolean allowKotlinDefaults,
                                              @Nullable
                                              BiConsumer<Integer, ParameterElement> argumentsPusher) {
+        invokeBeanConstructor(writer, constructor, allowKotlinDefaults, argumentsPusher, null);
+    }
+
+    public static void invokeBeanConstructor(GeneratorAdapter writer,
+                                             MethodElement constructor,
+                                             boolean allowKotlinDefaults,
+                                             @Nullable
+                                             BiConsumer<Integer, ParameterElement> argumentsPusher,
+                                             @Nullable
+                                             BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher) {
         Type beanType = getTypeReference(constructor.getOwningType());
         boolean isConstructor = constructor.getName().equals("<init>");
         boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
@@ -68,7 +80,7 @@ public final class WriterUtils {
         if (isKotlinDefault) {
             // Calculate the Kotlin defaults mask
             // Every bit indicated true/false if the parameter should have the default value set
-            maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, constructorArguments);
+            maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, argumentValueIsPresentPusher, constructorArguments);
         }
 
         if (constructor.isReflectionRequired() && !isCompanion) { // Companion reflection not implemented
@@ -123,16 +135,18 @@ public final class WriterUtils {
             }
             writer.invokeConstructor(beanType, method);
         } else if (constructor.isStatic()) {
-            final String methodDescriptor = getMethodDescriptor(beanType, argumentTypes);
+            final String methodDescriptor = getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
             if (constructor.getOwningType().isInterface()) {
-                writer.visitMethodInsn(INVOKESTATIC, getTypeReference(constructor.getDeclaringType()).getInternalName(), method.getName(),
-                    method.getDescriptor(), true);
-            } else {
                 writer.invokeStatic(getTypeReference(constructor.getDeclaringType()), method);
+            } else {
+                writer.invokeStatic(beanType, method);
             }
         } else if (isCompanion) {
-            writer.invokeVirtual(JavaModelUtils.getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, argumentTypes)));
+            writer.invokeVirtual(
+                JavaModelUtils.getTypeReference(constructor.getDeclaringType()),
+                new Method(constructor.getName(), getMethodDescriptor(getTypeReference(constructor.getReturnType()), argumentTypes))
+            );
         }
     }
 
@@ -142,14 +156,27 @@ public final class WriterUtils {
                                   ParameterElement parameter,
                                   int index) {
         if (argumentsPusher == null) {
-            if (parameter.isPrimitive() && !parameter.isArray()) {
-                writer.push(0);
-                writer.cast(Type.INT_TYPE, JavaModelUtils.getTypeReference(parameter.getType()));
-            } else {
-                writer.push((String) null);
-            }
+            pushDefaultTypeValue(writer, parameter.getType());
         } else {
             argumentsPusher.accept(index, parameter);
+        }
+    }
+
+    /**
+     * Pushed a default value.
+     * @param writer The writer
+     * @param type   The type
+     */
+    public static void pushDefaultTypeValue(GeneratorAdapter writer, ClassElement type) {
+        if (type.isPrimitive() && !type.isArray()) {
+            if (type.equals(PrimitiveElement.BOOLEAN)) {
+                writer.push(false);
+            } else {
+                writer.push(0);
+                writer.cast(Type.INT_TYPE, JavaModelUtils.getTypeReference(type));
+            }
+        } else {
+            writer.push((String) null);
         }
     }
 
