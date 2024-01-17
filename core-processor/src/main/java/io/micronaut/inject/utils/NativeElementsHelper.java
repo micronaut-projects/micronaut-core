@@ -171,7 +171,10 @@ public abstract class NativeElementsHelper<C, M> {
                 continue;
             }
             overridesCache.put(
-                methodCacheKey,
+                new MethodCacheKey(
+                    classCacheKey,
+                    getMethodCacheKey(method.methodElement)
+                ),
                 method.overridden
             );
         }
