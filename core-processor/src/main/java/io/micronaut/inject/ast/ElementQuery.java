@@ -331,6 +331,7 @@ public interface ElementQuery<T extends Element> {
         /**
          * Creates a copy without the predicates.
          * @return a copy without the predicates.
+         * @since 4.3.0
          */
         Result<T> withoutPredicates();
     }

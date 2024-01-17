@@ -573,7 +573,10 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeOverriddenMethods,
             includeHiddenElements,
             false,
-            null, null, null, null,
+            null,
+            null,
+            null,
+            namePredicates, // Keep this to allow selecting only specific element
             null);
     }
 
