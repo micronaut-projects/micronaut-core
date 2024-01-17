@@ -172,18 +172,18 @@ public abstract class EnclosedElementsQuery<C, N> {
             return true;
         };
 
-        // Let's try to load the unfiltered result and apply the filter
-        QueryResultKey queryWithoutPredicatesResultKey = new QueryResultKey(result.withoutPredicates(), classElement.getNativeType());
-        List<T> valuesWithoutPredicates = (List<T>) resultsCache.get(queryWithoutPredicatesResultKey);
-        if (valuesWithoutPredicates != null) {
-            return valuesWithoutPredicates.stream().filter(filter).toList();
-        }
-
         C nativeClassType = getNativeClassType(classElement);
         List<T> elements;
         if (result.isOnlyDeclared() || classElement.getSuperType().isEmpty() && classElement.getInterfaces().isEmpty()) {
             elements = getElements(nativeClassType, result, filter);
         } else {
+            // Let's try to load the unfiltered result and apply the filter
+            QueryResultKey queryWithoutPredicatesResultKey = new QueryResultKey(result.withoutPredicates(), classElement.getNativeType());
+            List<T> valuesWithoutPredicates = (List<T>) resultsCache.get(queryWithoutPredicatesResultKey);
+            if (valuesWithoutPredicates != null) {
+                return valuesWithoutPredicates.stream().filter(filter).toList();
+            }
+
             elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result);
             if (!queryWithoutPredicatesResultKey.equals(queryResultKey)) {
                 // This collection is before predicates are applied, we can store it and reuse
