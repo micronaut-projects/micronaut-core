@@ -558,6 +558,25 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
+    @Override
+    public Result<T> withoutPredicates() {
+        return new DefaultElementQuery<>(
+            elementType,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            includeEnumConstants,
+            includeOverriddenMethods,
+            includeHiddenElements,
+            false,
+            null, null, null, null,
+            null);
+    }
+
     @NonNull
     @Override
     public Result<T> result() {

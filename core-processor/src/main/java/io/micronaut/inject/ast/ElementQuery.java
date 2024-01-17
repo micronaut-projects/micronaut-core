@@ -327,5 +327,11 @@ public interface ElementQuery<T extends Element> {
          * @return The element predicates
          */
         @NonNull List<Predicate<T>> getElementPredicates();
+
+        /**
+         * Creates a copy without the predicates.
+         * @return a copy without the predicates.
+         */
+        Result<T> withoutPredicates();
     }
 }
