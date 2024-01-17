@@ -178,7 +178,7 @@ public abstract class NativeElementsHelper<C, M> {
                 method.overridden
             );
         }
-        processedClasses.add(classNode);
+        processedClasses.add(classKey);
         return overridesCache.getOrDefault(cacheKey, List.of());
     }
 
