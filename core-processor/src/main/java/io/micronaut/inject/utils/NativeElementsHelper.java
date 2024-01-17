@@ -153,16 +153,16 @@ public abstract class NativeElementsHelper<C, M> {
      * @return the overridden methods
      */
     public final Collection<M> findOverriddenMethods(C classNode, M methodElement) {
-        Object classKey = getClassCacheKey(classNode);
-        MethodCacheKey cacheKey = new MethodCacheKey(
-            classKey,
+        Object classCacheKey = getClassCacheKey(classNode);
+        MethodCacheKey methodCacheKey = new MethodCacheKey(
+            classCacheKey,
             getMethodCacheKey(methodElement)
         );
-        Collection<M> overriddenMethods = overridesCache.get(cacheKey);
+        Collection<M> overriddenMethods = overridesCache.get(methodCacheKey);
         if (overriddenMethods != null) {
             return overriddenMethods;
         }
-        if (processedClasses.contains(classKey)) {
+        if (processedClasses.contains(classCacheKey)) {
             return List.of();
         }
         List<MethodElement<M>> allElements = getAllElements(classNode);
@@ -171,15 +171,12 @@ public abstract class NativeElementsHelper<C, M> {
                 continue;
             }
             overridesCache.put(
-                new MethodCacheKey(
-                    classKey,
-                    getMethodCacheKey(method.methodElement)
-                ),
+                methodCacheKey,
                 method.overridden
             );
         }
-        processedClasses.add(classKey);
-        return overridesCache.getOrDefault(cacheKey, List.of());
+        processedClasses.add(classCacheKey);
+        return overridesCache.getOrDefault(methodCacheKey, List.of());
     }
 
     private List<MethodElement<M>> getAllElements(C classNode) {
