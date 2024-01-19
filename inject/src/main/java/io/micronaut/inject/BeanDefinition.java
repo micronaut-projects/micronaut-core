@@ -254,6 +254,20 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     }
 
     /**
+     * Whether an {@link ExecutableMethod} exists which is annotated with the supplied annotation
+     *
+     * @param methodName          The method name
+     * @param argumentTypes The argument types
+     * @return Whether an {@link ExecutableMethod} exists which is annotated with the supplied annotation
+     * @since 4.3.0
+     */
+    default boolean hasAnnotatedMethod(@NonNull Class<? extends Annotation> annotationClass,
+                                       @NonNull String methodName,
+                                       @NonNull Class<?>... argumentTypes) {
+        return findMethod(methodName, argumentTypes).map(method -> method.hasAnnotation(annotationClass)).orElse(false);
+    }
+
+    /**
      * Finds possible methods for the given method name.
      *
      * @param name The method name

@@ -177,6 +177,10 @@ public class KotlinCompiler {
         return loadReference(name, clazz, BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX);
     }
 
+    public static BeanDefinition<?> buildIntroducedBeanDefinition(String className, @Language("kotlin") String cls) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        return loadReference(className, cls, BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX);
+    }
+
     public static BeanDefinition<?> buildInterceptedBeanDefinition(String className, @Language("kotlin") String cls) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         return loadReference(className, cls, BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX);
     }
@@ -194,6 +198,10 @@ public class KotlinCompiler {
         String packageName = NameUtils.getPackageName(className);
         String beanFullName = packageName + "." + beanDefName;
 
+        return buildAndLoad(className, beanFullName, cls);
+    }
+
+    public static <T> T buildAndLoad(String className, String beanFullName, @Language("kotlin") String cls) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         ClassLoader classLoader = buildClassLoader(className, cls);
         return (T) loadDefinition(classLoader, beanFullName);
     }

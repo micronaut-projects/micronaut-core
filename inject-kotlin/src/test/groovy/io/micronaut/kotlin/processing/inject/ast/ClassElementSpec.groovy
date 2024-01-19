@@ -5,6 +5,7 @@ import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.Element
@@ -21,6 +22,7 @@ import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.kotlin.processing.visitor.AllElementsVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinEnumElement
+import io.micronaut.runtime.context.env.ConfigurationAdvice
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
@@ -695,6 +697,30 @@ class Test<T : Test<*>>
         then:
             def e = thrown(RuntimeException)
             e.message.contains "This type parameter violates the Finite Bound Restriction"
+    }
+
+    void "test nested configurations"() {
+        when:
+            def ce = (BeanDefinition) KotlinCompiler.buildAndLoad('test.ConfigurationLevel1', 'test.$ConfigurationLevel1$ConfigurationLevel2$ConfigurationLevel3$Intercepted$Definition', '''\
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("level1")
+interface ConfigurationLevel1 {
+    val foo: String
+    @ConfigurationProperties("level2")
+    interface ConfigurationLevel2 {
+        val bar: String
+        @ConfigurationProperties("level3")
+        interface ConfigurationLevel3 {
+            val baz: String
+        }
+    }
+}
+''')
+        then:
+            ce.hasDeclaredAnnotation(ConfigurationAdvice)
     }
 
     void "test recursive generic type parameter 3"() {

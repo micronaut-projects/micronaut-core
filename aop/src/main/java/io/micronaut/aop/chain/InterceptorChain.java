@@ -69,7 +69,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         this.target = target;
         this.executionHandle = method;
         AnnotationMetadata metadata = executionHandle.getAnnotationMetadata();
-        if (originalParameters.length > 0 && metadata instanceof EvaluatedAnnotationMetadata eam) {
+        if (metadata instanceof EvaluatedAnnotationMetadata eam) {
             this.annotationMetadata = eam.withArguments(target, originalParameters);
         } else {
             this.annotationMetadata = metadata;
@@ -121,18 +121,36 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param beanContext bean context passed in
      * @param method The method
      * @param interceptors The array of interceptors
+     * @param <T> The intercepted type
      * @return The filtered array of interceptors
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveAroundInterceptors(
-            @Nullable BeanContext beanContext,
-            ExecutableMethod<?, ?> method,
-            List<BeanRegistration<Interceptor<?, ?>>> interceptors) {
+    public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(BeanContext beanContext,
+                                                                    ExecutableMethod<T, ?> method,
+                                                                    List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
         return resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
     }
 
+    /**
+     * Resolves the {@link Around} interceptors for a method.
+     *
+     * @param interceptorRegistry the interceptor registry
+     * @param method              The method
+     * @param interceptors        The array of interceptors
+     * @param <T> The intercepted type
+     * @return The filtered array of interceptors
+     * @since 4.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    @Internal
+    @UsedByGeneratedCode
+    public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(InterceptorRegistry interceptorRegistry,
+                                                                    ExecutableMethod<T, ?> method,
+                                                                    List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        return resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
+    }
 
     /**
      * Resolves the {@link Introduction} interceptors for a method.
@@ -140,17 +158,39 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param beanContext bean context passed in
      * @param method The method
      * @param interceptors The array of interceptors
+     * @param <T> The intercepted type
      * @return The filtered array of interceptors
+     * @since 4.3.0
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveIntroductionInterceptors(
-            @Nullable BeanContext beanContext,
-            ExecutableMethod<?, ?> method,
-            List<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        final Interceptor[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
-        final Interceptor[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+    public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(BeanContext beanContext,
+                                                                          ExecutableMethod<T, ?> method,
+                                                                          List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+    /**
+     * Resolves the {@link Introduction} interceptors for a method.
+     *
+     * @param interceptorRegistry the interceptor registry
+     * @param method              The method
+     * @param interceptors        The array of interceptors
+     * @param <T> The intercepted type
+     * @return The filtered array of interceptors
+     * @since 4.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    @Internal
+    @UsedByGeneratedCode
+    public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(InterceptorRegistry interceptorRegistry,
+                                                                          ExecutableMethod<T, ?> method,
+                                                                          List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
@@ -203,19 +243,24 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     @NonNull
-    private static Interceptor[] resolveInterceptors(
-            BeanContext beanContext,
-            ExecutableMethod<?, ?> method,
-            List<BeanRegistration<Interceptor<?, ?>>> interceptors,
-            InterceptorKind interceptorKind) {
-        return beanContext.getBean(InterceptorRegistry.class)
-                    .resolveInterceptors(
-                            (ExecutableMethod) method,
-                            (List) interceptors,
-                            interceptorKind
-                    );
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,
+                                                               ExecutableMethod<T, ?> method,
+                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
+                                                               InterceptorKind interceptorKind) {
+        return resolveInterceptors(beanContext.getBean(InterceptorRegistry.class), method, interceptors, interceptorKind);
+    }
+
+    @NonNull
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(InterceptorRegistry interceptorRegistry,
+                                                               ExecutableMethod<T, ?> method,
+                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
+                                                               InterceptorKind interceptorKind) {
+        return interceptorRegistry.resolveInterceptors(
+            method,
+            interceptors,
+            interceptorKind
+        );
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
@@ -226,7 +271,10 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
     }
 
-    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, @NonNull ClassLoader classLoader) {
+    private static <T> Interceptor<T, ?>[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method,
+                                                                       Class<? extends Annotation> annotationType,
+                                                                       Interceptor<T, ?>[] interceptors,
+                                                                       @NonNull ClassLoader classLoader) {
         List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
         Set<Class<?>> applicableClasses = new HashSet<>();
@@ -243,7 +291,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
             }
         }
 
-        Interceptor[] interceptorArray = Arrays.stream(interceptors)
+        Interceptor<T, ?>[] interceptorArray = Arrays.stream(interceptors)
             .filter(i -> applicableClasses.stream().anyMatch(t -> t.isInstance(i)))
             .toArray(Interceptor[]::new);
         OrderUtil.sort(interceptorArray);

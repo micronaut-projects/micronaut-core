@@ -1489,6 +1489,27 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier).bean;
     }
 
+    /**
+     * Resolves the proxy target for a given proxy bean definition. If the bean has no proxy then the original bean is returned.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param definition        The proxy bean definition
+     * @param beanType          The bean type
+     * @param qualifier         The bean qualifier
+     * @param <T>               The generic type
+     * @return The proxied instance
+     * @since 4.3.0
+     */
+    @Internal
+    @NonNull
+    @UsedByGeneratedCode
+    public <T> T getProxyTargetBean(@Nullable BeanResolutionContext resolutionContext,
+                                    @NonNull BeanDefinition<T> definition,
+                                    @NonNull Argument<T> beanType,
+                                    @Nullable Qualifier<T> qualifier) {
+        return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier).bean;
+    }
+
     @NonNull
     @Override
     public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, @NonNull String method, @NonNull Class<?>[] arguments) {

@@ -27,6 +27,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import org.intellij.lang.annotations.Language
 
+
 abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec {
 
     @Override
