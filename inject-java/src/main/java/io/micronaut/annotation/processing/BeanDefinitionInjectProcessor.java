@@ -191,8 +191,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
                                 if (processed.add(writer.getBeanDefinitionName())) {
                                     processBeanDefinitions(writer);
-                                } else {
-                                    throw new IllegalStateException("Already processed: " + writer.getBeanDefinitionName());
                                 }
                             }
                         } catch (ProcessingException ex) {
