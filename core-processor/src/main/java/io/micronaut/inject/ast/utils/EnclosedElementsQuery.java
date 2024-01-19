@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -29,6 +30,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -282,6 +284,8 @@ public abstract class EnclosedElementsQuery<C, N> {
         reduce(collectedElements, getEnclosedElements(classNode, result, includeAbstract), reduce, result, addedFromClassElements, true, includeAbstract);
     }
 
+    protected abstract boolean hasAnnotation(N element, Class<? extends Annotation> annotation);
+
     private <T extends Element> void reduce(Collection<T> collectedElements,
                                             List<N> classElements,
                                             BiPredicate<T, T> reduce,
@@ -301,6 +305,9 @@ public abstract class EnclosedElementsQuery<C, N> {
                         continue classElements;
                     }
                 }
+            }
+            if (hasAnnotation(element, Vetoed.class)) {
+                continue;
             }
             T newElement = convertElement(result, element);
 
@@ -348,6 +355,9 @@ public abstract class EnclosedElementsQuery<C, N> {
                         continue enclosedElementsLoop;
                     }
                 }
+            }
+            if (hasAnnotation(enclosedElement, Vetoed.class)) {
+                continue;
             }
             T element = convertElement(result, enclosedElement);
             if (filter.test(element)) {
