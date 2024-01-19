@@ -634,6 +634,16 @@ internal open class KotlinClassElement(
     private inner class KotlinEnclosedElementsQuery :
         EnclosedElementsQuery<KSClassDeclaration, KSNode>() {
 
+        override fun hasAnnotation(element: KSNode, annotation: Class<out Annotation>): Boolean {
+            if (element is KSAnnotated) {
+                return element.annotations.any {
+                    it.shortName.getShortName() == annotation.simpleName && it.annotationType.resolve().declaration
+                        .qualifiedName?.asString() == annotation.name
+                }
+            }
+            return false
+        }
+
         @OptIn(KspExperimental::class)
         override fun getElementName(element: KSNode): String {
             if (element is KSPropertyDeclaration) {

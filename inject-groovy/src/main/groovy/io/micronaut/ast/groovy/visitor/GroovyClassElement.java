@@ -64,6 +64,7 @@ import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.objectweb.asm.Opcodes;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -671,6 +672,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         private GroovyEnclosedElementsQuery(boolean isSource) {
             this.isSource = isSource;
+        }
+
+        @Override
+        protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
+            if (element.getAnnotations() != null) {
+                return element.getAnnotations().stream().anyMatch(a -> a.getClassNode().getName().equals(annotation.getName()));
+            }
+            return false;
         }
 
         @Override

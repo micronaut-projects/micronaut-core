@@ -54,6 +54,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -708,6 +709,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
         private JavaEnclosedElementsQuery(boolean isSource) {
             this.isSource = isSource;
+        }
+
+        @Override
+        protected boolean hasAnnotation(Element element, Class<? extends Annotation> annotation) {
+            return element.getAnnotation(annotation) != null;
         }
 
         @Override
