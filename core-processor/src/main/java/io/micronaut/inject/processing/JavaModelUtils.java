@@ -232,13 +232,13 @@ public class JavaModelUtils {
                 TypeElement enclosingElement = typeElement;
                 StringBuilder builder = new StringBuilder();
                 while (nestingKind == NestingKind.MEMBER) {
-                    builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                     Element enclosing = enclosingElement.getEnclosingElement();
-
                     if (enclosing instanceof TypeElement element) {
+                        builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                         enclosingElement = element;
                         nestingKind = enclosingElement.getNestingKind();
                     } else {
+                        // Generated Java classes might come as enclosed by non type element
                         break;
                     }
                 }
@@ -266,13 +266,13 @@ public class JavaModelUtils {
                 TypeElement enclosingElement = typeElement;
                 StringBuilder builder = new StringBuilder();
                 while (nestingKind == NestingKind.MEMBER) {
-                    builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                     Element enclosing = enclosingElement.getEnclosingElement();
-
                     if (enclosing instanceof TypeElement element) {
+                        builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                         enclosingElement = element;
                         nestingKind = enclosingElement.getNestingKind();
                     } else {
+                        // Generated Java classes might come as enclosed by non type element
                         break;
                     }
                 }
