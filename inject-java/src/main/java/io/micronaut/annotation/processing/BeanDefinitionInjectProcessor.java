@@ -189,11 +189,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             BeanDefinitionCreator beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, javaVisitorContext);
                             for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
-                                if (!processed.contains(writer.getBeanDefinitionName())) {
+                                if (processed.contains(writer.getBeanDefinitionName())) {
+                                    throw new IllegalStateException("Already processed: " + writer.getBeanDefinitionName());
+                                } else {
                                     processBeanDefinitions(writer);
                                     processed.add(writer.getBeanDefinitionName());
-                                } else {
-                                    throw new IllegalStateException("Already processed: " + writer.getBeanDefinitionName());
                                 }
                             }
                         } catch (ProcessingException ex) {
