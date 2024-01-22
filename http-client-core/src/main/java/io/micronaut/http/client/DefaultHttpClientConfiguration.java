@@ -51,11 +51,24 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
 
     /**
      * @param connectionPoolConfiguration The connection pool configuration
+     * @param applicationConfiguration The application configuration
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, ApplicationConfiguration)} instead.
+     */
+    @Deprecated
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
+        this(connectionPoolConfiguration, new DefaultWebSocketCompressionConfiguration(), applicationConfiguration);
+    }
+
+
+    /**
+     * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration, ApplicationConfiguration applicationConfiguration) {
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
+                                          DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+                                          ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.connectionPoolConfiguration = connectionPoolConfiguration;
         this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
