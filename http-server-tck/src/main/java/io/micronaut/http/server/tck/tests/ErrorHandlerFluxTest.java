@@ -66,15 +66,11 @@ public class ErrorHandlerFluxTest {
 
     @Test
     void testErrorHandlerWithFluxChunkedSignaledImmediateError() throws IOException {
-        //NOTE - This demonstrates the current behavior of the error handler not getting invoked
-        //when writing a chunked response, even if the error is signaled before any data to be
-        //written to the response body. It would be ideal if in this case the error handler could
-        //still be invoked with the exception from the error signal.
         asserts(SPEC_NAME,
             HttpRequest.GET("/errors/flux-chunked-immediate-error"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Internal Server Error: Cannot process request.")
+                .status(HttpStatus.I_AM_A_TEAPOT)
+                .body("Your request is erroneous: Cannot process request.")
                 .build()));
     }
 

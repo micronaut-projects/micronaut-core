@@ -62,10 +62,13 @@ import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.CorePublisher;
+import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -79,6 +82,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -559,7 +563,7 @@ public final class RouteExecutor {
                             response = httpResponse.toMutableResponse();
                             final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                             if (bodyArgument.isAsyncOrReactive()) {
-                                return processPublisherBody(propagatedContext, request, response, routeInfo);
+                                return Mono.from(processPublisherBody(propagatedContext, request, response, routeInfo));
                             }
                         } else {
                             response = forStatus(routeInfo, null);
@@ -627,6 +631,11 @@ public final class RouteExecutor {
                 .switchIfEmpty(Mono.fromSupplier(emptyResponse))
                 .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
         }
+
+        return getStreamingResponsePublisher(propagatedContext, request, body, routeInfo);
+    }
+
+    private CorePublisher<MutableHttpResponse<?>> getStreamingResponsePublisher(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
         // streaming case
         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         if (HttpResponse.class.isAssignableFrom(typeArgument.getType())) {
@@ -645,10 +654,10 @@ public final class RouteExecutor {
         return processPublisherBody(propagatedContext, request, response, routeInfo);
     }
 
-    private Mono<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
-                                                              HttpRequest<?> request,
-                                                              MutableHttpResponse<?> response,
-                                                              RouteInfo<?> routeInfo) {
+    private CorePublisher<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
+                                                                       HttpRequest<?> request,
+                                                                       MutableHttpResponse<?> response,
+                                                                       RouteInfo<?> routeInfo) {
         Object body = response.body();
         if (body == null) {
             return Mono.just(response);
@@ -667,11 +676,126 @@ public final class RouteExecutor {
             propagatedContext
         ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
 
-        return Mono.<MutableHttpResponse<?>>just(response
-            .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
-            .header(HttpHeaders.CONTENT_TYPE, mediaType)
-            .body(ReactivePropagation.propagate(propagatedContext, bodyPublisher)))
-            .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
+        return new StreamingDataProcessor(bodyPublisher).chunkedResponsePublisher(propagatedContext, request, response, routeInfo, mediaType);
+    }
+
+    /**
+     * Stateful processor for writing a streaming data HTTP response.
+     * <p>
+     * The first signal from the underlying body publisher is inspected before writing the response
+     * in order to check for potential errors and a matching error route. If the publisher signals
+     * an immediate error before writing any data and there is a matching error route, then the
+     * error will be propagated outward so that the error route will be invoked. Otherwise, an
+     * appropriate {@link MutableHttpResponse} will be published that is able to stream the body
+     * publisher as a chunked HTTP response.
+     */
+    private class StreamingDataProcessor implements Consumer<FluxSink<Object>> {
+
+        private final Flux<Object> bodyPublisher;
+
+        private boolean firstRequest = true;
+
+        private boolean bufferWritten = false;
+
+        private FluxSink<Object> bodySink;
+
+        private boolean subscribed = false;
+
+        private Object bufferedFirstValue = null;
+
+        private Throwable bufferedImmediateError = null;
+
+        private final StreamSubscriber subscriber = new StreamSubscriber();
+
+        private boolean isComplete;
+
+        private boolean isEmpty;
+
+        private StreamingDataProcessor(Flux<Object> bodyPublisher) {
+            this.bodyPublisher = bodyPublisher;
+        }
+
+        @SuppressWarnings("unchecked")
+        private CorePublisher<MutableHttpResponse<?>> chunkedResponsePublisher(PropagatedContext propagatedContext,
+                                                                               HttpRequest<?> request,
+                                                                               MutableHttpResponse<?> response,
+                                                                               RouteInfo<?> routeInfo,
+                                                                               MediaType mediaType) {
+            Flux<Object> outputStream = Flux.push(this);
+
+            response
+                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                .header(HttpHeaders.CONTENT_TYPE, mediaType)
+                .body(ReactivePropagation.propagate(propagatedContext, outputStream));
+
+            Mono<? extends MutableHttpResponse<?>> responsePublisher = Mono.just(response)
+                .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
+
+            return (CorePublisher<MutableHttpResponse<?>>) outputStream.take(1)
+                .switchIfEmpty(responsePublisher)
+                .onErrorReturn(throwable -> findErrorRoute(throwable, routeInfo.getDeclaringType(), request) == null, response)
+                .flatMap(data -> responsePublisher)
+                .contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
+        }
+
+        @Override
+        public void accept(FluxSink<Object> bodySink) {
+            this.bodySink = bodySink;
+            if (!subscribed) {
+                subscribed = true;
+                bodyPublisher.subscribe(subscriber);
+            } else if (!firstRequest && !bufferWritten) {
+                if (bufferedImmediateError != null) {
+                    bodySink.error(bufferedImmediateError);
+                } if (isEmpty){
+                    bodySink.complete();
+                } else {
+                    bodySink.next(bufferedFirstValue);
+                    if (isComplete) {
+                        bodySink.complete();
+                    }
+                }
+                bufferWritten = true;
+                bufferedFirstValue = null;
+                bodySink.onRequest(subscriber::request);
+            }
+        }
+
+        private class StreamSubscriber extends BaseSubscriber<Object> {
+
+            @Override
+            protected void hookOnSubscribe(Subscription subscription) {
+                subscription.request(1L);
+            }
+
+            @Override
+            protected void hookOnNext(Object data) {
+                if(firstRequest) {
+                    bufferedFirstValue = data;
+                    firstRequest = false;
+                }
+                bodySink.next(data);
+            }
+
+            @Override
+            protected void hookOnComplete() {
+                if (firstRequest) {
+                    isEmpty = true;
+                    firstRequest = false;
+                }
+                isComplete = true;
+                bodySink.complete();
+            }
+
+            @Override
+            protected void hookOnError(Throwable throwable) {
+                if (firstRequest) {
+                    bufferedImmediateError = throwable;
+                    firstRequest = false;
+                }
+                bodySink.error(throwable);
+            }
+        }
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
