@@ -2,6 +2,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.reflect.ClassUtils
@@ -788,5 +789,49 @@ interface MyEntityControllerInterface {
 
         expect:
             definition == null
+    }
+
+    void "test mapped interface bean"() {
+        given:
+            def definition = buildSimpleInterceptedBeanDefinition('test.ProductMappers', '''
+package test;
+
+import io.micronaut.context.annotation.Mapper.Mapping;
+import jakarta.inject.Singleton;
+import io.micronaut.core.annotation.Introspected;
+
+@Singleton
+interface ProductMappers {
+    @Mapping(
+        to = "price",
+        from = "#{product.price * 2}",
+        format = "$#.00"
+    )
+    @Mapping(
+        to = "distributor",
+        from = "#{this.getDistributor()}"
+    )
+    ProductDTO toProductDTO(Product product);
+
+    default String getDistributor() {
+        return "Great Product Company";
+    }
+}
+
+@Introspected
+record Product(
+    String name,
+    double price,
+    String manufacturer) {
+}
+
+@Introspected
+record ProductDTO(String name, String price, String distributor) {
+}
+''')
+
+        expect:
+            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
+            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
 }

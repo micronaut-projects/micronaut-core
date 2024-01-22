@@ -18,6 +18,7 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.simple.Mutating
+import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
@@ -62,7 +63,7 @@ class MyBean {
         !beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.constructor.arguments.size() == 5
+        beanDefinition.constructor.arguments.size() == 1 + AopProxyWriter.ADDITIONAL_PARAMETERS_COUNT
         beanDefinition.constructor.arguments[0].name == 'val'
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'
@@ -118,7 +119,7 @@ class MyBean {
         !beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.constructor.arguments.size() == 5
+        beanDefinition.constructor.arguments.size() == 1 + AopProxyWriter.ADDITIONAL_PARAMETERS_COUNT
         beanDefinition.constructor.arguments[0].name == 'val'
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'

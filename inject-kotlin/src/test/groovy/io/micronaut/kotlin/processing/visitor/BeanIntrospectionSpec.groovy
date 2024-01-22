@@ -49,6 +49,55 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void "test enum introspection with a creator"() {
+        given:
+        def introspection = buildBeanIntrospection("test.StateEnum", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonCreator
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class StateEnum (
+    val value: String
+) {
+
+    STARTING("starting"),
+    RUNNING("running"),
+    STOPPED("stopped"),
+    DELETED("deleted");
+
+    override fun toString(): String {
+        return value
+    }
+
+    companion object {
+
+        @JvmField
+        val VALUE_MAPPING = entries.associateBy { it.value }
+
+        @JsonCreator
+        @JvmStatic
+        fun fromValue(value: String): StateEnum {
+            require(VALUE_MAPPING.containsKey(value)) { "Unexpected value " + value }
+            return VALUE_MAPPING[value]!!
+        }
+    }
+}
+""")
+
+
+        when:
+            def instance = introspection.instantiate("starting")
+        then:
+            instance.class.name == "test.StateEnum"
+        when:
+            introspection.instantiate("STARTING")
+        then:
+            def e = thrown(Exception)
+            e.message == 'Unexpected value STARTING'
+    }
+
     void "test default introspection"() {
         when:
             def introspection = buildBeanIntrospection("test.Test", """

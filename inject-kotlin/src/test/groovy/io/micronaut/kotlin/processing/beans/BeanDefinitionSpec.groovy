@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.annotation.Mapper
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
@@ -128,6 +129,35 @@ class F
         expect:
         definition.injectedMethods.size() == 0
         definition.injectedFields.size() == 1
+    }
+
+    void "test abstract mapper singleton"() {
+        given:
+        def definition = KotlinCompiler.buildIntroducedBeanDefinition('test.ProductMappers', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Mapper.Mapping
+import jakarta.inject.Singleton
+
+@Singleton
+abstract class ProductMappers {
+    @Mapping(to = "price", from = "#{product.price * 2}", format = "$#.00")
+    @Mapping(to = "distributor", from = "#{this.getDistributor()}")
+    abstract fun toProductDTO(product: Product): ProductDTO
+    fun getDistributor() : String = "Great Product Company"
+}
+
+@Introspected
+data class Product(val name: String, val price: Double, val manufacturer: String)
+
+@Introspected
+data class ProductDTO(val name: String, val price: String, val distributor: String)
+''')
+
+        expect:
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
 
     void "test interface bean"() {

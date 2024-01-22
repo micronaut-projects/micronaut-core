@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -39,6 +40,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.IntersectionType;
 import javax.lang.model.type.NoType;
 import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.UnionType;
@@ -248,6 +250,9 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                 } else {
                     visitedTypes.add(dt);
                     resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                }
+                if (type.getKind() == TypeKind.ERROR) {
+                    throw new PostponeToNextRoundException(typeElement, getName() + " " + typeElement);
                 }
                 if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(

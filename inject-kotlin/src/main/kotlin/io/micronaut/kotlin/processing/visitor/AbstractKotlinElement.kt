@@ -132,12 +132,17 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         false
     }
 
-    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata) = annotationMetadata.declaredMetadata.hasDeclaredStereotype(
-        Around::class.java,
-        Introduction::class.java,
-        InterceptorBinding::class.java,
-        InterceptorBindingDefinitions::class.java
-    )
+    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata): Boolean {
+        if (extraOpenAnnotations != null && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
+            return true
+        }
+        return annotationMetadata.declaredMetadata.hasDeclaredStereotype(
+            Around::class.java,
+            Introduction::class.java,
+            InterceptorBinding::class.java,
+            InterceptorBindingDefinitions::class.java
+        )
+    }
 
     override fun isAbstract(): Boolean {
         return if (annotatedInfo is KSModifierListOwner) {
@@ -605,6 +610,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     companion object {
+        val extraOpenAnnotations = System.getProperty("kotlin.allopen.annotations")?.split(",")?.toTypedArray()
+
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
             "kotlin.Char" to PrimitiveElement.CHAR,

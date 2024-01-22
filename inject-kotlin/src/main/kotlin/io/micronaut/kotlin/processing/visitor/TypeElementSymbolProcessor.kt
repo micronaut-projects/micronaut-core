@@ -31,6 +31,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Vetoed
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
@@ -95,9 +96,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 .flatMap { file: KSFile -> file.declarations }
                 .filterIsInstance<KSClassDeclaration>()
                 .filter { declaration: KSClassDeclaration ->
-                    declaration.annotations.none { ksAnnotation ->
-                        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
-                    }
+                    acceptClass(declaration)
                 }
                 .toList()
 
@@ -130,6 +129,9 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                                     )
                                 } catch (e: ProcessingException) {
                                     BeanDefinitionProcessor.handleProcessingException(environment, e)
+                                } catch (e: Exception) {
+                                    environment.logger.error("Error processing type visitor [${loadedVisitor.visitor}]: ${e.message}", typeElement)
+                                    environment.logger.exception(e)
                                 }
                             }
                         }
@@ -139,6 +141,12 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
         return emptyList()
     }
+
+    private fun acceptClass(declaration: KSClassDeclaration) =
+        declaration.annotations.none { ksAnnotation ->
+            val annotationName = ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString()
+            annotationName == Generated::class.java.name || annotationName == Vetoed::class.java.name
+        }
 
     override fun finish() {
         for (loadedVisitor in loadedVisitors) {
@@ -260,21 +268,26 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                         }
 
                     visitMembers(classElement)
-                    val innerClassQuery =
-                        ElementQuery.ALL_INNER_CLASSES.onlyStatic()
-                            .modifiers { it.contains(ElementModifier.PUBLIC) }
-                    val innerClasses = classElement.getEnclosedElements(innerClassQuery)
-                    innerClasses.forEach {
-                        val visitor = loadedVisitor.visitor
-                        val kspClassElement: KotlinClassElement = it as KotlinClassElement
-                        if (loadedVisitor.matches(kspClassElement.declaration)) {
-                            visitor.visitClass(it, loadedVisitor.visitorContext)
-                            visitMembers(it)
-                        }
-                    }
+                    visitInnerClasses(classElement)
                 }
             }
             return data
+        }
+
+        private fun visitInnerClasses(classElement: ClassElement, processed: MutableSet<String> = HashSet()) {
+            val innerClassQuery = ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
+            classElement.getEnclosedElements(innerClassQuery).forEach {
+                val visitor = loadedVisitor.visitor
+                val kspClassElement: KotlinClassElement = it as KotlinClassElement
+                val declaration = kspClassElement.declaration
+                if (processed.add(it.name) && acceptClass(declaration)) {
+                    if (loadedVisitor.matches(declaration)) {
+                        visitor.visitClass(it, loadedVisitor.visitorContext)
+                        visitMembers(it)
+                    }
+                    visitInnerClasses(it, processed)
+                }
+            }
         }
 
         private fun visitMembers(classElement: ClassElement) {

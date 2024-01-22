@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -29,6 +30,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -177,7 +179,19 @@ public abstract class EnclosedElementsQuery<C, N> {
         if (result.isOnlyDeclared() || classElement.getSuperType().isEmpty() && classElement.getInterfaces().isEmpty()) {
             elements = getElements(nativeClassType, result, filter);
         } else {
-            elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result, filter);
+            // Let's try to load the unfiltered result and apply the filter
+            QueryResultKey queryWithoutPredicatesResultKey = new QueryResultKey(result.withoutPredicates(), classElement.getNativeType());
+            List<T> valuesWithoutPredicates = (List<T>) resultsCache.get(queryWithoutPredicatesResultKey);
+            if (valuesWithoutPredicates != null) {
+                return valuesWithoutPredicates.stream().filter(filter).toList();
+            }
+
+            elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result);
+            if (!queryWithoutPredicatesResultKey.equals(queryResultKey)) {
+                // This collection is before predicates are applied, we can store it and reuse
+                resultsCache.put(queryWithoutPredicatesResultKey, new ArrayList<>(elements));
+            }
+            elements.removeIf(element -> !filter.test(element));
         }
         resultsCache.put(queryResultKey, elements);
         adjustMapCapacity(resultsCache, MAX_RESULTS);
@@ -223,8 +237,7 @@ public abstract class EnclosedElementsQuery<C, N> {
 
     private <T extends io.micronaut.inject.ast.Element> List<T> getAllElements(C classNode,
                                                                                BiPredicate<T, T> reduce,
-                                                                               ElementQuery.Result<?> result,
-                                                                               Predicate<T> filter) {
+                                                                               ElementQuery.Result<?> result) {
 
         List<T> elements = new LinkedList<>();
         List<T> addedFromClassElements = new ArrayList<>(20);
@@ -234,7 +247,6 @@ public abstract class EnclosedElementsQuery<C, N> {
             boolean includeAbstract = isAbstractClass(classNode) || result.isIncludeOverriddenMethods();
             processClassHierarchy(classNode, reduce, result, addedFromClassElements, elements, includeAbstract);
         }
-        elements.removeIf(element -> !filter.test(element));
         return elements;
     }
 
@@ -272,6 +284,8 @@ public abstract class EnclosedElementsQuery<C, N> {
         reduce(collectedElements, getEnclosedElements(classNode, result, includeAbstract), reduce, result, addedFromClassElements, true, includeAbstract);
     }
 
+    protected abstract boolean hasAnnotation(N element, Class<? extends Annotation> annotation);
+
     private <T extends Element> void reduce(Collection<T> collectedElements,
                                             List<N> classElements,
                                             BiPredicate<T, T> reduce,
@@ -291,6 +305,9 @@ public abstract class EnclosedElementsQuery<C, N> {
                         continue classElements;
                     }
                 }
+            }
+            if (hasAnnotation(element, Vetoed.class)) {
+                continue;
             }
             T newElement = convertElement(result, element);
 
@@ -338,6 +355,9 @@ public abstract class EnclosedElementsQuery<C, N> {
                         continue enclosedElementsLoop;
                     }
                 }
+            }
+            if (hasAnnotation(enclosedElement, Vetoed.class)) {
+                continue;
             }
             T element = convertElement(result, enclosedElement);
             if (filter.test(element)) {

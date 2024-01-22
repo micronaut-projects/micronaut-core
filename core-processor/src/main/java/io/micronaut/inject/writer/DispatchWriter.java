@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -41,8 +42,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
+import static org.objectweb.asm.commons.GeneratorAdapter.EQ;
 
 /**
  * Switch based dispatch writer.
@@ -317,19 +322,9 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         builder.push(declaringTypeObject);
         builder.push(methodElement.getName());
         if (!argumentTypes.isEmpty()) {
-            int len = argumentTypes.size();
-            Iterator<ParameterElement> iter = argumentTypes.iterator();
-            pushNewArray(builder, Class.class, len);
-            for (int i = 0; i < len; i++) {
-                ParameterElement type = iter.next();
-                pushStoreInArray(
-                    builder,
-                        i,
-                        len,
-                        () -> builder.push(JavaModelUtils.getTypeReference(type))
-                );
-
-            }
+            pushNewArray(builder, Class.class, argumentTypes, parameterElement -> {
+                builder.push(JavaModelUtils.getTypeReference(parameterElement));
+            });
         } else {
             builder.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
         }
@@ -358,18 +353,20 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
     /**
      * Computes Kotlin default method mask.
      *
-     * @param writer          The writer
-     * @param argumentsPusher The argument pusher
-     * @param parameters      The arguments
-     * @param allValuesAreNull Is all parameters values are null
+     * @param writer                       The writer
+     * @param argumentValuePusher          The argument value pusher
+     * @param argumentValueIsPresentPusher The argument is present pusher
+     * @param parameters                   The arguments
      * @return The mask
      */
     public static int computeKotlinDefaultsMask(GeneratorAdapter writer,
-                                                BiConsumer<Integer, ParameterElement> argumentsPusher,
-                                                List<ParameterElement> parameters,
-                                                boolean allValuesAreNull) {
+                                                @Nullable
+                                                BiConsumer<Integer, ParameterElement> argumentValuePusher,
+                                                @Nullable
+                                                BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher,
+                                                List<ParameterElement> parameters) {
         int maskLocal = writer.newLocal(Type.INT_TYPE);
-        if (allValuesAreNull) {
+        if (argumentValueIsPresentPusher == null && argumentValuePusher == null) {
             writer.push((int) Math.pow(2, parameters.size()) - 1);
             writer.storeLocal(maskLocal);
         } else {
@@ -378,21 +375,40 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             int maskIndex = 1;
             int paramIndex = 0;
             for (ParameterElement parameter : parameters) {
-                if (parameter instanceof KotlinParameterElement kp && kp.hasDefault() && (!kp.getType().isPrimitive() || kp.getType().isArray())) {
-                    Label elseLabel = writer.newLabel();
-                    argumentsPusher.accept(paramIndex, parameter);
-                    writer.ifNonNull(elseLabel);
-                    writer.push(maskIndex);
-                    writer.loadLocal(maskLocal, Type.INT_TYPE);
-                    writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
-                    writer.storeLocal(maskLocal);
-                    writer.visitLabel(elseLabel);
+                if (parameter instanceof KotlinParameterElement kp && kp.hasDefault()) {
+                    writeMask(writer, argumentValuePusher, argumentValueIsPresentPusher, kp, paramIndex, maskIndex, maskLocal);
                 }
                 maskIndex *= 2;
                 paramIndex++;
             }
         }
         return maskLocal;
+    }
+
+    private static void writeMask(GeneratorAdapter writer,
+                                  BiConsumer<Integer, ParameterElement> argumentValuePusher,
+                                  BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher,
+                                  KotlinParameterElement kp,
+                                  int paramIndex,
+                                  int maskIndex,
+                                  int maskLocal) {
+        Label elseLabel = writer.newLabel();
+        if (argumentValueIsPresentPusher != null && argumentValueIsPresentPusher.apply(paramIndex, kp)) {
+            // Is present boolean pushed to the stack
+            writer.push(true);
+            writer.ifCmp(BOOLEAN, EQ, elseLabel);
+        } else if (kp.getType().isPrimitive() && !kp.getType().isArray()) {
+            // We cannot recognize the default from a primitive value
+            return;
+        } else {
+            argumentValuePusher.accept(paramIndex, kp);
+            writer.ifNonNull(elseLabel);
+        }
+        writer.push(maskIndex);
+        writer.loadLocal(maskLocal, Type.INT_TYPE);
+        writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
+        writer.storeLocal(maskLocal);
+        writer.visitLabel(elseLabel);
     }
 
     /**
@@ -683,7 +699,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                             writer.loadArg(2);
                             writer.push(paramIndex);
                             writer.visitInsn(AALOAD);
-                        }, argumentTypes, false);
+                        }, null, argumentTypes);
                     }
                     if (isMulti) {
                         int argCount = argumentTypes.size();
