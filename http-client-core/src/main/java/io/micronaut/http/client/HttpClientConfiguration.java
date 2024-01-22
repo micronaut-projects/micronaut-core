@@ -305,6 +305,7 @@ public abstract class HttpClientConfiguration {
      * Obtains the WebSocket compression configuration.
      *
      * @return The WebSocket compression configuration.
+     * @since 4.3.0
      */
     public abstract WebSocketCompressionConfiguration getWebSocketCompressionConfiguration();
 
