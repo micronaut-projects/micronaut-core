@@ -150,7 +150,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public @NonNull void writeTo(@NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object, @NonNull NettyWriteContext nettyContext) throws CodecException {
+    public void writeTo(@NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object, @NonNull NettyWriteContext nettyContext) throws CodecException {
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) outgoingResponse.getHeaders();
         if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);

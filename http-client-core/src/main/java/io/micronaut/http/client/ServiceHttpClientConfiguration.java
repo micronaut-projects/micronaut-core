@@ -80,14 +80,12 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
-     * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param sslConfiguration The SSL configuration
      * @param applicationConfiguration The application configuration
      */
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-            @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
@@ -100,11 +98,25 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         } else {
             this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
         }
-        if (webSocketCompressionConfiguration != null) {
-            this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
-        } else {
-            this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
-        }
+        this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param sslConfiguration The SSL configuration
+     * @param defaultHttpClientConfiguration The default HTTP client configuration
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     */
+    @Deprecated
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, new ServiceWebSocketCompressionConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
     }
 
     /**

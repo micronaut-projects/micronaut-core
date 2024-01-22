@@ -467,7 +467,7 @@ public class ConnectionManager {
                 }
 
                 try {
-                    if (configuration.getWebSocketCompressionConfiguration().isEnabled()) {
+                    if (configuration.getWebSocketCompressionConfiguration() != null && configuration.getWebSocketCompressionConfiguration().isEnabled()) {
                         ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
