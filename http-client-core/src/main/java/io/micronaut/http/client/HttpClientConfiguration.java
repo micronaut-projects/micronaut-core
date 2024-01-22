@@ -306,7 +306,10 @@ public abstract class HttpClientConfiguration {
      *
      * @return The WebSocket compression configuration.
      */
-    public abstract WebSocketCompressionConfiguration getWebSocketCompressionConfiguration();
+    @Nullable
+    public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+        return null;
+    }
 
     /**
      * @return Whether redirects should be followed
