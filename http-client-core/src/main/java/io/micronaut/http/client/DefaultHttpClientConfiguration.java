@@ -54,7 +54,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * @param applicationConfiguration The application configuration
      * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, ApplicationConfiguration)} instead.
      */
-    @Deprecated
+    @Deprecated(since = "4.3.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         this(connectionPoolConfiguration, new DefaultWebSocketCompressionConfiguration(), applicationConfiguration);
     }

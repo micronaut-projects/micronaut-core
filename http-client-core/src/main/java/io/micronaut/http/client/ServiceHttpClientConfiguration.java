@@ -110,7 +110,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param defaultHttpClientConfiguration The default HTTP client configuration
      * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
-    @Deprecated
+    @Deprecated(since = "4.3.0")
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
