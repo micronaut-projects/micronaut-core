@@ -255,7 +255,7 @@ public final class WriterUtils {
             int fromIndex = i * 32;
             List<ParameterElement> params = parameters.subList(fromIndex, Math.min(fromIndex + 32, parameters.size()));
             if (argumentValueIsPresentPusher == null && argumentValuePusher == null) {
-                writer.push((int)((long) Math.pow(2, params.size() + 1) - 1));
+                writer.push((int) ((long) Math.pow(2, params.size() + 1) - 1));
                 writer.storeLocal(maskLocal);
             } else {
                 writer.push(0);
@@ -299,6 +299,5 @@ public final class WriterUtils {
         writer.storeLocal(maskLocal);
         writer.visitLabel(elseLabel);
     }
-
 
 }
