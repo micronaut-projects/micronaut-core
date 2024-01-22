@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.processing.JavaModelUtils;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -35,12 +36,14 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getConstructorDescriptor;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getMethodDescriptor;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.getTypeReference;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArray;
 import static io.micronaut.inject.writer.AbstractClassFileWriter.pushNewArrayIndexed;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.commons.GeneratorAdapter.EQ;
 
 /**
  * The writer utils.
@@ -79,11 +82,11 @@ public final class WriterUtils {
         ).toList();
         boolean isKotlinDefault = allowKotlinDefaults && constructorArguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
 
-        int maskLocal = -1;
+        int[] masksLocal = null;
         if (isKotlinDefault) {
             // Calculate the Kotlin defaults mask
             // Every bit indicated true/false if the parameter should have the default value set
-            maskLocal = DispatchWriter.computeKotlinDefaultsMask(writer, argumentsPusher, argumentValueIsPresentPusher, constructorArguments);
+            masksLocal = computeKotlinDefaultsMask(writer, argumentsPusher, argumentValueIsPresentPusher, constructorArguments);
         }
 
         if (requiresReflection && !isCompanion) { // Companion reflection not implemented
@@ -138,8 +141,10 @@ public final class WriterUtils {
             final String constructorDescriptor = getConstructorDescriptor(constructorArguments);
             Method method = new Method("<init>", constructorDescriptor);
             if (isKotlinDefault) {
-                method = asDefaultKotlinConstructor(method);
-                writer.loadLocal(maskLocal, Type.INT_TYPE); // Bit mask of defaults
+                method = asDefaultKotlinConstructor(method, masksLocal.length);
+                for (int maskLocal : masksLocal) {
+                    writer.loadLocal(maskLocal, Type.INT_TYPE); // Bit mask of defaults
+                }
                 writer.push((String) null); // Last parameter is just a marker and is always null
             }
             writer.invokeConstructor(beanType, method);
@@ -196,13 +201,104 @@ public final class WriterUtils {
         }
     }
 
-    private static Method asDefaultKotlinConstructor(Method method) {
+    private static Method asDefaultKotlinConstructor(Method method, int numberOfMasks) {
         Type[] argumentTypes = method.getArgumentTypes();
         int length = argumentTypes.length;
-        Type[] newArgumentTypes = Arrays.copyOf(argumentTypes, length + 2);
-        newArgumentTypes[length] = Type.INT_TYPE;
-        newArgumentTypes[length + 1] = Type.getObjectType("kotlin/jvm/internal/DefaultConstructorMarker");
+        Type[] newArgumentTypes = Arrays.copyOf(argumentTypes, length + numberOfMasks + 1);
+        for (int i = 0; i < numberOfMasks; i++) {
+            newArgumentTypes[length + i] = Type.INT_TYPE;
+        }
+        newArgumentTypes[length + numberOfMasks] = Type.getObjectType("kotlin/jvm/internal/DefaultConstructorMarker");
         return new Method(method.getName(), method.getReturnType(), newArgumentTypes);
     }
+
+    /**
+     * Create a method for Kotlin default invocation.
+     * @param method The method
+     * @param declaringTypeObject The declaring type
+     * @param numberOfMasks The number of default masks
+     * @return A new method
+     */
+    static Method asDefaultKotlinMethod(Method method, Type declaringTypeObject, int numberOfMasks) {
+        Type[] argumentTypes = method.getArgumentTypes();
+        int length = argumentTypes.length;
+        Type[] newArgumentTypes = new Type[length + 2 + numberOfMasks];
+        System.arraycopy(argumentTypes, 0, newArgumentTypes, 1, length);
+        newArgumentTypes[0] = declaringTypeObject;
+        for (int i = 0; i < numberOfMasks; i++) {
+            newArgumentTypes[1 + length + i] = Type.INT_TYPE;
+        }
+        newArgumentTypes[length + 1 + numberOfMasks] = Type.getObjectType("java/lang/Object");
+        return new Method(method.getName() + "$default", method.getReturnType(), newArgumentTypes);
+    }
+
+    /**
+     * Computes Kotlin default method mask.
+     *
+     * @param writer                       The writer
+     * @param argumentValuePusher          The argument value pusher
+     * @param argumentValueIsPresentPusher The argument is present pusher
+     * @param parameters                   The arguments
+     * @return The masks
+     */
+    public static int[] computeKotlinDefaultsMask(GeneratorAdapter writer,
+                                                  @Nullable
+                                                  BiConsumer<Integer, ParameterElement> argumentValuePusher,
+                                                  @Nullable
+                                                  BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher,
+                                                  List<ParameterElement> parameters) {
+        int numberOfMasks = (int) Math.ceil(parameters.size() / 32.0);
+        int[] masksLocal = new int[numberOfMasks];
+        for (int i = 0; i < numberOfMasks; i++) {
+            int maskLocal = writer.newLocal(Type.INT_TYPE);
+            masksLocal[i] = maskLocal;
+            int fromIndex = i * 32;
+            List<ParameterElement> params = parameters.subList(fromIndex, Math.min(fromIndex + 32, parameters.size()));
+            if (argumentValueIsPresentPusher == null && argumentValuePusher == null) {
+                writer.push((int)((long) Math.pow(2, params.size() + 1) - 1));
+                writer.storeLocal(maskLocal);
+            } else {
+                writer.push(0);
+                writer.storeLocal(maskLocal);
+                int maskIndex = 1;
+                int paramIndex = 0;
+                for (ParameterElement parameter : params) {
+                    if (parameter instanceof KotlinParameterElement kp && kp.hasDefault()) {
+                        writeMask(writer, argumentValuePusher, argumentValueIsPresentPusher, kp, paramIndex, maskIndex, maskLocal);
+                    }
+                    maskIndex *= 2;
+                    paramIndex++;
+                }
+            }
+        }
+        return masksLocal;
+    }
+
+    private static void writeMask(GeneratorAdapter writer,
+                                  BiConsumer<Integer, ParameterElement> argumentValuePusher,
+                                  BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher,
+                                  KotlinParameterElement kp,
+                                  int paramIndex,
+                                  int maskIndex,
+                                  int maskLocal) {
+        Label elseLabel = writer.newLabel();
+        if (argumentValueIsPresentPusher != null && argumentValueIsPresentPusher.apply(paramIndex, kp)) {
+            // Is present boolean pushed to the stack
+            writer.push(true);
+            writer.ifCmp(BOOLEAN, EQ, elseLabel);
+        } else if (kp.getType().isPrimitive() && !kp.getType().isArray()) {
+            // We cannot recognize the default from a primitive value
+            return;
+        } else {
+            argumentValuePusher.accept(paramIndex, kp);
+            writer.ifNonNull(elseLabel);
+        }
+        writer.push(maskIndex);
+        writer.loadLocal(maskLocal, Type.INT_TYPE);
+        writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
+        writer.storeLocal(maskLocal);
+        writer.visitLabel(elseLabel);
+    }
+
 
 }
