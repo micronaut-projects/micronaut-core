@@ -967,6 +967,7 @@ public abstract class HttpClientConfiguration {
          *
          * @return True if the per message deflate extension is enabled.
          */
+        @Override
         public boolean isEnabled() {
             return enabled;
         }
