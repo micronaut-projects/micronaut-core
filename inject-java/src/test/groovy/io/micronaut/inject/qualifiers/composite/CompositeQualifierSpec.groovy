@@ -16,8 +16,8 @@
 package io.micronaut.inject.qualifiers.composite
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.Qualifier
+import io.micronaut.inject.qualifiers.PrimaryQualifier
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -46,6 +46,13 @@ class CompositeQualifierSpec extends Specification {
             all.contains(subset)
             all.contains(single)
             all.contains(Qualifiers.byQualifiers(all, single, subset, Qualifiers.byQualifiers(all, single, subset)))
+    }
+
+    void 'test find name composite qualifier'() {
+        when:
+            Qualifier all = Qualifiers.byQualifiers(PrimaryQualifier.instance(), Qualifiers.byName('ABC'))
+        then:
+            Qualifiers.findName(all) == "ABC"
     }
 
 }
