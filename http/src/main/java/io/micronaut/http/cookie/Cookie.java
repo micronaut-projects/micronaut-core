@@ -35,39 +35,38 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     /**
      * @see <a href="https://tools.ietf.org/html/rfc6265#section-4.1.1">The Secure Attribute</a>.
      */
-    String SECURE = "Secure";
+    String ATTRIBUTE_SECURE = "Secure";
 
     /**
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.6">The HttpOnly Attribute</a>.
      */
-    String HTTP_ONLY = "HttpOnly";
+    String ATTRIBUTE_HTTP_ONLY = "HttpOnly";
 
     /**
      * Controls whether a cookie is sent with cross-site requests.
      */
-    String SAME_SITE = "SameSite";
+    String ATTRIBUTE_SAME_SITE = "SameSite";
 
     /**
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.3">The Domain Attribute</a>
      */
-    String DOMAIN = "Domain";
+    String ATTRIBUTE_DOMAIN = "Domain";
 
     /**
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.4">The Path Attribute</a>.
      */
-    String PATH = "Path";
+    String ATTRIBUTE_PATH = "Path";
 
     /**
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.1">The Expires Attribute</a>.
      */
-    String EXPIRES = "Expires";
+    String ATTRIBUTE_EXPIRES = "Expires";
 
     /**
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2">The Max-Age Attribute</a>
      */
-    String MAX_AGE = "Max-Age";
-
-
+    String ATTRIBUTE_MAX_AGE = "Max-Age";
+    
     /**
      * @return The name of the cookie
      */

@@ -25,8 +25,8 @@ class DefaultServerCookieEncoderTest {
         assertEquals("SID=31d4d96e407aad42; Path=/; Secure; HttpOnly", cookieEncoder.encode(cookie).get(0));
 
         long maxAge = 2592000;
-        String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.EXPIRES + "=" + expires(maxAge);
-        String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.EXPIRES + "=" + expires(maxAge + 1); // To prevent flakiness
+        String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge);
+        String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge + 1); // To prevent flakiness
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
         String result = cookieEncoder.encode(cookie).get(0);
         assertTrue(expected.equals(result) || expected2.equals(result));

@@ -10,9 +10,6 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-import static org.junit.jupiter.api.Assertions.assertEquals
-import static org.junit.jupiter.api.Assertions.assertTrue
-
 class NettyServerCookieEncoderSpec extends Specification {
 
     void "netty server cookie encoding"() {
@@ -39,8 +36,8 @@ class NettyServerCookieEncoderSpec extends Specification {
 
         when:
         long maxAge = 2592000
-        String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.EXPIRES + "=" + expires(maxAge)
-        String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.EXPIRES + "=" + expires(maxAge + 1) // To prevent flakiness
+        String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge)
+        String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge + 1) // To prevent flakiness
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
         String result = cookieEncoder.encode(cookie).get(0);
 

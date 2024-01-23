@@ -51,23 +51,23 @@ public class DefaultServerCookieEncoder implements ServerCookieEncoder {
         StringBuilder sb = new StringBuilder();
         sb.append(cookie.getName()).append(EQUAL).append(cookie.getValue());
         if (isMaxAgeSet(cookie)) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.MAX_AGE).append(EQUAL).append(cookie.getMaxAge());
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.EXPIRES).append(EQUAL).append(expires(cookie.getMaxAge()));
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_MAX_AGE).append(EQUAL).append(cookie.getMaxAge());
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_EXPIRES).append(EQUAL).append(expires(cookie.getMaxAge()));
         }
         if (StringUtils.isNotEmpty(cookie.getPath())) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.PATH).append(EQUAL).append(cookie.getPath());
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_PATH).append(EQUAL).append(cookie.getPath());
         }
         if (StringUtils.isNotEmpty(cookie.getDomain())) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.DOMAIN).append(EQUAL).append(cookie.getDomain());
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_DOMAIN).append(EQUAL).append(cookie.getDomain());
         }
         if (cookie.isSecure()) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.SECURE);
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_SECURE);
         }
         if (cookie.isHttpOnly()) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.HTTP_ONLY);
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_HTTP_ONLY);
         }
         cookie.getSameSite().ifPresent(sameSite ->
-                sb.append(SEMICOLON).append(SPACE).append(Cookie.SAME_SITE).append(EQUAL).append(sameSite));
+                sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_SAME_SITE).append(EQUAL).append(sameSite));
         return sb.toString();
     }
 
