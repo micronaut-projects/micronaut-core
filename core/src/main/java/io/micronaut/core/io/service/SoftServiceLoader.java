@@ -181,6 +181,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             Collection<S> values,
             Predicate<S> predicate,
             String name) {
+        AotHelper.checkDynamicServiceLoad(name);
+
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
