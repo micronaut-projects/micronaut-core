@@ -186,7 +186,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets whether to allow private network.
+     * Sets whether to allow private network. Defaults to {@code true}.
      *
      * @param allowPrivateNetwork Allow private network
      */
