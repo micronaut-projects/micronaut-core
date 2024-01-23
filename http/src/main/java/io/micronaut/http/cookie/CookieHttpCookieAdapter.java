@@ -27,7 +27,7 @@ import java.util.Optional;
  * @since 4.3.0
  */
 @Internal
-public class CookieHttpCookieAdapter implements Cookie {
+class CookieHttpCookieAdapter implements Cookie {
     private static final CookieComparator COMPARATOR = new CookieComparator();
 
     private final HttpCookie httpCookie;
