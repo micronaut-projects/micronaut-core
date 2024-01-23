@@ -39,27 +39,49 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      */
     public static final String PREFIX = "micronaut.http.client";
     private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
+    private final DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration;
 
     /**
      * Default constructor.
      */
     public DefaultHttpClientConfiguration() {
         this.connectionPoolConfiguration = new DefaultConnectionPoolConfiguration();
+        this.webSocketCompressionConfiguration = new DefaultWebSocketCompressionConfiguration();
     }
 
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, ApplicationConfiguration)} instead.
+     */
+    @Deprecated(since = "4.3.0")
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
+        this(connectionPoolConfiguration, new DefaultWebSocketCompressionConfiguration(), applicationConfiguration);
+    }
+
+
+    /**
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param applicationConfiguration The application configuration
      */
     @Inject
-    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
+                                          DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+                                          ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.connectionPoolConfiguration = connectionPoolConfiguration;
+        this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
     }
 
     @Override
     public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
         return connectionPoolConfiguration;
+    }
+
+    @Override
+    public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+        return webSocketCompressionConfiguration;
     }
 
     /**
@@ -81,5 +103,14 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @BootstrapContextCompatible
     @Primary
     public static class DefaultConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
+    /**
+     * The default WebSocket compression configuration.
+     */
+    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    @BootstrapContextCompatible
+    @Primary
+    public static class DefaultWebSocketCompressionConfiguration extends WebSocketCompressionConfiguration {
     }
 }

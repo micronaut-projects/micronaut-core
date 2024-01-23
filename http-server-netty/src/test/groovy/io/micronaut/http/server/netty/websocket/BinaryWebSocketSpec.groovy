@@ -250,11 +250,69 @@ class BinaryWebSocketSpec extends Specification {
 
         fred.sendMany()
 
-        then:
+        then: "Messages were compressed"
         conditions.eventually {
             bob.replies.contains("[fred] abcdef")
         }
         interceptors.any { it.seenCompressedMessage }
+
+        cleanup:
+        fred.close()
+        bob.close()
+        wsClient.close()
+        embeddedServer.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7711')
+    void "test per-message compression disabled"() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name'            : 'test per-message compression',
+                'micronaut.server.port': -1,
+                'micronaut.http.client.ws.compression.enabled': false
+        ])
+        def cdcServer = ctx.getBean(CompressionDetectionCustomizerServer)
+        def cdcClient = ctx.getBean(CompressionDetectionCustomizerClient)
+        EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when: "a websocket connection is established"
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic: "stuff", username: "bob"]).blockFirst()
+
+
+        then: "The connection is valid"
+        fred.session != null
+        fred.session.id != null
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
+
+        cdcServer.getPipelines().size() == 2
+        cdcClient.getPipelines().size() == 2
+
+        when: "A message is sent"
+        List<MessageInterceptor> interceptors = new ArrayList<>()
+        for (ChannelPipeline pipeline : cdcServer.getPipelines() + cdcClient.getPipelines()) {
+            def interceptor = new MessageInterceptor()
+            if (pipeline.get('ws-encoder') != null) {
+                pipeline.addAfter('ws-encoder', 'MessageInterceptor', interceptor)
+            } else {
+                pipeline.addAfter('wsencoder', 'MessageInterceptor', interceptor)
+            }
+            interceptors.add(interceptor)
+        }
+
+        fred.sendMany()
+
+        then: "Messages were not compressed"
+        conditions.eventually {
+            bob.replies.contains("[fred] abcdef")
+        }
+        interceptors.every { !it.seenCompressedMessage }
 
         cleanup:
         fred.close()
