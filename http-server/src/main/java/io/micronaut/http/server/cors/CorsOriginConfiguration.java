@@ -47,6 +47,7 @@ public class CorsOriginConfiguration {
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
     private boolean allowCredentials = true;
+    private boolean allowPrivateNetwork = true;
     private Long maxAge = 1800L;
 
     /**
@@ -175,5 +176,21 @@ public class CorsOriginConfiguration {
         } else {
             this.maxAge = maxAge;
         }
+    }
+
+    /**
+     * @return Whether to allow private network
+     */
+    public boolean isAllowPrivateNetwork() {
+        return allowPrivateNetwork;
+    }
+
+    /**
+     * Sets whether to allow private network.
+     *
+     * @param allowPrivateNetwork Allow private network
+     */
+    public void setAllowPrivateNetwork(boolean allowPrivateNetwork) {
+        this.allowPrivateNetwork = allowPrivateNetwork;
     }
 }

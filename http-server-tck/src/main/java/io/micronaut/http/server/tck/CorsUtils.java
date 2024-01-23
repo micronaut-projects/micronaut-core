@@ -80,6 +80,25 @@ public final class CorsUtils {
      * @param response HTTP Response to run CORS assertions against it.
      * @param origin The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_ORIGIN}.
      * @param method The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_METHODS}.
+     * @param allowCredentials The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_CREDENTIALS}.
+     * @param allowPrivateNetwork The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK}.
+     */
+    public static void assertCorsHeaders(HttpResponse<?> response, String origin, HttpMethod method, boolean allowCredentials, boolean allowPrivateNetwork) {
+        CorsAssertion.builder()
+                .vary("Origin")
+                .allowCredentials(allowCredentials)
+                .allowOrigin(origin)
+                .allowMethods(method)
+                .maxAge("1800")
+                .allowPrivateNetwork(allowPrivateNetwork)
+                .build()
+                .validate(response);
+    }
+
+    /**
+     * @param response HTTP Response to run CORS assertions against it.
+     * @param origin The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_ORIGIN}.
+     * @param method The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_METHODS}.
      * @param maxAge The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_MAX_AGE}.
      */
     public static void assertCorsHeaders(HttpResponse<?> response, String origin, HttpMethod method, String maxAge) {

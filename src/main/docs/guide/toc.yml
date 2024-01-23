@@ -169,6 +169,7 @@ httpServer:
       corsAllowedHeaders: Allowed Headers
       corsExposedHeaders: Exposed Headers
       corsAllowCredentials: Allow Credentials
+      corsAllowPrivateNetwork: Allow Private Network
       corsMaxAge: Max Age
       corsMultipleHeaderValues: Multiple Header Values
     https: Securing the Server with HTTPS

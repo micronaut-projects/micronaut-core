@@ -36,10 +36,12 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK
 import static io.micronaut.http.HttpHeaders.ORIGIN
 import static io.micronaut.http.HttpHeaders.VARY
 
@@ -89,6 +91,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
@@ -110,6 +113,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
@@ -134,6 +138,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
     }
 
     void "test cors request with invalid method"() {
@@ -220,6 +225,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['Foo', 'Bar']
         !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
@@ -232,6 +238,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, 'true')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).blockFirst()
 
@@ -244,6 +251,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_MAX_AGE) == '150'
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'bar.com'
         response.header(VARY) == ORIGIN
+        response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) == 'true'
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
@@ -253,6 +261,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, 'true')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).onErrorResume(t -> {
@@ -320,6 +329,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
         'micronaut.server.cors.configurations.bar.maxAge': 150,
         'micronaut.server.cors.configurations.bar.allowCredentials': false,
+        'micronaut.server.cors.configurations.bar.allowPrivateNetwork': true,
         'micronaut.server.dateHeader': false]
     }
 

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * CORS assertion.
@@ -42,17 +43,19 @@ public final class CorsAssertion {
     private final List<HttpMethod> allowMethods;
 
     private final String maxAge;
+    private final String allowPrivateNetwork;
 
     private CorsAssertion(String vary,
                           String accessControlAllowCredentials,
                           String origin,
                           List<HttpMethod> allowMethods,
-                          String maxAge) {
+                          String maxAge, String allowPrivateNetwork) {
         this.vary = vary;
         this.accessControlAllowCredentials = accessControlAllowCredentials;
         this.origin = origin;
         this.allowMethods = allowMethods;
         this.maxAge = maxAge;
+        this.allowPrivateNetwork = allowPrivateNetwork;
     }
 
     /**
@@ -76,6 +79,10 @@ public final class CorsAssertion {
         if (StringUtils.isNotEmpty(maxAge)) {
             assertEquals(maxAge, response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
         }
+
+        if (StringUtils.isNotEmpty(allowPrivateNetwork)) {
+            assertEquals(allowPrivateNetwork, response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+        }
     }
 
     /**
@@ -98,6 +105,8 @@ public final class CorsAssertion {
         private List<HttpMethod> allowMethods;
 
         private String maxAge;
+
+        private String allowPrivateNetwork;
 
         /**
          *
@@ -163,6 +172,34 @@ public final class CorsAssertion {
 
         /**
          *
+         * @param allowPrivateNetwork The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK}.
+         * @return The Builder
+         */
+        public Builder allowPrivateNetwork(String allowPrivateNetwork) {
+            this.allowPrivateNetwork = accessControlAllowCredentials;
+            return this;
+        }
+
+        /**
+         *
+         * Set expectation of value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK} to {@value StringUtils#TRUE}.
+         * @return The Builder
+         */
+        public Builder allowPrivateNetwork() {
+            return allowPrivateNetwork(StringUtils.TRUE);
+        }
+
+        /**
+         *
+         * @param allowPrivateNetwork The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK}.
+         * @return The Builder
+         */
+        public Builder allowPrivateNetwork(boolean allowPrivateNetwork) {
+            return allowPrivateNetwork ? allowPrivateNetwork(StringUtils.TRUE) : allowPrivateNetwork("");
+        }
+
+        /**
+         *
          * @param maxAge The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_MAX_AGE}.
          * @return The Builder
          */
@@ -176,7 +213,7 @@ public final class CorsAssertion {
          * @return A CORS assertion.
          */
         public CorsAssertion build() {
-            return new CorsAssertion(vary, accessControlAllowCredentials, origin, allowMethods, maxAge);
+            return new CorsAssertion(vary, accessControlAllowCredentials, origin, allowMethods, maxAge, allowPrivateNetwork);
         }
     }
 }

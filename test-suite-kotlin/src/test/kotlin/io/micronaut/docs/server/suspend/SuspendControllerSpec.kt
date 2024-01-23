@@ -21,6 +21,7 @@ import io.kotest.assertions.throwables.shouldThrowExactly
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.should
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpHeaders.*
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest.GET
@@ -39,6 +40,7 @@ class SuspendControllerSpec : StringSpec() {
                 "micronaut.server.cors.enabled" to true,
                 "micronaut.server.cors.configurations.dev.allowedOrigins" to listOf("foo.com"),
                 "micronaut.server.cors.configurations.dev.allowedMethods" to listOf("GET"),
+                "micronaut.server.cors.configurations.dev.allowedPrivateNetwork" to true,
                 "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE)
             )
         )
@@ -60,10 +62,12 @@ class SuspendControllerSpec : StringSpec() {
                 OPTIONS<Any>("/suspend/greet")
                     .header(ORIGIN, origin)
                     .header(ACCESS_CONTROL_REQUEST_METHOD, method)
+                    .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
                     .header(ACCESS_CONTROL_REQUEST_HEADERS, headers)
             ).awaitSingle()
 
             optionsResponse.status shouldBe HttpStatus.OK
+            optionsResponse.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) shouldBe StringUtils.TRUE
             optionsResponse.header(ACCESS_CONTROL_ALLOW_ORIGIN) shouldBe origin
             optionsResponse.header(ACCESS_CONTROL_ALLOW_METHODS) shouldBe method.toString()
             optionsResponse.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS).joinToString(",") shouldBe headers

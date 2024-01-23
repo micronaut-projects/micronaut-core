@@ -47,6 +47,7 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
 import static io.micronaut.http.HttpHeaders.VARY

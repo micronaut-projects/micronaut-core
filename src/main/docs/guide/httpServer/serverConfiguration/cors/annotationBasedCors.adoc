@@ -14,6 +14,7 @@ The `@CrossOrigin` annotation maps with a one-to-one correspondence to applicati
 	allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
 	exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
 	allowCredentials = false,
+	allowPrivateNetwork = false,
 	maxAge = 3600
 )
 ----

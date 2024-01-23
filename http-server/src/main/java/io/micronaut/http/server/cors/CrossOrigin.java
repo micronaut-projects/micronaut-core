@@ -85,6 +85,12 @@ public @interface CrossOrigin {
 
     /**
      *
+     * @return should the browser have access to the local network
+     */
+    boolean allowPrivateNetwork() default true;
+
+    /**
+     *
      * @return maximum age (in seconds) of the cache duration for preflight responses
      */
     long maxAge() default 1800L;
