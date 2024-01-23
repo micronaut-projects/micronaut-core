@@ -11,5 +11,3 @@ snippet::io.micronaut.docs.netty.LogbookNettyClientCustomizer[tags="imports,clas
 <3> The actual customizer implements api:http.client.netty.NettyClientCustomizer[]
 <4> When a new channel is created, a new, specialized customizer is created for that channel
 <5> When the client signals that the stream pipeline has been fully constructed, the logbook handler is registered
-
-WARNING: Logbook has a https://github.com/zalando/logbook/issues/1216[major bug] that limits its usefulness with netty.

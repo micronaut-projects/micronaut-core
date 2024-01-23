@@ -133,6 +133,8 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'foo',
         ]
+        cleanup:
+        ctx.close()
     }
 
     def 'tls alpn http 2'() {
@@ -210,6 +212,8 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'foo',
         ]
+        cleanup:
+        ctx.close()
     }
 
     def 'tls alpn http 1'() {
@@ -274,6 +278,9 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'foo',
         ]
+
+        cleanup:
+        ctx.close()
     }
 
     def 'h2c do not upgrade'() {
@@ -335,9 +342,11 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'POST /logbook/logged',
                 'bar',
                 '200',
-                // second response body not included because of logbook bug: https://github.com/zalando/logbook/issues/1216
-                //'bar',
+                'bar',
         ]
+
+        cleanup:
+        ctx.close()
     }
 
     def 'h2c with upgrade'() {
@@ -423,6 +432,9 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'bar',
         ]
+
+        cleanup:
+        ctx.close()
     }
 
     @Requires(property = 'spec.name', value = 'LogbookNettyServerCustomizerSpec')
@@ -468,6 +480,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
     }
 
     @Controller("/logbook/logged")
+    @Requires(property = 'spec.name', value = 'LogbookNettyServerCustomizerSpec')
     static class LoggedController {
         @Get("/")
         @Produces(MediaType.TEXT_PLAIN)
