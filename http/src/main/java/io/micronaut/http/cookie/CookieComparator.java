@@ -19,7 +19,7 @@ import java.util.Comparator;
 
 /**
  * {@link Comparator} for {@link Cookie}.
- * Implementation mimics implementation of Netty {@link io.netty.handler.codec.http.cookie.DefaultCookie#compareTo(io.netty.handler.codec.http.cookie.Cookie)}.
+ * Implementation mimics implementation of Netty `io.netty.handler.codec.http.cookie.DefaultCookie#compareTo(io.netty.handler.codec.http.cookie.Cookie)`.
  * @author Sergio del Amo
  * @since 4.3.0
  */
