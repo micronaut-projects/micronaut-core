@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 public class DefaultClientCookieEncoder implements ClientCookieEncoder {
     private static final String EQUAL = "=";
+    
     @Override
     public String encode(Cookie cookie) {
         return cookie.getName() + EQUAL + (cookie.getValue() != null ? cookie.getValue() : "");
