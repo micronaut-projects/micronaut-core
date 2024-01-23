@@ -180,6 +180,7 @@ public class CorsOriginConfiguration {
 
     /**
      * @return Whether to allow private network
+     * @since 4.3.0
      */
     public boolean isAllowPrivateNetwork() {
         return allowPrivateNetwork;
@@ -189,6 +190,7 @@ public class CorsOriginConfiguration {
      * Sets whether to allow private network. Defaults to {@code true}.
      *
      * @param allowPrivateNetwork Allow private network
+     * @since 4.3.0
      */
     public void setAllowPrivateNetwork(boolean allowPrivateNetwork) {
         this.allowPrivateNetwork = allowPrivateNetwork;

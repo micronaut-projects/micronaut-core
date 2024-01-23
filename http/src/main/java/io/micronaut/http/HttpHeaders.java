@@ -104,6 +104,7 @@ public interface HttpHeaders extends Headers {
 
     /**
      * {@code "Access-Control-Allow-Private-Network"}.
+     * @since 4.3.0
      */
     String ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK = "Access-Control-Allow-Private-Network";
 
@@ -129,6 +130,7 @@ public interface HttpHeaders extends Headers {
 
     /**
      * {@code "Access-Control-Request-Private-Network"}.
+     * @since 4.3.0
      */
     String ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK = "Access-Control-Request-Private-Network";
 
