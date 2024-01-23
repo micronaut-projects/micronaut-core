@@ -54,10 +54,12 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
 import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
@@ -250,7 +252,18 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowCredentials()) {
-            response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, Boolean.toString(true));
+            response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, StringUtils.TRUE);
+        }
+    }
+
+    /**
+     * Sets the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK} in the response to {@code true}, if the {@link CorsOriginConfiguration#isAllowPrivateNetwork()} is {@code true}.
+     * @param config   The {@link CorsOriginConfiguration} instance
+     * @param response The {@link MutableHttpResponse} object
+     */
+    protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+        if (config.isAllowPrivateNetwork()) {
+            response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
         }
     }
 
@@ -401,6 +414,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             .ifPresent(methods -> setAllowMethods(methods, response));
         headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING)
             .ifPresent(val -> setAllowHeaders(val, response));
+        headers.getFirst(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, ConversionContext.BOOLEAN)
+                .ifPresent(value -> setAllowPrivateNetwork(config, response));
         setMaxAge(config.getMaxAge(), response);
     }
 

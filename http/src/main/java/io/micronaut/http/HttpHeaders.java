@@ -103,6 +103,13 @@ public interface HttpHeaders extends Headers {
     String ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
 
     /**
+     * {@code "Access-Control-Allow-Private-Network"}.
+     * @see <a href="https://developer.chrome.com/blog/private-network-access-preflight">Private Network Access</a>
+     * @since 4.3.0
+     */
+    String ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK = "Access-Control-Allow-Private-Network";
+
+    /**
      * {@code "Access-Control-Expose-Headers"}.
      */
     String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
@@ -121,6 +128,13 @@ public interface HttpHeaders extends Headers {
      * {@code "Access-Control-Request-Method"}.
      */
     String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+
+    /**
+     * {@code "Access-Control-Request-Private-Network"}.
+     * @see <a href="https://developer.chrome.com/blog/private-network-access-preflight">Private Network Access</a>
+     * @since 4.3.0
+     */
+    String ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK = "Access-Control-Request-Private-Network";
 
     /**
      * {@code "Age"}.
@@ -528,6 +542,7 @@ public interface HttpHeaders extends Headers {
         ACCESS_CONTROL_MAX_AGE,
         ACCESS_CONTROL_REQUEST_HEADERS,
         ACCESS_CONTROL_REQUEST_METHOD,
+        ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK,
         AGE,
         ALLOW,
         AUTHORIZATION,

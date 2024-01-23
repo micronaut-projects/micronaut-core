@@ -68,6 +68,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
 
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
+    private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
@@ -97,6 +98,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         } else {
             this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
         }
+        this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
     }
 
     /**
@@ -106,11 +108,31 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param connectionPoolConfiguration The connection pool configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     */
+    @Deprecated(since = "4.3.0")
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, new ServiceWebSocketCompressionConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param sslConfiguration The SSL configuration
+     * @param defaultHttpClientConfiguration The default HTTP client configuration
      */
     @Inject
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
@@ -122,6 +144,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             this.connectionPoolConfiguration = connectionPoolConfiguration;
         } else {
             this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
+        }
+        if (webSocketCompressionConfiguration != null) {
+            this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
+        } else {
+            this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
         }
     }
 
@@ -248,11 +275,23 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         return connectionPoolConfiguration;
     }
 
+    @Override
+    public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+        return webSocketCompressionConfiguration;
+    }
+
     /**
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
+    /**
+     * The default WebSocket compression configuration.
+     */
+    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    public static class ServiceWebSocketCompressionConfiguration extends WebSocketCompressionConfiguration {
     }
 
     /**

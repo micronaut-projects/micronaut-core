@@ -16,8 +16,6 @@ dependencies {
     compileOnly libs.managed.netty.transport.native.kqueue
     compileOnly libs.managed.netty.transport.native.iouring
     compileOnly project(":websocket")
-
-    api(project(":http-cookie-netty"))
     api project(":http")
     api project(":buffer-netty")
 

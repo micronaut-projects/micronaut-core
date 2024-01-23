@@ -1,9 +1,10 @@
 package io.micronaut.management.health.indicator.client
 
+
 import io.micronaut.discovery.StaticServiceInstanceList
 import io.micronaut.health.HealthStatus
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.ServiceHttpClientConfiguration
-import io.micronaut.runtime.ApplicationConfiguration
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
@@ -13,7 +14,10 @@ class ServiceHttpClientHealthIndicatorSpec extends Specification {
     def static uri2 = new URI("http://localhost:8081")
     def instanceList = new StaticServiceInstanceList("some-http-service", [uri1, uri2])
 
-    def serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", null, null, GroovyMock(ApplicationConfiguration))
+    ServiceHttpClientConfiguration.ServiceConnectionPoolConfiguration connectionPoolConfiguration = null
+    ServiceHttpClientConfiguration.ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration = null
+    ServiceHttpClientConfiguration.ServiceSslClientConfiguration sslConfiguration = null
+    ServiceHttpClientConfiguration serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", connectionPoolConfiguration, webSocketCompressionConfiguration, sslConfiguration, Mock(HttpClientConfiguration))
 
     def "Health Indicator is set to true and is healthy"() {
         given:

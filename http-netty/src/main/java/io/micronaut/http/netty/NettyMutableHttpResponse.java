@@ -34,7 +34,7 @@ import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
@@ -50,8 +50,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
-
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,8 +64,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
 public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
-    private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
-
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
@@ -78,8 +74,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     private final DecoderResult decoderResult;
     private final ConversionService conversionService;
     private MutableConvertibleValues<Object> attributes;
-    private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
-
     private final BodyConvertor bodyConvertor = newBodyConvertor();
     private MessageBodyWriter<B> messageBodyWriter;
 
@@ -258,12 +252,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie nettyCookie) {
-            String value = serverCookieEncoder.encode(nettyCookie.getNettyCookie());
-            headers.add(HttpHeaderNames.SET_COOKIE, value);
-        } else {
-            throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
-        }
+        ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> headers.add(HttpHeaderNames.SET_COOKIE, c));
         return this;
     }
 
@@ -318,20 +307,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     public MutableHttpResponse<B> contentType(MediaType mediaType) {
         headers.contentType(mediaType);
         return this;
-    }
-
-    /**
-     * @return Server cookie encoder
-     */
-    public ServerCookieEncoder getServerCookieEncoder() {
-        return serverCookieEncoder;
-    }
-
-    /**
-     * @param serverCookieEncoder Server cookie encoder
-     */
-    public void setServerCookieEncoder(ServerCookieEncoder serverCookieEncoder) {
-        this.serverCookieEncoder = serverCookieEncoder;
     }
 
     @NonNull

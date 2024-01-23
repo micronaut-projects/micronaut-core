@@ -1,0 +1,13 @@
+Access from https://developer.chrome.com/blog/private-network-access-preflight[private network] is allowed by default for CORS requests. To disallow acces from local network, set the `allow-private-network` option to `false`.
+
+.Example CORS Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allow-private-network: false
+----

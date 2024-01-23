@@ -136,4 +136,38 @@ class KotlinBeanIntrospectionSpec {
         assertEquals("88", test4.invoke(instance3, null))
         assertEquals("99", test4.invoke(instance3, 99))
     }
+
+    @Test
+    fun testALotOfParams() {
+        val introspection = BeanIntrospection.getIntrospection(TestEntity5::class.java)
+        val bean = introspection.instantiate()
+        for (beanProperty in introspection.beanProperties) {
+            assertEquals(beanProperty.name, beanProperty.get(bean))
+        }
+        assertEquals("s1", bean.s1)
+        assertEquals("s2", bean.s2)
+        assertEquals("s3", bean.s3)
+        assertEquals("s4", bean.s4)
+        assertEquals("s5", bean.s5)
+        assertEquals("s6", bean.s6)
+        assertEquals("s5", bean.s5)
+        assertEquals("s50", bean.s50)
+    }
+
+    @Test
+    fun testALotOfParams2() {
+        val introspection = BeanIntrospection.getIntrospection(TestEntity6::class.java)
+        val bean = introspection.instantiate()
+        for (beanProperty in introspection.beanProperties) {
+            assertEquals(beanProperty.name, beanProperty.get(bean))
+        }
+        assertEquals("s1", bean.s1)
+        assertEquals("s2", bean.s2)
+        assertEquals("s3", bean.s3)
+        assertEquals("s4", bean.s4)
+        assertEquals("s5", bean.s5)
+        assertEquals("s6", bean.s6)
+        assertEquals("s5", bean.s5)
+        assertEquals("s32", bean.s32)
+    }
 }
