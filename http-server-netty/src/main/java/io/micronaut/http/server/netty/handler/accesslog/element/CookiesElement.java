@@ -15,10 +15,9 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
-
 import java.util.List;
 import java.util.StringJoiner;
 
@@ -74,17 +73,17 @@ final class CookiesElement extends AbstractHttpMessageLogElement {
     protected String value(HttpHeaders headers) {
         final String header = headers.get(headerName);
         if (header != null) {
-            final List<Cookie> cookies = ServerCookieDecoder.STRICT.decodeAll(header);
+            final List<Cookie> cookies = ServerCookieDecoder.INSTANCE.decode(header);
             if (cookies.isEmpty()) {
                 return ConstantElement.UNKNOWN_VALUE;
             }
             if (cookies.size() == 1) {
                 final Cookie cookie = cookies.iterator().next();
-                return cookie.name() + ':' + cookie.value();
+                return cookie.getName() + ':' + cookie.getValue();
             }
             final StringJoiner joiner = new StringJoiner(",", "[", "]");
             for (Cookie cookie: cookies) {
-                joiner.add(cookie.name() + ':' + cookie.value());
+                joiner.add(cookie.getName() + ':' + cookie.getValue());
             }
             return joiner.toString();
         }

@@ -55,6 +55,20 @@ public class NettyCookie implements Cookie {
     }
 
     /**
+     *
+     * @param cookie Micronaut Cookie
+     */
+    public NettyCookie(Cookie cookie) {
+        this(cookie.getName(), cookie.getValue());
+        domain(cookie.getDomain());
+        path(cookie.getPath());
+        maxAge(cookie.getMaxAge());
+        httpOnly(cookie.isHttpOnly());
+        secure(cookie.isSecure());
+        cookie.getSameSite().ifPresent(this::sameSite);
+    }
+
+    /**
      * @return The Netty cookie
      */
     public io.netty.handler.codec.http.cookie.Cookie getNettyCookie() {
