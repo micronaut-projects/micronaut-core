@@ -22,7 +22,7 @@ import java.net.HttpCookie;
  * @author Sergio del Amo
  * @since 4.3.0
  */
-public class HttpCookieFactory implements CookieFactory {
+public final class HttpCookieFactory implements CookieFactory {
     @Override
     public Cookie create(String name, String value) {
         return new CookieHttpCookieAdapter(new HttpCookie(name, value));

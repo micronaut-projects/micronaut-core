@@ -33,7 +33,7 @@ import java.util.List;
  * @since 4.4.0
  */
 @Internal
-public class DefaultServerCookieEncoder implements ServerCookieEncoder {
+public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     private static final String SPACE = " ";
     private static final String EQUAL = "=";
     private static final String SEMICOLON = ";";

@@ -28,7 +28,7 @@ import static io.netty.handler.codec.http.cookie.ServerCookieDecoder.LAX;
  * @since 4.3.0
  */
 @Internal
-public class NettyLaxServerCookieDecoder implements ServerCookieDecoder {
+public final class NettyLaxServerCookieDecoder implements ServerCookieDecoder {
     @Override
     @NonNull
     public List<Cookie> decode(@NonNull String headerValue) {

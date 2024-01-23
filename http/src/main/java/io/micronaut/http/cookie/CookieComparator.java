@@ -23,7 +23,7 @@ import java.util.Comparator;
  * @author Sergio del Amo
  * @since 4.3.0
  */
-public class CookieComparator implements Comparator<Cookie> {
+public final class CookieComparator implements Comparator<Cookie> {
     @Override
     public int compare(Cookie o1, Cookie o2) {
         int v = o1.getName().compareTo(o2.getName());

@@ -26,7 +26,7 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 4.3.0
  */
-public class DefaultServerCookieDecoder implements ServerCookieDecoder {
+public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
     @Override
     @NonNull
     public List<Cookie> decode(@NonNull String header) {

@@ -25,7 +25,7 @@ import static io.netty.handler.codec.http.cookie.ClientCookieEncoder.LAX;
  * @author Sergio del Amo
  * @since 4.3.0
  */
-public class NettyLaxClientCookieEncoder implements ClientCookieEncoder {
+public final class NettyLaxClientCookieEncoder implements ClientCookieEncoder {
 
     @Override
     public String encode(Cookie cookie) {

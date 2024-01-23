@@ -30,7 +30,7 @@ import static io.netty.handler.codec.http.cookie.ServerCookieEncoder.STRICT;
  * @since 4.3.0
  */
 @Internal
-public class NettyServerCookieEncoder implements ServerCookieEncoder {
+public final class NettyServerCookieEncoder implements ServerCookieEncoder {
     @Override
     public List<String> encode(@NonNull Cookie... cookies) {
         return Arrays.stream(cookies)

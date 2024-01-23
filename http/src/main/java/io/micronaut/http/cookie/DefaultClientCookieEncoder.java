@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.Internal;
  * @since 4.3.0
  */
 @Internal
-public class DefaultClientCookieEncoder implements ClientCookieEncoder {
+public final class DefaultClientCookieEncoder implements ClientCookieEncoder {
     private static final String EQUAL = "=";
     
     @Override
