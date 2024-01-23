@@ -21,7 +21,7 @@ import io.micronaut.core.util.StringUtils;
 
 import java.net.HttpCookie;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -37,7 +37,6 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     private static final String SPACE = " ";
     private static final String EQUAL = "=";
     private static final String SEMICOLON = ";";
-    private static final ZoneId GMT_ZONE = ZoneId.of("GMT");
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
 
     @Override
@@ -81,8 +80,8 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     }
 
     private static String expires(Long maxAgeSeconds) {
-        LocalDateTime localDateTime = LocalDateTime.now(GMT_ZONE).plusSeconds(maxAgeSeconds);
-        ZonedDateTime gmtDateTime = ZonedDateTime.of(localDateTime, GMT_ZONE);
+        LocalDateTime localDateTime = LocalDateTime.now(ZoneOffset.UTC).plusSeconds(maxAgeSeconds);
+        ZonedDateTime gmtDateTime = ZonedDateTime.of(localDateTime, ZoneOffset.UTC);
         return gmtDateTime.format(FORMATTER);
     }
 
