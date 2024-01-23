@@ -22,7 +22,9 @@ import io.micronaut.http.HttpRequest;
 
 import java.util.Optional;
 
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
 
 /**
  * Utility methods for CORS.
@@ -43,6 +45,10 @@ public final class CorsUtil {
     public static boolean isPreflightRequest(HttpRequest<?> request) {
         HttpHeaders headers = request.getHeaders();
         Optional<String> origin = request.getOrigin();
-        return origin.isPresent() && headers.contains(ACCESS_CONTROL_REQUEST_METHOD) && HttpMethod.OPTIONS == request.getMethod();
+        return origin.isPresent()
+                && HttpMethod.OPTIONS == request.getMethod()
+                && (headers.contains(ACCESS_CONTROL_REQUEST_METHOD)
+                    || headers.contains(ACCESS_CONTROL_REQUEST_HEADERS)
+                    || headers.contains(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK));
     }
 }
