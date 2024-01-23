@@ -20,7 +20,9 @@ import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 
 /**
- *
+ * Encodes a {@link Cookie} into a String. Typically used to set the {@link io.micronaut.http.HttpHeaders#COOKIE} value for example in an HTTP Client.
+ * The cookie gets serialized by concatenating the cookie's name, the %x3D ("=") character, and the cookie's value.
+ * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>.
  * @author Sergio del Amo
  * @since 4.3.0
  */
@@ -35,6 +37,13 @@ public interface ClientCookieEncoder {
             .map(ServiceDefinition::load)
             .orElse(null);
 
+    /**
+     * Encodes a {@link Cookie} into a String. Typically used to set the {@link io.micronaut.http.HttpHeaders#COOKIE} value for example in an HTTP Client.
+     * The cookie gets serialized by concatenating the cookie's name, the %x3D ("=") character, and the cookie's value.
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>.
+     * @param cookie Cookie to encode
+     * @return The cookie serialized into a string by concatenating the cookie's name, the %x3D ("=") character, and the cookie's value.
+     */
     @NonNull
     String encode(@NonNull Cookie cookie);
 }
