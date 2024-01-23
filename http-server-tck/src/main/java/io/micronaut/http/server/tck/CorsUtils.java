@@ -83,7 +83,11 @@ public final class CorsUtils {
      * @param allowCredentials The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_CREDENTIALS}.
      * @param allowPrivateNetwork The expected value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK}.
      */
-    public static void assertCorsHeaders(HttpResponse<?> response, String origin, HttpMethod method, boolean allowCredentials, boolean allowPrivateNetwork) {
+    public static void assertCorsHeaders(HttpResponse<?> response,
+                                         String origin,
+                                         HttpMethod method,
+                                         boolean allowCredentials,
+                                         boolean allowPrivateNetwork) {
         CorsAssertion.builder()
                 .vary("Origin")
                 .allowCredentials(allowCredentials)
