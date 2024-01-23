@@ -24,12 +24,49 @@ import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
- * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.
+ * An interface representing a Cookie. See .
+ * @see <a href="https://tools.ietf.org/html/rfc6265">RFC6265</a>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface Cookie extends Comparable<Cookie>, Serializable {
+
+    /**
+     * @see <a href="https://tools.ietf.org/html/rfc6265#section-4.1.1">The Secure Attribute</a>.
+     */
+    String SECURE = "Secure";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.6">The HttpOnly Attribute</a>.
+     */
+    String HTTP_ONLY = "HttpOnly";
+
+    /**
+     * Controls whether a cookie is sent with cross-site requests.
+     */
+    String SAME_SITE = "SameSite";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.3">The Domain Attribute</a>
+     */
+    String DOMAIN = "Domain";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.4">The Path Attribute</a>.
+     */
+    String PATH = "Path";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.1">The Expires Attribute</a>.
+     */
+    String EXPIRES = "Expires";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2">The Max-Age Attribute</a>
+     */
+    String MAX_AGE = "Max-Age";
+
 
     /**
      * @return The name of the cookie
@@ -140,12 +177,33 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     @NonNull Cookie secure(boolean secure);
 
     /**
+     * Sets this cookie as secure.
+     * @return This Cookie
+     * @since 4.3.0
+     */
+    @NonNull
+    default Cookie secure() {
+        return secure(true);
+    }
+
+    /**
      * Sets whether the cookie is HTTP-Only.
      *
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
      */
     @NonNull Cookie httpOnly(boolean httpOnly);
+
+    /**
+     * Sets this cookie as HTTP-Only.
+     *
+     * @return This cookie
+     * @since 4.3.0
+     */
+    @NonNull
+    default Cookie httpOnly() {
+        return httpOnly(true);
+    }
 
     /**
      * Configure the Cookie with the given configuration.
