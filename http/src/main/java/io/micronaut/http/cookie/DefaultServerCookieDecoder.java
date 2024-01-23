@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.cookie;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.net.HttpCookie;
@@ -26,6 +27,7 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 4.3.0
  */
+@Internal
 public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
     @Override
     @NonNull

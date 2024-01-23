@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.cookie;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.net.HttpCookie;
 
 /**
@@ -22,6 +24,7 @@ import java.net.HttpCookie;
  * @author Sergio del Amo
  * @since 4.3.0
  */
+@Internal
 public final class HttpCookieFactory implements CookieFactory {
     @Override
     public Cookie create(String name, String value) {

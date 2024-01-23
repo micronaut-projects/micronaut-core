@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.cookies;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 
@@ -25,6 +26,7 @@ import static io.netty.handler.codec.http.cookie.ClientCookieEncoder.LAX;
  * @author Sergio del Amo
  * @since 4.3.0
  */
+@Internal
 public final class NettyLaxClientCookieEncoder implements ClientCookieEncoder {
 
     @Override
