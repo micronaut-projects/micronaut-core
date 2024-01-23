@@ -8,6 +8,6 @@ class ServerCookieDecoderTest {
 
     @Test
     void serverCookieDecoderResolvedViaSpi() {
-        assertInstanceOf(ServerCookieDecoder.class, ServerCookieDecoder.INSTANCE);
+        assertInstanceOf(DefaultServerCookieDecoder.class, ServerCookieDecoder.INSTANCE);
     }
 }
