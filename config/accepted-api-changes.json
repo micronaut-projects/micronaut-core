@@ -348,5 +348,65 @@
     "type": "io.micronaut.core.graal.AutomaticFeatureUtils",
     "member": "Constructor io.micronaut.core.graal.AutomaticFeatureUtils()",
     "reason": "Was deprecated"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Constructor io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference()",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanContextConditional",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.beans.BeanInfo",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataDelegate",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.QualifiedBeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.type.ArgumentCoercible",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinitionReference",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
   }
 ]
