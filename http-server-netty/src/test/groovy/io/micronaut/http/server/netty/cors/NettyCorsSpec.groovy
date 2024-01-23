@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.cors
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -238,7 +239,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
-                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, 'true')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).blockFirst()
 
@@ -251,7 +252,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_MAX_AGE) == '150'
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'bar.com'
         response.header(VARY) == ORIGIN
-        response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) == 'true'
+        response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) == StringUtils.TRUE
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
@@ -261,7 +262,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
-                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, 'true')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).onErrorResume(t -> {
