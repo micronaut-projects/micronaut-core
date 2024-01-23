@@ -22,6 +22,8 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":core-reactive")
     testImplementation project(":inject-java-test")
+    testImplementation libs.logback.classic
+
 }
 
 spotless {
