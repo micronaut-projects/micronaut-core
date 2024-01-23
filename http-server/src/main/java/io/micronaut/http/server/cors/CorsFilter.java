@@ -257,6 +257,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     /**
+     * Sets the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK} in the response to {@code true}, if the {@link CorsOriginConfiguration#isAllowPrivateNetwork()} is {@code true}.
      * @param config   The {@link CorsOriginConfiguration} instance
      * @param response The {@link MutableHttpResponse} object
      */
