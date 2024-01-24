@@ -41,6 +41,7 @@ public final class CrossOriginUtil {
     public static final String MEMBER_EXPOSED_HEADERS = "exposedHeaders";
     public static final String MEMBER_ALLOWED_METHODS = "allowedMethods";
     public static final String MEMBER_ALLOW_CREDENTIALS = "allowCredentials";
+    public static final String MEMBER_ALLOW_PRIVATE_NETWORK = "allowPrivateNetwork";
     public static final String MEMBER_MAX_AGE = "maxAge";
 
     private CrossOriginUtil() {
@@ -85,6 +86,8 @@ public final class CrossOriginUtil {
 
         annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOW_CREDENTIALS)
             .ifPresent(config::setAllowCredentials);
+        annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOW_PRIVATE_NETWORK)
+                .ifPresent(config::setAllowPrivateNetwork);
         annotationMetadata.longValue(CrossOrigin.class, MEMBER_MAX_AGE)
             .ifPresent(config::setMaxAge);
         return Optional.of(config);

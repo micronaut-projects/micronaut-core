@@ -41,12 +41,17 @@ public class CorsOriginConfiguration {
      */
     public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
+    /**
+     * Default value for allow private network.
+     */
+    public static final boolean DEFAULT_ALLOW_PRIVATE_NETWORK = true;
     private List<String> allowedOrigins = ANY;
     private String allowedOriginsRegex;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
     private boolean allowCredentials = true;
+    private boolean allowPrivateNetwork = DEFAULT_ALLOW_PRIVATE_NETWORK;
     private Long maxAge = 1800L;
 
     /**
@@ -175,5 +180,23 @@ public class CorsOriginConfiguration {
         } else {
             this.maxAge = maxAge;
         }
+    }
+
+    /**
+     * @return Whether to allow private network
+     * @since 4.3.0
+     */
+    public boolean isAllowPrivateNetwork() {
+        return allowPrivateNetwork;
+    }
+
+    /**
+     * Sets whether to allow private network. Defaults to {@code #DEFAULT_ALLOW_PRIVATE_NETWORK}.
+     *
+     * @param allowPrivateNetwork Allow private network
+     * @since 4.3.0
+     */
+    public void setAllowPrivateNetwork(boolean allowPrivateNetwork) {
+        this.allowPrivateNetwork = allowPrivateNetwork;
     }
 }

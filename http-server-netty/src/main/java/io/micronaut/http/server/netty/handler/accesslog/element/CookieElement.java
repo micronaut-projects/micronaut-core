@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 
 /**
  * CookieElement LogElement. A cookie.
@@ -55,9 +55,9 @@ final class CookieElement extends AbstractHttpMessageLogElement {
     protected String value(HttpHeaders headers) {
         String header = headers.get(headerName);
         if (header != null) {
-            for (Cookie cookie: ServerCookieDecoder.STRICT.decodeAll(header)) {
-                if (cookieName.equals(cookie.name())) {
-                    return cookie.value();
+            for (Cookie cookie: ServerCookieDecoder.INSTANCE.decode(header)) {
+                if (cookieName.equals(cookie.getName())) {
+                    return cookie.getValue();
                 }
             }
         }

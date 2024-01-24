@@ -19,10 +19,10 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,17 +58,10 @@ public class NettyCookies implements Cookies {
         String value = nettyHeaders.get(HttpHeaderNames.COOKIE);
         if (value != null) {
             cookies = new LinkedHashMap<>();
-            Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.LAX.decode(value);
-            for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
-                String cookiePath = nettyCookie.path();
-                if (cookiePath != null) {
-                    if (path.startsWith(cookiePath)) {
-                        cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
-                    }
-                } else {
-                    cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
-                }
-            }
+            ServerCookieDecoder.INSTANCE.decode(value)
+                    .stream()
+                    .filter(cookie -> cookie.getPath() == null || path.startsWith(cookie.getPath()))
+                    .forEach(cookie -> cookies.put(cookie.getName(), cookie));
         } else {
             cookies = Collections.emptyMap();
         }

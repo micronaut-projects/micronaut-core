@@ -275,6 +275,41 @@ public class CrossOriginTest {
     }
 
     /**
+     * The Access-Control-Allow-Private-Network response header tells browsers whether to access in private network.
+     * @see <a href="https://wicg.github.io/private-network-access">Access-Control-Allow-Private-Network</a>
+     */
+    @Test
+    void defaultAccessControlAllowPrivateNetworkValueIsSet() throws IOException {
+        asserts(SPECNAME,
+                preflight(UriBuilder.of("/privateNetwork").path("foo"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> {
+                            assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, false);
+                            assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                        })
+                        .build()));
+    }
+
+    /**
+     * The Access-Control-Allow-Private-Network response header tells browsers whether to access in private network.
+     * @see <a href="https://wicg.github.io/private-network-access">Access-Control-Allow-Private-Network</a>
+     */
+    @Test
+    void accessControlAllowPrivateNetworkValueIsSet() throws IOException {
+        asserts(SPECNAME,
+                preflight(UriBuilder.of("/privateNetwork").path("bar"), "https://foo.com", HttpMethod.GET, true),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> {
+                            assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, true);
+                            assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                            assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                        })
+                        .build()));
+    }
+
+    /**
      * The Access-Control-Max-Age response header indicates how long the results of a preflight request (that is the information contained in the Access-Control-Allow-Methods and Access-Control-Allow-Headers headers) can be cached.
      * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Max-Age">Access-Control-Max-Age</a>
      */
@@ -393,14 +428,28 @@ public class CrossOriginTest {
     }
 
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
-        return preflight(uriBuilder.build(), originValue, method);
+        return preflight(uriBuilder, originValue, method, false);
+    }
+
+    private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method, boolean allowPrivateNetwork) {
+        return preflight(uriBuilder.build(), originValue, method, allowPrivateNetwork);
     }
 
     private static MutableHttpRequest<?> preflight(URI uri, String originValue, HttpMethod method) {
-        return HttpRequest.OPTIONS(uri)
+        return preflight(uri, originValue, method, false);
+    }
+
+    private static MutableHttpRequest<?> preflight(URI uri, String originValue, HttpMethod method, boolean allowPrivateNetwork) {
+        var request = HttpRequest.OPTIONS(uri)
             .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
             .header(HttpHeaders.ORIGIN, originValue)
             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
+
+        if (allowPrivateNetwork) {
+            request.header(HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, method);
+        }
+
+        return request;
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
@@ -531,6 +580,29 @@ public class CrossOriginTest {
 
         @CrossOrigin(
             value = "https://foo.com"
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String bar() {
+            return "bar";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/privateNetwork")
+    static class PrivateNetwork {
+        @CrossOrigin(
+                value = "https://foo.com",
+                allowPrivateNetwork = false
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foo")
+        String foo() {
+            return "foo";
+        }
+
+        @CrossOrigin(
+                value = "https://foo.com"
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")

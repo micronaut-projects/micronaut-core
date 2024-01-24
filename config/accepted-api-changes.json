@@ -348,5 +348,741 @@
     "type": "io.micronaut.core.graal.AutomaticFeatureUtils",
     "member": "Constructor io.micronaut.core.graal.AutomaticFeatureUtils()",
     "reason": "Was deprecated"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Constructor io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference()",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanContextConditional",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.beans.BeanInfo",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataDelegate",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.QualifiedBeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.type.ArgumentCoercible",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.cookie.$SameSiteConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinitionReference",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils",
+    "member": "Constructor io.micronaut.ast.groovy.utils.AstGenericUtils()",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Constructor io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface java.lang.Cloneable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface org.codehaus.groovy.runtime.GeneratedClosure",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface java.util.concurrent.Callable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface groovy.lang.GroovyCallable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface java.lang.Runnable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_carryForwardTypeArguments_closure2",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Constructor io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface java.lang.Cloneable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface org.codehaus.groovy.runtime.GeneratedClosure",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface java.util.concurrent.Callable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface groovy.lang.GroovyCallable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface java.lang.Runnable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.utils.AstGenericUtils$_resolveInterfaceGenericType_closure1",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Constructor io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference()",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanContextConditional",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.beans.BeanInfo",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataDelegate",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.QualifiedBeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.core.type.ArgumentCoercible",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanType",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.http.server.cors.$CorsOriginConverter$Definition$Reference",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinitionReference",
+    "reason": "No longer a bean since https://github.com/micronaut-projects/micronaut-core/pull/10315"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$10",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$10",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Field includeAllBeans",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Field classLoader",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Field files",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Field env",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.BeanContext",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.attr.MutableAttributeHolder",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.event.ApplicationEventPublisher",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataResolver",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.BeanDefinitionRegistry",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.value.ValueResolver",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.LifeCycle",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface java.lang.AutoCloseable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.InitializableBeanContext",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.attr.AttributeHolder",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.ExecutionHandleLocator",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.ApplicationContext",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.value.PropertyResolver",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface java.io.Closeable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.env.PropertyPlaceholderResolver",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.core.convert.ConversionServiceProvider",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4",
+    "member": "Implemented interface io.micronaut.context.BeanLocator",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Constructor io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1(java.lang.Object,java.lang.Object)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface java.lang.Cloneable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface org.codehaus.groovy.runtime.GeneratedClosure",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface java.util.concurrent.Callable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface groovy.lang.GroovyCallable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface java.lang.Runnable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure1",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Constructor io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2(java.lang.Object,java.lang.Object,groovy.lang.Reference)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface java.lang.Cloneable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface org.codehaus.groovy.runtime.GeneratedClosure",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface java.util.concurrent.Callable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface groovy.lang.GroovyCallable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface java.lang.Runnable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$4$_resolveBeanDefinitionReferences_closure2",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5",
+    "member": "Field visitors",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5",
+    "member": "Implemented interface java.io.Closeable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5",
+    "member": "Implemented interface java.lang.AutoCloseable",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$1",
+    "member": "Field visitors",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$1",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$1",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$1",
+    "member": "Implemented interface javax.annotation.processing.Processor",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$2",
+    "member": "Field visitors",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$2",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$2",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$5$2",
+    "member": "Implemented interface javax.annotation.processing.Processor",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$6",
+    "member": "Field stream",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$6",
+    "member": "Field className",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$7",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$7",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$8",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$8",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$9",
+    "member": "Field __$stMC",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.test.AbstractTypeElementSpec$9",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.AbstractKotlinMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.AbstractKotlinMethodElement(io.micronaut.kotlin.processing.visitor.KotlinNativeElement,java.lang.String,io.micronaut.inject.ast.ClassElement,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.AbstractKotlinPropertyAccessorMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.AbstractKotlinPropertyAccessorMethodElement(io.micronaut.kotlin.processing.visitor.KotlinNativeElement,com.google.devtools.ksp.symbol.KSPropertyAccessor,com.google.devtools.ksp.symbol.Visibility,io.micronaut.inject.ast.ClassElement,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.AbstractKotlinPropertyElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.AbstractKotlinPropertyElement(io.micronaut.kotlin.processing.visitor.KotlinNativeElement,io.micronaut.inject.ast.ClassElement,java.lang.String,boolean,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinConstructorElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinConstructorElement(io.micronaut.inject.ast.ClassElement,com.google.devtools.ksp.symbol.KSFunctionDeclaration,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinMethodElement(io.micronaut.inject.ast.ClassElement,com.google.devtools.ksp.symbol.KSFunctionDeclaration,java.util.List,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinMethodElement(io.micronaut.inject.ast.ClassElement,com.google.devtools.ksp.symbol.KSFunctionDeclaration,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinPropertyElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinPropertyElement(io.micronaut.inject.ast.ClassElement,com.google.devtools.ksp.symbol.KSPropertyDeclaration,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinPropertyGetterMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinPropertyGetterMethodElement(io.micronaut.inject.ast.ClassElement,io.micronaut.kotlin.processing.visitor.KotlinPropertyElement,com.google.devtools.ksp.symbol.KSPropertyGetter,java.util.List,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinPropertySetterMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinPropertySetterMethodElement(io.micronaut.inject.ast.ClassElement,io.micronaut.kotlin.processing.visitor.KotlinPropertyElement,com.google.devtools.ksp.symbol.KSPropertySetter,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinPropertySetterMethodElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinPropertySetterMethodElement(io.micronaut.inject.ast.ClassElement,io.micronaut.kotlin.processing.visitor.KotlinPropertyElement,com.google.devtools.ksp.symbol.KSPropertySetter,java.util.List,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyElement(io.micronaut.inject.ast.ClassElement,io.micronaut.inject.ast.ClassElement,java.lang.String,io.micronaut.inject.ast.FieldElement,io.micronaut.inject.ast.MethodElement,io.micronaut.inject.ast.MethodElement,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext,boolean,int,kotlin.jvm.internal.DefaultConstructorMarker)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyElement",
+    "member": "Constructor io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyElement(io.micronaut.inject.ast.ClassElement,io.micronaut.inject.ast.ClassElement,java.lang.String,io.micronaut.inject.ast.FieldElement,io.micronaut.inject.ast.MethodElement,io.micronaut.inject.ast.MethodElement,io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory,io.micronaut.kotlin.processing.visitor.KotlinVisitorContext,boolean)",
+    "reason": "Changed at https://github.com/micronaut-projects/micronaut-core/pull/10342"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Constructor io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef()",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$BuildSelfSignedCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Constructor io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef()",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$CertificateProvidedSslBuilder$SelfSignedNotConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Constructor io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef()",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SelfSignedSslBuilder$SelfSignedConfigured$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Constructor io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef()",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.ssl.$SslEnabledCondition$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Constructor io.micronaut.http.client.tck.tests.$Person$IntrospectionRef()",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
+    "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
+    "reason": "Introspection changes"
   }
+
 ]

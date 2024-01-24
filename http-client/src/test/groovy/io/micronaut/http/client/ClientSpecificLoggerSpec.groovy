@@ -3,6 +3,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.client.DefaultHttpClientConfiguration.DefaultWebSocketCompressionConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.runtime.ApplicationConfiguration
@@ -54,15 +55,25 @@ class ClientSpecificLoggerSpec extends Specification {
 
         private final DefaultHttpClientConfiguration.DefaultConnectionPoolConfiguration connectionPoolConfiguration
 
+        private final DefaultHttpClientConfiguration.DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration
+
         @Inject
-        ClientTwoHttpConfiguration(ApplicationConfiguration applicationConfiguration, DefaultHttpClientConfiguration.DefaultConnectionPoolConfiguration connectionPoolConfiguration) {
+        ClientTwoHttpConfiguration(ApplicationConfiguration applicationConfiguration,
+                                   DefaultHttpClientConfiguration.DefaultConnectionPoolConfiguration connectionPoolConfiguration,
+                                   DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration) {
             super(applicationConfiguration)
             this.connectionPoolConfiguration = connectionPoolConfiguration
+            this.webSocketCompressionConfiguration = webSocketCompressionConfiguration
         }
 
         @Override
         ConnectionPoolConfiguration getConnectionPoolConfiguration() {
             return this.connectionPoolConfiguration
+        }
+
+        @Override
+        WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+            return this.webSocketCompressionConfiguration
         }
 
         @Override

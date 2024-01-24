@@ -26,15 +26,14 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
 import java.util.Optional;
 
@@ -140,14 +139,9 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public synchronized MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie nettyCookie) {
-            // this is a response cookie, encode with server encoder
-            String value = ServerCookieEncoder.STRICT.encode(nettyCookie.getNettyCookie());
-            headers.add(HttpHeaderNames.SET_COOKIE, value);
-            nettyCookies = null; // need to rebuild cookie map
-        } else {
-            throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
-        }
+        ServerCookieEncoder.INSTANCE.encode(cookie)
+                .forEach(cookieEncoded -> headers.add(HttpHeaderNames.SET_COOKIE, cookieEncoded));
+        nettyCookies = null; // need to rebuild cookie map
         return this;
     }
 

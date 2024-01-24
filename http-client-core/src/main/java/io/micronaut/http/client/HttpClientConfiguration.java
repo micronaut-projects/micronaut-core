@@ -98,7 +98,6 @@ public abstract class HttpClientConfiguration {
     /**
      * The default value.
      */
-    @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
     /**
@@ -300,6 +299,17 @@ public abstract class HttpClientConfiguration {
      */
     public void setSslConfiguration(SslConfiguration sslConfiguration) {
         this.sslConfiguration = sslConfiguration;
+    }
+
+    /**
+     * Obtains the WebSocket compression configuration.
+     *
+     * @return The WebSocket compression configuration.
+     * @since 4.3.0
+     */
+    @Nullable
+    public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+        return null;
     }
 
     /**
@@ -934,4 +944,42 @@ public abstract class HttpClientConfiguration {
         }
     }
 
+    /**
+     * Configuration for WebSocket client compression extensions.
+     */
+    public static class WebSocketCompressionConfiguration implements Toggleable {
+
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "ws.compression";
+
+        /**
+         * The default enable value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_ENABLED = true;
+
+        private boolean enabled = DEFAULT_ENABLED;
+
+        /**
+         * Whether deflate compression is enabled for client WebSocket connections.
+         *
+         * @return True if the per message deflate extension is enabled.
+         */
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether the per message deflate extension is enabled for WebSocket connections.
+         * Default value ({@link io.micronaut.http.client.HttpClientConfiguration.WebSocketCompressionConfiguration#DEFAULT_ENABLED}).
+         *
+         * @param enabled True is it is enabled.
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
 }
