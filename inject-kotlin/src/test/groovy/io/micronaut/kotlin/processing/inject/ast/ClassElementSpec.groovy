@@ -2587,6 +2587,7 @@ class SomeInner {
             return
         }
         type.getAnnotationNames()
+        type.getTypeAnnotationMetadata().getAnnotationNames()
         initializeAllTypeArguments0(type.getType(), level + 1)
         initializeAllTypeArguments0(type.getGenericType(), level + 1)
         type.getAllTypeArguments().entrySet().forEach { e1 ->
