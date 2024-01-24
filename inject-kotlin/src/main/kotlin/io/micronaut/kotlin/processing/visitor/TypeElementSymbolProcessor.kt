@@ -88,6 +88,8 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
             loadedVisitors = ArrayList(typeElementVisitors!!.size)
             visitorContext = KotlinVisitorContext(environment, resolver)
             start()
+        } else {
+            visitorContext.resolver = resolver
         }
 
         if (loadedVisitors.isNotEmpty()) {

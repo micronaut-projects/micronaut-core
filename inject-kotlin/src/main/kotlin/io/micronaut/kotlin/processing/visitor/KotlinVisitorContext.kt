@@ -50,7 +50,7 @@ import kotlin.collections.ArrayList
 @OptIn(KspExperimental::class)
 internal open class KotlinVisitorContext(
     private val environment: SymbolProcessorEnvironment,
-    val resolver: Resolver
+    var resolver: Resolver
 ) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>
