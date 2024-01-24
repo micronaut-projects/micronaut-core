@@ -833,7 +833,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      */
     protected static void pushBoxPrimitiveIfNecessary(Type fieldType, GeneratorAdapter injectMethodVisitor) {
         if (JavaModelUtils.isPrimitive(fieldType)) {
-            injectMethodVisitor.box(fieldType);
+            injectMethodVisitor.valueOf(fieldType);
         }
     }
 
