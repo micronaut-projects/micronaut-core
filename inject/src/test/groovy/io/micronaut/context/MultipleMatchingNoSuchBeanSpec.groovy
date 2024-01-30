@@ -5,10 +5,12 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import jakarta.inject.Singleton
+import spock.lang.Issue
 import spock.lang.Specification
 
 class MultipleMatchingNoSuchBeanSpec extends Specification {
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/10429")
     def "multiple possible beans, but none matching failure message doesn't throw an exception"() {
         given:
         def ctx = ApplicationContext.run('spec.name': 'MultipleMatchingNoSuchBeanSpec')
