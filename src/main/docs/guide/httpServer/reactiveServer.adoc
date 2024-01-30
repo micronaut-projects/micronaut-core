@@ -14,7 +14,7 @@ micronaut:
       nThreads: 75
 ----
 
-To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest is to use the ann:scheduling.annotation.ExecuteOn[] annotation, which can be declared at the type or method level to indicate which configured thread pool to run the method(s) of the controller on:
+To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest is to use the ann:scheduling.annotation.ExecuteOn[] annotation, which can be applied only to either a ann:http.annotation.Controller[] or ann:http.annotation.Filter[] at the type or method level. It indicates the configured thread pool to run method(s) of the controller or filter on:
 
 snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
 
