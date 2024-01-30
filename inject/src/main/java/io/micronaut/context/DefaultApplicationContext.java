@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -319,7 +320,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         Collection<BeanDefinition<T>> beanCandidates = findBeanCandidates(resolutionContext, beanType, false, definition -> !definition.isAbstract())
-            .stream().sorted().toList();
+            .stream().sorted(Comparator.comparing(BeanDefinition::getName)).toList();
         for (BeanDefinition<T> definition : beanCandidates) {
             if (definition != null && definition.isIterable()) {
                 if (definition.hasDeclaredAnnotation(EachProperty.class)) {
