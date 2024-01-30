@@ -620,8 +620,7 @@ public final class RouteExecutor {
             Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
                 MutableHttpResponse<?> singleResponse;
                 if (isCompletable || routeInfo.isVoid()) {
-                    singleResponse = forStatus(routeInfo, HttpStatus.OK)
-                        .header(HttpHeaders.CONTENT_LENGTH, "0");
+                    singleResponse = voidResponse(routeInfo);
                 } else {
                     singleResponse = newNotFoundError(request);
                 }
@@ -674,6 +673,11 @@ public final class RouteExecutor {
         return processPublisherBody(propagatedContext, request, response, routeInfo);
     }
 
+    private MutableHttpResponse<Object> voidResponse(RouteInfo<?> routeInfo) {
+        return forStatus(routeInfo, HttpStatus.OK)
+            .header(HttpHeaders.CONTENT_LENGTH, "0");
+    }
+
     @NonNull
     private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(@NonNull HttpRequest<?> request,
                                                                         @NonNull Object body,
@@ -709,6 +713,9 @@ public final class RouteExecutor {
                     .body(asyncBody);
             }
             if (mutableResponse.body() == null) {
+                if (routeInfo.isVoid()) {
+                    return CompletableFuture.completedStage(voidResponse(routeInfo));
+                }
                 return CompletableFuture.completedStage(newNotFoundError(request));
             }
             return CompletableFuture.completedStage(mutableResponse);

@@ -143,7 +143,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             this.consumesMediaTypes = consumesMediaTypes;
             consumesMediaTypesContainsAll = this.consumesMediaTypes.contains(MediaType.ALL_TYPE);
         }
-        this.imperative = isVoid || !suspended && !reactive && !async && !returnType.getType().equals(Object.class)
+        this.imperative = returnType.getType() == void.class || !suspended && !reactive && !async && !returnType.getType().equals(Object.class)
             && (returnType.getType().getPackageName().startsWith("java.") || BeanIntrospector.SHARED.findIntrospection(returnType.getType()).isPresent());
     }
 
