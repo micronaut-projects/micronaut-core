@@ -534,6 +534,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return readNestedAnnotationValue(annotationElement, annotationType, new HashMap<>());
     }
 
+    /**
+     * @param annotationElement The annotation element
+     * @param annotationType    The annotation type
+     * @param resolvedDefaults resoldved defaults
+     * @return The annotation value
+     */
     protected AnnotationValue<?> readNestedAnnotationValue(T annotationElement, A annotationType, Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         final String annotationTypeName = getAnnotationTypeName(annotationType);
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);

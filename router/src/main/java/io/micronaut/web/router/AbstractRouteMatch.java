@@ -96,7 +96,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
             this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
         }
-        if (methodExecutionHandle instanceof UnsafeExecutionHandle<?,?>) {
+        if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
             unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
         } else {
             unsafeMethodExecutionHandle = null;

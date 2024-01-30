@@ -17,7 +17,11 @@ package io.micronaut.inject.test.external;
 
 import io.micronaut.context.annotation.Value;
 
+/**
+ * Configuration class for tests.
+ */
 public class ExternalConfiguration {
+
     private final String endpoint;
     private final boolean wrapped;
     private final int leaseMinRenewalSeconds;
