@@ -53,7 +53,6 @@ import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -195,7 +194,6 @@ class AccessLogSpec extends Specification {
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
-    @PendingFeature
     def 'http1.1 continue status'() {
         given:
         def ctx = ApplicationContext.run([
