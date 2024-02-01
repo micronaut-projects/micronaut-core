@@ -19,9 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.util.AbstractMap;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -195,7 +197,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextImpl ctx = this;
         ThreadContext.set(ctx);
         if (containsThreadElements) {
-            List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = ctx.updateThreadState();
+            Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = ctx.updateThreadState();
             return () -> {
                 ctx.restoreState(threadState);
                 if (prevCtx == null) {
@@ -208,19 +210,19 @@ final class PropagatedContextImpl implements PropagatedContext {
         return restore;
     }
 
-    private List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> updateThreadState() {
-        List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = new ArrayList<>(elements.length);
+    private Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> updateThreadState() {
+        Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = new ArrayDeque<>(elements.length);
         for (PropagatedContextElement element : elements) {
             if (isThreadElement(element)) {
                 ThreadPropagatedContextElement<Object> threadPropagatedContextElement = (ThreadPropagatedContextElement<Object>) element;
                 Object state = threadPropagatedContextElement.updateThreadContext();
-                threadState.add(new AbstractMap.SimpleEntry<>(threadPropagatedContextElement, state));
+                threadState.push(new AbstractMap.SimpleEntry<>(threadPropagatedContextElement, state));
             }
         }
         return threadState;
     }
 
-    private void restoreState(List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState) {
+    private void restoreState(Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState) {
         for (Map.Entry<ThreadPropagatedContextElement<Object>, Object> e : threadState) {
             ThreadPropagatedContextElement<Object> threadPropagatedContextElement = e.getKey();
             threadPropagatedContextElement.restoreThreadContext(e.getValue());
