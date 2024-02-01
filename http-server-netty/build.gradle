@@ -91,7 +91,7 @@ dependencies {
     }
     testImplementation(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
-            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+            classifier = Os.isArch("aarch64") ? "linux-aarch_64" : "linux-x86_64"
         }
     }
     testImplementation libs.logback.classic

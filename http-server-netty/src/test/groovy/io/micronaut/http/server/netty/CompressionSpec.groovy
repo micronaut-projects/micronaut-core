@@ -60,6 +60,38 @@ class CompressionSpec extends Specification {
         HttpHeaderValues.SNAPPY    | new SnappyFrameDecoder()
     }
 
+    def compressionLevel(int threshold, int actual, boolean compressed) {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'CompressionSpec', 'micronaut.server.netty.compression-threshold': threshold])
+        def server = ctx.getBean(EmbeddedServer).start()
+
+        byte[] uncompressed = new byte[actual]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        ctx.getBean(Ctrl).data = uncompressed
+
+        def connection = new URL("$server.URI/compress").openConnection()
+        connection.addRequestProperty("Accept-Encoding", "gzip")
+
+        when:
+        byte[] data = connection.inputStream.readAllBytes()
+        then:
+        connection.getHeaderField("Content-Encoding") == (compressed ? "gzip" : null)
+        compressed ? (data.length != actual) : (data.length == actual)
+
+        cleanup:
+        connection.inputStream.close()
+        server.stop()
+        ctx.close()
+
+        where:
+        threshold | actual | compressed
+        0         | 0      | false // special case
+        0         | 1      | true
+        1         | 0      | false
+        1         | 1      | true
+        -1        | 10000  | false
+    }
+
     @Requires(property = "spec.name", value = "CompressionSpec")
     @Controller
     static class Ctrl {

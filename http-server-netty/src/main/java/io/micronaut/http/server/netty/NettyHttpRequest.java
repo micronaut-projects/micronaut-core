@@ -20,8 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -163,6 +165,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+
+    /**
+     * ONLY for NettyBodyAnnotationBinder use.
+     */
+    @Internal
+    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}

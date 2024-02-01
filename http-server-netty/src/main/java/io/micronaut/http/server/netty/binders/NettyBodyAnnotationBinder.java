@@ -40,8 +40,6 @@ import java.util.List;
 import java.util.Optional;
 
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
-    private static final CharSequence ATTR_CONVERTIBLE_BODY = "NettyBodyAnnotationBinder.convertibleBody";
-
     final HttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
@@ -68,13 +66,13 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (!(source instanceof NettyHttpRequest<?> nhr)) {
             return super.bindFullBodyConvertibleValues(source);
         }
-        Optional<Object> existing = nhr.getAttribute(ATTR_CONVERTIBLE_BODY);
-        if (existing.isPresent()) {
-            return (BindingResult<ConvertibleValues<?>>) existing.get();
+        BindingResult<ConvertibleValues<?>> existing = nhr.convertibleBody;
+        if (existing != null) {
+            return existing;
         } else {
             //noinspection unchecked
             BindingResult<ConvertibleValues<?>> result = (BindingResult<ConvertibleValues<?>>) bindFullBody((ArgumentConversionContext<T>) ConversionContext.of(ConvertibleValues.class), nhr);
-            nhr.setAttribute(ATTR_CONVERTIBLE_BODY, result);
+            nhr.convertibleBody = result;
             return result;
         }
     }
