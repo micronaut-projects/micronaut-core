@@ -3427,6 +3427,36 @@ interface SpecificInterface {
         declaredMethods.get(0).isDefault() == true
     }
 
+    void "test overridden methods"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
+
+import java.util.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+@jakarta.inject.Singleton
+class Test implements TestBase {
+    @Override
+    public void map(Map<@NotBlank String, List<@NotNull String>> list) {
+    }
+}
+
+interface TestBase {
+    @io.micronaut.context.annotation.Executable
+    void map(Map<String, List<@NotBlank String>> list);
+}
+
+''')
+        when:
+        def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+        declaredMethods.size() == 1
+        declaredMethods.get(0).getOverriddenMethods()[0].getDeclaringType().getName() == "test.TestBase"
+        declaredMethods.get(0).getOverriddenMethods()[0].getParameters()[0].getGenericType().getTypeArguments(Map).get("V").getTypeArguments(List).get("E").getAnnotationNames().toList() == ['jakarta.validation.constraints.NotBlank$List']
+    }
+
     void "test bean properties interfaces"() {
         def ce = buildClassElement('''
 package test;

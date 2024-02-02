@@ -359,7 +359,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             .stream()
             .map(overriddenMethod -> new JavaMethodElement(
                     owningType,
-                    new JavaNativeElement.Method(executableElement),
+                    new JavaNativeElement.Method(overriddenMethod),
                     elementAnnotationMetadataFactory,
                     visitorContext
                 )
