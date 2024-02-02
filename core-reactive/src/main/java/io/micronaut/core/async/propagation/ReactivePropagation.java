@@ -51,7 +51,7 @@ public final class ReactivePropagation {
                 public void subscribe(CoreSubscriber<? super T> subscriber) {
                     CorePublisher<T> actualCorePublisher = (CorePublisher<T>) actual;
                     try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actualCorePublisher.subscribe(subscriber);
+                        actualCorePublisher.subscribe(propagate(propagatedContext, subscriber));
                     }
                 }
 
@@ -62,14 +62,14 @@ public final class ReactivePropagation {
                         return;
                     }
                     try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actual.subscribe(subscriber);
+                        actual.subscribe(propagate(propagatedContext, subscriber));
                     }
                 }
             };
         }
         return subscriber -> {
             try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                actual.subscribe(subscriber);
+                actual.subscribe(propagate(propagatedContext, subscriber));
             }
         };
     }

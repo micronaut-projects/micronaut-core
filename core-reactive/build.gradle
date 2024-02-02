@@ -9,6 +9,8 @@ dependencies {
 
     compileOnly libs.managed.reactor
     compileOnly libs.managed.kotlinx.coroutines.core
+
+    testImplementation libs.managed.reactor
 }
 
 tasks.named("compileKotlin") {
