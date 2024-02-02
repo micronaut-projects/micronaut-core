@@ -168,6 +168,88 @@ class PropagatedContextSpec extends Specification {
             assert PropagatedContext.getOrEmpty().allElements.size() == 0
     }
 
+    def "test restoring thread context"() {
+        given:
+        String before = ''
+        String inside, after
+        CONTEXT_NAME_HOLDER.set(before)
+        PropagatedContext context = PropagatedContext.empty()
+                .plus(new SetContextName('one', strict))
+                .plus(new SetContextName('two', strict))
+
+        when:
+        try (def ignore = context.propagate()) {
+            inside = currentContextName
+        }
+        after = currentContextName
+
+        then:
+        inside == 'two'
+        after == before
+
+        where:
+        strict << [false, true]
+    }
+
+    def "test restoring thread context in a chain"() {
+        given:
+        String before = ''
+        String firstIn, firstOut, secondIn, secondOut
+        CONTEXT_NAME_HOLDER.set(before)
+
+        when:
+        try (def ignore1 = PropagatedContext.empty().plus(new SetContextName('first', strict)).propagate()) {
+            firstIn = currentContextName
+            try (def ignore2 = PropagatedContext.get().plus(new SetContextName('second', strict)).propagate()) {
+                secondIn = currentContextName
+            }
+            secondOut = currentContextName
+        }
+        firstOut = currentContextName
+
+        then:
+        firstIn == 'first'
+        secondIn == 'second'
+        secondOut == 'first'
+        firstOut == before
+
+        where:
+        strict << [false, true]
+    }
+
     static class PropagatedElement implements PropagatedContextElement {
+    }
+
+    static final ThreadLocal<String> CONTEXT_NAME_HOLDER = ThreadLocal.withInitial { '' }
+
+    static String getCurrentContextName() {
+        return CONTEXT_NAME_HOLDER.get()
+    }
+
+    static record SetContextName(String name, boolean strict) implements ThreadPropagatedContextElement<String> {
+
+        @Override
+        String updateThreadContext() {
+            String current = getCurrentContextName()
+            CONTEXT_NAME_HOLDER.set(name)
+            return current
+        }
+
+        @Override
+        void restoreThreadContext(String oldState) {
+            String current = getCurrentContextName()
+            if (name == current) {
+                CONTEXT_NAME_HOLDER.set(oldState)
+            } else {
+                handleIncorrectContext(current)
+            }
+        }
+
+        private void handleIncorrectContext(String currentContextName) {
+            if (strict) {
+                throw new IllegalStateException("Expected to be in context: $name but was: $currentContextName")
+            }
+            // otherwise: ignore silently
+        }
     }
 }
