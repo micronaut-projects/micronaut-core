@@ -3426,7 +3426,6 @@ interface SpecificInterface {
         declaredMethods.size() == 1
         declaredMethods.get(0).isDefault() == true
     }
-
     void "test bean properties interfaces"() {
         def ce = buildClassElement('''
 package test;

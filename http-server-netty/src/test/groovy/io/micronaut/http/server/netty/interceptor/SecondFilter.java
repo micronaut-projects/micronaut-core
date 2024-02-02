@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -29,6 +30,7 @@ import org.spockframework.util.Assert;
  * @since 1.0
  */
 @Filter("/secure**")
+@Requires(property = "spec.name", pattern = "HttpFilterSpec|HttpFilterContextPathSpec")
 public class SecondFilter implements HttpFilter {
     @Override
     public int getOrder() {

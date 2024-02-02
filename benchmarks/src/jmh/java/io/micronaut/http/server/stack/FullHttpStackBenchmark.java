@@ -128,7 +128,6 @@ public class FullHttpStackBenchmark {
             //System.out.println(response.content().toString(StandardCharsets.UTF_8));
             Assertions.assertEquals(HttpResponseStatus.OK, response.status());
             Assertions.assertEquals("application/json", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
-            Assertions.assertEquals("keep-alive", response.headers().get(HttpHeaderNames.CONNECTION));
             String expectedResponseBody = "{\"listIndex\":4,\"stringIndex\":0}";
             Assertions.assertEquals(expectedResponseBody, response.content().toString(StandardCharsets.UTF_8));
             Assertions.assertEquals(expectedResponseBody.length(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
@@ -164,7 +163,8 @@ public class FullHttpStackBenchmark {
                 ApplicationContext ctx = ApplicationContext.run(Map.of(
                     "spec.name", "FullHttpStackBenchmark",
                     //"micronaut.server.netty.server-type", NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT,
-                    "micronaut.server.date-header", false // disabling this makes the response identical each time
+                    "micronaut.server.date-header", false, // disabling this makes the response identical each time
+                    "micronaut.server.netty.optimized-routing", true
                 ));
                 EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
                 EmbeddedChannel channel = ((NettyHttpServer) server).buildEmbeddedChannel(false);

@@ -28,6 +28,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -99,6 +100,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
         }
         return null;
+    }
+
+    @Override
+    public Optional<MatchRule> pathMatchRule() {
+        //noinspection OptionalOfNullableMisuse
+        return Optional.ofNullable(uriMatchTemplate.getExactPath().<MatchRule>map(MatchRule.PathMatchExact::new)
+                .orElseGet(() -> new MatchRule.PathMatchPattern(uriMatchTemplate.getMatchPattern().orElse(null))));
     }
 
     @Override

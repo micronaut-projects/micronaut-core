@@ -96,6 +96,18 @@ public class FilterRunner {
     }
 
     /**
+     * Check whether the given filter is a cors filter. This is an internal hook that is used to
+     * optimize cors filter processing.
+     *
+     * @param genericHttpFilter The filter to check
+     * @param corsFilterClass   The cors filter class as it's in a different module
+     * @return {@code true} iff this is the cors filter
+     */
+    public static boolean isCorsFilter(GenericHttpFilter genericHttpFilter, Class<?> corsFilterClass) {
+        return genericHttpFilter instanceof MethodFilter<?> mf && mf.method().getDeclaringType() == corsFilterClass;
+    }
+
+    /**
      * Transform a response, e.g. by replacing an error response with an exception. Called before
      * every filter.
      *

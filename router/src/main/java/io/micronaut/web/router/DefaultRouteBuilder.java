@@ -44,6 +44,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.shortcircuit.MatchRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -926,7 +927,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public UriRoute exposedPort(int port) {
             this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
+            where(new MatchRule.ServerPort(port));
             DefaultRouteBuilder.this.exposedPorts.add(port);
             return this;
         }

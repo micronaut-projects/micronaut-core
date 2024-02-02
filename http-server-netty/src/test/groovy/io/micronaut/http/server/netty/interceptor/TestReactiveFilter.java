@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -28,6 +29,7 @@ import reactor.core.publisher.Flux;
  * @since 1.0
  */
 @Filter("/secure**")
+@Requires(property = "spec.name", pattern = "HttpFilterSpec|HttpFilterContextPathSpec")
 public class TestReactiveFilter implements HttpServerFilter{
 
     @Override

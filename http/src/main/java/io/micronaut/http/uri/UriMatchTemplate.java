@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
@@ -215,6 +216,34 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             }
         }
         return null;
+    }
+
+    /**
+     * Get the exact matched path.
+     *
+     * @return The path to match or {@link Optional#empty()} if this is not an exact match
+     */
+    @Internal
+    public Optional<String> getExactPath() {
+        if (!exactMatch) {
+            return Optional.empty();
+        }
+        if (isRoot) {
+            return Optional.of("");
+        } else {
+            return Optional.of(templateString);
+        }
+    }
+
+    /**
+     * Get the regex matched path.
+     *
+     * @return The pattern to match or {@link Optional#empty()} if this is not an exact match
+     */
+    @Nullable
+    @Internal
+    public Optional<Pattern> getMatchPattern() {
+        return Optional.ofNullable(matchPattern);
     }
 
     @Override
