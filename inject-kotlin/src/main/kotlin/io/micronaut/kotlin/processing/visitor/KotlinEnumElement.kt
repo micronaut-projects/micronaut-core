@@ -45,6 +45,7 @@ internal class KotlinEnumElement(
 
     override fun elements() = declaration.declarations
         .filterIsInstance<KSClassDeclaration>()
+        .filter { ksClassDeclaration -> !ksClassDeclaration.isCompanionObject }
         .map { ksClassDeclaration ->
             KotlinEnumConstantElement(
                 this,
