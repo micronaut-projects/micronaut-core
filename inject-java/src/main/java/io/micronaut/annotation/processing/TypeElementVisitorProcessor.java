@@ -44,6 +44,8 @@ import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -278,7 +280,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 try {
                     loadedVisitor.getVisitor().finish(javaVisitorContext);
                 } catch (Throwable e) {
-                    error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+                    StringWriter stackTraceWriter = new StringWriter();
+                    e.printStackTrace(new PrintWriter(stackTraceWriter));
+
+                    error("Error finalizing type visitor [%s]: %s\n%s",
+                        loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
                 }
             }
         }
