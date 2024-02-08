@@ -64,7 +64,8 @@ dependencies {
     testImplementation libs.managed.groovy.json
     testImplementation libs.managed.groovy.templates
     // tag::testcontainers-dependencies[]
-    testImplementation libs.testcontainers.spock
+    testImplementation(platform(libs.micronaut.test.resources.bom))
+    testImplementation(libs.testcontainers.core)
     // end::testcontainers-dependencies[]
     testImplementation libs.awaitility
 

@@ -44,6 +44,7 @@ micronaut-validation = "4.2.0"
 micronaut-rxjava2 = "2.2.1"
 micronaut-rxjava3 = "3.2.0"
 micronaut-reactor = "3.2.1"
+micronaut-test-resources = "2.3.3"
 neo4j-java-driver = "5.15.0"
 selenium = "4.9.1"
 slf4j = "2.0.12"
@@ -51,7 +52,6 @@ smallrye = "6.2.6"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.19.4"
 vertx = "3.9.16"
 wiremock = "2.33.2"
 
@@ -227,6 +227,7 @@ micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-pr
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
+micronaut-test-resources-bom = { module = "io.micronaut.testresources:micronaut-test-resources-bom", version.ref = "micronaut-test-resources" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
@@ -262,7 +263,7 @@ micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-bra
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
 
-testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
+testcontainers-core = { module = "org.testcontainers:testcontainers" }
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
