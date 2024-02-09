@@ -347,25 +347,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.index = index;
             this.methodReference = methodReference;
             this.annotationMetadata = annotationMetadata;
-            this.arguments = new Argument[methodReference.arguments.length];
-            boolean foundExpressions = false;
-            Argument<?>[] methodArguments = methodReference.arguments;
-            for (int i = 0; i < methodArguments.length; i++) {
-                Argument<?> argument = methodArguments[i];
-                AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
-                AnnotationMetadata wrappedArgumentAnnotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argumentAnnotationMetadata);
-                if (argumentAnnotationMetadata == wrappedArgumentAnnotationMetadata) {
-                    arguments[i] = argument;
-                } else {
-                    foundExpressions = true;
-                    if (argument instanceof GenericPlaceholder<?> genericPlaceholder) {
-                        arguments[i] = Argument.ofTypeVariable(argument.getType(), argument.getName(), genericPlaceholder.getVariableName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
-                    } else {
-                        arguments[i] = Argument.of(argument.getType(), argument.getName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
-                    }
-                }
-            }
-            this.argumentsAnnotationsWithExpressions = foundExpressions;
+            MethodArguments methodArguments = methodArguments(methodReference);
+            this.arguments = methodArguments.arguments;
+            this.argumentsAnnotationsWithExpressions = methodArguments.argumentsAnnotationsWithExpressions;
         }
 
         @Override
@@ -505,6 +489,30 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
         }
 
+        private record MethodArguments(Argument<?>[] arguments, boolean argumentsAnnotationsWithExpressions) {
+        }
+
+        private MethodArguments methodArguments(MethodReference methodReference) {
+            final Argument<?>[] arguments= new Argument[methodReference.arguments.length];
+            boolean foundExpressions = false;
+            Argument<?>[] methodArguments = methodReference.arguments;
+            for (int i = 0; i < methodArguments.length; i++) {
+                Argument<?> argument = methodArguments[i];
+                AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
+                AnnotationMetadata wrappedArgumentAnnotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argumentAnnotationMetadata);
+                if (argumentAnnotationMetadata == wrappedArgumentAnnotationMetadata) {
+                    arguments[i] = argument;
+                } else {
+                    foundExpressions = true;
+                    if (argument instanceof GenericPlaceholder<?> genericPlaceholder) {
+                        arguments[i] = Argument.ofTypeVariable(argument.getType(), argument.getName(), genericPlaceholder.getVariableName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    } else {
+                        arguments[i] = Argument.of(argument.getType(), argument.getName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    }
+                }
+            }
+            return new MethodArguments(arguments, foundExpressions);
+        }
     }
 
     /**
