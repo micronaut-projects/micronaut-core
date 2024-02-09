@@ -35,9 +35,59 @@ class ParameterExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
             def bean = ctx.getBean(ctx.getClassLoader().loadClass("tst.MyBean"))
             def beanDefinition = ctx.getBeanDefinition(ctx.getClassLoader().loadClass("tst.MyBean"))
+        when:
             def av = beanDefinition.getRequiredMethod("doStuff", String.class).getArguments()[0].getAnnotationMetadata().getAnnotation(Value.class)
-        expect:
+        then:
             (av as EvaluatedAnnotationValue).withArguments(bean, "MyValue").stringValue().get() == "7"
+        when:
+            buildContext('tst.MyBean', """
+
+            package tst;
+
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Value;
+            import jakarta.inject.Inject;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class MyBean {
+
+                @Executable
+                static void doStuffStatic(@Value("#{1 + 1 + this.myNumber()}") String someParam) {
+                }
+
+                int myNumber() {
+                    return 5;
+                }
+            }
+
+        """)
+        then:
+            def e = thrown(Exception)
+            e.message.contains("Cannot reference 'this'")
+        when:
+            buildContext('tst.MyBean2', """
+
+            package tst;
+
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Value;
+            import jakarta.inject.Inject;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class MyBean2 {
+                String someParam;
+                MyBean2(@Value("#{1 + 1 + this.myNumber()}") String someParam) {
+                    this.someParam = someParam;
+                }
+
+            }
+
+        """)
+        then:
+            def ee = thrown(Exception)
+            ee.message.contains("Cannot reference 'this'")
 
         cleanup:
             ctx.stop()
