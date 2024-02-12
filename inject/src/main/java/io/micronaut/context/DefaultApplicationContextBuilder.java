@@ -422,7 +422,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (configurers.size() == 1) {
             return configurers.get(0);
         }
-        OrderUtil.sort(configurers);
+        OrderUtil.sortOrdered(configurers);
         return new ApplicationContextConfigurer() {
 
             @Override

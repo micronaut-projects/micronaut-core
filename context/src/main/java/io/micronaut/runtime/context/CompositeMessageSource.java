@@ -18,15 +18,14 @@ package io.micronaut.runtime.context;
 import io.micronaut.context.AbstractMessageSource;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Composite message source that is the primary message source.
@@ -46,7 +45,7 @@ public final class CompositeMessageSource extends AbstractMessageSource {
      */
     public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
         if (messageSources != null) {
-            this.messageSources = OrderUtil.sort(messageSources.stream()).collect(Collectors.toList());
+            this.messageSources = OrderUtil.sortOrderedCollection(messageSources);
         } else {
             this.messageSources = Collections.emptyList();
         }
