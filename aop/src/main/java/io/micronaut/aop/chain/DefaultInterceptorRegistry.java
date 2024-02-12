@@ -124,7 +124,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 selectedInterceptorRegistrations.add(beanRegistration);
             }
         }
-        selectedInterceptorRegistrations.sort(OrderUtil.COMPARATOR);
+        selectedInterceptorRegistrations.sort(OrderUtil.ORDERED_COMPARATOR);
 
         List<Interceptor<T, ?>> selectedInterceptors = new ArrayList<>(selectedInterceptorRegistrations.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {

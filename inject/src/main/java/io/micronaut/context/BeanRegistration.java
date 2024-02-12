@@ -42,6 +42,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     final BeanIdentifier identifier;
     final BeanDefinition<T> beanDefinition;
     final T bean;
+    private final int order;
 
     /**
      * @param identifier     The bean identifier
@@ -52,6 +53,11 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
+        if (bean == null) {
+            this.order = beanDefinition == null ? 0 : beanDefinition.getOrder();
+        } else {
+            this.order = beanDefinition == null ? OrderUtil.getOrder(bean) : OrderUtil.getOrder(beanDefinition, bean);
+        }
     }
 
     /**
@@ -103,7 +109,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
 
     @Override
     public int getOrder() {
-        return OrderUtil.getOrder(beanDefinition.getAnnotationMetadata(), bean);
+        return order;
     }
 
     /**

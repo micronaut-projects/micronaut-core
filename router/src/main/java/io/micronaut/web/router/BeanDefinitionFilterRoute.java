@@ -19,7 +19,6 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
@@ -45,7 +44,7 @@ class BeanDefinitionFilterRoute extends DefaultFilterRoute {
     BeanDefinitionFilterRoute(String pattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> definition) {
         super(pattern, () -> GenericHttpFilter.createLegacyFilter(
             beanLocator.getBean(definition),
-            new FilterOrder.Dynamic(OrderUtil.getOrder(definition))));
+            new FilterOrder.Dynamic(definition.getOrder())));
         this.definition = definition;
     }
 

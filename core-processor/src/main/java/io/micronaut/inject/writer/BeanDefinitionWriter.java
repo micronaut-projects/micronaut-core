@@ -48,6 +48,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
@@ -55,6 +56,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -160,6 +162,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  */
 @Internal
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement, Toggleable {
+    @NextMajorVersion("Inline as true")
     public static final String OMIT_CONFPROP_INJECTION_POINTS = "micronaut.processing.omit.confprop.injectpoints";
 
     public static final String CLASS_SUFFIX = "$Definition";
@@ -1176,6 +1179,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
             checkIfShouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
+        addGetOrder();
 
         getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
 
@@ -1309,6 +1313,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 getExposedTypesMethod.visitEnd();
             }
         }
+    }
+
+    private void addGetOrder() {
+        int order = OrderUtil.getOrder(annotationMetadata);
+        GeneratorAdapter getOrderMethod = startPublicMethod(classWriter, "getOrder", int.class.getName());
+        getOrderMethod.push(order);
+        getOrderMethod.returnValue();
+        getOrderMethod.endMethod();
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
