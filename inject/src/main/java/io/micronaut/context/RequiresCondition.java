@@ -98,6 +98,21 @@ public class RequiresCondition implements Condition {
         }
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
+        boolean both = isBeanReference && component instanceof BeanDefinition<?>;
+
+        if (both) {
+            for (AnnotationValue<Requires> requirement : requirements) {
+                processPreStartRequirements(context, requirement);
+                if (context.isFailing()) {
+                    return false;
+                }
+                processPostStartRequirements(context, requirement);
+                if (context.isFailing()) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
         if (isBeanReference) {

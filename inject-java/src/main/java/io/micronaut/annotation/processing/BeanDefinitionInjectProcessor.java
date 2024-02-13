@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -32,7 +31,6 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 
@@ -264,16 +262,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
-                BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanDefinitionWriter, this.javaVisitorContext);
-                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
-
-                String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
-                processed.add(className);
-                beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
-
-                beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
             }
         } catch (IOException e) {
             // raise a compile error

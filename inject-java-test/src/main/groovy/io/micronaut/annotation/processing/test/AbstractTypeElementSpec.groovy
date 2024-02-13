@@ -280,7 +280,7 @@ class Test {
                 protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                     def references = StreamSupport.stream(files.spliterator(), false)
                             .filter({ JavaFileObject jfo ->
-                                jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
+                                jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
                             })
                             .map({ JavaFileObject jfo ->
                                 def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
@@ -504,7 +504,7 @@ class Test {
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, @Language("java") String cls) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -514,7 +514,7 @@ class Test {
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, @Language("java") String cls) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 

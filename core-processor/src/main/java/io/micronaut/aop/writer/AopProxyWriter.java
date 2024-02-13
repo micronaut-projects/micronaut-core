@@ -1152,7 +1152,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator,
                 targetType,
             new AnnotationMetadataReference(
-                    getBeanDefinitionReferenceClassName(),
+                    getBeanDefinitionName(),
                     getAnnotationMetadata()
             ),
             parentWriter != null ? parentWriter.getTypeArguments() : proxyBeanDefinitionWriter.getTypeArguments()

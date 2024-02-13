@@ -47,6 +47,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
@@ -61,8 +62,6 @@ import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -104,7 +103,6 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional
     implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static final Optional<Class<? extends Annotation>> SINGLETON_SCOPE = Optional.of(Singleton.class);
 
@@ -177,9 +175,59 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.precalculatedInfo = precalculatedInfo;
     }
 
-    @Override
-    public final boolean isConfigurationProperties() {
-        return precalculatedInfo.isConfigurationProperties;
+    /**
+     * Represents {@link BeanDefinitionReference#getBeanDefinitionName()} when the class implements {@link BeanDefinitionReference}.
+     *
+     * @return The name of this bean definition
+     */
+    // @Override for BeanDefinitionReference
+    public String getBeanDefinitionName() {
+        return getClass().getName();
+    }
+
+    /**
+     * Represents {@link BeanDefinitionReference#load(BeanContext)} when the class implements {@link BeanDefinitionReference}.
+     *
+     * @param context The bean context
+     * @return a new bean definition instance
+     */
+    // @Override for BeanDefinitionReference
+    public final BeanDefinition<T> load(BeanContext context) {
+        BeanDefinition<T> definition = load();
+        if (definition instanceof EnvironmentConfigurable environmentConfigurable) {
+            if (context instanceof DefaultApplicationContext applicationContext) {
+                // Performance optimization to check for the actual class to avoid the type-check pollution
+                environmentConfigurable.configure(applicationContext.getEnvironment());
+            } else if (context instanceof ApplicationContext applicationContext) {
+                environmentConfigurable.configure(applicationContext.getEnvironment());
+            }
+        }
+        if (definition instanceof BeanContextConfigurable ctxConfigurable) {
+            ctxConfigurable.configure(context);
+        }
+        return definition;
+    }
+
+    /**
+     * Represents {@link BeanDefinitionReference#load()} when the class implements {@link BeanDefinitionReference}.
+     * NOTE: We cannot reuse this instance because of the contextual values et in {@link #load(BeanContext)}.
+     *
+     * @return a new instance of this class
+     */
+    // @Override for BeanDefinitionReference
+    public BeanDefinition<T> load() {
+        throw new IllegalStateException("Should be implemented!");
+    }
+
+    /**
+     * Represents {@link BeanDefinitionReference#isPresent()} when the class implements {@link BeanDefinitionReference}.
+     * Method returns always true, otherwise class not found would eliminate the instance
+     *
+     * @return always true
+     */
+    // @Override for BeanDefinitionReference
+    public boolean isPresent() {
+        return true;
     }
 
     @Override
@@ -252,6 +300,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     public boolean isIterable() {
         return precalculatedInfo.isIterable;
+    }
+
+    @Override
+    public final boolean isConfigurationProperties() {
+        return precalculatedInfo.isConfigurationProperties;
     }
 
     @Override
@@ -689,9 +742,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      */
     @Internal
     protected final void warn(String message) {
-        if (LOG.isWarnEnabled()) {
-            LOG.warn(message);
-        }
+//        if (LOG.isWarnEnabled()) {
+//            LOG.warn(message);
+//        }
     }
 
     /**
@@ -704,9 +757,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @SuppressWarnings("unused")
     @Internal
     protected final void warnMissingProperty(Class type, String method, String property) {
-        if (LOG.isWarnEnabled()) {
-            LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
-        }
+//        if (LOG.isWarnEnabled()) {
+//            LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
+//        }
     }
 
     /**

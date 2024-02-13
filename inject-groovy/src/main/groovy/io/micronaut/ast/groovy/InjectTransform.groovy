@@ -24,12 +24,10 @@ import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
-import io.micronaut.context.annotation.Context
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanConfigurationWriter
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
@@ -127,15 +125,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
-                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanDefWriter, groovyVisitorContext)
-                beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
-                    beanReferenceWriter.accept(outputVisitor)
                     beanDefWriter.accept(outputVisitor)
                 } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
-                    beanReferenceWriter.accept(outputVisitor)
                     beanDefWriter.accept(outputVisitor)
                 }
             } catch (Throwable e) {
