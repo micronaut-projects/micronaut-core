@@ -739,12 +739,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * Allows printing warning messages produced by the compiler.
      *
      * @param message The message
+     * @deprecated No longer used
      */
     @Internal
+    @Deprecated(forRemoval = true, since = "4.4.0")
     protected final void warn(String message) {
-//        if (LOG.isWarnEnabled()) {
-//            LOG.warn(message);
-//        }
     }
 
     /**
@@ -753,13 +752,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @param type     The type
      * @param method   The method
      * @param property The property
+     * @deprecated No longer used
      */
     @SuppressWarnings("unused")
     @Internal
+    @Deprecated(forRemoval = true, since = "4.4.0")
     protected final void warnMissingProperty(Class type, String method, String property) {
-//        if (LOG.isWarnEnabled()) {
-//            LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
-//        }
     }
 
     /**
