@@ -121,6 +121,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 // before RepositoryMapper is going to process repositories and read entities
 
                 for (loadedVisitor in loadedVisitors) {
+                    visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
                     for (typeElement in elements) {
                         if (!loadedVisitor.matches(typeElement)) {
                             continue
@@ -155,6 +156,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun finish() {
         for (loadedVisitor in loadedVisitors) {
+            visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
             try {
                 loadedVisitor.visitor.finish(visitorContext)
             } catch (e: ProcessingException) {

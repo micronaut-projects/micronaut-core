@@ -96,7 +96,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
 
     override fun finish() {
         try {
-            val outputVisitor = KotlinOutputVisitor(environment)
+            val outputVisitor = KotlinOutputVisitor(environment, visitorContext!!)
             val processed = HashSet<String>()
             var count = 0
             for (beanDefinitionCreator in beanDefinitionMap.values) {
