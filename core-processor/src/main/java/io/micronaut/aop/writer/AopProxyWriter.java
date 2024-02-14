@@ -251,6 +251,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 parent,
                 visitorContext
         );
+        proxyBeanDefinitionWriter.setRequiresMethodProcessing(parent.requiresMethodProcessing());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReferenceForName(targetClassFullName));
         proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
     }
@@ -736,7 +737,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             processAlreadyVisitedMethods(parentWriter);
         }
 
-        this.proxyBeanDefinitionWriter.setRequiresMethodProcessing(parentWriter != null && parentWriter.requiresMethodProcessing());
         interceptorsListParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);
