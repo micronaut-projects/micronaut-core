@@ -336,7 +336,7 @@ class Test {
         List<Element> elements = []
 
         try (def parser = newJavaParser()) {
-            parser().parseLines("",
+            parser.parseLines("",
                     cls
             ).each { elements.add(it) }
         }
