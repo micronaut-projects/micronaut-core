@@ -2028,8 +2028,8 @@ final class Test<T extends Test<?>> {
     }
 
     void "test recursive generic method return"() {
-        given:
-        ClassElement ce = buildClassElement('''\
+        expect:
+        buildClassElement('''\
 package test;
 
 import org.hibernate.SessionFactory;
@@ -2042,17 +2042,19 @@ class MyFactory {
     }
 }
 
-''')
-        expect:
-        def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
-        def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
-        def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
-        typeArguments.size() == 1
-        def typeArgument = typeArguments.get("T")
-        typeArgument.name == "org.hibernate.SessionBuilder"
-        def nextTypeArguments = typeArgument.getTypeArguments()
-        def nextTypeArgument = nextTypeArguments.get("T")
-        nextTypeArgument.name == "java.lang.Object"
+''') { ClassElement ce ->
+            def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
+            def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
+            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+            assert typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            assert typeArgument.name == "org.hibernate.SessionBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            assert nextTypeArgument.name == "java.lang.Object"
+            return ce
+        }
+
     }
 
     void "test recursive generic method return 2"() {
@@ -3027,7 +3029,8 @@ class Outer {
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method"() {
-        ClassElement ce = buildClassElement('''
+        expect:
+        buildClassElement('''
 package test;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -3057,20 +3060,20 @@ class MyBean {
     }
 }
 
-''')
-
-        when:
-        def method = ce.findMethod("findById").get()
-        def type = method.getGenericReturnType()
-        then:
-        method.getAnnotationNames().isEmpty()
-        method.getReturnType().isEmpty()
-        type.hasAnnotation(NotNull)
-        !type.hasAnnotation(Null)
+''') { ClassElement ce ->
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+            assert method.getAnnotationNames().isEmpty()
+            assert method.getReturnType().isEmpty()
+            assert type.hasAnnotation(NotNull)
+            assert !type.hasAnnotation(Null)
+            return ce
+        }
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method different order"() {
-        ClassElement ce = buildClassElement('''
+        expect:
+        buildClassElement('''
 package test;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -3100,16 +3103,16 @@ class MyBean {
     }
 }
 
-''')
+''') { ClassElement ce ->
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+            assert method.getAnnotationNames().isEmpty()
+            assert method.getReturnType().isEmpty()
+            assert !type.hasAnnotation(NotNull)
+            assert type.hasAnnotation(Null)
+            return ce
+        }
 
-        when:
-        def method = ce.findMethod("findById").get()
-        def type = method.getGenericReturnType()
-        then:
-        method.getAnnotationNames().isEmpty()
-        method.getReturnType().isEmpty()
-        !type.hasAnnotation(NotNull)
-        type.hasAnnotation(Null)
     }
 
     void "test interface with conflicting method having not inherited method annotations"() {

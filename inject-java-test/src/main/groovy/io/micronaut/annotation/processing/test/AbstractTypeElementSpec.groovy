@@ -22,6 +22,7 @@ import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.JavaNativeElementsHelper
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
+import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
@@ -82,7 +83,9 @@ abstract class AbstractTypeElementSpec extends Specification {
      * Builds a class element for the given source code.
      * @param cls The source
      * @return The class element
+     * @deprecated Use closure equivalent and supply assertions
      */
+    @Deprecated
     ClassElement buildClassElement(@Language("java") String cls) {
         TypeElementInfo typeElementInfo = buildTypeElementInfo(cls)
         TypeElement typeElement = typeElementInfo.typeElement
@@ -105,6 +108,32 @@ abstract class AbstractTypeElementSpec extends Specification {
         )
 
         return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
+    }
+
+    ClassElement buildClassElement(@Language("java") String cls, Closure<ClassElement> closure) {
+        buildTypeElementInfo(cls) { TypeElementInfo typeElementInfo ->
+            TypeElement typeElement = typeElementInfo.typeElement
+            def lastTask = typeElementInfo.javaParser.lastTask.get()
+            def elements = lastTask.elements
+            def types = lastTask.types
+            def processingEnv = typeElementInfo.javaParser.processingEnv
+            def messager = processingEnv.messager
+            ModelUtils modelUtils = new ModelUtils(elements, types) {}
+
+            JavaVisitorContext visitorContext = new JavaVisitorContext(
+                    processingEnv,
+                    messager,
+                    elements,
+                    types,
+                    modelUtils,
+                    processingEnv.filer,
+                    new MutableConvertibleValuesMap<Object>(),
+                    TypeElementVisitor.VisitorKind.ISOLATING
+            )
+
+            def classElement = new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
+            return closure.call(classElement)
+        }
     }
 
     /**
@@ -361,6 +390,23 @@ class Test {
 
     }
 
+    protected <T> T buildTypeElementInfo(@Language("java") String cls, Closure<T> callable) {
+        List<Element> elements = []
+
+        try (def parser = newJavaParser()) {
+            parser.parseLines("",
+                    cls
+            ).each { elements.add(it) }
+            def element = elements ? elements[0] : null
+
+            return callable.call( new TypeElementInfo(
+                    typeElement: element,
+                    javaParser: parser
+            ))
+        }
+
+    }
+
     protected String buildAndReadResourceAsString(String resourceName, @Language("java") String cls) {
         ClassLoader classLoader = buildClassLoader("test.Test", cls)
         return IOUtils.readText(new BufferedReader(new InputStreamReader(classLoader.getResources(resourceName).toList().last().openStream())))
@@ -484,7 +530,7 @@ class Test {
     @CompileStatic
     protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
         AbstractAnnotationMetadataBuilder.clearMutated()
-        try (def parser = new JavaParser()) {
+        try (def parser = newJavaParser()) {
             Iterable<? extends JavaFileObject> files = parser.generate(className, cls)
             return new JavaFileObjectClassLoader(files)
         }
