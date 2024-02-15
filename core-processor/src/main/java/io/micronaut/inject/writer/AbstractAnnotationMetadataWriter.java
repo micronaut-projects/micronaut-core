@@ -163,10 +163,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     }
 
     /**
-     * @param classWriter     The class writer
-     * @param staticInit      The static init
-     * @param defaults        The defaults
-     * @param loadTypeMethods The loadTypeMethods
+     * @param classWriter        The class writer
+     * @param staticInit         The static init
+     * @param targetClassType    The targetClassType
+     * @param annotationMetadata The annotation metadata
+     * @param defaults           The defaults
+     * @param loadTypeMethods    The loadTypeMethods
      */
     protected static void writeAnnotationDefault(ClassWriter classWriter,
                                                  GeneratorAdapter staticInit,
@@ -196,10 +198,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     }
 
     /**
-     * @param staticInit      The {@link GeneratorAdapter}
-     * @param classWriter     The {@link ClassWriter}
-     * @param defaults        The annotation defaults
-     * @param loadTypeMethods The loadTypeMethods
+     * @param staticInit         The {@link GeneratorAdapter}
+     * @param classWriter        The {@link ClassWriter}
+     * @param targetClassType    The targetClassType
+     * @param annotationMetadata The annotation metadata
+     * @param defaults           The annotation defaults
+     * @param loadTypeMethods    The loadTypeMethods
      */
     protected static void initializeAnnotationMetadata(GeneratorAdapter staticInit,
                                                        ClassWriter classWriter,
