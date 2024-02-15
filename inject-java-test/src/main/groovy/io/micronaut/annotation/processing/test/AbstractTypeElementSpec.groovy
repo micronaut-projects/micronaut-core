@@ -110,7 +110,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
     }
 
-    ClassElement buildClassElement(@Language("java") String cls, Closure<ClassElement> closure) {
+    <T> T buildClassElement(@Language("java") String cls, Closure<T> closure) {
         buildTypeElementInfo(cls) { TypeElementInfo typeElementInfo ->
             TypeElement typeElement = typeElementInfo.typeElement
             def lastTask = typeElementInfo.javaParser.lastTask.get()
