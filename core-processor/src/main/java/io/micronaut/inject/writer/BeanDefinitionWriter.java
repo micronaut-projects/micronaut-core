@@ -1205,14 +1205,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             isContextScopeMethod.endMethod();
         }
 
-        if (proxiedBean || superType != null) {
+        if (proxiedBean || superType != TYPE_ABSTRACT_BEAN_DEFINITION) {
             GeneratorAdapter isProxiedBeanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, "isProxiedBean");
             isProxiedBeanMethod.push(proxiedBean);
             isProxiedBeanMethod.returnValue();
             isProxiedBeanMethod.endMethod();
         }
 
-        if (isProxyTarget || superType != null) {
+        if (isProxyTarget || superType != TYPE_ABSTRACT_BEAN_DEFINITION) {
             GeneratorAdapter isProxiedBeanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, "isProxyTarget");
             isProxiedBeanMethod.push(isProxyTarget);
             isProxiedBeanMethod.returnValue();
@@ -4120,8 +4120,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // 2: `AbstractBeanDefinition2.MethodOrFieldReference.class` constructor
             protectedConstructor.loadArg(1);
 
-            annotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, defaultsStorage, loadTypeMethods);
-            annotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, defaultsStorage, loadTypeMethods);
+            annotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
+            annotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
 
             // 3: annotationMetadata
             if (annotationMetadata.isEmpty()) {

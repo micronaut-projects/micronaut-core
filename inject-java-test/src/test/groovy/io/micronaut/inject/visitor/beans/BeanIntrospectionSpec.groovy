@@ -36,9 +36,7 @@ import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import spock.lang.IgnoreIf
 import spock.lang.Issue
-import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -277,7 +275,7 @@ public class Test {
         introspection.getProperty("name").isPresent()
 
         when:
-        def introspectionRefName = 'test.introspections.$Test$IntrospectionRef'
+        def introspectionRefName = 'test.introspections.$Test$Introspection'
         def introspectionRef = classLoader.loadClass(introspectionRefName).newInstance() as BeanIntrospectionReference
 
         then:
@@ -1197,7 +1195,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = applicationContext.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1235,7 +1233,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def reference = classLoader.loadClass('test.micronaut.intro.$Test$IntrospectionRef0').newInstance() as BeanIntrospectionReference
+        def reference = classLoader.loadClass('test.micronaut.intro.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection').newInstance() as BeanIntrospectionReference
 
         then:"the reference is valid"
         notThrown(ClassNotFoundException)
@@ -1281,7 +1279,7 @@ class MyImpl implements MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -1315,7 +1313,7 @@ class MyImpl implements MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -1340,7 +1338,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = applicationContext.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OuterBean$InnerInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2259,7 +2257,7 @@ interface GroupOne {}
 interface GroupTwo {}
 interface GroupThree {}
 ''')
-        def clazz = context.classLoader.loadClass('test.$Address$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Address$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
 
@@ -2306,7 +2304,7 @@ class Book {
     }
 }
 ''')
-        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2346,7 +2344,7 @@ class Book {
         context?.close()
     }
 
-    void "test default constructor "() {
+    void "test default constructor"() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
 package test;
@@ -2368,7 +2366,7 @@ class Book {
     }
 }
 ''')
-        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2445,7 +2443,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2497,7 +2495,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2548,7 +2546,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2606,7 +2604,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2697,7 +2695,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2797,7 +2795,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2830,7 +2828,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2864,7 +2862,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        context.classLoader.loadClass('test.$Test$Introspection')
 
         then:"The reference is not written"
         thrown(ClassNotFoundException)
@@ -2888,7 +2886,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is generated"
@@ -2993,7 +2991,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -3182,7 +3180,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
