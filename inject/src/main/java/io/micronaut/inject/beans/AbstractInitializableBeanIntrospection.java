@@ -108,7 +108,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
         this.beanPropertyIndex = new StringIntMap(beanProperties.length);
         for (int i = 0; i < beanProperties.length; i++) {
-            System.out.println("XXX " + beanType + " " + beanProperties[i].getName());
             beanPropertyIndex.put(beanProperties[i].getName(), i);
         }
         if (methodsRefs != null) {
