@@ -352,13 +352,13 @@ class Test {
             parser.parseLines("",
                     cls
             ).each { elements.add(it) }
+            def element = elements ? elements[0] : null
+            return new TypeElementInfo(
+                    typeElement: element,
+                    javaParser: parser
+            )
         }
 
-        def element = elements ? elements[0] : null
-        return new TypeElementInfo(
-                typeElement: element,
-                javaParser: parser
-        )
     }
 
     protected String buildAndReadResourceAsString(String resourceName, @Language("java") String cls) {
