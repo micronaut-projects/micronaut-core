@@ -26,8 +26,10 @@ import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.IOException;
@@ -95,6 +97,11 @@ public final class EvaluatedExpressionProcessor {
                 return new ExpressionWithContext(expression, evaluationContext);
             })
             .forEach(this::addExpression);
+
+        ClassElement resolvedThis = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
+        for (ParameterElement parameter: methodElement.getParameters()) {
+            processEvaluatedExpressions(parameter.getAnnotationMetadata(), resolvedThis);
+        }
     }
 
     private void addExpression(ExpressionWithContext ee) {

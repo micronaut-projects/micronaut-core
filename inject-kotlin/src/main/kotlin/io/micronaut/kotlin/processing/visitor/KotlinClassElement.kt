@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
@@ -34,6 +35,7 @@ import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
 import java.util.stream.Stream
+import kotlin.collections.ArrayList
 
 internal open class KotlinClassElement(
     private val nativeType: KotlinClassNativeElement,
@@ -398,12 +400,22 @@ internal open class KotlinClassElement(
         val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
+        val methods = ArrayList(getEnclosedElements(ElementQuery.ALL_METHODS))
+        allProperties.forEach { prop ->
+            methods.removeIf { m ->
+                prop.name == NameUtils.getPropertyNameForGetter(
+                    m.name,
+                    propertyElementQuery.readPrefixes
+                ) || prop.name == NameUtils.getPropertyNameForSetter(
+                    m.name,
+                    propertyElementQuery.writePrefixes
+                )
+            }
+        }
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
-                getEnclosedElements(
-                    ElementQuery.ALL_METHODS
-                )
+                methods
             },
             {
                 emptyList()

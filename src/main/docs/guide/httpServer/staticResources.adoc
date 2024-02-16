@@ -3,3 +3,5 @@ Static resource resolution is enabled by default. The Micronaut framework suppor
 See the information below for available configuration options:
 
 include::{includedir}configurationProperties/io.micronaut.web.router.resource.StaticResourceConfiguration.adoc[]
+
+TIP: Read the https://guides.micronaut.io/latest/micronaut-static-resources.html[Serving static resources in a Micronaut Application] guide, a step-by-step tutorial, to learn how to expose static resources such as CSS or images in a Micronaut Framework application.
