@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -54,6 +55,24 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An immutable collection of properties.
      */
     @NonNull Collection<BeanProperty<T, Object>> getBeanProperties();
+
+    /**
+     * @return An immutable collection of read properties.
+     * @since 4.4.0
+     */
+    @NonNull
+    default List<BeanReadProperty<T, Object>> getBeanReadProperties() {
+        return List.of();
+    }
+
+    /**
+     * @return An immutable collection of write properties.
+     * @since 4.4.0
+     */
+    @NonNull
+    default List<BeanWriteProperty<T, Object>> getBeanWriteProperties() {
+        return List.of();
+    }
 
     /**
      * Get all the bean properties annotated for the given annotation type. If the annotation is {@link io.micronaut.core.annotation.Introspected#indexed()} by the given annotation,
@@ -157,7 +176,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
-     * Get all the bean properties annotated for the given type.
+     * Get first bean properties annotated for the given type.
      *
      * @param annotationType The annotation type
      * @return An immutable collection of properties.
@@ -183,8 +202,33 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @param name The name of the property
      * @return A bean property if found
      */
-    default @NonNull Optional<BeanProperty<T, Object>> getProperty(@NonNull String name) {
-        return Optional.empty();
+    @NonNull
+    default Optional<BeanProperty<T, Object>> getProperty(@NonNull String name) {
+        return getBeanProperties().stream().filter(p -> p.getName().equals(name)).findFirst();
+    }
+
+    /**
+     * Obtain a read property by name.
+     *
+     * @param name The name of the property
+     * @return A bean read property if found
+     * @since 4.4.0
+     */
+    @NonNull
+    default Optional<BeanReadProperty<T, Object>> getReadProperty(@NonNull String name) {
+        return getBeanReadProperties().stream().filter(p -> p.getName().equals(name)).findFirst();
+    }
+
+    /**
+     * Obtain a write property by name.
+     *
+     * @param name The name of the property
+     * @return A bean write property if found
+     * @since 4.4.0
+     */
+    @NonNull
+    default Optional<BeanWriteProperty<T, Object>> getWriteProperty(@NonNull String name) {
+        return getBeanWriteProperties().stream().filter(p -> p.getName().equals(name)).findFirst();
     }
 
     /**
@@ -219,6 +263,36 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * Gets a read property of the given name and type or throws {@link IntrospectionException} if the property is not present.
+     *
+     * @param name The name
+     * @param type The type
+     * @param <P>  The property generic type
+     * @return The property
+     * @since 4.4.0
+     */
+    @NonNull
+    default <P> BeanReadProperty<T, P> getRequiredReadProperty(@NonNull String name, @NonNull Class<P> type) {
+        return getReadProperty(name, type)
+            .orElseThrow(() -> new IntrospectionException("No read property [" + name + "] of type [" + type + "] present"));
+    }
+
+    /**
+     * Gets a write property of the given name and type or throws {@link IntrospectionException} if the property is not present.
+     *
+     * @param name The name
+     * @param type The type
+     * @param <P>  The property generic type
+     * @return The property
+     * @since 4.4.0
+     */
+    @NonNull
+    default <P> BeanWriteProperty<T, P> getRequiredWriteProperty(@NonNull String name, @NonNull Class<P> type) {
+        return getWriteProperty(name, type)
+            .orElseThrow(() -> new IntrospectionException("No write property [" + name + "] of type [" + type + "] present"));
+    }
+
+    /**
      * Obtain a property by name and type.
      *
      * @param name The name of the property
@@ -239,12 +313,63 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * Obtain a read property by name and type.
+     *
+     * @param name The name of the property
+     * @param type The property type to search for
+     * @param <P>  The property type
+     * @return A bean read property if found
+     */
+    default @NonNull <P> Optional<BeanReadProperty<T, P>> getReadProperty(@NonNull String name, @NonNull Class<P> type) {
+        ArgumentUtils.requireNonNull("name", name);
+        ArgumentUtils.requireNonNull("type", type);
+
+        final BeanReadProperty<T, ?> prop = getReadProperty(name).orElse(null);
+        if (prop != null && type.isAssignableFrom(prop.getType())) {
+            //noinspection unchecked
+            return Optional.of((BeanProperty<T, P>) prop);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Obtain a write property by name and type.
+     *
+     * @param name The name of the property
+     * @param type The property type to search for
+     * @param <P>  The property type
+     * @return A bean write property if found
+     * @since 4.4.0
+     */
+    default @NonNull <P> Optional<BeanWriteProperty<T, P>> getWriteProperty(@NonNull String name, @NonNull Class<P> type) {
+        ArgumentUtils.requireNonNull("name", name);
+        ArgumentUtils.requireNonNull("type", type);
+
+        final BeanWriteProperty<T, ?> prop = getWriteProperty(name).orElse(null);
+        if (prop != null && type.isAssignableFrom(prop.getType())) {
+            //noinspection unchecked
+            return Optional.of((BeanProperty<T, P>) prop);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * The property names as an array.
      *
      * @return The property names
      */
     default @NonNull String[] getPropertyNames() {
         return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
+    }
+
+    /**
+     * The read property names as an array.
+     *
+     * @return The property names
+     * @since 4.4.0
+     */
+    default @NonNull String[] getReadPropertyNames() {
+        return getBeanReadProperties().stream().map(BeanReadProperty::getName).toArray(String[]::new);
     }
 
     /**

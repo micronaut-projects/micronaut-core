@@ -26,8 +26,12 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanReadProperty;
+import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
 import io.micronaut.core.beans.UnsafeBeanProperty;
+import io.micronaut.core.beans.UnsafeBeanReadProperty;
+import io.micronaut.core.beans.UnsafeBeanWriteProperty;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -77,6 +81,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final Argument<?>[] constructorArguments;
     private final BeanProperty<B, Object>[] beanProperties;
     private final List<BeanProperty<B, Object>> beanPropertiesList;
+    private final List<BeanReadProperty<B, Object>> beanReadPropertiesList;
+    private final List<BeanWriteProperty<B, Object>> beanWritePropertiesList;
     private final List<BeanMethod<B, Object>> beanMethodsList;
     private final StringIntMap beanPropertyIndex;
 
@@ -97,14 +103,44 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         if (propertiesRefs != null) {
             List<BeanProperty<B, Object>> beanProperties = new ArrayList<>(propertiesRefs.length);
-            for (BeanPropertyRef beanPropertyRef : propertiesRefs) {
+            List<BeanReadProperty<B, Object>> beanReadProperties = new ArrayList<>(propertiesRefs.length);
+            List<BeanWriteProperty<B, Object>> beanWriteProperties = new ArrayList<>(propertiesRefs.length);
+            for (BeanPropertyRef<Object> beanPropertyRef : propertiesRefs) {
+                if (beanPropertyRef.readyOnly) {
+                    if (beanPropertyRef.readArgument != null) {
+                        beanReadProperties.add(new BeanReadPropertyImpl<>(beanPropertyRef));
+                    } else {
+                        beanReadProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
+                    }
+                } else if (beanPropertyRef.writeOnly) {
+                    if (beanPropertyRef.writeArgument != null) {
+                        beanWriteProperties.add(new BeanWritePropertyImpl<>(beanPropertyRef));
+                    } else {
+                        beanWriteProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
+                    }
+                } else {
+                    if (beanPropertyRef.readArgument != null) {
+                        beanReadProperties.add(new BeanReadPropertyImpl<>(beanPropertyRef));
+                    } else {
+                        beanReadProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
+                    }
+                    if (beanPropertyRef.writeArgument != null) {
+                        beanWriteProperties.add(new BeanWritePropertyImpl<>(beanPropertyRef));
+                    } else {
+                        beanWriteProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
+                    }
+                }
                 beanProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
             }
             this.beanProperties = beanProperties.toArray(BeanProperty[]::new);
             this.beanPropertiesList = Collections.unmodifiableList(beanProperties);
+            this.beanReadPropertiesList = Collections.unmodifiableList(beanReadProperties);
+            this.beanWritePropertiesList = Collections.unmodifiableList(beanWriteProperties);
         } else {
             this.beanProperties = new BeanProperty[0];
             this.beanPropertiesList = Collections.emptyList();
+            this.beanReadPropertiesList = Collections.emptyList();
+            this.beanWritePropertiesList = Collections.emptyList();
         }
         this.beanPropertyIndex = new StringIntMap(beanProperties.length);
         for (int i = 0; i < beanProperties.length; i++) {
@@ -112,7 +148,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
         if (methodsRefs != null) {
             List<BeanMethod<B, Object>> beanMethods = new ArrayList<>(methodsRefs.length);
-            for (BeanMethodRef beanMethodRef : methodsRefs) {
+            for (BeanMethodRef<Object> beanMethodRef : methodsRefs) {
                 beanMethods.add(new BeanMethodImpl<>(beanMethodRef));
             }
             this.beanMethodsList = Collections.unmodifiableList(beanMethods);
@@ -383,6 +419,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Override
     public Collection<BeanProperty<B, Object>> getBeanProperties() {
         return beanPropertiesList;
+    }
+
+    @Override
+    public List<BeanReadProperty<B, Object>> getBeanReadProperties() {
+        return beanReadPropertiesList;
+    }
+
+    @Override
+    public List<BeanWriteProperty<B, Object>> getBeanWriteProperties() {
+        return beanWritePropertiesList;
     }
 
     @NonNull
@@ -819,7 +865,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     /**
-     * Implementation of {@link BeanProperty} that is using {@link BeanPropertyRef} and method dispatch.
+     * Implementation of {@link UnsafeBeanProperty} that is using {@link BeanPropertyRef} and method dispatch.
      *
      * @param <P> The property type
      */
@@ -934,7 +980,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public boolean isWriteOnly() {
-            return ref.getMethodIndex == -1 && (ref.setMethodIndex != -1 || ref.withMethodIndex != -1);
+            return ref.writeOnly;
         }
 
         @Override
@@ -948,6 +994,174 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                     "beanType=" + beanType +
                     ", type=" + ref.argument.getType() +
                     ", name='" + ref.argument.getName() + '\'' +
+                    '}';
+        }
+    }
+
+    /**
+     * Implementation of {@link UnsafeBeanWriteProperty} that is using {@link BeanPropertyRef} and method dispatch.
+     *
+     * @param <P> The property type
+     */
+    private final class BeanWritePropertyImpl<P> implements UnsafeBeanWriteProperty<B, P> {
+
+        private final Argument<P> argument;
+        private final Class<?> typeOrWrapperType;
+        private final AnnotationMetadata annotationMetadata;
+        private final int setMethodIndex;
+        private final int withMethodIndex;
+
+        private BeanWritePropertyImpl(BeanPropertyRef<P> ref) {
+            this.argument = ref.writeArgument;
+            this.typeOrWrapperType = ReflectionUtils.getWrapperType(getType());
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argument.getAnnotationMetadata());
+            this.setMethodIndex = ref.setMethodIndex;
+            this.withMethodIndex = ref.withMethodIndex;
+        }
+
+        @NonNull
+        @Override
+        public String getName() {
+            return argument.getName();
+        }
+
+        @NonNull
+        @Override
+        public Class<P> getType() {
+            return argument.getType();
+        }
+
+        @Override
+        @NonNull
+        public Argument<P> asArgument() {
+            return argument;
+        }
+
+        @NonNull
+        @Override
+        public BeanIntrospection<B> getDeclaringBean() {
+            return AbstractInitializableBeanIntrospection.this;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public void set(@NonNull B bean, @Nullable P value) {
+            ArgumentUtils.requireNonNull("bean", bean);
+
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + bean);
+            }
+            if (value != null && !typeOrWrapperType.isInstance(value)) {
+                throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
+            }
+            dispatchOne(setMethodIndex, bean, value);
+        }
+
+        @Override
+        public void setUnsafe(B bean, P value) {
+            dispatchOne(setMethodIndex, bean, value);
+        }
+
+        @Override
+        public B withValue(@NonNull B bean, @Nullable P value) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
+            }
+            return withValueUnsafe(bean, value);
+        }
+
+        @Override
+        public B withValueUnsafe(B bean, P value) {
+            if (withMethodIndex == -1) {
+                dispatchOne(setMethodIndex, bean, value);
+                return bean;
+            } else {
+                return dispatchOne(withMethodIndex, bean, value);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "BeanWriteProperty{" +
+                    "beanType=" + beanType +
+                    ", type=" + argument.getType() +
+                    ", name='" + argument.getName() + '\'' +
+                    '}';
+        }
+    }
+
+    /**
+     * Implementation of {@link io.micronaut.core.beans.UnsafeBeanReadProperty} that is using {@link BeanPropertyRef} and method dispatch.
+     *
+     * @param <P> The property type
+     */
+    private final class BeanReadPropertyImpl<P> implements UnsafeBeanReadProperty<B, P> {
+
+        private final Argument<P> argument;
+        private final AnnotationMetadata annotationMetadata;
+        private final int getMethodIndex;
+
+        private BeanReadPropertyImpl(BeanPropertyRef<P> ref) {
+            this.argument = ref.readArgument;
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argument.getAnnotationMetadata());
+            this.getMethodIndex = ref.getMethodIndex;
+        }
+
+        @NonNull
+        @Override
+        public String getName() {
+            return argument.getName();
+        }
+
+        @NonNull
+        @Override
+        public Class<P> getType() {
+            return argument.getType();
+        }
+
+        @Override
+        @NonNull
+        public Argument<P> asArgument() {
+            return argument;
+        }
+
+        @NonNull
+        @Override
+        public BeanIntrospection<B> getDeclaringBean() {
+            return AbstractInitializableBeanIntrospection.this;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Nullable
+        @Override
+        public P get(@NonNull B bean) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
+            }
+            return dispatchOne(getMethodIndex, bean, null);
+        }
+
+        @Override
+        public P getUnsafe(B bean) {
+            return dispatchOne(getMethodIndex, bean, null);
+        }
+
+        @Override
+        public String toString() {
+            return "BeanReadProperty{" +
+                    "beanType=" + beanType +
+                    ", type=" + argument.getType() +
+                    ", name='" + argument.getName() + '\'' +
                     '}';
         }
     }
@@ -1058,18 +1272,39 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final int withMethodIndex;
         final boolean readyOnly;
         final boolean mutable;
+        final boolean writeOnly;
+
+        @Nullable
+        final Argument<P> readArgument;
+        @Nullable
+        final Argument<P> writeArgument;
 
         public BeanPropertyRef(@NonNull Argument<P> argument,
                                int getMethodIndex,
                                int setMethodIndex,
-                               int valueMethodIndex,
-                               boolean readyOnly, boolean mutable) {
+                               int withMethodIndex,
+                               boolean readyOnly,
+                               boolean mutable) {
+            this(argument, null, null, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable);
+        }
+
+        public BeanPropertyRef(@NonNull Argument<P> argument,
+                               @Nullable Argument<P> readArgument,
+                               @Nullable Argument<P> writeArgument,
+                               int getMethodIndex,
+                               int setMethodIndex,
+                               int withMethodIndex,
+                               boolean readyOnly,
+                               boolean mutable) {
             this.argument = argument;
             this.getMethodIndex = getMethodIndex;
             this.setMethodIndex = setMethodIndex;
-            this.withMethodIndex = valueMethodIndex;
+            this.withMethodIndex = withMethodIndex;
             this.readyOnly = readyOnly;
             this.mutable = mutable;
+            this.writeOnly = getMethodIndex == -1 && (setMethodIndex != -1 || withMethodIndex != -1);
+            this.writeArgument = writeArgument == null && (setMethodIndex != -1 || withMethodIndex != -1) ? argument : writeArgument;
+            this.readArgument = readArgument == null && (getMethodIndex != -1) ? argument : readArgument;
         }
     }
 

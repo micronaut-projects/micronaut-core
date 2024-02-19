@@ -213,6 +213,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
+        if (presetAnnotationMetadata != null) {
+            return presetAnnotationMetadata;
+        }
         if (annotationMetadata == null) {
             if (getNativeType().typeMirror() == null) {
                 annotationMetadata = super.getAnnotationMetadata();

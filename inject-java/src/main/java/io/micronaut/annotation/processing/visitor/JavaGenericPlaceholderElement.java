@@ -173,6 +173,11 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
+    protected JavaClassElement copyThis() {
+        return new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType);
+    }
+
+    @Override
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         Objects.requireNonNull(fold, "Function argument cannot be null");
         return fold.apply(this);

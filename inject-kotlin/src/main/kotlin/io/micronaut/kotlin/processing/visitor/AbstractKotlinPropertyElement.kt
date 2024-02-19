@@ -51,7 +51,7 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
     abstract val abstract: Boolean
     abstract val declaration: KSDeclaration
 
-    private val internalAnnotationMetadata: MutableAnnotationMetadataDelegate<*> by lazy {
+    private val internalAnnotationMetadata: PropertyElementAnnotationMetadata by lazy {
         PropertyElementAnnotationMetadata(
             this,
             getter.orElse(null),
@@ -78,6 +78,14 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
             return overriddenNativeType == nativeType.findOverridee()
         }
         return false
+    }
+
+    override fun getWriteTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
+        return Optional.of(annotationMetadata.writeAnnotationMetadata)
+    }
+
+    override fun getReadTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
+        return Optional.of(annotationMetadata.readAnnotationMetadata)
     }
 
     override fun isExcluded() = excluded

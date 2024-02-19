@@ -23,6 +23,7 @@ import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.core.value.OptionalMultiValues
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
@@ -48,6 +49,278 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test annotations"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A5 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+    @A4
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A4 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A5 {
+}
+
+''')
+            def property = introspection.getBeanProperties().iterator().next()
+            def readProperty = introspection.getBeanReadProperties()[0]
+            def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+            !property.hasAnnotation("test.A3")
+            property.hasAnnotation("test.A4")
+            !property.hasAnnotation("test.A5")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A5")
+            readProperty.hasAnnotation("test.A1")
+            readProperty.hasAnnotation("test.A2")
+            !readProperty.hasAnnotation("test.A3")
+            readProperty.hasAnnotation("test.A4")
+            !readProperty.hasAnnotation("test.A5")
+            writeProperty.hasAnnotation("test.A1")
+            writeProperty.hasAnnotation("test.A2")
+            !writeProperty.hasAnnotation("test.A3")
+            writeProperty.hasAnnotation("test.A4")
+            !writeProperty.hasAnnotation("test.A5")
+    }
+
+    void "test TYPE_USE annotations"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A4 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A4 {
+}
+
+''')
+            def property = introspection.getBeanProperties()[0]
+            def readProperty = introspection.getBeanReadProperties()[0]
+            def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+            property.hasAnnotation("test.A3")
+            !property.hasAnnotation("test.A4")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+            readProperty.hasAnnotation("test.A1")
+            readProperty.hasAnnotation("test.A2")
+            readProperty.hasAnnotation("test.A3")
+            !readProperty.hasAnnotation("test.A4")
+            writeProperty.hasAnnotation("test.A1")
+            writeProperty.hasAnnotation("test.A2")
+            writeProperty.hasAnnotation("test.A3")
+            !writeProperty.hasAnnotation("test.A4")
+    }
+
+    void "test different setter / getter"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private Map<CharSequence, List<String>> foo;
+    @A2
+    public OptionalMultiValues<String> getFoo() {
+        return OptionalMultiValues.of(foo);
+    }
+    public void setFoo(@A3 Map<String, Object> foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+''')
+        def property = introspection.getBeanProperties().iterator().next()
+        then:
+            property.asArgument().getType() == OptionalMultiValues
+            property.getType() == OptionalMultiValues
+//            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+//            property.hasAnnotation("test.A3")
+            property.isReadOnly()
+            introspection.getBeanReadProperties().size() == 1
+            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+            introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+            introspection.getBeanReadProperties().iterator().next().getType() == OptionalMultiValues
+            introspection.getBeanWriteProperties().size() == 0
+    }
+
+    void "test different setter / getter - ignoreSettersWithDifferingType"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected(ignoreSettersWithDifferingType = false)
+class Test {
+    @A1
+    private Map<CharSequence, List<String>> foo;
+    @A2
+    public OptionalMultiValues<String> getFoo() {
+        return OptionalMultiValues.of(foo);
+    }
+    public void setFoo(@A3 Map<String, Object> foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+''')
+        def property = introspection.getBeanProperties().iterator().next()
+        then:
+            property.asArgument().getType() == Map // The property is defined by it's writer type
+            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+            !property.hasAnnotation("test.A3")
+            property.getType() == Map
+            !property.isReadOnly()
+            introspection.getBeanReadProperties().size() == 1
+            introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+            introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+            introspection.getBeanReadProperties()[0].getType() == OptionalMultiValues
+            introspection.getBeanWriteProperties().size() == 1
+            introspection.getBeanWriteProperties()[0].getType() == Map
+            introspection.getBeanWriteProperties()[0].hasAnnotation("test.A1")
+            introspection.getBeanWriteProperties()[0].hasAnnotation("test.A2")
+            !introspection.getBeanWriteProperties()[0].hasAnnotation("test.A3")
+    }
+
     void "test expressions in introspection properties with type use"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
@@ -199,6 +472,39 @@ class Test {
     }
     public void setFoo(@Nullable String foo) {
         this.foo = foo;
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", Optional)
+        test.foo = 'value'
+
+        then: 'the write method is not considered to match the getter/setter pair'
+        prop.get(test).get() == 'value'
+        prop.type == Optional
+        prop.isReadOnly()
+    }
+
+    void "test mix optional getter with setter - different order"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
     }
 }
 ''')
