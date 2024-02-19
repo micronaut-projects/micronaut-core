@@ -167,7 +167,18 @@ public class NameUtils {
      * @return The underscore separated version
      */
     public static String underscoreSeparate(String camelCase) {
-        return separateCamelCase(camelCase.replace('-', '_'), false, '_');
+        return underscoreSeparate(camelCase, false);
+    }
+
+    /**
+     * Returns the underscore separated version of the given camel case string, optionally with lowercase result.
+     *
+     * @param camelCase The camel case name
+     * @param lowercase true to lowercase the result
+     * @return The underscore separated version
+     */
+    public static String underscoreSeparate(String camelCase, boolean lowercase) {
+        return separateCamelCase(camelCase.replace('-', '_'), lowercase, '_');
     }
 
     /**
@@ -555,13 +566,19 @@ public class NameUtils {
     }
 
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
+        StringBuilder newName = new StringBuilder();
         if (!lowerCase) {
-            StringBuilder newName = new StringBuilder();
             boolean first = true;
             char last = '0';
             for (char c : name.toCharArray()) {
                 if (first) {
-                    newName.append(c);
+                    if (c == separatorChar) {
+                        // special case where first char == separatorChar, don't double it
+                        // https://github.com/micronaut-projects/micronaut-core/issues/10140
+                        last = separatorChar;
+                    } else {
+                        newName.append(c);
+                    }
                     first = false;
                 } else {
                     if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
@@ -583,9 +600,7 @@ public class NameUtils {
                 }
                 last = c;
             }
-            return newName.toString();
         } else {
-            StringBuilder newName = new StringBuilder();
             char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
@@ -619,8 +634,8 @@ public class NameUtils {
                 last = c;
             }
 
-            return newName.toString();
         }
+        return newName.toString();
     }
 
     /**

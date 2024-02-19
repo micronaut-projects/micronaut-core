@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.naming
 
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -126,6 +127,34 @@ class NameUtilsSpec extends Specification {
         "FOO-BAR"           | 'FOO_BAR'
         "foo-bar-baz"       | 'FOO_BAR_BAZ'
         "fooBBar"           | 'FOO_BBAR'
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/10140')
+    @Unroll
+    void "test underscore separated #value with lowercase = #lowercase"() {
+        expect:
+        NameUtils.underscoreSeparate(value, lowercase) == result
+
+        where:
+        value               | result                    | lowercase
+        // the fix handles this case, where previously it resulted in '__name_Of_Thing'
+        "_nameOfThing"      | '_name_Of_Thing'          | false
+        "__nameOfThing"      | '_name_Of_Thing'         | false
+        "_nameOfThing"      | '_name_of_thing'          | true
+        "__nameOfThing"      | '_name_of_thing'         | true
+        // the following are passing cases from prior to fix
+        "com.fooBar.FooBar" | "com.foo_bar.foo_bar"     | true
+        "FooBar"            | "foo_bar"                 | true
+        "com.bar.FooBar"    | "com.bar.foo_bar"         | true
+        "Foo"               | 'foo'                     | true
+        "FOO__BAR"          | 'foo_bar'                 | true
+        "FooBBar"           | 'foo_bbar'                | true
+        "com.fooBar.FooBar" | "com.foo_Bar.Foo_Bar"     | false
+        "FooBar"            | "Foo_Bar"                 | false
+        "com.bar.FooBar"    | "com.bar.Foo_Bar"         | false
+        "Foo"               | 'Foo'                     | false
+        "FOO__BAR"          | 'FOO_BAR'                 | false
+        "FooBBar"           | 'Foo_BBar'                | false
     }
 
     void "test decapitalize"() {
