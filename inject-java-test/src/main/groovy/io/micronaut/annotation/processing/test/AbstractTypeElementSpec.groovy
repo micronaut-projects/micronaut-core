@@ -56,7 +56,6 @@ import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.intellij.lang.annotations.Language
@@ -280,7 +279,7 @@ class Test {
                 protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                     def references = StreamSupport.stream(files.spliterator(), false)
                             .filter({ JavaFileObject jfo ->
-                                jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
+                                jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + '$Reference' + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
                             })
                             .map({ JavaFileObject jfo ->
                                 def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
