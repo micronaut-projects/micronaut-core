@@ -1061,69 +1061,49 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
                 invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
-                    boolean isPrimitive;
+                    TypedElement supplierType;
                     if (constructorArgument instanceof MethodElement readMethod) {
-                        isPrimitive = readMethod.getReturnType().isPrimitive();
+                        supplierType = readMethod.getReturnType();
                     } else if (constructorArgument instanceof FieldElement fieldElement) {
-                        isPrimitive = fieldElement.isPrimitive();
+                        supplierType = fieldElement;
                     } else {
                         throw new IllegalStateException();
                     }
 
-                    boolean writeNonReplaceBranch = true;
-
                     Label endOfProperty = null;
                     Integer target = propertyNames.get(parameter.getName());
                     if (target != null) {
+                        if (propertyNames.size() == 1) {
+                            writer.loadArg(2); // Load new property value
+                            pushCastFromObjectToType(writer, parameter);
+                            // if we're the only replaceable property, we can skip the second branch
+                            return;
+                        }
                         // replace property with new value
-
-                        // if we're the only replaceable property, we can skip the second branch
-                        writeNonReplaceBranch = propertyNames.size() > 1;
-
-                        Label nonReplaceBranch = null;
-                        if (writeNonReplaceBranch) {
-                            nonReplaceBranch = writer.newLabel();
-                            writer.loadArg(0);
-                            writer.push(target);
-                            writer.ifICmp(GeneratorAdapter.NE, nonReplaceBranch);
-                        }
-
-                        writer.loadArg(2);
-                        // if the parameter is non-primitive, we share the cast with the non-replace branch
-                        if (isPrimitive) {
-                            pushCastToType(writer, parameter);
-                        }
-
-                        if (writeNonReplaceBranch) {
-                            endOfProperty = writer.newLabel();
-                            writer.goTo(endOfProperty);
-                            writer.visitLabel(nonReplaceBranch);
-                        }
+                        Label nonReplaceBranch = writer.newLabel();
+                        writer.loadArg(0);
+                        writer.push(target);
+                        writer.ifICmp(GeneratorAdapter.NE, nonReplaceBranch);
+                        writer.loadArg(2); // Load new property value
+                        pushCastFromObjectToType(writer, parameter);
+                        endOfProperty = writer.newLabel();
+                        writer.goTo(endOfProperty);
+                        writer.visitLabel(nonReplaceBranch);
                     }
 
-                    if (writeNonReplaceBranch) {
-                        // non-replace branch
-                        if (constructorArgument instanceof MethodElement readMethod) {
-                            writer.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeMethod(writer, readMethod);
-                        } else {
-                            writer.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeGetField(writer, (FieldElement) constructorArgument);
-                        }
-                        if (isPrimitive) {
-                            if (!parameter.isPrimitive()) {
-                                pushBoxPrimitiveIfNecessary(parameter, writer);
-                            }
-                        }
+                    if (constructorArgument instanceof MethodElement readMethod) {
+                        writer.loadLocal(prevBeanTypeLocal, beanType);
+                        invokeMethod(writer, readMethod);
+                    } else {
+                        writer.loadLocal(prevBeanTypeLocal, beanType);
+                        invokeGetField(writer, (FieldElement) constructorArgument);
                     }
+                    pushCastToType(writer, supplierType, parameter);
 
                     if (endOfProperty != null) {
                         writer.visitLabel(endOfProperty);
                     }
 
-                    if (!isPrimitive) {
-                        pushCastToType(writer, parameter);
-                    }
                 });
 
                 List<BeanPropertyData> readWriteProps = beanProperties.stream()

@@ -36,9 +36,7 @@ import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import spock.lang.IgnoreIf
 import spock.lang.Issue
-import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -50,6 +48,56 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test Boolean in a constructor"() {
+        given:
+            def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			Boolean percent
+	) {
+		super(Optional.of(percent));
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final boolean percent;
+
+    public FormulaCreationDto(Optional<Boolean> percent) {
+        this.percent = percent.orElse(false);
+    }
+
+    public boolean isPercent() {
+        return this.percent;
+    }
+
+}
+''')
+        expect:
+            introspection.instantiate(true, List.of(), true).isPercent()
+    }
+
     void "test expressions in introspection properties with type use"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
