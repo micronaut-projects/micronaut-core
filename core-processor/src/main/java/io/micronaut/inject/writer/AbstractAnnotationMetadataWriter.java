@@ -170,12 +170,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param defaults           The defaults
      * @param loadTypeMethods    The loadTypeMethods
      */
-    protected static void writeAnnotationDefault(ClassWriter classWriter,
-                                                 GeneratorAdapter staticInit,
-                                                 Type targetClassType,
-                                                 AnnotationMetadata annotationMetadata,
-                                                 Map<String, Integer> defaults,
-                                                 Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void writeAnnotationDefault(ClassWriter classWriter,
+                                              GeneratorAdapter staticInit,
+                                              Type targetClassType,
+                                              AnnotationMetadata annotationMetadata,
+                                              Map<String, Integer> defaults,
+                                              Map<String, GeneratorAdapter> loadTypeMethods) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             return;
@@ -205,12 +205,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param defaults           The annotation defaults
      * @param loadTypeMethods    The loadTypeMethods
      */
-    protected static void initializeAnnotationMetadata(GeneratorAdapter staticInit,
-                                                       ClassWriter classWriter,
-                                                       Type targetClassType,
-                                                       AnnotationMetadata annotationMetadata,
-                                                       Map<String, Integer> defaults,
-                                                       Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void initializeAnnotationMetadata(GeneratorAdapter staticInit,
+                                                    ClassWriter classWriter,
+                                                    Type targetClassType,
+                                                    AnnotationMetadata annotationMetadata,
+                                                    Map<String, Integer> defaults,
+                                                    Map<String, GeneratorAdapter> loadTypeMethods) {
         Type annotationMetadataType = Type.getType(AnnotationMetadata.class);
         classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
 

@@ -121,18 +121,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
     }
 
-    public BeanIntrospection<B> load() {
-        return this;
-    }
-
-    public String getName() {
-        return getBeanType().getName();
-    }
-
-    public final boolean isPresent() {
-        return true;
-    }
-
     @Override
     public Builder<B> builder() {
         if (isBuildable()) {

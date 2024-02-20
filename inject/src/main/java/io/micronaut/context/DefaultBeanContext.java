@@ -4113,7 +4113,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         BeanDefinitionProducer(@NonNull BeanDefinitionReference reference) {
             this.reference = reference;
-            if (reference instanceof BeanDefinition<?>) {
+            if (reference instanceof AbstractInitializableBeanDefinitionAndReference<?>) {
                 referenceEnabled  = true; // Postpone validation check
             }
         }

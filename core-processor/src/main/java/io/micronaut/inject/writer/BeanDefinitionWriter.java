@@ -19,6 +19,7 @@ import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.AbstractBeanDefinitionBeanConstructor;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
+import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -357,7 +358,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             BeanContext.class,
             String.class));
 
-    private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractInitializableBeanDefinition.class);
+    private static final Type TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE = Type.getType(AbstractInitializableBeanDefinitionAndReference.class);
 
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_EMPTY = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "empty")
@@ -563,7 +564,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private int postConstructInstanceLocalVarIndex = -1;
     private int preDestroyInstanceLocalVarIndex = -1;
     private boolean beanFinalized = false;
-    private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
+    private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE;
     private boolean isParametrized = false;
     private boolean superBeanDefinition = false;
     private boolean isSuperFactory = false;
@@ -590,8 +591,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final boolean keepConfPropInjectPoints;
     private boolean proxiedBean = false;
     private boolean isProxyTarget = false;
-
-    private final AbstractAnnotationMetadataWriter annotationMetadataWriter;
 
     /**
      * Creates a bean definition writer.
@@ -731,13 +730,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .toList();
         String prop = visitorContext.getOptions().get(OMIT_CONFPROP_INJECTION_POINTS);
         keepConfPropInjectPoints = prop == null || !prop.equals("true");
-
-        annotationMetadataWriter = new AbstractAnnotationMetadataWriter(beanDefinitionName, originatingElements, annotationMetadata, true, visitorContext) {
-
-            @Override
-            public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) {
-            }
-        };
     }
 
     @Override
@@ -1055,14 +1047,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
         }
 
-        interfaceTypes.add(BeanDefinitionReference.class);
-
         classWriter.visit(
             V17,
             ACC_PUBLIC | ACC_SYNTHETIC,
             beanDefinitionInternalName,
             generateBeanDefSig(beanType),
-            isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
+            getSuperTypeInternalType(),
             interfaceTypes.stream().map(Type::getInternalName).toArray(String[]::new)
         );
 
@@ -1205,14 +1195,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             isContextScopeMethod.endMethod();
         }
 
-        if (proxiedBean || superType != TYPE_ABSTRACT_BEAN_DEFINITION) {
+        if (proxiedBean || superType != TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE) {
             GeneratorAdapter isProxiedBeanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, "isProxiedBean");
             isProxiedBeanMethod.push(proxiedBean);
             isProxiedBeanMethod.returnValue();
             isProxiedBeanMethod.endMethod();
         }
 
-        if (isProxyTarget || superType != TYPE_ABSTRACT_BEAN_DEFINITION) {
+        if (isProxyTarget || superType != TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE) {
             GeneratorAdapter isProxiedBeanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, "isProxyTarget");
             isProxiedBeanMethod.push(isProxyTarget);
             isProxiedBeanMethod.returnValue();
@@ -1237,6 +1227,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private String getSuperTypeInternalType() {
+        return getSuperType().getInternalName();
+    }
+
+    private Type getSuperType() {
+        return isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE : superType;
     }
 
     private void buildCheckIfShouldLoadMethod(GeneratorAdapter adapter, Map<Type, List<AnnotationVisitData>> beanPropertyVisitData) {
@@ -1365,10 +1363,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void addGetOrder() {
         int order = OrderUtil.getOrder(annotationMetadata);
-        GeneratorAdapter getOrderMethod = startPublicMethod(classWriter, "getOrder", int.class.getName());
-        getOrderMethod.push(order);
-        getOrderMethod.returnValue();
-        getOrderMethod.endMethod();
+        if (order != 0) {
+            GeneratorAdapter getOrderMethod = startPublicMethod(classWriter, "getOrder", int.class.getName());
+            getOrderMethod.push(order);
+            getOrderMethod.returnValue();
+            getOrderMethod.endMethod();
+        }
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
@@ -2854,18 +2854,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, Method methodToInvoke) {
         constructorVisitor.visitMethodInsn(INVOKESPECIAL,
-                isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
-                methodToInvoke.getName(),
-                Type.getMethodDescriptor(methodToInvoke),
-                false);
+            getSuperTypeInternalType(),
+            methodToInvoke.getName(),
+            Type.getMethodDescriptor(methodToInvoke),
+            false);
     }
 
     private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, org.objectweb.asm.commons.Method methodToInvoke) {
         constructorVisitor.visitMethodInsn(INVOKESPECIAL,
-                isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
-                methodToInvoke.getName(),
-                methodToInvoke.getDescriptor(),
-                false);
+            getSuperTypeInternalType(),
+            methodToInvoke.getName(),
+            methodToInvoke.getDescriptor(),
+            false);
     }
 
     private void visitCheckIfShouldLoadMethodDefinition() {
@@ -4120,8 +4120,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // 2: `AbstractBeanDefinition2.MethodOrFieldReference.class` constructor
             protectedConstructor.loadArg(1);
 
-            annotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
-            annotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
+            AbstractAnnotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
+            AbstractAnnotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
 
             // 3: annotationMetadata
             if (annotationMetadata.isEmpty()) {
@@ -4180,7 +4180,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             pushPrecalculatedInfo(staticInit, protectedConstructor, annotationMetadata);
 
             protectedConstructor.invokeConstructor(
-                    isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION : superType,
+                    getSuperType(),
                     BEAN_DEFINITION_CLASS_CONSTRUCTOR
             );
 
@@ -4402,8 +4402,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void visitSuperTypeParameters(SignatureVisitor sv, Type... typeParameters) {
         // visit super class
         SignatureVisitor psv = sv.visitSuperclass();
-        psv.visitClassType(isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName());
-        if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
+        psv.visitClassType(getSuperTypeInternalType());
+        if (superType == TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
                 SignatureVisitor ppsv = psv.visitTypeArgument('=');

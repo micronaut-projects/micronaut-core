@@ -39,11 +39,13 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
+import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
+import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
+import io.micronaut.inject.writer.EvaluatedExpressionProcessor;
 import io.micronaut.inject.writer.StringSwitchWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -65,6 +67,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA;
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.initializeAnnotationMetadata;
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.writeAnnotationDefault;
 import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
 
 /**
@@ -76,8 +81,7 @@ import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
  * @since 1.1
  */
 @Internal
-final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
-    private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
+final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";
@@ -117,17 +121,21 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final List<BeanMethodData> beanMethods = new ArrayList<>();
 
     private final DispatchWriter dispatchWriter;
+    private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
+    private final AnnotationMetadata annotationMetadata;
+    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, Integer> defaults = new HashMap<>();
 
     /**
      * Default constructor.
      *
      * @param classElement           The class element
-     * @param beanAnnotationMetadata The bean annotation metadata
+     * @param annotationMetadata The bean annotation metadata
      * @param visitorContext          The visitor context
      */
-    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
+    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata annotationMetadata,
                             VisitorContext visitorContext) {
-        super(computeShortIntrospectionName(targetPackage, classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
+        super(classElement);
         this.visitorContext = visitorContext;
         final String name = classElement.getName();
         this.classElement = classElement;
@@ -135,6 +143,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
         this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
+        this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
     /**
@@ -144,7 +155,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param index                  A unique index
      * @param originatingElement     The originating element
      * @param classElement           The class element
-     * @param beanAnnotationMetadata The bean annotation metadata
+     * @param annotationMetadata The bean annotation metadata
      * @param visitorContext          The visitor context
      */
     BeanIntrospectionWriter(
@@ -153,9 +164,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         int index,
         ClassElement originatingElement,
         ClassElement classElement,
-        AnnotationMetadata beanAnnotationMetadata,
+        AnnotationMetadata annotationMetadata,
         VisitorContext visitorContext) {
-        super(computeShortIntrospectionName(targetPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
+        super(originatingElement);
         this.visitorContext = visitorContext;
         final String className = classElement.getName();
         this.classElement = classElement;
@@ -163,6 +174,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
         this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
     /**
@@ -491,7 +505,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        final Type superType = Type.getType(AbstractInitializableBeanIntrospection.class);
+        final Type superType = Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
 
         ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
         classWriter.visit(
@@ -500,7 +514,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             introspectionType.getInternalName(),
             null,
             superType.getInternalName(),
-            new String[]{Type.getInternalName(BeanIntrospectionReference.class)}
+            null
         );
 
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, getOriginatingElement());
@@ -558,7 +572,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         invokeConstructor(
             constructorWriter,
-            AbstractInitializableBeanIntrospection.class,
+            AbstractInitializableBeanIntrospectionAndReference.class,
             Class.class,
             AnnotationMetadata.class,
             AnnotationMetadata.class,

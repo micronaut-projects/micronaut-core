@@ -98,9 +98,8 @@ public class RequiresCondition implements Condition {
         }
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
-        boolean both = isBeanReference && component instanceof BeanDefinition<?>;
 
-        if (both) {
+        if (component instanceof AbstractInitializableBeanDefinitionAndReference<?>) {
             for (AnnotationValue<Requires> requirement : requirements) {
                 processPreStartRequirements(context, requirement);
                 if (context.isFailing()) {

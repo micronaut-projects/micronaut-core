@@ -175,61 +175,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.precalculatedInfo = precalculatedInfo;
     }
 
-    /**
-     * Represents {@link BeanDefinitionReference#getBeanDefinitionName()} when the class implements {@link BeanDefinitionReference}.
-     *
-     * @return The name of this bean definition
-     */
-    // @Override for BeanDefinitionReference
-    public String getBeanDefinitionName() {
-        return getClass().getName();
-    }
-
-    /**
-     * Represents {@link BeanDefinitionReference#load(BeanContext)} when the class implements {@link BeanDefinitionReference}.
-     *
-     * @param context The bean context
-     * @return a new bean definition instance
-     */
-    // @Override for BeanDefinitionReference
-    public final BeanDefinition<T> load(BeanContext context) {
-        BeanDefinition<T> definition = load();
-        if (definition instanceof EnvironmentConfigurable environmentConfigurable) {
-            if (context instanceof DefaultApplicationContext applicationContext) {
-                // Performance optimization to check for the actual class to avoid the type-check pollution
-                environmentConfigurable.configure(applicationContext.getEnvironment());
-            } else if (context instanceof ApplicationContext applicationContext) {
-                environmentConfigurable.configure(applicationContext.getEnvironment());
-            }
-        }
-        if (definition instanceof BeanContextConfigurable ctxConfigurable) {
-            ctxConfigurable.configure(context);
-        }
-        return definition;
-    }
-
-    /**
-     * Represents {@link BeanDefinitionReference#load()} when the class implements {@link BeanDefinitionReference}.
-     * NOTE: We cannot reuse this instance because of the contextual values et in {@link #load(BeanContext)}.
-     *
-     * @return a new instance of this class
-     */
-    // @Override for BeanDefinitionReference
-    public BeanDefinition<T> load() {
-        throw new IllegalStateException("Should be implemented!");
-    }
-
-    /**
-     * Represents {@link BeanDefinitionReference#isPresent()} when the class implements {@link BeanDefinitionReference}.
-     * Method returns always true, otherwise class not found would eliminate the instance
-     *
-     * @return always true
-     */
-    // @Override for BeanDefinitionReference
-    public boolean isPresent() {
-        return true;
-    }
-
     @Override
     public Qualifier<T> getDeclaredQualifier() {
         if (declaredQualifier == null) {
