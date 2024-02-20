@@ -17,33 +17,13 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.body.NettyWriteContext;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpResponse;
-import org.reactivestreams.Publisher;
-
-import java.io.InputStream;
-import java.util.concurrent.ExecutorService;
 
 /**
  * @since 4.4.0
  */
 @Internal
 public interface OutboundAccess extends NettyWriteContext {
-    @Override
-    ByteBufAllocator alloc();
-
     void attachment(Object attachment);
 
     void closeAfterWrite();
-
-    @Override
-    void writeFull(FullHttpResponse response, boolean headResponse);
-
-    @Override
-    void writeStreamed(HttpResponse response, Publisher<HttpContent> content);
-
-    @Override
-    void writeStream(HttpResponse response, InputStream stream, ExecutorService executorService);
 }
