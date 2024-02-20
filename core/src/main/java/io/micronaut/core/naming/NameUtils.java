@@ -572,11 +572,9 @@ public class NameUtils {
             char last = '0';
             for (char c : name.toCharArray()) {
                 if (first) {
-                    if (c == separatorChar) {
+                    if (c != separatorChar) {
                         // special case where first char == separatorChar, don't double it
                         // https://github.com/micronaut-projects/micronaut-core/issues/10140
-                        last = separatorChar;
-                    } else {
                         newName.append(c);
                     }
                     first = false;

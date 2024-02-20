@@ -139,9 +139,9 @@ class NameUtilsSpec extends Specification {
         value               | result                    | lowercase
         // the fix handles this case, where previously it resulted in '__name_Of_Thing'
         "_nameOfThing"      | '_name_Of_Thing'          | false
-        "__nameOfThing"      | '_name_Of_Thing'         | false
+        "__nameOfThing"     | '_name_Of_Thing'          | false
         "_nameOfThing"      | '_name_of_thing'          | true
-        "__nameOfThing"      | '_name_of_thing'         | true
+        "__nameOfThing"     | '_name_of_thing'          | true
         // the following are passing cases from prior to fix
         "com.fooBar.FooBar" | "com.foo_bar.foo_bar"     | true
         "FooBar"            | "foo_bar"                 | true
