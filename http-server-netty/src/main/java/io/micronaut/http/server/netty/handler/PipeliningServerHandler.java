@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -105,7 +104,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Queue of outbound messages that can't be written yet.
      */
-    private final Queue<OutboundAccess> outboundQueue = new ArrayDeque<>(1);
+    private final Queue<OutboundAccessImpl> outboundQueue = new ArrayDeque<>(1);
     /**
      * Current outbound message, or {@code null} if no outbound message is waiting.
      */
@@ -198,7 +197,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         if (outboundHandler != null) {
             outboundHandler.discard();
         }
-        for (OutboundAccess queued : outboundQueue) {
+        for (OutboundAccessImpl queued : outboundQueue) {
             if (queued.handler != null) {
                 queued.handler.discard();
             }
@@ -285,7 +284,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             while (ctx.channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
-                    OutboundAccess next = outboundQueue.peek();
+                    OutboundAccessImpl next = outboundQueue.peek();
                     if (next != null && next.handler != null) {
                         outboundQueue.poll();
                         outboundHandler = next.handler;
@@ -343,7 +342,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpRequest request = (HttpRequest) message;
-            OutboundAccess outboundAccess = new OutboundAccess(request);
+            OutboundAccessImpl outboundAccess = new OutboundAccessImpl(request);
             outboundQueue.add(outboundAccess);
 
             HttpHeaders headers = request.headers();
@@ -435,10 +434,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class OptimisticBufferingInboundHandler extends InboundHandler {
         private HttpRequest request;
-        private OutboundAccess outboundAccess;
+        private OutboundAccessImpl outboundAccess;
         private final List<HttpContent> buffer = new ArrayList<>();
 
-        void init(HttpRequest request, OutboundAccess outboundAccess) {
+        void init(HttpRequest request, OutboundAccessImpl outboundAccess) {
             assert buffer.isEmpty();
             this.request = request;
             this.outboundAccess = outboundAccess;
@@ -496,7 +495,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             buffer.clear();
             HttpRequest request = this.request;
-            OutboundAccess outboundAccess = this.outboundAccess;
+            OutboundAccessImpl outboundAccess = this.outboundAccess;
             this.request = null;
             this.outboundAccess = null;
 
@@ -705,7 +704,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Class that allows writing the response for the request this object is associated with.
      */
-    public final class OutboundAccess implements NettyWriteContext {
+    public final class OutboundAccessImpl implements OutboundAccess {
         /**
          * The request that caused this response. This is used for compression decisions.
          */
@@ -717,7 +716,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private Object attachment = null;
         private boolean closeAfterWrite = false;
 
-        private OutboundAccess(HttpRequest request) {
+        private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
         }
 
@@ -732,6 +731,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param attachment The attachment to forward
          */
+        @Override
         public void attachment(Object attachment) {
             this.attachment = attachment;
         }
@@ -739,6 +739,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Mark this channel to be closed after this response has been written.
          */
+        @Override
         public void closeAfterWrite() {
             closeAfterWrite = true;
         }
@@ -879,13 +880,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private abstract class OutboundHandler {
         /**
-         * {@link OutboundAccess} that created this handler, for metadata access.
+         * {@link OutboundAccessImpl} that created this handler, for metadata access.
          */
-        final OutboundAccess outboundAccess;
+        final OutboundAccessImpl outboundAccess;
 
         EmbeddedChannel compressionChannel;
 
-        private OutboundHandler(OutboundAccess outboundAccess) {
+        private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
         }
 
@@ -988,7 +989,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         boolean written = false;
         OutboundHandler next;
 
-        private ContinueOutboundHandler(OutboundAccess outboundAccess) {
+        private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
             super(outboundAccess);
         }
 
@@ -1019,7 +1020,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class FullOutboundHandler extends OutboundHandler {
         private final FullHttpResponse message;
 
-        FullOutboundHandler(OutboundAccess outboundAccess, FullHttpResponse message) {
+        FullOutboundHandler(OutboundAccessImpl outboundAccess, FullHttpResponse message) {
             super(outboundAccess);
             this.message = message;
         }
@@ -1046,13 +1047,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
-        private final OutboundAccess outboundAccess;
+        private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;
         private boolean earlyComplete = false;
         private boolean writtenLast = false;
 
-        StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
+        StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
             if (initialMessage instanceof FullHttpResponse) {
                 throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
@@ -1191,7 +1192,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private boolean consumerWaiting = false;
 
         BlockingOutboundHandler(
-            OutboundAccess outboundAccess,
+            OutboundAccessImpl outboundAccess,
             HttpResponse response,
             InputStream stream,
             ExecutorService blockingExecutor) {
