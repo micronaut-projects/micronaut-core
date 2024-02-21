@@ -48,7 +48,7 @@ public final class ConfigurationUtils {
         } else {
             typePath = getRequiredTypePath(owningType);
         }
-        return typePath + "." + propertyName;
+        return typePath + '.' + propertyName;
     }
 
     public static String getRequiredTypePath(ClassElement classElement) {
@@ -57,7 +57,7 @@ public final class ConfigurationUtils {
 
     public static Optional<String> getTypePath(ClassElement classElement) {
         if (!classElement.hasStereotype(ConfigurationReader.class)) {
-            return Optional.empty();
+            return Optional.of(StringUtils.EMPTY_STRING);
         }
         if (classElement.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
             return classElement.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
@@ -75,7 +75,7 @@ public final class ConfigurationUtils {
 
     private static String combinePaths(String p1, String p2) {
         if (StringUtils.isNotEmpty(p1) && StringUtils.isNotEmpty(p2)) {
-            return p1 + "." + p2;
+            return p1 + '.' + p2;
         }
         if (StringUtils.isNotEmpty(p1)) {
             return p1;
@@ -91,7 +91,7 @@ public final class ConfigurationUtils {
             if (prefixOptional.isEmpty()) {
                 prefix = basePrefixOptional.get();
             } else {
-                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse(null);
+                prefix = prefixOptional.map(p -> basePrefixOptional.get() + '.' + p).orElse(null);
             }
         } else {
             prefix = prefixOptional.orElse(null);
@@ -100,7 +100,7 @@ public final class ConfigurationUtils {
             return computeIterablePrefix(annotationMetadata, prefix);
         }
         if (prefix == null) {
-            return "";
+            return StringUtils.EMPTY_STRING;
         }
         return prefix;
     }
@@ -128,7 +128,8 @@ public final class ConfigurationUtils {
         while (classElement.isInner() && inner.isPresent()) {
             ClassElement enclosingType = inner.get();
             if (enclosingType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
-                String parentPrefix = enclosingType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse("");
+                String parentPrefix = enclosingType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
+                        .orElse(StringUtils.EMPTY_STRING);
                 path = combinePaths(parentPrefix, path);
                 break;
             } else {
@@ -149,7 +150,8 @@ public final class ConfigurationUtils {
             while (optionalSuperType.isPresent()) {
                 ClassElement superType = optionalSuperType.get();
                 if (superType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
-                    String parentPrefix = superType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse("");
+                    String parentPrefix = superType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
+                            .orElse(StringUtils.EMPTY_STRING);
                     path = combinePaths(parentPrefix, path);
                     break;
                 } else {
@@ -177,7 +179,10 @@ public final class ConfigurationUtils {
     }
 
     private static ClassElement resolveSuperInterface(ClassElement declaringType) {
-        return declaringType.getInterfaces().stream().filter(tm -> tm.hasStereotype(ConfigurationReader.class)).findFirst().orElse(null);
+        return declaringType.getInterfaces().stream()
+                .filter(tm -> tm.hasStereotype(ConfigurationReader.class))
+                .findFirst()
+                .orElse(null);
     }
 
 }
