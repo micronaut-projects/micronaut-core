@@ -93,12 +93,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         this.beanType = beanType;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
         this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
-        if (hasBuilder()) {
-            IntrospectionBuilderData bd = getBuilderData();
-            this.constructorArguments = ArrayUtils.concat(bd.arguments, bd.creator.getArguments());
-        } else {
-            this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
-        }
+        this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
 
         if (propertiesRefs != null) {
             List<BeanProperty<B, Object>> beanProperties = new ArrayList<>(propertiesRefs.length);
@@ -362,7 +357,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public Argument<?>[] getConstructorArguments() {
-        return constructorArguments;
+        return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
     }
 
     @NonNull
@@ -518,6 +513,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @SuppressWarnings("java:S6218")
     private record IntrospectionBuilderData(
         Argument<?>[] arguments,
+        Argument<?>[] constructorArguments,
         int constructorLength,
         @Nullable
         UnsafeBeanProperty<Object, Object>[] writeableProperties,
@@ -528,10 +524,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         @Nullable
         BeanMethod<Object, Object>[] buildMethods,
         StringIntMap argumentIndex,
-
         Object[] defaultValues,
-
         boolean[] required) {
+
         public IntrospectionBuilderData(
             Argument<?>[] constructorArguments,
             int constructorLength,
@@ -572,6 +567,23 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             Argument<?>[] arguments) {
             this(arguments, 0, null, builder, creator, buildMethods, new StringIntMap(arguments.length), new Object[arguments.length], new boolean[arguments.length]);
             init(arguments);
+        }
+
+        public IntrospectionBuilderData(
+            Argument<?>[] arguments,
+            int constructorLength,
+            @Nullable
+            UnsafeBeanProperty<Object, Object>[] writeableProperties,
+            @Nullable
+            BeanIntrospection<Object> builder,
+            @Nullable
+            BeanMethod<Object, Object> creator,
+            @Nullable
+            BeanMethod<Object, Object>[] buildMethods,
+            StringIntMap argumentIndex,
+            Object[] defaultValues,
+            boolean[] required) {
+            this(arguments, creator == null ? arguments : ArrayUtils.concat(arguments, creator.getArguments()), constructorLength, writeableProperties, builder, creator, buildMethods, argumentIndex, defaultValues, required);
         }
 
         static Argument<?>[] toArguments(Argument<?>[] constructorArguments, int constructorLength, UnsafeBeanProperty<Object, Object>[] writeableProperties) {
@@ -616,7 +628,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         private final IntrospectionBuilderData builderData;
         private final AbstractInitializableBeanIntrospection<B> introspection;
 
-
         IntrospectionBuilder(AbstractInitializableBeanIntrospection<B> outer) {
             IntrospectionBuilderData data = outer.getBuilderData();
             this.introspection = outer;
@@ -624,7 +635,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.params = new Object[data.arguments.length];
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public @NonNull Argument<?>[] getBuilderArguments() {
             return builderData.arguments;

@@ -113,6 +113,12 @@ final class ServiceLoaderFeature implements Feature {
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
                     }
+                    final Class<?> exec = access.findClassByName(typeName + "$Exec");
+                    if (exec != null) {
+                        RuntimeClassInitialization.initializeAtBuildTime(exec);
+                    }
+
+
                 } catch (NoClassDefFoundError | InstantiationException e) {
                     i.remove();
                 }

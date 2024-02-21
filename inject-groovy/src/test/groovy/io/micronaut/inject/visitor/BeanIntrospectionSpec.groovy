@@ -569,7 +569,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -641,7 +641,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -696,7 +696,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -746,7 +746,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -802,7 +802,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -848,7 +848,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -924,7 +924,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1039,7 +1039,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1205,7 +1205,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1293,7 +1293,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
         def test = classLoader.loadClass('test.Test').newInstance()

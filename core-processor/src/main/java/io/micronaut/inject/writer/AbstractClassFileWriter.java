@@ -1362,6 +1362,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      */
     protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType, String... interfaces) {
         classWriter.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
+        annotateAsGeneratedAndService(classWriter, serviceName);
+    }
+
+    protected final void annotateAsGeneratedAndService(ClassVisitor classWriter, String serviceName) {
         AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
         annotationVisitor.visit("service", serviceName);
         annotationVisitor.visitEnd();
@@ -1467,6 +1471,25 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         ), ACC_PUBLIC,
                 methodName,
                 getMethodDescriptor(returnType, argumentTypes));
+    }
+
+    /**
+     * @param writer        The class writer
+     * @param methodName    The method name
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The {@link GeneratorAdapter}
+     */
+    protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, Class<?> returnType, Class<?>... argumentTypes) {
+        return new GeneratorAdapter(writer.visitMethod(
+                ACC_PUBLIC,
+                methodName,
+                getMethodDescriptor(returnType, List.of(argumentTypes)),
+                null,
+                null
+        ), ACC_PUBLIC,
+                methodName,
+                getMethodDescriptor(returnType, List.of(argumentTypes)));
     }
 
     /**
