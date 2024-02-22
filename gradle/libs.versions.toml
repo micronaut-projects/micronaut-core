@@ -77,6 +77,7 @@ managed-snakeyaml = "2.2"
 managed-java-parser-core = "3.25.8"
 managed-ksp = "1.9.22-1.0.17"
 micronaut-docs = "2.0.0"
+micronaut-serde = "2.8.1"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
@@ -86,6 +87,7 @@ test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-v
 test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
+test-boms-micronaut-serde = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "micronaut-serde" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -261,6 +263,10 @@ micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-bra
 
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
+
+micronaut-serde-api = { module = "io.micronaut.serde:micronaut-serde-api" }
+micronaut-serde-processor = { module = "io.micronaut.serde:micronaut-serde-processor" }
+micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
 
