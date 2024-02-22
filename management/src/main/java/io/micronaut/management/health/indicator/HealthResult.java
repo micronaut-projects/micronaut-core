@@ -16,6 +16,7 @@
 package io.micronaut.management.health.indicator;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotNull;
@@ -33,6 +34,7 @@ import java.util.Map;
  */
 @Serdeable
 @JsonDeserialize(as = DefaultHealthResult.class)
+@ReflectiveAccess
 public interface HealthResult {
 
     /**

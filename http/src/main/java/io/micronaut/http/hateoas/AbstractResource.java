@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
@@ -143,6 +144,7 @@ public abstract class AbstractResource<Impl extends AbstractResource<Impl>> impl
      */
     @SuppressWarnings("unchecked")
     @Internal
+    @ReflectiveAccess
     @JsonProperty(LINKS)
     public final void setLinks(Map<String, Object> links) {
         for (Map.Entry<String, Object> entry : links.entrySet()) {
@@ -169,6 +171,7 @@ public abstract class AbstractResource<Impl extends AbstractResource<Impl>> impl
      * @param embedded The links
      */
     @Internal
+    @ReflectiveAccess
     @JsonProperty(EMBEDDED)
     public final void setEmbedded(Map<String, List<Resource>> embedded) {
         this.embeddedMap.putAll(embedded);
