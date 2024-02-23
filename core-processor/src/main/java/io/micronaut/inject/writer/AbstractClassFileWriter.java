@@ -896,12 +896,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static void pushCastToType(GeneratorAdapter ga, TypedElement from, TypedElement to) {
         Type toType = JavaModelUtils.getTypeReference(to);
         if (from.isPrimitive() && to.isPrimitive()) {
-            if (!from.getName().equals(to.getName())) {
+            if (!from.getType().equals(to.getType())) {
                 ga.cast(JavaModelUtils.getTypeReference(from), toType);
             }
         } else if (from.isPrimitive()) {
             ga.box(JavaModelUtils.getTypeReference(from));
-        } else if (!to.getName().equals(Object.class.getName())) {
+        } else if (!to.getType().getName().equals(Object.class.getName())) {
             pushCastToType(ga, toType);
         }
     }
