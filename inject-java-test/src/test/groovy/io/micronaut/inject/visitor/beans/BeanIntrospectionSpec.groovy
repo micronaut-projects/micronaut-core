@@ -49,6 +49,55 @@ import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test bytes[] in a constructor"() {
+        given:
+            def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			byte[] bytes
+	) {
+		super(bytes);
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final byte[] bytes;
+
+    public FormulaCreationDto(byte[] bytes) {
+        this.bytes = bytes;
+    }
+
+    public byte[] getBytes() {
+        return this.bytes;
+    }
+
+}
+''')
+        expect:
+            introspection.instantiate(true, List.of(), new byte[] {123}).getBytes()
+    }
+
     void "test Boolean in a constructor"() {
         given:
             def introspection = buildBeanIntrospection('test.FormulaDto', '''
