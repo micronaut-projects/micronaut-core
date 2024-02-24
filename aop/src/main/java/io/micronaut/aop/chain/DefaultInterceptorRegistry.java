@@ -53,6 +53,7 @@ import java.util.List;
 public class DefaultInterceptorRegistry implements InterceptorRegistry {
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
+    private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
@@ -134,7 +135,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 selectedInterceptors.add(bean);
             }
         }
-        return selectedInterceptors.toArray(new Interceptor[0]);
+        return selectedInterceptors.toArray(ZERO_INTERCEPTORS);
     }
 
     private <T> boolean selectInterceptor(Class<?> declaringType,

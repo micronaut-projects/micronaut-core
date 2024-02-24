@@ -683,7 +683,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
         Collections.sort(routes);
-        return routes.toArray(new UriRouteInfo[0]);
+        return routes.toArray(EMPTY);
     }
 
     private <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {

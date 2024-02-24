@@ -441,7 +441,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @since 3.0.0
      */
     default @NonNull ClassElement[] getTypeArguments() {
-        return new ClassElement[0];
+        return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     /**

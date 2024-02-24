@@ -29,6 +29,8 @@ import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
+
 /**
  * Abstract implementation of the {@link AnnotationMetadata} interface.
  *
@@ -142,7 +144,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     @Override
     public @NonNull Annotation[] synthesizeAll() {
         if (annotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
+            return ZERO_ANNOTATIONS;
         }
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
@@ -160,7 +162,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     @Override
     public @NonNull Annotation[] synthesizeDeclared() {
         if (declaredAnnotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
+            return ZERO_ANNOTATIONS;
         }
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
@@ -189,9 +191,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                     }
                 }
             }
-            return annotations.toArray(new Annotation[0]);
+            return annotations.toArray(ZERO_ANNOTATIONS);
         }
 
-        return AnnotationUtil.ZERO_ANNOTATIONS;
+        return ZERO_ANNOTATIONS;
     }
 }

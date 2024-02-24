@@ -50,6 +50,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
  * {@link io.micronaut.core.beans.BeanIntrospectionReference} instances at compilation time.
@@ -129,7 +131,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
             } else {
                 for (String aPackage : packages) {
-                    ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
+                    ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(EMPTY_STRING_ARRAY));
                     int j = 0;
                     for (ClassElement classElement : elements) {
                         if (classElement.isAbstract() || !classElement.isPublic() || isIntrospected(context, classElement)) {

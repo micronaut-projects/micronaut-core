@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Implementation of {@link ApplicationContextBuilder}.
  *
@@ -60,7 +62,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
     private final List<String> envVarExcludes = new ArrayList<>();
-    private String[] args = new String[0];
+    private String[] args = EMPTY_STRING_ARRAY;
     private final Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;

@@ -67,6 +67,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 import static io.micronaut.inject.annotation.AnnotationMetadataWriter.isSupportedMapValue;
 
 /**
@@ -802,7 +803,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The descriptor for the class
      */
     protected static String getTypeDescriptor(String type) {
-        return getTypeDescriptor(type, new String[0]);
+        return getTypeDescriptor(type, EMPTY_STRING_ARRAY);
     }
 
     /**
