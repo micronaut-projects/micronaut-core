@@ -48,6 +48,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
+
 /**
  * A method element returning data from a {@link ExecutableElement}.
  *
@@ -263,7 +265,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 }
                 elts.add(newParameterElement(this, variableElement));
             }
-            this.parameters = elts.toArray(new ParameterElement[0]);
+            this.parameters = elts.toArray(ZERO_PARAMETER_ELEMENTS);
         }
         return this.parameters;
     }

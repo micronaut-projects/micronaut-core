@@ -186,7 +186,7 @@ public class GroovyVisitorContext implements VisitorContext {
                 classElements.add(groovyElementFactory.newClassElement(classNode, getElementAnnotationMetadataFactory()));
             });
         }
-        return classElements.toArray(new ClassElement[0]);
+        return classElements.toArray(ClassElement.ZERO_CLASS_ELEMENTS);
     }
 
     @NonNull

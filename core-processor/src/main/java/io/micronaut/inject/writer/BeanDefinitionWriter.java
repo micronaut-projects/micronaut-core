@@ -133,6 +133,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
@@ -1278,7 +1279,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             if (beanTypeInnerClasses.size() > 0) {
                 classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Set.class).getDescriptor(), null, null);
-                pushStoreClassesAsSet(staticInit, beanTypeInnerClasses.toArray(new String[0]));
+                pushStoreClassesAsSet(staticInit, beanTypeInnerClasses.toArray(EMPTY_STRING_ARRAY));
                 staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
 
                 GeneratorAdapter isInnerConfigurationMethod = startProtectedMethod(classWriter, "isInnerConfiguration", boolean.class.getName(), Class.class.getName());

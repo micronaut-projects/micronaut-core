@@ -32,6 +32,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Validates all route uri variables are present in the route arguments.
  *
@@ -69,7 +71,7 @@ public class MissingParameterRule implements RouteValidationRule {
             }
         }
 
-        return new RouteValidationResult(errorMessages.toArray(new String[0]));
+        return new RouteValidationResult(errorMessages.toArray(EMPTY_STRING_ARRAY));
     }
 
     private static Collection<? extends AnnotatedElement> findProperties(ClassElement t) {

@@ -55,6 +55,8 @@ import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
+
 /**
  * Generates the GraalVM reflect.json file at compilation time.
  *
@@ -341,7 +343,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         data.methods.add(
                 AnnotationValue.builder(ReflectionConfig.ReflectiveMethodConfig.class)
                         .member("name", methodName)
-                        .member("parameterTypes", params.toArray(AnnotationClassValue.EMPTY_ARRAY))
+                        .member("parameterTypes", params.toArray(AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES))
                         .build()
         );
     }
@@ -381,10 +383,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     .member("type", type)
                     .member("accessType", accessTypes.toArray(new TypeHint.AccessType[0]));
             if (!methods.isEmpty()) {
-                builder.member("methods", methods.toArray(new AnnotationValue<?>[0]));
+                builder.member("methods", methods.toArray(ZERO_ANNOTATION_VALUES));
             }
             if (!fields.isEmpty()) {
-                builder.member("fields", fields.toArray(new AnnotationValue<?>[0]));
+                builder.member("fields", fields.toArray(ZERO_ANNOTATION_VALUES));
             }
             return builder
                     .build();

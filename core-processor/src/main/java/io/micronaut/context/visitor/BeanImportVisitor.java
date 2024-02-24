@@ -36,8 +36,10 @@ import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
- * Implementation of {@link io.micronaut.context.annotation.Import}.
+ * Implementation of {@link Import}.
  *
  * @author graemerocher
  * @since 3.0.0
@@ -98,7 +100,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         if (ArrayUtils.isNotEmpty(packages)) {
             for (String aPackage : packages) {
                 final ClassElement[] classElements = context
-                            .getClassElements(aPackage, annotationSet.toArray(new String[0]));
+                            .getClassElements(aPackage, annotationSet.toArray(EMPTY_STRING_ARRAY));
                 for (ClassElement classElement : classElements) {
                     if (!classElement.isAbstract()) {
                         beanElements.add(classElement);

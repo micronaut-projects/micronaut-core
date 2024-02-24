@@ -90,6 +90,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
+import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
+
 /**
  * A class that generates AOP proxy classes at compile time.
  *
@@ -502,7 +505,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyClass,
                 proxyClass,
                 "<init>",
-                newConstructorParameters.toArray(new ParameterElement[0])
+                newConstructorParameters.toArray(ZERO_PARAMETER_ELEMENTS)
         );
         this.beanResolutionContextArgumentIndex = constructorParameters.length;
         this.beanContextArgumentIndex = constructorParameters.length + 1;
@@ -738,7 +741,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         this.proxyBeanDefinitionWriter.setRequiresMethodProcessing(parentWriter != null && parentWriter.requiresMethodProcessing());
         interceptorsListParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
-            final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
+            final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(ZERO_ANNOTATION_VALUES);
             builder.values(interceptorBinding);
         });
         qualifierParameter.annotate(AnnotationUtil.NULLABLE);
