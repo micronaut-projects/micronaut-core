@@ -15,7 +15,6 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     implementation(projects.runtime)
-    implementation(projects.jacksonDatabind)
     implementation(projects.inject)
     api(projects.httpServer)
     api(projects.httpClientCore)
