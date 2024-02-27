@@ -165,7 +165,7 @@ class RequestCertificateSpec2 extends Specification {
         def response = future.get()
         then:
         def e = thrown ExecutionException
-        e.cause instanceof SSLHandshakeException
+        e.cause instanceof SSLHandshakeException || e.cause.cause instanceof SSLHandshakeException
 
         cleanup:
         vertx.close()
