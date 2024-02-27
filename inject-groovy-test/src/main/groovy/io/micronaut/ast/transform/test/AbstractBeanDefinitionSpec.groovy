@@ -243,7 +243,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      *
      * @return the introspection if it is correct
      **/
-    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+    protected BeanIntrospection buildBeanIntrospection(String className, @Language("groovy") String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
