@@ -51,6 +51,8 @@ class EmbeddedTestUtil {
 
         void register() {
             source.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
+                boolean flushing = false
+
                 @Override
                 void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
                     if (!(msg instanceof ByteBuf)) {
@@ -74,7 +76,11 @@ class EmbeddedTestUtil {
 
                 @Override
                 void flush(ChannelHandlerContext ctx_) throws Exception {
-                    if (sourceQueue != null) {
+                    if (flushing) {
+                        return // avoid reentrancy
+                    }
+                    flushing = true
+                    while (sourceQueue != null) {
                         ByteBuf packet = sourceQueue
                         sourceQueue = null
 
@@ -91,6 +97,7 @@ class EmbeddedTestUtil {
                             destQueue.add(packet)
                         }
                     }
+                    flushing = false
                 }
             })
             dest.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {

@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
@@ -30,11 +31,11 @@ class EmbeddedTestUtil {
     }
 
     private static class ConnectionDirection {
-        private static final Object FLUSH = new Object()
-
         final EmbeddedChannel source
         final EmbeddedChannel dest
-        final Queue<Object> queue = new ArrayDeque<>()
+        CompositeByteBuf sourceQueue
+        List<ChannelPromise> sourceQueueFutures = new ArrayList<>();
+        final Queue<ByteBuf> destQueue = new ArrayDeque<>()
         boolean readPending
 
         ConnectionDirection(EmbeddedChannel source, EmbeddedChannel dest) {
@@ -42,46 +43,73 @@ class EmbeddedTestUtil {
             this.dest = dest
         }
 
-        private void forwardLater(Object msg) {
-            if (readPending || dest.config().isAutoRead() || msg == FLUSH) {
-                dest.eventLoop().execute(() -> forwardNow(msg))
-                readPending = false
-            } else {
-                queue.add(msg)
+        private void forwardNow(ByteBuf msg) {
+            if (!dest.isOpen()) {
+                return
             }
-        }
-
-        private void forwardNow(Object msg) {
-            if (msg == FLUSH) {
-                dest.flushInbound()
-            } else {
-                dest.writeOneInbound(msg)
-            }
+            dest.writeOneInbound(msg)
+            dest.pipeline().fireChannelReadComplete()
         }
 
         void register() {
             source.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
+                boolean flushing = false
+
                 @Override
                 void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
                     if (!(msg instanceof ByteBuf)) {
-                        throw new IllegalArgumentException("Can only forward bytes!")
+                        throw new IllegalArgumentException("Can only forward bytes, got " + msg)
                     }
-                    forwardLater(msg)
-                    promise.setSuccess()
+                    if (!msg.isReadable()) {
+                        // no data
+                        msg.release()
+                        promise.setSuccess()
+                        return
+                    }
+
+                    if (sourceQueue == null) {
+                        sourceQueue = ((ByteBuf) msg).alloc().compositeBuffer()
+                    }
+                    sourceQueue.addComponent(true, (ByteBuf) msg)
+                    if (!promise.isVoid()) {
+                        sourceQueueFutures.add(promise)
+                    }
                 }
 
                 @Override
                 void flush(ChannelHandlerContext ctx_) throws Exception {
-                    forwardLater(FLUSH)
+                    if (flushing) {
+                        return // avoid reentrancy
+                    }
+                    flushing = true
+                    while (sourceQueue != null) {
+                        ByteBuf packet = sourceQueue
+                        sourceQueue = null
+
+                        def sqf = sourceQueueFutures
+                        sourceQueueFutures = new ArrayList<>()
+                        for (ChannelPromise promise : sqf) {
+                            promise.trySuccess()
+                        }
+
+                        if (readPending || dest.config().isAutoRead()) {
+                            dest.eventLoop().execute(() -> forwardNow(packet))
+                            readPending = false
+                        } else {
+                            destQueue.add(packet)
+                        }
+                    }
+                    flushing = false
                 }
             })
             dest.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
                 @Override
                 void read(ChannelHandlerContext ctx) throws Exception {
-                    if (queue.isEmpty()) {
+                    if (destQueue.isEmpty()) {
                         readPending = true
                     } else {
-                        ctx.fireChannelRead(queue.poll())
+                        ByteBuf msg = destQueue.poll()
+                        ctx.channel().eventLoop().execute(() -> forwardNow(msg))
                     }
                 }
             })

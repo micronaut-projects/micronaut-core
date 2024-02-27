@@ -23,7 +23,16 @@ import io.micronaut.http.netty.body.NettyWriteContext;
  */
 @Internal
 public interface OutboundAccess extends NettyWriteContext {
+    /**
+     * Register an attachment that will be passed to {@link RequestHandler#responseWritten(Object)}.
+     *
+     * @param attachment The attachment
+     */
     void attachment(Object attachment);
 
+    /**
+     * Close this HTTP/1.1 connection after this response has been written, e.g. when there's an
+     * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
+     */
     void closeAfterWrite();
 }
