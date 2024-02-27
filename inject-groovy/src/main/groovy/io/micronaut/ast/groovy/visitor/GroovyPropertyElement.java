@@ -50,7 +50,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final ElementAnnotationMetadata annotationMetadata;
+    private final PropertyElementAnnotationMetadata annotationMetadata;
 
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
                           ClassElement owningElement,
@@ -74,6 +74,16 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         this.owningElement = owningElement;
         this.excluded = excluded;
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getReadAnnotationMetadata());
     }
 
     @Override

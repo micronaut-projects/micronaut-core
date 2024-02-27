@@ -210,21 +210,21 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
      * @param genericType        The generic type
      * @param name               The property name
      * @param readMember         The read method
-     * @param writeMember        The write methodname
-     * @param isReadOnly         Is the property read only
-     * @param annotationMetadata The property annotation metadata
-     * @param typeArguments      The type arguments
+     * @param readType           The read type
+     * @param writeMember        The write member
+     * @param writeType          The write type
+     * @param isReadOnly         Is read only
      */
     void visitProperty(
-        @NonNull TypedElement type,
-        @NonNull TypedElement genericType,
+        @NonNull ClassElement type,
+        @NonNull ClassElement genericType,
         @NonNull String name,
         @Nullable MemberElement readMember,
         @Nullable MemberElement writeMember,
-        boolean isReadOnly,
-        @Nullable AnnotationMetadata annotationMetadata,
-        @Nullable Map<String, ClassElement> typeArguments) {
-        this.evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, classElement);
+        @Nullable ClassElement readType,
+        @Nullable ClassElement writeType,
+        boolean isReadOnly) {
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), classElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
             if (readMember instanceof MethodElement element) {
@@ -280,10 +280,10 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         }
 
         beanProperties.add(new BeanPropertyData(
-            genericType,
             name,
-            annotationMetadata,
-            typeArguments,
+            genericType,
+            readType,
+            writeType,
             readDispatchIndex,
             writeDispatchIndex,
             withMethodIndex,
@@ -419,31 +419,94 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private void pushBeanPropertyReference(ClassWriter classWriter,
                                            GeneratorAdapter staticInit,
                                            BeanPropertyData beanPropertyData) {
-        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class));
-        staticInit.dup();
 
-        pushCreateArgument(
+        Runnable pushTypeArgument = () -> pushCreateArgument(
             annotationMetadata,
-            beanType.getClassName(),
+            classElement.getName(),
             introspectionType,
             classWriter,
             staticInit,
             beanPropertyData.name,
-            beanPropertyData.typedElement,
-            beanPropertyData.annotationMetadata,
-            beanPropertyData.typeArguments,
+            beanPropertyData.type,
             defaults,
             loadTypeMethods
         );
+
+        int typeLocal = -1;
+        int readTypeLocal = -1;
+        int writeTypeLocal = -1;
+
+        Type argumentType = Type.getType(Argument.class);
+        if (beanPropertyData.type.equals(beanPropertyData.readType)) {
+            typeLocal = staticInit.newLocal(argumentType);
+            pushTypeArgument.run();
+            staticInit.storeLocal(typeLocal, argumentType);
+            readTypeLocal = typeLocal;
+        }
+        if (beanPropertyData.type.equals(beanPropertyData.writeType)) {
+            if (typeLocal == -1) {
+                typeLocal = staticInit.newLocal(argumentType);
+                pushTypeArgument.run();
+                staticInit.storeLocal(typeLocal, argumentType);
+            }
+            writeTypeLocal = typeLocal;
+        }
+
+        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class));
+        staticInit.dup();
+
+        if (typeLocal != -1) {
+            staticInit.loadLocal(typeLocal, argumentType);
+        } else {
+            pushTypeArgument.run();
+        }
+
+        if (beanPropertyData.readType == null) {
+            staticInit.push((String) null);
+        } else if (readTypeLocal != -1) {
+            staticInit.loadLocal(readTypeLocal, argumentType);
+        } else {
+            pushCreateArgument(
+                annotationMetadata,
+                classElement.getName(),
+                introspectionType,
+                classWriter,
+                staticInit,
+                beanPropertyData.name,
+                beanPropertyData.readType,
+                defaults,
+                loadTypeMethods
+            );
+        }
+
+        if (beanPropertyData.writeType == null) {
+            staticInit.push((String) null);
+        } else if (writeTypeLocal != -1) {
+            staticInit.loadLocal(writeTypeLocal, argumentType);
+        } else {
+            pushCreateArgument(
+                annotationMetadata,
+                classElement.getName(),
+                introspectionType,
+                classWriter,
+                staticInit,
+                beanPropertyData.name,
+                beanPropertyData.writeType,
+                defaults,
+                loadTypeMethods
+            );
+        }
         staticInit.push(beanPropertyData.getDispatchIndex);
         staticInit.push(beanPropertyData.setDispatchIndex);
         staticInit.push(beanPropertyData.withMethodDispatchIndex);
         staticInit.push(beanPropertyData.isReadOnly);
-        staticInit.push(!beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.typedElement));
+        staticInit.push(!beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type));
 
         invokeConstructor(
             staticInit,
             AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+            Argument.class,
+            Argument.class,
             Argument.class,
             int.class,
             int.class,
@@ -1153,29 +1216,24 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private record BeanMethodData(MethodElement methodElement, int dispatchIndex) {
     }
 
-    private record BeanPropertyData(@NonNull TypedElement typedElement, @NonNull String name,
-                                    AnnotationMetadata annotationMetadata,
-                                    @Nullable Map<String, ClassElement> typeArguments,
-                                    int getDispatchIndex, int setDispatchIndex,
-                                    int withMethodDispatchIndex, boolean isReadOnly) {
-
-        private BeanPropertyData(@NonNull TypedElement typedElement,
-                                 @NonNull String name,
-                                 @Nullable AnnotationMetadata annotationMetadata,
-                                 @Nullable Map<String, ClassElement> typeArguments,
-                                 int getDispatchIndex,
-                                 int setDispatchIndex,
-                                 int withMethodDispatchIndex,
-                                 boolean isReadOnly) {
-            this.typedElement = typedElement;
-            this.name = name;
-            this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
-            this.typeArguments = typeArguments;
-            this.getDispatchIndex = getDispatchIndex;
-            this.setDispatchIndex = setDispatchIndex;
-            this.withMethodDispatchIndex = withMethodDispatchIndex;
-            this.isReadOnly = isReadOnly;
-        }
+    /**
+     * @param name
+     * @param type
+     * @param readType
+     * @param writeType
+     * @param getDispatchIndex
+     * @param setDispatchIndex
+     * @param withMethodDispatchIndex
+     * @param isReadOnly
+     */
+    private record BeanPropertyData(@NonNull String name,
+                                    @NonNull ClassElement type,
+                                    @Nullable ClassElement readType,
+                                    @Nullable ClassElement writeType,
+                                    int getDispatchIndex,
+                                    int setDispatchIndex,
+                                    int withMethodDispatchIndex,
+                                    boolean isReadOnly) {
     }
 
     /**

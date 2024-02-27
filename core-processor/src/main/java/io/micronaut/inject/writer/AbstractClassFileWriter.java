@@ -623,6 +623,44 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
      * @param declaringTypeName    The declaring type name
      * @param owningType           The owning type
+     * @param classWriter          The class writer
+     * @param generatorAdapter     The generator adapter
+     * @param argumentName         The argument name
+     * @param classElement         The typed element
+     * @param defaults             The annotation defaults
+     * @param loadTypeMethods      The load type methods
+     */
+    protected static void pushCreateArgument(
+        AnnotationMetadata annotationMetadataWithDefaults,
+        String declaringTypeName,
+        Type owningType,
+        ClassWriter classWriter,
+        GeneratorAdapter generatorAdapter,
+        String argumentName,
+        ClassElement classElement,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
+
+        pushCreateArgument(
+            annotationMetadataWithDefaults,
+            declaringTypeName,
+            owningType,
+            classWriter,
+            generatorAdapter,
+            argumentName,
+            classElement,
+            classElement.getAnnotationMetadata(),
+            classElement.getTypeArguments(),
+            defaults,
+            loadTypeMethods
+        );
+    }
+    /**
+     * Pushes a new Argument creation.
+     *
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
+     * @param declaringTypeName    The declaring type name
+     * @param owningType           The owning type
      * @param declaringClassWriter The declaring class writer
      * @param generatorAdapter     The generator adapter
      * @param argumentName         The argument name

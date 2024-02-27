@@ -15,8 +15,29 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.*
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getConstructors
+import com.google.devtools.ksp.getDeclaredFunctions
+import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.getKotlinClassByName
+import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isPrivate
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.google.devtools.ksp.symbol.KSTypeArgument
+import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationReader
@@ -25,7 +46,18 @@ import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
-import io.micronaut.inject.ast.*
+import io.micronaut.inject.ast.ArrayableClassElement
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.MemberElement
+import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.ast.PropertyElementQuery
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
@@ -35,7 +67,6 @@ import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
 import java.util.stream.Stream
-import kotlin.collections.ArrayList
 
 internal open class KotlinClassElement(
     private val nativeType: KotlinClassNativeElement,
@@ -229,14 +260,18 @@ internal open class KotlinClassElement(
     }
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
-        if (definedType != null) {
-            AnnotationMetadataHierarchy(
-                true,
-                super<AbstractKotlinElement>.getAnnotationMetadata(),
-                typeAnnotationMetadata
-            )
+        if (presetAnnotationMetadata != null) {
+            presetAnnotationMetadata
         } else {
-            super<AbstractKotlinElement>.getAnnotationMetadata()
+            if (definedType != null) {
+                AnnotationMetadataHierarchy(
+                    true,
+                    super<AbstractKotlinElement>.getAnnotationMetadata(),
+                    typeAnnotationMetadata
+                )
+            } else {
+                super<AbstractKotlinElement>.getAnnotationMetadata()
+            }
         }
     }
 
