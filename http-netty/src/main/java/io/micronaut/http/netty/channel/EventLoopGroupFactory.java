@@ -242,6 +242,7 @@ public interface EventLoopGroupFactory {
      *
      * @param type Type of the channel to return
      * @param configuration The configuration
+     * @param parent The {@link Channel#parent() parent channel}
      * @param fd The pre-defined file descriptor
      * @return A channel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
