@@ -232,7 +232,7 @@ public interface EventLoopGroupFactory {
      * @throws UnsupportedOperationException if domain sockets are not supported.
      * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration, Channel, int)} instead
      */
-    @Deprecated
+    @Deprecated(since = "4.4.0")
     default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
         return channelInstance(type, configuration, null, fd);
     }
