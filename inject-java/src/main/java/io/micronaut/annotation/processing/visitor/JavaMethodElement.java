@@ -87,6 +87,24 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public Optional<String> getDocumentation() {
+        Optional<String> doc = super.getDocumentation();
+        if (doc.isPresent()) {
+            return doc;
+        }
+
+        Collection<ExecutableElement> overriddenMethods = visitorContext.getNativeElementsHelper()
+                .findOverriddenMethods(owningType.classElement, executableElement);
+        for (ExecutableElement method: overriddenMethods) {
+            String methodDoc = visitorContext.getElements().getDocComment(method);
+            if (methodDoc != null) {
+                return Optional.of(methodDoc.trim());
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }

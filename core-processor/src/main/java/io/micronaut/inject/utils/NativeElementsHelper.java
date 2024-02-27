@@ -201,11 +201,11 @@ public abstract class NativeElementsHelper<C, M> {
         if (excludeClass(classNode)) {
             return;
         }
+        reduce(owner, collectedMethods, getMethods(classNode), cache, false, false);
         C superClass = getSuperClass(classNode);
         if (superClass != null) {
             processClassHierarchy(owner, superClass, cache, collectedMethods, includeAbstract);
         }
-        reduce(owner, collectedMethods, getMethods(classNode), cache, false, false);
         for (C anInterface : getInterfaces(classNode)) {
             processInterfaceHierarchy(owner, anInterface, cache, collectedMethods, includeAbstract);
         }
@@ -219,10 +219,10 @@ public abstract class NativeElementsHelper<C, M> {
         if (excludeClass(classNode)) {
             return;
         }
+        reduce(owner, collectedMethods, getMethods(classNode), cache, true, includeAbstract);
         for (C anInterface : getInterfaces(classNode)) {
             processInterfaceHierarchy(owner, anInterface, cache, collectedMethods, includeAbstract);
         }
-        reduce(owner, collectedMethods, getMethods(classNode), cache, true, includeAbstract);
     }
 
     private void reduce(C owner,
