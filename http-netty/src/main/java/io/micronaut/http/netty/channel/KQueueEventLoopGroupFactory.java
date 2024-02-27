@@ -25,6 +25,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueDatagramChannel;
+import io.netty.channel.kqueue.KQueueDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
@@ -34,6 +35,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -49,6 +52,7 @@ import java.util.concurrent.ThreadFactory;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+    private static final Logger LOG = LoggerFactory.getLogger(KQueueEventLoopGroupFactory.class);
 
     /**
      * Creates a KQueueEventLoopGroup.
@@ -137,6 +141,7 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> KQueueServerSocketChannel.class;
             case CLIENT_SOCKET -> KQueueSocketChannel.class;
+            case DOMAIN_SOCKET -> KQueueDomainSocketChannel.class;
             case DOMAIN_SERVER_SOCKET -> KQueueServerDomainSocketChannel.class;
             case DATAGRAM_SOCKET -> KQueueDatagramChannel.class;
         };
@@ -152,16 +157,21 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> new KQueueServerSocketChannel();
             case CLIENT_SOCKET -> new KQueueSocketChannel();
+            case DOMAIN_SOCKET -> new KQueueDomainSocketChannel();
             case DOMAIN_SERVER_SOCKET -> new KQueueServerDomainSocketChannel();
             case DATAGRAM_SOCKET -> new KQueueDatagramChannel();
         };
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, int fd) {
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+        if (parent != null) {
+            LOG.warn("kqueue does not support FD-based channels with a parent channel. This may cause issues with HTTP2.");
+        }
         return switch (type) {
             case SERVER_SOCKET -> new KQueueServerSocketChannel(fd);
             case CLIENT_SOCKET -> new KQueueSocketChannel(fd);
+            case DOMAIN_SOCKET -> new KQueueDomainSocketChannel(fd);
             case DOMAIN_SERVER_SOCKET -> new KQueueServerDomainSocketChannel(fd);
             case DATAGRAM_SOCKET -> new KQueueDatagramChannel(fd);
         };

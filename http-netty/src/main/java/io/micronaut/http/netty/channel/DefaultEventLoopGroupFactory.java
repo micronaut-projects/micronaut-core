@@ -154,8 +154,8 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, int fd) {
-        return getFactory(configuration).channelInstance(type, configuration, fd);
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+        return getFactory(configuration).channelInstance(type, configuration, parent, fd);
     }
 
     @NonNull
