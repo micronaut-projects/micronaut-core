@@ -66,14 +66,12 @@ import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
 
 import java.io.InputStream;
-import java.io.InterruptedIOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -84,7 +82,6 @@ import java.util.concurrent.Future;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
-    private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
     private final RequestHandler requestHandler;
@@ -1177,19 +1174,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private final class BlockingOutboundHandler extends OutboundHandler {
-        private static final int QUEUE_SIZE = 2;
-
-        private final HttpResponse response;
-        private final InputStream stream;
-        private final ExecutorService blockingExecutor;
-
-        private final Queue<ByteBuf> queue = new ArrayDeque<>(QUEUE_SIZE);
-        private Future<?> worker = null;
-        private boolean workerReady = false;
-        private boolean discard = false;
-        private boolean done = false;
-        private boolean producerWaiting = false;
-        private boolean consumerWaiting = false;
+        private final BlockingWriter blockingWriter;
 
         BlockingOutboundHandler(
             OutboundAccessImpl outboundAccess,
@@ -1197,137 +1182,44 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             InputStream stream,
             ExecutorService blockingExecutor) {
             super(outboundAccess);
-            this.response = response;
-            this.stream = stream;
-            this.blockingExecutor = blockingExecutor;
+            blockingWriter = new BlockingWriter(ctx.alloc(), stream, blockingExecutor) {
+                @Override
+                protected void writeStart() {
+                    write(response, false, false);
+                }
+
+                @Override
+                protected boolean writeData(ByteBuf buf) {
+                    writeCompressing(new DefaultHttpContent(buf), true, false);
+                    return ctx.channel().isWritable();
+                }
+
+                @Override
+                protected void writeLast() {
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    outboundHandler = null;
+                    requestHandler.responseWritten(outboundAccess.attachment);
+                    PipeliningServerHandler.this.writeSome();
+                }
+
+                @Override
+                protected void writeSomeAsync() {
+                    ctx.executor().execute(PipeliningServerHandler.this::writeSome);
+                }
+            };
         }
 
         @Override
         void writeSome() {
-            if (worker == null) {
-                write(response, false, false);
-                worker = blockingExecutor.submit(this::work);
-            }
-            do {
-                ByteBuf msg;
-                synchronized (this) {
-                    if (producerWaiting) {
-                        producerWaiting = false;
-                        notifyAll();
-                    }
-                    msg = queue.poll();
-                    if (msg == null && !this.done) {
-                        consumerWaiting = true;
-                        break;
-                    }
-                }
-                if (msg == null) {
-                    // this.done == true inside the synchronized block
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
-
-                    outboundHandler = null;
-                    requestHandler.responseWritten(outboundAccess.attachment);
-                    PipeliningServerHandler.this.writeSome();
-                    break;
-                } else {
-                    writeCompressing(new DefaultHttpContent(msg), true, false);
-                }
-            } while (ctx.channel().isWritable());
+            blockingWriter.writeSome();
         }
 
         @Override
         void discard() {
             super.discard();
-            discard = true;
-            if (worker == null) {
-                worker = blockingExecutor.submit(this::work);
-            } else {
-                synchronized (this) {
-                    if (workerReady) {
-                        worker.cancel(true);
-                        // in case the worker was already done, drain buffers
-                        drain();
-                    } // else worker is still setting up and will see the discard flag in due time
-                }
-            }
+            blockingWriter.discard();
             // pretend we wrote to clean up resources
             requestHandler.responseWritten(outboundAccess.attachment);
-        }
-
-        private void work() {
-            ByteBuf buf = null;
-            try (InputStream stream = this.stream) {
-                synchronized (this) {
-                    this.workerReady = true;
-                    if (this.discard) {
-                        // don't read
-                        return;
-                    }
-                }
-                while (true) {
-                    buf = ctx.alloc().heapBuffer(LENGTH_8K);
-                    int n = buf.writeBytes(stream, LENGTH_8K);
-                    synchronized (this) {
-                        if (n == -1) {
-                            done = true;
-                            wakeConsumer();
-                            break;
-                        }
-                        while (queue.size() >= QUEUE_SIZE && !discard) {
-                            producerWaiting = true;
-                            wait();
-                        }
-                        if (discard) {
-                            break;
-                        }
-                        queue.add(buf);
-                        // buf is now owned by the queue
-                        buf = null;
-
-                        wakeConsumer();
-                    }
-                }
-            } catch (InterruptedException | InterruptedIOException ignored) {
-            } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("InputStream threw an error during read. This error cannot be forwarded to the client. Please make sure any errors are thrown by the controller instead.", e);
-                }
-            } finally {
-                // if we failed to add a buffer to the queue, release it
-                if (buf != null) {
-                    buf.release();
-                }
-                synchronized (this) {
-                    done = true;
-
-                    if (discard) {
-                        drain();
-                    }
-                }
-            }
-        }
-
-        private void wakeConsumer() {
-            assert Thread.holdsLock(this);
-
-            if (!discard && consumerWaiting) {
-                consumerWaiting = false;
-                ctx.executor().execute(PipeliningServerHandler.this::writeSome);
-            }
-        }
-
-        private void drain() {
-            assert Thread.holdsLock(this);
-
-            ByteBuf buf;
-            while (true) {
-                buf = queue.poll();
-                if (buf != null) {
-                    buf.release();
-                } else {
-                    break;
-                }
-            }
         }
     }
 }

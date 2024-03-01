@@ -73,6 +73,7 @@ abstract class MultiplexedServerHandler {
 
         private boolean requestAccepted;
         private boolean responseDone;
+        private BlockingWriter blockingWriter;
 
         abstract void notifyDataConsumed(int n);
 
@@ -140,7 +141,7 @@ abstract class MultiplexedServerHandler {
             return 0;
         }
 
-        void devolveToStreaming() {
+        final void devolveToStreaming() {
             if (requestAccepted || streamer != null || request == null) {
                 return;
             }
@@ -155,10 +156,15 @@ abstract class MultiplexedServerHandler {
             requestHandler.accept(ctx, request, ByteBody.of(streamer, request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)), this);
         }
 
+        final void onGoAwayRead(Exception e) {
+            onRstStreamRead(e);
+        }
+
         final void onRstStreamRead(Exception e) {
             if (streamer != null) {
                 streamer.sink.tryEmitError(e);
             }
+            finish();
         }
 
         private boolean finish() {
@@ -166,6 +172,9 @@ abstract class MultiplexedServerHandler {
                 return false;
             }
             responseDone = true;
+            if (blockingWriter != null) {
+                blockingWriter.discard();
+            }
             requestHandler.responseWritten(attachment);
             return true;
         }
@@ -214,13 +223,7 @@ abstract class MultiplexedServerHandler {
                                 if (future.isSuccess()) {
                                     subscription.request(1);
                                 } else {
-                                    if (future.cause() instanceof Http2Exception h2e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Stream shut down by client while sending data", h2e);
-                                        }
-                                    } else {
-                                        LOG.debug("Stream shut down by client while sending data", future.cause());
-                                    }
+                                    logStreamWriteFailure(future.cause());
                                     subscription.cancel();
                                 }
                             }));
@@ -246,9 +249,65 @@ abstract class MultiplexedServerHandler {
             });
         }
 
+        private void logStreamWriteFailure(Throwable cause) {
+            if (cause instanceof Http2Exception h2e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Stream shut down by client while sending data", h2e);
+                }
+            } else {
+                LOG.debug("Stream shut down by client while sending data", cause);
+            }
+        }
+
         @Override
         public final void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService) {
-            // todo
+            blockingWriter = new BlockingWriter(ctx.alloc(), stream, executorService) {
+                int lastSuspend = 0;
+
+                @Override
+                protected void writeStart() {
+                    writeHeaders(response, false, ctx.voidPromise());
+                }
+
+                @Override
+                protected boolean writeData(ByteBuf buf) {
+                    ChannelPromise promise = ctx.newPromise();
+                    MultiplexedStream.this.writeData(buf, false, promise);
+                    flush();
+                    if (promise.isSuccess()) {
+                        return true;
+                    }
+                    int suspend = ++lastSuspend;
+                    promise.addListener((ChannelFutureListener) future -> {
+                        if (!ctx.executor().inEventLoop()) {
+                            throw new IllegalStateException("Should complete in event loop");
+                        }
+                        if (future.isSuccess()) {
+                            // make sure that there's not another queued write that will also call
+                            // writeSome when completed
+                            if (suspend == lastSuspend) {
+                                writeSome();
+                            }
+                        } else {
+                            logStreamWriteFailure(future.cause());
+                            discard();
+                        }
+                    });
+                    return false;
+                }
+
+                @Override
+                protected void writeLast() {
+                    MultiplexedStream.this.writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
+                    finish();
+                }
+
+                @Override
+                protected void writeSomeAsync() {
+                    ctx.executor().execute(this::writeSome);
+                }
+            };
+            blockingWriter.writeSome();
         }
 
         @Override
@@ -297,6 +356,8 @@ abstract class MultiplexedServerHandler {
                 }
 
                 if (sink.currentSubscriberCount() == 0) {
+                    // this prevents further onData calls from leaking items
+                    sink.tryEmitError(SubscribedTooLateException.INSTANCE);
                     closeInput();
                 }
             }
@@ -305,6 +366,19 @@ abstract class MultiplexedServerHandler {
             public void subscribe(Subscriber<? super HttpContent> s) {
                 flux.subscribe(s);
             }
+        }
+    }
+
+    private static final class SubscribedTooLateException extends RuntimeException {
+        static final SubscribedTooLateException INSTANCE = new SubscribedTooLateException();
+
+        SubscribedTooLateException() {
+            super("Subscribed too late to message body (after closeIfNoSubscriber)");
+        }
+
+        @Override
+        public Throwable fillInStackTrace() {
+            return this;
         }
     }
 }

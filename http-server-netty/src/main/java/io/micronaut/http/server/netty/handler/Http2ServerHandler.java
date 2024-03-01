@@ -51,7 +51,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         for (Http2Error value : Http2Error.values()) {
             Exception e;
             if (value == Http2Error.CANCEL) {
-                e = new StacklessStreamClosedChannelException();
+                e = StacklessStreamClosedChannelException.INSTANCE;
             } else {
                 e = new StacklessHttp2Exception(value);
             }
@@ -147,7 +147,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onGoAwayRead(ChannelHandlerContext ctx, int lastStreamId, long errorCode, ByteBuf debugData) throws Http2Exception {
-        // todo
+        Http2Error http2Error = Http2Error.valueOf(errorCode);
+        if (http2Error == null) {
+            http2Error = Http2Error.INTERNAL_ERROR;
+        }
+        Exception e = HTTP2_ERRORS.get(http2Error);
+        connectionHandler.connection().forEachActiveStream(s -> {
+            Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
+            if (stream != null) {
+                stream.onGoAwayRead(e);
+            }
+            return true;
+        });
     }
 
     @Override
@@ -191,6 +202,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             });
             handler.reading = false;
             super.channelReadComplete(ctx);
+        }
+
+        @Override
+        protected void handlerRemoved0(ChannelHandlerContext ctx) throws Exception {
+            super.handlerRemoved0(ctx);
+            connection().forEachActiveStream(s -> {
+                Http2ServerHandler.Http2Stream stream = s.getProperty(handler.streamKey);
+                if (stream != null) {
+                    stream.onGoAwayRead(StacklessStreamClosedChannelException.INSTANCE);
+                }
+                return true;
+            });
         }
     }
 
@@ -277,6 +300,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     private static class StacklessStreamClosedChannelException extends ClosedChannelException {
+        static final StacklessStreamClosedChannelException INSTANCE = new StacklessStreamClosedChannelException();
+
         @Override
         public String getMessage() {
             return "HTTP2 peer cancelled request stream";

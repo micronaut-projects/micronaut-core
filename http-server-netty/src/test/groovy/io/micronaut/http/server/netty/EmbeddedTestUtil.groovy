@@ -45,6 +45,7 @@ class EmbeddedTestUtil {
 
         private void forwardNow(ByteBuf msg) {
             if (!dest.isOpen()) {
+                msg.release()
                 return
             }
             dest.writeOneInbound(msg)
@@ -101,6 +102,14 @@ class EmbeddedTestUtil {
                     }
                     flushing = false
                 }
+
+                @Override
+                void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                    if (sourceQueue != null) {
+                        sourceQueue.release()
+                        sourceQueue = null
+                    }
+                }
             })
             dest.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
                 @Override
@@ -110,6 +119,17 @@ class EmbeddedTestUtil {
                     } else {
                         ByteBuf msg = destQueue.poll()
                         ctx.channel().eventLoop().execute(() -> forwardNow(msg))
+                    }
+                }
+
+                @Override
+                void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                    while (true) {
+                        def buf = destQueue.poll()
+                        if (buf == null) {
+                            break
+                        }
+                        buf.release()
                     }
                 }
             })

@@ -22,6 +22,7 @@ import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
+import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
 import io.netty.handler.codec.http2.DefaultHttp2ResetFrame
@@ -31,6 +32,7 @@ import io.netty.handler.codec.http2.Http2CodecUtil
 import io.netty.handler.codec.http2.Http2DataFrame
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2Exception
+import io.netty.handler.codec.http2.Http2Frame
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameLogger
@@ -38,6 +40,7 @@ import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
+import io.netty.handler.codec.http2.Http2StreamFrame
 import io.netty.handler.logging.LogLevel
 import io.netty.util.AsciiString
 import org.junit.jupiter.api.Assertions
@@ -46,8 +49,11 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import java.nio.channels.ClosedChannelException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
 
 class Http2ServerHandlerSpec extends Specification {
@@ -136,6 +142,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
     }
 
     def "upload backpressure"() {
@@ -229,6 +237,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
     }
 
     def "download backpressure"() {
@@ -320,9 +330,88 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
     }
 
-    def "upload stream reset"() {
+    def "download inputstream backpressure"() {
+        given:
+        ExecutorService service = Executors.newSingleThreadExecutor()
+        long read = 0
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+                outboundAccess.writeStream(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new InputStream() {
+                    @Override
+                    int read() throws IOException {
+                        read++
+                        return 1
+                    }
+                }, service)
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send request"
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, false).stream(stream1))
+        def windowSize = duplexHandler.frameCodec.connection().local().flowController().windowSize(duplexHandler.frameCodec.connection().stream(stream1.id()))
+        EmbeddedTestUtil.advance(client, server)
+        then:"read and buffered some bytes"
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+        new PollingConditions(timeout: 5).eventually {
+            EmbeddedTestUtil.advance(client, server)
+            // floor(windowSize/CHUNK_SIZE) chunks successfully written
+            // 1 chunk waiting in the write future
+            // QUEUE_SIZE chunks in queue
+            // 1 chunk waiting in the reader thread
+            read == (BlockingWriter.QUEUE_SIZE + windowSize.intdiv(BlockingWriter.CHUNK_SIZE) + 2) * BlockingWriter.CHUNK_SIZE
+            duplexHandler.received.readableBytes() == windowSize
+        }
+
+        when:"consume some of the bytes"
+        read = 0
+        // have to munch a number of bytes that is:
+        // - not too close to a multiple of windowSize so that we aren't below the window update threshold
+        // - not too small to be satisfied by the existing buffered chunks
+        int toConsume = (int) (BlockingWriter.CHUNK_SIZE * 1.6)
+        while (toConsume > 0) {
+            def n = Math.min(duplexHandler.received.readableBytes(), toConsume)
+            duplexHandler.received.skipBytes(n)
+            client.writeOutbound(new DefaultHttp2WindowUpdateFrame(n).stream(stream1))
+            EmbeddedTestUtil.advance(client, server)
+            toConsume -= n
+        }
+        then:"more chunks read from the input stream"
+        new PollingConditions(timeout: 5).eventually {
+            EmbeddedTestUtil.advance(client, server)
+            // two more chunks
+            read == BlockingWriter.CHUNK_SIZE * 2
+            println(duplexHandler.received.readableBytes())
+            duplexHandler.received.readableBytes() == windowSize
+        }
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+        service.shutdownNow()
+    }
+
+    def "upload stream reset"(Http2Frame frame) {
         given:
         Throwable err = null
         CompositeByteBuf received = ByteBufAllocator.DEFAULT.compositeBuffer()
@@ -380,7 +469,8 @@ class Http2ServerHandlerSpec extends Specification {
         received.readSlice(received.readableBytes()) == data1
 
         when:
-        client.writeOutbound(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream1))
+        if (frame instanceof Http2StreamFrame) frame.stream(stream1)
+        client.writeOutbound(frame)
         EmbeddedTestUtil.advance(server, client)
         then:
         err instanceof ClosedChannelException
@@ -391,6 +481,11 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        frame << [new DefaultHttp2ResetFrame(Http2Error.CANCEL), new DefaultHttp2GoAwayFrame(Http2Error.CANCEL)]
     }
 
     def "download exception"(Exception exception, Http2Error expectedCode) {
@@ -455,6 +550,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
 
         where:
         exception                             | expectedCode
@@ -516,6 +613,7 @@ class Http2ServerHandlerSpec extends Specification {
         server.checkException()
         client.finishAndReleaseAll()
         server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
     }
 
     def "download cancelled by client"() {
@@ -588,5 +686,7 @@ class Http2ServerHandlerSpec extends Specification {
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
     }
 }
