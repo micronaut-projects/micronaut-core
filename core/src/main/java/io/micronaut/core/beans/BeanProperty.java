@@ -15,8 +15,9 @@
  */
 package io.micronaut.core.beans;
 
-import io.micronaut.core.annotation.AnnotatedElement;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -25,8 +26,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
@@ -44,12 +43,13 @@ import java.util.Optional;
  * @since 1.1
  * @see BeanIntrospection
  */
-//@Immutable
-public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadataDelegate, ArgumentCoercible<T> {
+@NextMajorVersion("Remove all the methods, only keeping those in read/write interfaces")
+public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWriteProperty<B, T>, ArgumentCoercible<T> {
 
     /**
      * @return The declaring bean introspection.
      */
+    @Override
     @NonNull BeanIntrospection<B> getDeclaringBean();
 
     /**
@@ -58,6 +58,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @return The value
      * @throws IllegalArgumentException If the bean instance if not of the correct type
      */
+    @Override
     @Nullable T get(@NonNull B bean);
 
     /**
@@ -67,6 +68,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
+    @Override
     default @NonNull <T2> Optional<T2> get(@NonNull B bean, @NonNull Class<T2> type) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", type);
@@ -81,6 +83,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
+    @Override
     default <T2> Optional<T2> get(@NonNull B bean, @NonNull Argument<T2> argument) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", argument);
@@ -96,6 +99,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
+    @Override
     default <T2> Optional<T2> get(@NonNull B bean, @NonNull ArgumentConversionContext<T2> conversionContext) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
@@ -112,6 +116,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
+    @Override
     default @Nullable <T2> T2 get(@NonNull B bean, @NonNull Class<T2> type, @Nullable T2 defaultValue) {
         ArgumentUtils.requireNonNull("bean", bean);
         //noinspection ConstantConditions
@@ -153,6 +158,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @throws UnsupportedOperationException if the property cannot be mutated
      * @since 2.3.0
      */
+    @Override
     default B withValue(@NonNull B bean, @Nullable T value) {
         if (isReadOnly())  {
             if (value == get(bean)) {
@@ -166,8 +172,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
                 Argument<?> constructorArgument = constructorArguments[i];
                 String argumentName = constructorArgument.getName();
                 Class<?> argumentType = constructorArgument.getType();
-                BeanProperty<B, ?> prop = declaringBean
-                        .getProperty(argumentName, argumentType).orElse(null);
+                BeanProperty<B, ?> prop = declaringBean.getProperty(argumentName, argumentType).orElse(null);
                 if (prop == null) {
                     throw new UnsupportedOperationException("Cannot create copy of type [" + declaringBean.getBeanType() + "]. Constructor contains argument [" + argumentName + "] that is not a readable property");
                 } else if (prop == this) {
@@ -177,9 +182,9 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
                     values[i] = prop.get(bean);
                 }
             }
+            B newInstance = declaringBean.instantiate(values);
+            Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
             if (found) {
-                B newInstance = declaringBean.instantiate(values);
-                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
                 for (BeanProperty<B, Object> beanProperty : beanProperties) {
                     if (beanProperty != this && beanProperty.isReadWrite()) {
                         beanProperty.set(newInstance, beanProperty.get(bean));
@@ -187,8 +192,6 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
                 }
                 return newInstance;
             } else {
-                B newInstance = declaringBean.instantiate(values);
-                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
                 for (BeanProperty<B, Object> beanProperty : beanProperties) {
                     if (beanProperty == this && beanProperty.isReadWrite()) {
                         found = true;
@@ -213,6 +216,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param value The value to write
      * @throws IllegalArgumentException If either the bean type or value type are not correct
      */
+    @Override
     default void set(@NonNull B bean, @Nullable T value) {
         if (isReadOnly()) {
             throw new UnsupportedOperationException("Cannot write read-only property: " + getName());
@@ -228,6 +232,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param value The value
      * @throws io.micronaut.core.convert.exceptions.ConversionErrorException If the value couldn't be converted
      */
+    @Override
     default void convertAndSet(@NonNull B bean, @Nullable Object value) {
         ArgumentUtils.requireNonNull("bean", bean);
         if (value != null) {
@@ -247,6 +252,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
     /**
      * @return The property type.
      */
+    @Override
     @NonNull Class<T> getType();
 
     /**
@@ -287,6 +293,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * The declaring type of the property.
      * @return The type
      */
+    @Override
     default Class<B> getDeclaringType() {
         return getDeclaringBean().getBeanType();
     }

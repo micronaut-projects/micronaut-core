@@ -65,7 +65,6 @@ import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -78,7 +77,6 @@ import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -166,28 +164,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
-    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<>() {
-        // Keep anonymous class to avoid lambda overhead during the startup
-        @Override
-        public int compare(BeanRegistration<?> o1, BeanRegistration<?> o2) {
-            int order1 = OrderUtil.getOrder(o1.getBeanDefinition(), o1.getBean());
-            int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
-            return Integer.compare(order1, order2);
-        }
-    };
-    private static final Comparator<BeanDefinition<?>> BEAN_DEFINITION_COMPARATOR = new Comparator<>() {
-        // Keep anonymous class to avoid lambda overhead during the startup
-        @Override
-        public int compare(BeanDefinition<?> bean1, BeanDefinition<?> bean2) {
-            int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
-            int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
-            return Integer.compare(order1, order2);
-        }
-    };
 
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
-
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -1989,7 +1968,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
             filterReplacedBeans(null, eagerInit);
-            OrderUtil.sort(eagerInit);
+            OrderUtil.sortOrdered(eagerInit);
             for (BeanDefinition eagerInitDefinition : eagerInit) {
                 try {
                     initializeEagerBean(eagerInitDefinition);
@@ -3245,25 +3224,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
-        if (hasOrder(candidates)) {
-            // pick the bean with the highest priority
-            ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
-            listCandidates.sort(BEAN_DEFINITION_COMPARATOR);
-            final Iterator<BeanDefinition<T>> i = listCandidates.iterator();
-            if (i.hasNext()) {
-                final BeanDefinition<T> bean = i.next();
-                if (i.hasNext()) {
-                    // check there are not 2 beans with the same order
-                    final BeanDefinition<T> next = i.next();
-                    if (OrderUtil.getOrder(bean.getAnnotationMetadata()) == OrderUtil.getOrder(next.getAnnotationMetadata())) {
-                        throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
-                    }
-                }
-                LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
-                return bean;
-            }
-            throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
+        // pick the bean with the highest priority
+        ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
+        listCandidates.sort(OrderUtil.ORDERED_COMPARATOR);
+        Iterator<BeanDefinition<T>> iterator = listCandidates.iterator();
+        final BeanDefinition<T> bean = iterator.next();
+        final BeanDefinition<T> next = iterator.next();
+        // We should have at least two beans - no need for next checks
+        // Check there are not 2 beans with the same order
+        if (bean.getOrder() != next.getOrder()) {
+            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
+            return bean;
         }
+
         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
             return exactMatches.iterator().next();
@@ -3272,15 +3245,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return findConcreteCandidate(beanType.getType(), qualifier, candidates);
         }
         return null;
-    }
-
-    private <T> boolean hasOrder(Collection<BeanDefinition<T>> candidates) {
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate.hasAnnotation(Order.class)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void readAllBeanConfigurations() {
@@ -3505,22 +3469,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                                          Collection<BeanDefinition<T>> beanDefinitions,
                                                                          Argument<T> beanType,
                                                                          Qualifier<T> qualifier) {
-        boolean hasOrderAnnotation = false;
-        Set<BeanRegistration<T>> beansOfTypeList = new HashSet<>();
+        List<BeanRegistration<T>> beansOfTypeList = new ArrayList<>(beanDefinitions.size());
         for (BeanDefinition<T> definition : beanDefinitions) {
-            if (!hasOrderAnnotation && definition.hasAnnotation(Order.class)) {
-                hasOrderAnnotation = true;
-            }
             addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
         }
-        if (!beansOfTypeList.isEmpty()) {
-            if (Ordered.class.isAssignableFrom(beanType.getType())) {
-                return beansOfTypeList.stream().sorted(OrderUtil.COMPARATOR).toList();
-            }
-            if (hasOrderAnnotation) {
-                return beansOfTypeList.stream().sorted(BEAN_REGISTRATION_COMPARATOR).toList();
-            }
-        }
+        beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
     }
 
@@ -4160,6 +4113,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         BeanDefinitionProducer(@NonNull BeanDefinitionReference reference) {
             this.reference = reference;
+            if (reference instanceof AbstractInitializableBeanDefinitionAndReference<?>) {
+                referenceEnabled  = true; // Postpone validation check
+            }
         }
 
         public boolean isReferenceEnabled(DefaultBeanContext context) {

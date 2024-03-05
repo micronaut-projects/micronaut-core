@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
@@ -28,8 +29,9 @@ import io.micronaut.core.annotation.Nullable;
  * @author Denis Stepanov
  * @since 3.3.1
  */
+@NextMajorVersion("Remove all the methods, only keeping those in read/write interfaces")
 @Experimental
-public interface UnsafeBeanProperty<B, T> extends BeanProperty<B, T> {
+public interface UnsafeBeanProperty<B, T> extends UnsafeBeanWriteProperty<B, T>, UnsafeBeanReadProperty<B, T>, BeanProperty<B, T> {
 
     /**
      * Unsafe version of {@link #get(Object)}.
@@ -37,6 +39,7 @@ public interface UnsafeBeanProperty<B, T> extends BeanProperty<B, T> {
      * @param bean The bean to read from
      * @return The value
      */
+    @Override
     T getUnsafe(@NonNull B bean);
 
     /**
@@ -46,6 +49,7 @@ public interface UnsafeBeanProperty<B, T> extends BeanProperty<B, T> {
      * @param value The new value
      * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
      */
+    @Override
     @NonNull
     B withValueUnsafe(@NonNull B bean, @Nullable T value);
 
@@ -55,6 +59,7 @@ public interface UnsafeBeanProperty<B, T> extends BeanProperty<B, T> {
      * @param bean  The bean
      * @param value The value to write
      */
+    @Override
     void setUnsafe(@NonNull B bean, @Nullable T value);
 
 }

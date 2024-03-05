@@ -748,15 +748,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param beanDefinitionWriter The writer
      * @throws IOException If an error occurred
      */
-    protected void finalizeAndWriteBean(
-            ClassWriterOutputVisitor classWriterOutputVisitor,
-            BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
+    protected void finalizeAndWriteBean(ClassWriterOutputVisitor classWriterOutputVisitor, BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
         beanDefinitionWriter.visitBeanDefinitionEnd();
-        BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                new BeanDefinitionReferenceWriter(beanDefinitionWriter, visitorContext);
-        beanDefinitionReferenceWriter
-                .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
-        beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         beanDefinitionWriter.accept(classWriterOutputVisitor);
     }
 

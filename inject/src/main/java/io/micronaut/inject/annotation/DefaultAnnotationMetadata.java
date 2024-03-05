@@ -156,7 +156,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             @Nullable Map<String, List<String>> annotationsByStereotype,
             boolean hasPropertyExpressions,
             boolean hasEvaluatedExpressions) {
-        super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;

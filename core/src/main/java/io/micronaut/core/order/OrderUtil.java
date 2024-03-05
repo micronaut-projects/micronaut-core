@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Order;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -36,11 +38,31 @@ public class OrderUtil {
     /**
      * Provide a comparator for collections.
      */
-    public static final Comparator<Object> COMPARATOR = (o1, o2) -> {
-        int order1 = getOrder(o1);
-        int order2 = getOrder(o2);
-        return Integer.compare(order1, order2);
+    // Keep as an anonymous class to avoid lambda overhead during the startup
+    public static final Comparator<Object> COMPARATOR = new Comparator<Object>() {
+        @Override
+        public int compare(Object o1, Object o2) {
+            int order1 = getOrder(o1);
+            int order2 = getOrder(o2);
+            return Integer.compare(order1, order2);
+        }
     };
+
+    /**
+     * The comparator of elements implementing {@link Ordered}.
+     */
+    // Keep as an anonymous class to avoid lambda overhead during the startup
+    public static final Comparator<Ordered> ORDERED_COMPARATOR = new Comparator<Ordered>() {
+        @Override
+        public int compare(Ordered o1, Ordered o2) {
+            return Integer.compare(o1.getOrder(), o2.getOrder());
+        }
+    };
+
+    /**
+     * The reverse comparator of elements implementing {@link Ordered}.
+     */
+    public static final Comparator<Ordered> REVERSE_ORDERED_COMPARATOR = Collections.reverseOrder(ORDERED_COMPARATOR);
 
     /**
      * Provide a comparator, in reversed order, for collections.
@@ -65,6 +87,54 @@ public class OrderUtil {
      */
     public static <T> Stream<T> sort(Stream<T> list) {
         return list.sorted(COMPARATOR);
+    }
+
+    /**
+     * Sort the given stream.
+     *
+     * @param list The list to sort
+     * @param <T>  The stream generic type
+     * @return The sorted stream
+     * @since 4.4.0
+     */
+    public static <T extends Ordered> Stream<T> sortOrdered(Stream<T> list) {
+        return list.sorted(ORDERED_COMPARATOR);
+    }
+
+    /**
+     * Sort the given list.
+     *
+     * @param list The list to sort
+     * @param <T>  The type
+     * @return The sorted collection
+     * @since 4.4.0
+     */
+    public static <T extends Ordered> List<T> sortOrderedCollection(Collection<T> list) {
+        var newList = new ArrayList<>(list);
+        newList.sort(ORDERED_COMPARATOR);
+        return newList;
+    }
+
+    /**
+     * Sort the given list.
+     *
+     * @param list The list to sort
+     * @param <T>  The type
+     * @since 4.4.0
+     */
+    public static <T extends Ordered> void sortOrdered(List<T> list) {
+        list.sort(ORDERED_COMPARATOR);
+    }
+
+    /**
+     * Sort the given list.
+     *
+     * @param list The list to sort
+     * @param <T>  The type
+     * @since 4.4.0
+     */
+    public static <T extends Ordered> void reverseSortOrdered(List<T> list) {
+        list.sort(REVERSE_ORDERED_COMPARATOR);
     }
 
     /**
@@ -111,7 +181,7 @@ public class OrderUtil {
      */
     public static int getOrder(Object o) {
         if (o instanceof Ordered ordered) {
-            return getOrder(ordered);
+            return ordered.getOrder();
         } else if (o instanceof AnnotationMetadata metadata) {
             return getOrder(metadata);
         }
@@ -128,7 +198,7 @@ public class OrderUtil {
      */
     public static int getOrder(AnnotationMetadata annotationMetadata, Object o) {
         if (o instanceof Ordered ordered) {
-            return getOrder(ordered);
+            return ordered.getOrder();
         }
         return getOrder(annotationMetadata);
     }
@@ -148,7 +218,9 @@ public class OrderUtil {
      *
      * @param o The ordered object
      * @return the order
+     * @deprecated Inline method
      */
+    @Deprecated(since = "4.4.0", forRemoval = true)
     public static int getOrder(Ordered o) {
         return o.getOrder();
     }

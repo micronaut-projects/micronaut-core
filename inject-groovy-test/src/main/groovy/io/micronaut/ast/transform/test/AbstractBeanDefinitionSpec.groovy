@@ -35,7 +35,6 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.codehaus.groovy.ast.ASTNode
@@ -113,7 +112,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     @CompileStatic
     BeanDefinitionReference buildBeanDefinitionReference(String className, @Language("groovy") String classStr) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -164,7 +163,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, @Language("groovy") String cls) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -275,8 +274,10 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references =  classLoader.generatedClasses.keySet()
                     .stream()
-                    .filter({ name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX) })
-                    .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
+                    .filter({ name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX) })
+                    .map({ name -> classLoader.loadClass(name) })
+                    .filter({ clazz -> BeanDefinitionReference.isAssignableFrom(clazz) })
+                    .map({ clazz -> (BeanDefinitionReference) clazz.newInstance() })
                     .collect(Collectors.toList())
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
                         new InterceptorRegistryBean(),

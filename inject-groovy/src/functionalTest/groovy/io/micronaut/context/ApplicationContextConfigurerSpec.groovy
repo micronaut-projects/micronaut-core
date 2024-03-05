@@ -65,7 +65,7 @@ class Application {
             withImplementations 'demo.app.Application$Configurer'
         }
         hasServiceFileFor(BeanDefinitionReference) {
-            withImplementations 'demo.app.$Application$Definition$Reference'
+            withImplementations 'demo.app.$Application$Definition'
         }
 
         when:

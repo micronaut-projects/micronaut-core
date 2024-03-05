@@ -30,6 +30,10 @@ public enum NettyChannelType {
      */
     CLIENT_SOCKET,
     /**
+     * @see io.netty.channel.unix.DomainSocketChannel
+     */
+    DOMAIN_SOCKET,
+    /**
      * @see io.netty.channel.unix.ServerDomainSocketChannel
      */
     DOMAIN_SERVER_SOCKET,
