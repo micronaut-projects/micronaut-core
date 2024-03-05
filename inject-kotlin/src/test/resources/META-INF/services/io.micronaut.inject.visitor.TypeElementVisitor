@@ -8,3 +8,6 @@ io.micronaut.kotlin.processing.annotations.AnnotatePropertySpec$AnnotateProperty
 io.micronaut.kotlin.processing.visitor.order.MyVisitor1
 io.micronaut.kotlin.processing.visitor.order.MyVisitor2
 io.micronaut.kotlin.processing.visitor.order.MyVisitor3
+io.micronaut.kotlin.processing.annotations.AddsRepeatableAnnotationSpec$AddRepeatableTypeElementVisitor
+io.micronaut.kotlin.processing.annotations.AddsUnseenInnerRepeatableAnnotationSpec$AddUnseenRepeatableTypeElementVisitor
+io.micronaut.kotlin.processing.annotations.AddsUnseenRepeatableAnnotationSpec$AddUnseenRepeatableTypeElementVisitor

@@ -38,6 +38,7 @@ import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.reflect.ClassUtils
@@ -49,6 +50,7 @@ import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
@@ -66,6 +68,21 @@ internal class KotlinAnnotationMetadataBuilder(
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
             return type.getBinaryName(resolver, visitorContext)
         }
+    }
+
+    override fun isRepeatableAnnotationContainer(annotationValue: AnnotationValue<*>?): Boolean {
+        val repeatableAnnotations = annotationValue!!.getAnnotations<Annotation>(AnnotationMetadata.VALUE_MEMBER)
+        return repeatableAnnotations.isNotEmpty() && repeatableAnnotations.all { isRepeatableAnnotation(it) }
+    }
+
+    private fun isRepeatableAnnotation(value: AnnotationValue<Annotation>): Boolean {
+        val annotationMirror = getAnnotationMirror(value.annotationName).orElse(null)
+        if (annotationMirror == null) {
+            return ClassUtils.forName(value.annotationName, null)
+                .map { it -> it.annotations.any { it.annotationClass.java == Repeatable::class.java } }
+                .orElse(false)
+        }
+        return getRepeatableContainerNameForType(annotationMirror) != null
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
@@ -493,7 +510,9 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
-        return getRepeatableContainerNameForType(annotationMirror.annotationType.getClassDeclaration(visitorContext))
+        val repeatableContainer =
+            getRepeatableContainerNameForType(annotationMirror.annotationType.getClassDeclaration(visitorContext))
+        return repeatableContainer
     }
 
     override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
@@ -509,6 +528,25 @@ internal class KotlinAnnotationMetadataBuilder(
             }
         }
         return null
+    }
+
+    override fun findRepeatableContainerNameForType(annotationName: String): String? {
+        val container = super.findRepeatableContainerNameForType(annotationName)
+        if (container == null) {
+            return ClassUtils.forName(annotationName, null)
+            .flatMap<String> {
+                for (annotation in it.annotations) {
+                    if (annotation.annotationClass.java == Repeatable::class.java) {
+                        return@flatMap Optional.of(
+                            (annotation as Repeatable).value.java.name
+                        )
+                    }
+                }
+                return@flatMap Optional.empty()
+            }
+            .orElse(null)
+        }
+        return container
     }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
