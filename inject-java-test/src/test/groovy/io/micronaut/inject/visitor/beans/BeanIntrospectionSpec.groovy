@@ -17,6 +17,7 @@ import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.EnumBeanIntrospection
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
@@ -3922,6 +3923,61 @@ public enum Test {
 
         then:
         thrown(ClassNotFoundException)
+    }
+
+    void "test enum bean with annotations"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@Introspected
+public enum Test {
+
+    @JsonProperty("X")
+    A(0),
+    @JsonProperty("Y")
+    B(1),
+    @JsonProperty("Z")
+    C(2);
+
+    private final int number;
+
+    Test(int number) {
+        this.number = number;
+    }
+
+    public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+        introspection instanceof EnumBeanIntrospection
+
+        when:
+        def enumIntrospection = introspection as EnumBeanIntrospection
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        def annotationMetadata = enumIntrospection.constants.find { it.value == instance }.annotationMetadata
+
+        then:
+        annotationMetadata.stringValue(JsonProperty).get() == "X"
+
+        and:
+        enumIntrospection.constants[0].stringValue(JsonProperty).get() == "X"
+        enumIntrospection.constants[1].stringValue(JsonProperty).get() == "Y"
+        enumIntrospection.constants[2].stringValue(JsonProperty).get() == "Z"
     }
 
     void "test enum bean properties with custom getter"() {
