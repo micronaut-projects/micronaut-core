@@ -11,7 +11,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.Bootstrap
-import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInitializer
@@ -46,7 +45,6 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Inject
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
@@ -58,6 +56,7 @@ import java.util.concurrent.CompletableFuture
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
 @Property(name = "micronaut.server.ssl.port", value = "-1")
 @Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
+@Property(name = "micronaut.server.netty.legacy-multiplex-handlers", value = "true")
 @Property(name = "spec.name", value = "Http2ServerPushSpec")
 class Http2ServerPushSpec extends Specification {
     @Inject

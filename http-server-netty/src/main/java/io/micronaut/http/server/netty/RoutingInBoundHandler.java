@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.publisher.DelayedSubscriber;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -578,7 +579,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private final class LazySendingSubscriber implements Processor<HttpContent, HttpContent> {
         boolean headersSent = false;
         Subscription upstream;
-        Subscriber<? super HttpContent> downstream;
+        final DelayedSubscriber<HttpContent> downstream = new DelayedSubscriber<>();
         @Nullable
         HttpContent first;
 
@@ -594,7 +595,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void subscribe(Subscriber<? super HttpContent> s) {
-            s.onSubscribe(new Subscription() {
+            downstream.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
                     HttpContent first = LazySendingSubscriber.this.first;
@@ -621,7 +622,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     upstream.cancel();
                 }
             });
-            downstream = s;
+            downstream.subscribe(s);
         }
 
         @Override

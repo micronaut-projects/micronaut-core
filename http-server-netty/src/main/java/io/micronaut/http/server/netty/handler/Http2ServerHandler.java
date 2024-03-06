@@ -230,6 +230,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         @Override
+        public ConnectionHandlerBuilder validateHeaders(boolean validateHeaders) {
+            return super.validateHeaders(validateHeaders);
+        }
+
+        @Override
+        public ConnectionHandlerBuilder initialSettings(Http2Settings settings) {
+            return super.initialSettings(settings);
+        }
+
+        @Override
         public ConnectionHandler build() {
             frameListener(frameListener);
             return super.build();

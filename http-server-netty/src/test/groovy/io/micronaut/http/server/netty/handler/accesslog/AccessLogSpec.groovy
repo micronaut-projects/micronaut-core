@@ -282,6 +282,7 @@ class AccessLogSpec extends Specification {
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.server.netty.legacy-multiplex-handlers': true,
                 'micronaut.netty.event-loops.default.num-threads': 1
         ])
         def server = ctx.getBean(EmbeddedServer)

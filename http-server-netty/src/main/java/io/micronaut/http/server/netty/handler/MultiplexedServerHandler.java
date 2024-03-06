@@ -186,6 +186,15 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public final void writeFull(@NonNull FullHttpResponse response, boolean headResponse) {
+            if (responseDone) {
+                // early check
+                throw new IllegalStateException("Response already written");
+            }
+            if (!ctx.executor().inEventLoop()) {
+                ctx.executor().execute(() -> writeFull(response, headResponse));
+                return;
+            }
+
             ByteBuf content = response.content();
             boolean empty = !content.isReadable();
             writeHeaders(response, empty, ctx.voidPromise());
@@ -200,14 +209,23 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public final void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content) {
+            if (responseDone) {
+                // early check
+                throw new IllegalStateException("Response already written");
+            }
+            if (!ctx.executor().inEventLoop()) {
+                ctx.executor().execute(() -> writeStreamed(response, content));
+                return;
+            }
+
             writeHeaders(response, false, ctx.voidPromise());
             content.subscribe(new Subscriber<>() {
                 Subscription subscription;
 
                 @Override
                 public void onSubscribe(Subscription s) {
-                    s.request(1);
                     subscription = s;
+                    s.request(1);
                 }
 
                 @Override
@@ -232,6 +250,12 @@ abstract class MultiplexedServerHandler {
 
                 @Override
                 public void onError(Throwable t) {
+                    EventLoop eventLoop = ctx.channel().eventLoop();
+                    if (!eventLoop.inEventLoop()) {
+                        eventLoop.execute(() -> onError(t));
+                        return;
+                    }
+
                     if (!reset(t)) {
                         LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
                     }
@@ -241,6 +265,12 @@ abstract class MultiplexedServerHandler {
 
                 @Override
                 public void onComplete() {
+                    EventLoop eventLoop = ctx.channel().eventLoop();
+                    if (!eventLoop.inEventLoop()) {
+                        eventLoop.execute(this::onComplete);
+                        return;
+                    }
+
                     if (finish()) {
                         writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
                         flush();
@@ -261,6 +291,15 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public final void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService) {
+            if (responseDone) {
+                // early check
+                throw new IllegalStateException("Response already written");
+            }
+            if (!ctx.executor().inEventLoop()) {
+                ctx.executor().execute(() -> writeStream(response, stream, executorService));
+                return;
+            }
+
             blockingWriter = new BlockingWriter(ctx.alloc(), stream, executorService) {
                 int lastSuspend = 0;
 
@@ -299,6 +338,7 @@ abstract class MultiplexedServerHandler {
                 @Override
                 protected void writeLast() {
                     MultiplexedStream.this.writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
+                    flush();
                     finish();
                 }
 

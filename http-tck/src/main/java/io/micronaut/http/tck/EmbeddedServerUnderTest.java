@@ -87,6 +87,11 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
     }
 
     @Override
+    public Optional<String> getScheme() {
+        return Optional.ofNullable(embeddedServer).map(EmbeddedServer::getScheme);
+    }
+
+    @Override
     @NonNull
     public Optional<Integer> getPort() {
         return Optional.ofNullable(embeddedServer).map(EmbeddedServer::getPort);

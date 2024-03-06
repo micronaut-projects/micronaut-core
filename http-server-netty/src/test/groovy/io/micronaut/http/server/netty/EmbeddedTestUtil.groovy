@@ -1,11 +1,15 @@
 package io.micronaut.http.server.netty
 
+import io.micronaut.core.annotation.NonNull
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
+import io.netty.channel.ChannelDuplexHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
+
+import java.nio.channels.ClosedChannelException
 
 class EmbeddedTestUtil {
     static void advance(EmbeddedChannel... channels) {
@@ -48,7 +52,9 @@ class EmbeddedTestUtil {
                 msg.release()
                 return
             }
-            dest.writeOneInbound(msg)
+            ByteBuf copy = msg.copy()
+            msg.release()
+            dest.writeOneInbound(copy)
             dest.pipeline().fireChannelReadComplete()
         }
 
@@ -60,6 +66,11 @@ class EmbeddedTestUtil {
                 void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
                     if (!(msg instanceof ByteBuf)) {
                         throw new IllegalArgumentException("Can only forward bytes, got " + msg)
+                    }
+                    if (!dest.isActive()) {
+                        msg.release()
+                        promise.tryFailure(new ClosedChannelException())
+                        return
                     }
                     if (!msg.isReadable()) {
                         // no data
@@ -111,7 +122,7 @@ class EmbeddedTestUtil {
                     }
                 }
             })
-            dest.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
+            dest.pipeline().addFirst(new ChannelDuplexHandler() {
                 @Override
                 void read(ChannelHandlerContext ctx) throws Exception {
                     if (destQueue.isEmpty()) {
@@ -120,6 +131,14 @@ class EmbeddedTestUtil {
                         ByteBuf msg = destQueue.poll()
                         ctx.channel().eventLoop().execute(() -> forwardNow(msg))
                     }
+                }
+
+                @Override
+                void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
+                    for (ChannelPromise f : sourceQueueFutures) {
+                        f.tryFailure(new ClosedChannelException())
+                    }
+                    super.channelInactive(ctx)
                 }
 
                 @Override

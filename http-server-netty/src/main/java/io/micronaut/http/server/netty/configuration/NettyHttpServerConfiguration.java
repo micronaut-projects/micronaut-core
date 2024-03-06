@@ -196,6 +196,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
+    private boolean legacyMultiplexHandlers = false;
 
     /**
      * Default empty constructor.
@@ -726,6 +727,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    public boolean isLegacyMultiplexHandlers() {
+        return legacyMultiplexHandlers;
+    }
+
+    public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
+        this.legacyMultiplexHandlers = legacyMultiplexHandlers;
     }
 
     /**
