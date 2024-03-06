@@ -579,8 +579,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private final class LazySendingSubscriber implements Processor<HttpContent, HttpContent> {
         private static final Object COMPLETE = new Object();
 
-        private final EventLoopSerializer serializer;
-
         boolean headersSent = false;
         Subscription upstream;
         Subscriber<? super HttpContent> downstream;
@@ -588,6 +586,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         HttpContent first;
         Object completion = null; // in case first hasn't been consumed we need to delay completion
 
+        private final EventLoopSerializer serializer;
         private final NettyHttpRequest<?> request;
         private final io.netty.handler.codec.http.HttpResponse headers;
         private final PipeliningServerHandler.OutboundAccess outboundAccess;
