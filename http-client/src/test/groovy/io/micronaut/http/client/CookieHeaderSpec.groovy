@@ -15,6 +15,6 @@ class CookieHeaderSpec extends Specification {
         request.cookie(Cookie.of("a", "3"))
 
         then:
-        request.headers.get(HttpHeaders.COOKIE) == "a=3;b=2"
+        request.headers.get(HttpHeaders.COOKIE) == "a=3; b=2"
     }
 }
