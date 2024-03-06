@@ -16,9 +16,9 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.EventLoopSerializer;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import org.reactivestreams.Publisher;
@@ -34,7 +34,7 @@ import org.reactivestreams.Subscription;
 @Internal
 final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements Subscriber<HttpContent> {
     private final Publisher<HttpContent> source;
-    private EventLoop eventLoop;
+    private EventLoopSerializer serializer;
     private ChannelHandlerContext ctx;
     private Subscription subscription;
     private boolean writtenLast;
@@ -45,7 +45,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        this.eventLoop = ctx.channel().eventLoop();
+        this.serializer = new EventLoopSerializer(ctx.channel().eventLoop());
         this.ctx = ctx;
         source.subscribe(this);
     }
@@ -68,11 +68,12 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onSubscribe(Subscription s) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onSubscribe(s));
-            return;
+        if (serializer.executeNow(() -> onSubscribe0(s))) {
+            onSubscribe0(s);
         }
+    }
 
+    private void onSubscribe0(Subscription s) {
         if (ctx == null) {
             s.cancel();
         } else {
@@ -85,11 +86,12 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onNext(HttpContent httpContent) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onNext(httpContent));
-            return;
+        if (serializer.executeNow(() -> onNext0(httpContent))) {
+            onNext0(httpContent);
         }
+    }
 
+    private void onNext0(HttpContent httpContent) {
         if (writtenLast) {
             throw new IllegalStateException("Already written a LastHttpContent");
         }
@@ -110,22 +112,24 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onError(Throwable t) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onError(t));
-            return;
+        if (serializer.executeNow(() -> onError0(t))) {
+            onError0(t);
         }
+    }
 
+    private void onError0(Throwable t) {
         ctx.fireExceptionCaught(t);
         ctx.pipeline().remove(ctx.name());
     }
 
     @Override
     public void onComplete() {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(this::onComplete);
-            return;
+        if (serializer.executeNow(this::onComplete0)) {
+            onComplete0();
         }
+    }
 
+    private void onComplete0() {
         if (!writtenLast) {
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, ctx.voidPromise());
         }
