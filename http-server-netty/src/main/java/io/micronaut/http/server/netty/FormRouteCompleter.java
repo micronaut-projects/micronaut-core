@@ -21,7 +21,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
-import io.micronaut.http.netty.EventLoopSerializer;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
@@ -58,7 +58,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
     private final EventLoop eventLoop;
-    private final EventLoopSerializer serializer;
+    private final EventLoopFlow serializer;
     private boolean executed;
     private final RouteMatch<?> routeMatch;
     private Subscription upstreamSubscription;
@@ -67,7 +67,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private boolean upstreamDemanded = false;
 
     FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
-        this.serializer = new EventLoopSerializer(eventLoop);
+        this.serializer = new EventLoopFlow(eventLoop);
         this.eventLoop = eventLoop;
         this.routeMatch = routeMatch;
     }

@@ -8,11 +8,11 @@ import spock.lang.Specification
 
 import java.util.concurrent.TimeUnit
 
-class EventLoopSerializerSpec extends Specification {
+class EventLoopFlowSpec extends Specification {
     def 'outside simple'() {
         given:
         def mock = new MockEventExecutor()
-        def serializer = new EventLoopSerializer(mock)
+        def serializer = new EventLoopFlow(mock)
         boolean run = false
 
         when:
@@ -31,7 +31,7 @@ class EventLoopSerializerSpec extends Specification {
     def 'inside simple'() {
         given:
         def mock = new MockEventExecutor()
-        def serializer = new EventLoopSerializer(mock)
+        def serializer = new EventLoopFlow(mock)
         boolean run = false
 
         when:
@@ -46,7 +46,7 @@ class EventLoopSerializerSpec extends Specification {
     def 'serialize on inside call after outside call'() {
         given:
         def mock = new MockEventExecutor()
-        def serializer = new EventLoopSerializer(mock)
+        def serializer = new EventLoopFlow(mock)
         boolean run1 = false
         boolean run2 = false
 

@@ -42,7 +42,7 @@ import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.netty.EventLoopSerializer;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
@@ -586,7 +586,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         HttpContent first;
         Object completion = null; // in case first hasn't been consumed we need to delay completion
 
-        private final EventLoopSerializer serializer;
+        private final EventLoopFlow serializer;
         private final NettyHttpRequest<?> request;
         private final io.netty.handler.codec.http.HttpResponse headers;
         private final PipeliningServerHandler.OutboundAccess outboundAccess;
@@ -595,7 +595,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             this.request = request;
             this.headers = headers;
             this.outboundAccess = outboundAccess;
-            this.serializer = new EventLoopSerializer(request.getChannelHandlerContext().channel().eventLoop());
+            this.serializer = new EventLoopFlow(request.getChannelHandlerContext().channel().eventLoop());
         }
 
         @Override

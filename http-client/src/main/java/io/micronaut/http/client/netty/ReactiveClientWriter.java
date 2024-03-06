@@ -16,7 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.EventLoopSerializer;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.HttpContent;
@@ -34,7 +34,7 @@ import org.reactivestreams.Subscription;
 @Internal
 final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements Subscriber<HttpContent> {
     private final Publisher<HttpContent> source;
-    private EventLoopSerializer serializer;
+    private EventLoopFlow serializer;
     private ChannelHandlerContext ctx;
     private Subscription subscription;
     private boolean writtenLast;
@@ -45,7 +45,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        this.serializer = new EventLoopSerializer(ctx.channel().eventLoop());
+        this.serializer = new EventLoopFlow(ctx.channel().eventLoop());
         this.ctx = ctx;
         source.subscribe(this);
     }

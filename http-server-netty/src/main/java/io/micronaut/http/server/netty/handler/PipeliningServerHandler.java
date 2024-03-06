@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.netty.EventLoopSerializer;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -1047,7 +1047,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
-        private final EventLoopSerializer serializer = new EventLoopSerializer(ctx.channel().eventLoop());
+        private final EventLoopFlow serializer = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccess outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;

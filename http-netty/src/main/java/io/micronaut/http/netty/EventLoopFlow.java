@@ -54,7 +54,7 @@ import io.netty.util.concurrent.OrderedEventExecutor;
  * @author Jonas Konrad
  */
 @Internal
-public final class EventLoopSerializer {
+public final class EventLoopFlow {
     /**
      * This adds some extra checks to find bugs.
      */
@@ -73,7 +73,7 @@ public final class EventLoopSerializer {
      */
     private volatile int runGeneration = 0;
 
-    public EventLoopSerializer(OrderedEventExecutor loop) {
+    public EventLoopFlow(OrderedEventExecutor loop) {
         this.loop = loop;
     }
 
