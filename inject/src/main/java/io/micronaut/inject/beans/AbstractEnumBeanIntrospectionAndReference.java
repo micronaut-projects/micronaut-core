@@ -17,6 +17,7 @@ package io.micronaut.inject.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.EnumBeanIntrospection;
@@ -31,21 +32,34 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 4.4.0
  */
-public abstract class AbstractInitializableEnumBeanIntrospectionAndReference<E extends Enum<E>> extends AbstractInitializableBeanIntrospectionAndReference<E> implements EnumBeanIntrospection<E> {
+@Internal
+public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E>> extends AbstractInitializableBeanIntrospectionAndReference<E> implements EnumBeanIntrospection<E> {
 
     private final List<EnumConstant<E>> enumConstantRefs;
 
-    protected AbstractInitializableEnumBeanIntrospectionAndReference(Class<E> beanType,
-                                                                     AnnotationMetadata annotationMetadata,
-                                                                     AnnotationMetadata constructorAnnotationMetadata,
-                                                                     Argument<?>[] constructorArguments,
-                                                                     BeanPropertyRef<Object>[] propertiesRefs,
-                                                                     BeanMethodRef<Object>[] methodsRefs,
-                                                                     EnumConstantRef<E>[] enumValueRefs) {
+    /**
+     * The default constructor.
+     *
+     * @param beanType                      The bean type
+     * @param annotationMetadata            The annotation metadata
+     * @param constructorAnnotationMetadata The constructor annotation metadata
+     * @param constructorArguments          The constructor arguments
+     * @param propertiesRefs                The property references
+     * @param methodsRefs                   The method references
+     * @param enumValueRefs                 The enum references
+     */
+    protected AbstractEnumBeanIntrospectionAndReference(Class<E> beanType,
+                                                        AnnotationMetadata annotationMetadata,
+                                                        AnnotationMetadata constructorAnnotationMetadata,
+                                                        Argument<?>[] constructorArguments,
+                                                        BeanPropertyRef<Object>[] propertiesRefs,
+                                                        BeanMethodRef<Object>[] methodsRefs,
+                                                        EnumConstantRef<E>[] enumValueRefs) {
         super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
         this.enumConstantRefs = List.of(enumValueRefs);
     }
 
+    @NonNull
     @Override
     public List<EnumConstant<E>> getConstants() {
         return enumConstantRefs;
@@ -56,13 +70,16 @@ public abstract class AbstractInitializableEnumBeanIntrospectionAndReference<E e
      */
     @Internal
     @UsedByGeneratedCode
-    public record EnumConstantRef<E extends Enum<E>>(E value, AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
+    public record EnumConstantRef<E extends Enum<E>>(@NonNull E value,
+                                                     @NonNull AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
 
+        @NonNull
         @Override
         public E getValue() {
             return value;
         }
 
+        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;

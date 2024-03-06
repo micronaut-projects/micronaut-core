@@ -40,9 +40,9 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
-import io.micronaut.inject.beans.AbstractInitializableEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
@@ -393,14 +393,14 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
         }
         if (isEnum) {
-            Type type = Type.getType(AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef[].class);
+            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class);
             classWriter.visitField(
                 ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ENUM_CONSTANTS_REFERENCES,
                 type.getDescriptor(),
                 null,
                 null
             );
-            pushNewArray(staticInit, AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
+            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
                 pushEnumConstantReference(
                     classWriter,
                     staticInit,
@@ -579,7 +579,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private void pushEnumConstantReference(ClassWriter classWriter,
                                            GeneratorAdapter staticInit,
                                            EnumConstantElement enumConstantElement) {
-        staticInit.newInstance(Type.getType(AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef.class));
+        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class));
         staticInit.dup();
         // 1: value
         staticInit.getStatic(getTypeReference(enumConstantElement.getOwningType()), enumConstantElement.getName(), getTypeReference(enumConstantElement.getOwningType()));
@@ -593,7 +593,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
         invokeConstructor(
             staticInit,
-            AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef.class,
+            AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class,
             Enum.class,
             AnnotationMetadata.class
         );
@@ -613,7 +613,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         boolean isEnum = classElement.isEnum();
-        final Type superType = isEnum ? Type.getType(AbstractInitializableEnumBeanIntrospectionAndReference.class) : Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
+        final Type superType = isEnum ? Type.getType(AbstractEnumBeanIntrospectionAndReference.class) : Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
 
         ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
         classWriter.visit(
@@ -680,18 +680,18 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         if (isEnum) {
             constructorWriter.getStatic(introspectionType,
                 FIELD_ENUM_CONSTANTS_REFERENCES,
-                Type.getType(AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef[].class)
+                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class)
             );
             invokeConstructor(
                 constructorWriter,
-                AbstractInitializableEnumBeanIntrospectionAndReference.class,
+                AbstractEnumBeanIntrospectionAndReference.class,
                 Class.class,
                 AnnotationMetadata.class,
                 AnnotationMetadata.class,
                 Argument[].class,
                 AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
                 AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
-                AbstractInitializableEnumBeanIntrospectionAndReference.EnumConstantRef[].class
+                AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class
             );
         } else {
             invokeConstructor(

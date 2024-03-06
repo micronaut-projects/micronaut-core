@@ -24,7 +24,7 @@ import java.util.List;
  *
  * @param <E> The type of the enum
  * @author Denis Stepanov
- * @since 4.4
+ * @since 4.4.0
  */
 public interface EnumBeanIntrospection<E extends Enum<E>> extends BeanIntrospection<E> {
 
