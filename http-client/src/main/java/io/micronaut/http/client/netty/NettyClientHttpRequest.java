@@ -115,8 +115,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         cookies.put(cookie.getName(), value);
         String headerValue;
         if (cookies.size() > 1) {
-            // this has to include a space, the spec says so.
-            headerValue = String.join("; ", cookies.values());
+            headerValue = String.join(";", cookies.values());
         } else {
             headerValue = value;
         }
