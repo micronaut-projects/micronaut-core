@@ -34,7 +34,7 @@ import org.reactivestreams.Subscription;
 @Internal
 final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements Subscriber<HttpContent> {
     private final Publisher<HttpContent> source;
-    private EventLoopFlow serializer;
+    private EventLoopFlow flow;
     private ChannelHandlerContext ctx;
     private Subscription subscription;
     private boolean writtenLast;
@@ -45,7 +45,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        this.serializer = new EventLoopFlow(ctx.channel().eventLoop());
+        this.flow = new EventLoopFlow(ctx.channel().eventLoop());
         this.ctx = ctx;
         source.subscribe(this);
     }
@@ -68,7 +68,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onSubscribe(Subscription s) {
-        if (serializer.executeNow(() -> onSubscribe0(s))) {
+        if (flow.executeNow(() -> onSubscribe0(s))) {
             onSubscribe0(s);
         }
     }
@@ -86,7 +86,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onNext(HttpContent httpContent) {
-        if (serializer.executeNow(() -> onNext0(httpContent))) {
+        if (flow.executeNow(() -> onNext0(httpContent))) {
             onNext0(httpContent);
         }
     }
@@ -112,7 +112,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onError(Throwable t) {
-        if (serializer.executeNow(() -> onError0(t))) {
+        if (flow.executeNow(() -> onError0(t))) {
             onError0(t);
         }
     }
@@ -124,7 +124,7 @@ final class ReactiveClientWriter extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void onComplete() {
-        if (serializer.executeNow(this::onComplete0)) {
+        if (flow.executeNow(this::onComplete0)) {
             onComplete0();
         }
     }

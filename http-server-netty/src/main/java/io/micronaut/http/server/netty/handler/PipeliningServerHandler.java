@@ -1047,7 +1047,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
-        private final EventLoopFlow serializer = new EventLoopFlow(ctx.channel().eventLoop());
+        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccess outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;
@@ -1088,7 +1088,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onNext(HttpContent httpContent) {
-            if (serializer.executeNow(() -> onNext0(httpContent))) {
+            if (flow.executeNow(() -> onNext0(httpContent))) {
                 onNext0(httpContent);
             }
         }
@@ -1118,7 +1118,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onError(Throwable t) {
-            if (serializer.executeNow(() -> onError0(t))) {
+            if (flow.executeNow(() -> onError0(t))) {
                 onError0(t);
             }
         }
@@ -1136,7 +1136,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onComplete() {
-            if (serializer.executeNow(this::onComplete0)) {
+            if (flow.executeNow(this::onComplete0)) {
                 onComplete0();
             }
         }

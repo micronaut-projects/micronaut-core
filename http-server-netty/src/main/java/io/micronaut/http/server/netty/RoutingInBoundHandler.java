@@ -586,7 +586,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         HttpContent first;
         Object completion = null; // in case first hasn't been consumed we need to delay completion
 
-        private final EventLoopFlow serializer;
+        private final EventLoopFlow flow;
         private final NettyHttpRequest<?> request;
         private final io.netty.handler.codec.http.HttpResponse headers;
         private final PipeliningServerHandler.OutboundAccess outboundAccess;
@@ -595,7 +595,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             this.request = request;
             this.headers = headers;
             this.outboundAccess = outboundAccess;
-            this.serializer = new EventLoopFlow(request.getChannelHandlerContext().channel().eventLoop());
+            this.flow = new EventLoopFlow(request.getChannelHandlerContext().channel().eventLoop());
         }
 
         @Override
@@ -646,7 +646,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onNext(HttpContent httpContent) {
-            if (serializer.executeNow(() -> onNext0(httpContent))) {
+            if (flow.executeNow(() -> onNext0(httpContent))) {
                 onNext0(httpContent);
             }
         }
@@ -663,7 +663,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onError(Throwable t) {
-            if (serializer.executeNow(() -> onError0(t))) {
+            if (flow.executeNow(() -> onError0(t))) {
                 onError0(t);
             }
         }
@@ -700,7 +700,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onComplete() {
-            if (serializer.executeNow(this::onComplete0)) {
+            if (flow.executeNow(this::onComplete0)) {
                 onComplete0();
             }
         }

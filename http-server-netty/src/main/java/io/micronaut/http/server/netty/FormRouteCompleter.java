@@ -58,7 +58,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
     private final EventLoop eventLoop;
-    private final EventLoopFlow serializer;
+    private final EventLoopFlow flow;
     private boolean executed;
     private final RouteMatch<?> routeMatch;
     private Subscription upstreamSubscription;
@@ -67,7 +67,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private boolean upstreamDemanded = false;
 
     FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
-        this.serializer = new EventLoopFlow(eventLoop);
+        this.flow = new EventLoopFlow(eventLoop);
         this.eventLoop = eventLoop;
         this.routeMatch = routeMatch;
     }
@@ -78,7 +78,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onSubscribe(Subscription s) {
-        if (serializer.executeNow(() -> onSubscribe0(s))) {
+        if (flow.executeNow(() -> onSubscribe0(s))) {
             onSubscribe0(s);
         }
     }
@@ -91,7 +91,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onNext(Object o) {
-        if (serializer.executeNow(() -> onNext0(o))) {
+        if (flow.executeNow(() -> onNext0(o))) {
             onNext0(o);
         }
     }
@@ -107,7 +107,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onComplete() {
-        if (serializer.executeNow(this::onComplete0)) {
+        if (flow.executeNow(this::onComplete0)) {
             onComplete0();
         }
     }
@@ -124,7 +124,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onError(Throwable t) {
-        if (serializer.executeNow(() -> onError0(t))) {
+        if (flow.executeNow(() -> onError0(t))) {
             onError0(t);
         }
     }
