@@ -19,7 +19,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Annotates a class or method as being experimental and subject to change or removal.
+ * <p>Annotates a class or method as being experimental and subject to change or removal.</p?
+ *
+ * <p>Overriding an experimental element will produce a compilation warning. These warnings can be
+ * suppressed by setting an annotation processing argument:
+ * <code>-Amicronaut.processing.internal-warnings=false</code></p>
  *
  * @author Graeme Rocher
  * @since 1.0

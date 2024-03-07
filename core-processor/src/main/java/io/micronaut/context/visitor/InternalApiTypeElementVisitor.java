@@ -18,6 +18,7 @@ package io.micronaut.context.visitor;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -38,6 +39,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
     private static final String IO_MICRONAUT = "io.micronaut";
+
+    private static final String MICRONAUT_PROCESSING_INTERNAL_WARNINGS = "micronaut.processing.internal-warnings";
 
     private boolean warned = false;
 
@@ -78,14 +81,21 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     private void warn(Element element, VisitorContext context) {
         if (element.hasAnnotation(Internal.class) || element.hasAnnotation(Experimental.class)) {
             warned = true;
-            context.warn("Element extends or implements an internal or experimental Micronaut API", element);
+            if (warnEnabled(context)) {
+                context.warn("Element extends or implements an internal or experimental Micronaut API", element);
+            }
         }
     }
 
     @Override
     public void finish(VisitorContext visitorContext) {
-        if (warned) {
+        if (warned && warnEnabled(visitorContext)) {
             visitorContext.warn("Overriding an internal Micronaut API may result in breaking changes in minor or patch versions of the framework. Proceed with caution!", null);
         }
+    }
+
+    private boolean warnEnabled(VisitorContext visitorContext) {
+        String value = visitorContext.getOptions().get(MICRONAUT_PROCESSING_INTERNAL_WARNINGS);
+        return value == null || StringUtils.TRUE.equals(value);
     }
 }
