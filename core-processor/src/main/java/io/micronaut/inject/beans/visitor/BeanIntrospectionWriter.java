@@ -32,12 +32,15 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -88,6 +91,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
+    private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
     private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class)
     );
@@ -334,7 +338,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void buildStaticInit(ClassWriter classWriter) {
+    private void buildStaticInit(ClassWriter classWriter, boolean isEnum) {
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
         Map<String, Integer> defaults = new HashMap<>();
 
@@ -387,6 +391,23 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                 );
             });
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
+        }
+        if (isEnum) {
+            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class);
+            classWriter.visitField(
+                ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ENUM_CONSTANTS_REFERENCES,
+                type.getDescriptor(),
+                null,
+                null
+            );
+            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
+                pushEnumConstantReference(
+                    classWriter,
+                    staticInit,
+                    enumConstantElement
+                );
+            });
+            staticInit.putStatic(introspectionType, FIELD_ENUM_CONSTANTS_REFERENCES, type);
         }
 
         int indexesIndex = 0;
@@ -555,6 +576,29 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             int.class);
     }
 
+    private void pushEnumConstantReference(ClassWriter classWriter,
+                                           GeneratorAdapter staticInit,
+                                           EnumConstantElement enumConstantElement) {
+        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class));
+        staticInit.dup();
+        // 1: value
+        staticInit.getStatic(getTypeReference(enumConstantElement.getOwningType()), enumConstantElement.getName(), getTypeReference(enumConstantElement.getOwningType()));
+        // 2: annotation metadata
+        AnnotationMetadata annotationMetadata = enumConstantElement.getAnnotationMetadata();
+        if (annotationMetadata.isEmpty()) {
+            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+        } else {
+            pushAnnotationMetadata(classWriter, staticInit, annotationMetadata);
+        }
+
+        invokeConstructor(
+            staticInit,
+            AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class,
+            Enum.class,
+            AnnotationMetadata.class
+        );
+    }
+
     private boolean hasAssociatedConstructorArgument(String name, TypedElement typedElement) {
         if (constructor != null) {
             ParameterElement[] parameters = constructor.getParameters();
@@ -568,7 +612,8 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        final Type superType = Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
+        boolean isEnum = classElement.isEnum();
+        final Type superType = isEnum ? Type.getType(AbstractEnumBeanIntrospectionAndReference.class) : Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
 
         ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
         classWriter.visit(
@@ -584,7 +629,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
         annotateAsGeneratedAndService(classWriter, introspectionName);
 
-        buildStaticInit(classWriter);
+        buildStaticInit(classWriter, isEnum);
 
         final GeneratorAdapter constructorWriter = startConstructor(classWriter);
 
@@ -632,17 +677,34 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                 FIELD_BEAN_METHODS_REFERENCES,
                 Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class));
         }
-
-        invokeConstructor(
-            constructorWriter,
-            AbstractInitializableBeanIntrospectionAndReference.class,
-            Class.class,
-            AnnotationMetadata.class,
-            AnnotationMetadata.class,
-            Argument[].class,
-            AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
-            AbstractInitializableBeanIntrospection.BeanMethodRef[].class
-        );
+        if (isEnum) {
+            constructorWriter.getStatic(introspectionType,
+                FIELD_ENUM_CONSTANTS_REFERENCES,
+                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class)
+            );
+            invokeConstructor(
+                constructorWriter,
+                AbstractEnumBeanIntrospectionAndReference.class,
+                Class.class,
+                AnnotationMetadata.class,
+                AnnotationMetadata.class,
+                Argument[].class,
+                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+                AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+                AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class
+            );
+        } else {
+            invokeConstructor(
+                constructorWriter,
+                AbstractInitializableBeanIntrospectionAndReference.class,
+                Class.class,
+                AnnotationMetadata.class,
+                AnnotationMetadata.class,
+                Argument[].class,
+                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+                AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+            );
+        }
 
         constructorWriter.returnValue();
         constructorWriter.visitMaxs(2, 1);
