@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.netty.buffer.ByteBuf;
@@ -220,6 +221,7 @@ abstract class MultiplexedServerHandler {
 
             writeHeaders(response, false, ctx.voidPromise());
             content.subscribe(new Subscriber<>() {
+                final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
                 Subscription subscription;
 
                 @Override
@@ -229,13 +231,13 @@ abstract class MultiplexedServerHandler {
                 }
 
                 @Override
-                public void onNext(HttpContent content) {
-                    EventLoop eventLoop = ctx.channel().eventLoop();
-                    if (!eventLoop.inEventLoop()) {
-                        eventLoop.execute(() -> onNext(content));
-                        return;
+                public void onNext(HttpContent httpContent) {
+                    if (flow.executeNow(() -> onNext0(httpContent))) {
+                        onNext0(httpContent);
                     }
+                }
 
+                private void onNext0(HttpContent content) {
                     writeData(content.content(), false, ctx.newPromise()
                             .addListener((ChannelFutureListener) future -> {
                                 if (future.isSuccess()) {
@@ -250,6 +252,12 @@ abstract class MultiplexedServerHandler {
 
                 @Override
                 public void onError(Throwable t) {
+                    if (flow.executeNow(() -> onError0(t))) {
+                        onError0(t);
+                    }
+                }
+
+                private void onError0(Throwable t) {
                     EventLoop eventLoop = ctx.channel().eventLoop();
                     if (!eventLoop.inEventLoop()) {
                         eventLoop.execute(() -> onError(t));
@@ -265,6 +273,12 @@ abstract class MultiplexedServerHandler {
 
                 @Override
                 public void onComplete() {
+                    if (flow.executeNow(this::onComplete0)) {
+                        onComplete0();
+                    }
+                }
+
+                private void onComplete0() {
                     EventLoop eventLoop = ctx.channel().eventLoop();
                     if (!eventLoop.inEventLoop()) {
                         eventLoop.execute(this::onComplete);
