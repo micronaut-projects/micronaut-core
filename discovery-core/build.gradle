@@ -5,9 +5,19 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
+
+    annotationProcessor(platform(libs.test.boms.micronaut.serde))
+    annotationProcessor(libs.micronaut.serde.processor) {
+        exclude group: "io.micronaut", module: "json-core"
+    }
+
     api project(':context')
     implementation libs.managed.reactor
+
     compileOnly project(":jackson-databind")
-    testImplementation project(":jackson-databind")
-//    api project(":http")
+    compileOnly(platform(libs.test.boms.micronaut.serde))
+    compileOnly(libs.micronaut.serde.api) {
+        exclude group: "io.micronaut", module: "json-core"
+    }
+
 }

@@ -48,27 +48,20 @@ import java.util.function.BiConsumer
 import kotlin.collections.ArrayList
 
 @OptIn(KspExperimental::class)
-internal open class KotlinVisitorContext(
+internal class KotlinVisitorContext(
     private val environment: SymbolProcessorEnvironment,
     var resolver: Resolver
 ) : VisitorContext {
 
-    private val visitorAttributes: MutableConvertibleValues<Any>
-    private val elementFactory: KotlinElementFactory
-    private val outputVisitor = KotlinOutputVisitor(environment)
-    val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
-    private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
-    private val expressionCompilationContextFactory : ExpressionCompilationContextFactory
+    private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
+    private val elementFactory: KotlinElementFactory = KotlinElementFactory(this)
+    private val outputVisitor = KotlinOutputVisitor(environment, this)
+    val annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver, this)
+    private val elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
+    private val expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
-
+    var aggregating: Boolean = false
     init {
-        visitorAttributes = MutableConvertibleValuesMap()
-        annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver, this)
-        elementFactory = KotlinElementFactory(this)
-        elementAnnotationMetadataFactory =
-            KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
-        expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
-
         try {
             // Workaround for bug in KSP https://github.com/google/ksp/issues/1493
             val resolverImplClass = ClassUtils.forName("com.google.devtools.ksp.processing.impl.ResolverImpl", javaClass.classLoader).orElseThrow()

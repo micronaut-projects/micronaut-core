@@ -31,6 +31,7 @@ import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyGetter
 import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
@@ -39,6 +40,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -349,12 +351,13 @@ internal class KotlinAnnotationMetadataBuilder(
         memberName: String,
         annotationValue: Any
     ): Any? {
+        val property = member as KSPropertyDeclaration
         return when (annotationValue) {
             is Collection<*> -> {
-                toArray(annotationValue, originatingElement)
+                toArray(annotationValue, member, property.type)
             }
             is Array<*> -> {
-                toArray(annotationValue.toList(), originatingElement)
+                toArray(annotationValue.toList(), member, property.type)
             }
             else -> {
                 if (isEvaluatedExpression(annotationValue)) {
@@ -373,11 +376,22 @@ internal class KotlinAnnotationMetadataBuilder(
 
     private fun toArray(
         annotationValue: Collection<*>,
-        originatingElement: KSAnnotated
+        element: KSAnnotated,
+        type: KSTypeReference
     ): Array<out Any>? {
         var valueType = Any::class.java
+        if (annotationValue.isEmpty()) {
+            val arrayType = type.resolve()
+            if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
+                val className = arrayType.arguments[0].type!!.resolve().declaration.getBinaryName(resolver, visitorContext);
+                val optionalClassName = ClassUtils.forName(className, javaClass.classLoader)
+                if (optionalClassName.isPresent) {
+                    valueType = optionalClassName.get() as Class<Any>
+                }
+            }
+        }
         val collection = annotationValue.mapNotNull {
-            val v = readAnnotationValue(originatingElement, it)
+            val v = readAnnotationValue(element, it)
             if (v != null) {
                 valueType = v.javaClass
             }
@@ -571,7 +585,7 @@ internal class KotlinAnnotationMetadataBuilder(
     private fun readAnnotationValue(originatingElement: KSAnnotated, value: Any?): Any? {
         if (value == null) {
             return null
-        }
+        }// (originatingElement as KSPropertyDeclaration).type
         if (value is KSType) {
             val declaration = value.declaration
             if (declaration is KSClassDeclaration) {

@@ -192,6 +192,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
+        if (presetAnnotationMetadata != null) {
+            return presetAnnotationMetadata;
+        }
         if (annotationMetadata == null) {
             if (getNativeType() instanceof GroovyNativeElement.ClassWithOwner) {
                 annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());

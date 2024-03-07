@@ -197,3 +197,11 @@ String lock(String name)
 ----
 
 The annotation can be used anywhere the standard method annotations can be used, including controllers and declarative HTTP clients.
+
+== RouteMatch
+
+The api:web.router.RouteMatch[] API provides information about an executable api:web.router.Route[].
+
+Given a request you can retrieve a RouteMatch with:
+
+snippet::io.micronaut.docs.web.router.routematch.RouteMatchTest[tags="routematch", indent=0]

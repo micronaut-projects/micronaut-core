@@ -230,8 +230,24 @@ public interface EventLoopGroupFactory {
      * @param fd The pre-defined file descriptor
      * @return A channel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration, Channel, int)} instead
      */
+    @Deprecated(since = "4.4.0")
     default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
+        return channelInstance(type, configuration, null, fd);
+    }
+
+    /**
+     * Returns the channel instance.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @param parent The {@link Channel#parent() parent channel}
+     * @param fd The pre-defined file descriptor
+     * @return A channel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         throw new UnsupportedOperationException("This transport does not support creating channels from file descriptors. Please use kqueue or epoll.");
     }
 

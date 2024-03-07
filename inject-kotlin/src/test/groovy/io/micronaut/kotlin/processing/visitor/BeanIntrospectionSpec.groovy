@@ -690,7 +690,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OuterBean$InnerBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerBean"
         def innerType = classLoader.loadClass(className)
@@ -734,7 +734,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OuterBean$InnerInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerInterface"
 
@@ -986,7 +986,7 @@ interface GroupOne
 interface GroupTwo
 interface GroupThree
 ''')
-        def clazz = classLoader.loadClass('test.$Address$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Address$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         expect:
@@ -1009,7 +1009,7 @@ class Book(val title: String) {
     }
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1071,7 +1071,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1110,7 +1110,7 @@ class Book {
         introspectionMapField.set(introspector, null)
     }
 
-    void "test default constructor "() {
+    void "test default constructor"() {
         given:
         def classLoader = buildClassLoader('test.Book', '''
 package test
@@ -1120,7 +1120,7 @@ class Book {
     var title: String? = null
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1188,7 +1188,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1236,7 +1236,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1292,7 +1292,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1347,7 +1347,7 @@ class Test(
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1415,7 +1415,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1443,7 +1443,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1491,7 +1491,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is generated"
@@ -1510,7 +1510,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_inject_beans_visitor_MappedSuperClassIntrospectionMapper$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1549,7 +1549,7 @@ open class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2255,7 +2255,7 @@ class MyImpl: MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -2287,7 +2287,7 @@ class MyImpl: MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 

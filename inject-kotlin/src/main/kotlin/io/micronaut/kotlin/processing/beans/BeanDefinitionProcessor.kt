@@ -19,13 +19,11 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
-import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Vetoed
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -96,13 +94,13 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
 
     override fun finish() {
         try {
-            val outputVisitor = KotlinOutputVisitor(environment)
+            val outputVisitor = KotlinOutputVisitor(environment, visitorContext!!)
             val processed = HashSet<String>()
             var count = 0
             for (beanDefinitionCreator in beanDefinitionMap.values) {
                 for (writer in beanDefinitionCreator.build()) {
                     if (processed.add(writer.beanDefinitionName)) {
-                        processBeanDefinitions(writer, outputVisitor, visitorContext!!, processed)
+                        processBeanDefinitions(writer, outputVisitor)
                         count++
                     }
                 }
@@ -144,21 +142,11 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
     private fun processBeanDefinitions(
         beanDefinitionWriter: BeanDefinitionVisitor,
         outputVisitor: KotlinOutputVisitor,
-        visitorContext: KotlinVisitorContext,
-        processed: HashSet<String>
     ) {
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd()
             if (beanDefinitionWriter.isEnabled) {
                 beanDefinitionWriter.accept(outputVisitor)
-                val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter, visitorContext)
-                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
-                val className = beanDefinitionReferenceWriter.beanDefinitionQualifiedClassName
-                processed.add(className)
-                beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.annotationMetadata.hasDeclaredAnnotation(Context::class.java)
-                )
-                beanDefinitionReferenceWriter.accept(outputVisitor)
             }
         } catch (e: IOException) {
             // raise a compile error

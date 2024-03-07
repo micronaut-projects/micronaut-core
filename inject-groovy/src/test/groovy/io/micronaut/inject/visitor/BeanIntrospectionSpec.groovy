@@ -27,6 +27,163 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
     }
 
+    void "test annotations"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A5 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+    @A4
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Target([ElementType.TYPE_USE])
+@Documented
+@interface A1 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Documented
+@interface A2 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Documented
+@interface A3 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Documented
+@interface A4 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Documented
+@interface A5 {
+}
+
+''')
+            def property = introspection.getBeanProperties().iterator().next()
+            def readProperty = introspection.getBeanReadProperties()[0]
+            def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+            !property.hasAnnotation("test.A3")
+            property.hasAnnotation("test.A4")
+            !property.hasAnnotation("test.A5")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A5")
+            readProperty.hasAnnotation("test.A1")
+            readProperty.hasAnnotation("test.A2")
+            !readProperty.hasAnnotation("test.A3")
+            readProperty.hasAnnotation("test.A4")
+            !readProperty.hasAnnotation("test.A5")
+            writeProperty.hasAnnotation("test.A1")
+            writeProperty.hasAnnotation("test.A2")
+            !writeProperty.hasAnnotation("test.A3")
+            writeProperty.hasAnnotation("test.A4")
+            !writeProperty.hasAnnotation("test.A5")
+    }
+
+    void "test TYPE_USE annotations"() {
+        when:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A4 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Target([ElementType.TYPE_USE])
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+@Target([ElementType.TYPE_USE])
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A4 {
+}
+
+''')
+            def property = introspection.getBeanProperties()[0]
+            def readProperty = introspection.getBeanReadProperties()[0]
+            def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+            property.hasAnnotation("test.A1")
+            property.hasAnnotation("test.A2")
+            !property.hasAnnotation("test.A3")
+            !property.hasAnnotation("test.A4")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+            readProperty.hasAnnotation("test.A1")
+            readProperty.hasAnnotation("test.A2")
+            !readProperty.hasAnnotation("test.A3")
+            !readProperty.hasAnnotation("test.A4")
+            writeProperty.hasAnnotation("test.A1")
+            writeProperty.hasAnnotation("test.A2")
+            !writeProperty.hasAnnotation("test.A3")
+            !writeProperty.hasAnnotation("test.A4")
+    }
+
     void 'test favor method access'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
@@ -569,7 +726,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -641,7 +798,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -696,7 +853,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -746,7 +903,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -802,7 +959,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -848,7 +1005,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -924,7 +1081,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1039,7 +1196,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1205,7 +1362,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1293,7 +1450,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
         def test = classLoader.loadClass('test.Test').newInstance()

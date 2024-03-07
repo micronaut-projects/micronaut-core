@@ -2298,6 +2298,55 @@ class TestNamed {
             ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
     }
 
+    void "test enum with inner companion"() {
+        when:
+        ClassElement enumEl = buildClassElement('test.ColorEnum', '''
+package test
+
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonValue
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class ColorEnum (
+    @get:JsonValue val value: String
+) {
+
+    @JsonProperty("red")
+    RED("red"),
+    @JsonProperty("blue")
+    BLUE("blue"),
+    @JsonProperty("green")
+    GREEN("green"),
+    @JsonProperty("light-blue")
+    LIGHT_BLUE("light-blue"),
+    @JsonProperty("dark-green")
+    DARK_GREEN("dark-green");
+
+    override fun toString(): String {
+        return value
+    }
+
+    companion object {
+
+        @JvmField
+        val VALUE_MAPPING = entries.associateBy { it.value }
+
+        @JsonCreator
+        @JvmStatic
+        fun fromValue(value: String): ColorEnum {
+            require(VALUE_MAPPING.containsKey(value)) { "Unexpected value '$value'" }
+            return VALUE_MAPPING[value]!!
+        }
+    }
+}
+
+''')
+        then:
+        ((EnumElement) enumEl).elements().size() == 5
+    }
+
     void "test conf with inner companion"() {
         when:
         ClassElement ce = buildClassElement('test.StripeConfig', '''
@@ -2538,6 +2587,28 @@ class TestNamed2 {
             returnType.getType() instanceof EnumElement
             returnType.getGenericType().isEnum()
             returnType.getType() instanceof EnumElement
+    }
+
+    void "test overridden accessor in properties"() {
+        def properties = buildClassElementMapped('test.EngineConfiguration', '''
+package test
+
+import io.micronaut.core.util.Toggleable
+
+class EngineConfiguration : Toggleable {
+
+    var enabled = true
+
+    val cylinders: Int? = null
+
+    override fun isEnabled(): Boolean {
+        return enabled
+    }
+}
+
+''', {ce -> ce.getBeanProperties()})
+        expect:
+            properties.size() == 2
     }
 
     void "test inner class not failing"() {

@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.beans.BeanIntrospection;
+
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -184,6 +186,15 @@ public @interface Introspected {
      */
     @Experimental
     String targetPackage() default "";
+
+    /**
+     * If the introspection should ignore a setter with a different type than a getter.
+     * NOTE: Access the correct a read/write type by using {@link BeanIntrospection#getBeanWriteProperties()} / {@link BeanIntrospection#getBeanReadProperties()} ()}
+     * @return true if to ignore.
+     * @since 4.4.0
+     */
+    @NextMajorVersion("Consider switching to false")
+    boolean ignoreSettersWithDifferingType() default true;
 
     /**
      * Allows specifying a builder for the introspection.
