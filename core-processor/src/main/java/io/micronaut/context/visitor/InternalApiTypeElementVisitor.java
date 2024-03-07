@@ -40,7 +40,7 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
 
     private static final String IO_MICRONAUT = "io.micronaut";
 
-    private static final String MICRONAUT_PROCESSING_INTERNAL_WARNINGS = "micronaut.processing.internal-warnings";
+    private static final String MICRONAUT_PROCESSING_INTERNAL_WARNINGS = "micronaut.processing.internal.warnings";
 
     private boolean warned = false;
 

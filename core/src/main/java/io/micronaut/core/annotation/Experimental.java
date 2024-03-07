@@ -23,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
  *
  * <p>Overriding an experimental element will produce a compilation warning. These warnings can be
  * suppressed by setting an annotation processing argument:
- * <code>-Amicronaut.processing.internal-warnings=false</code></p>
+ * <code>-Amicronaut.processing.internal.warnings=false</code></p>
  *
  * @author Graeme Rocher
  * @since 1.0
