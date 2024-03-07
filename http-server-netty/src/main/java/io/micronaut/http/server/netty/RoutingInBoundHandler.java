@@ -43,6 +43,7 @@ import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
@@ -577,12 +578,16 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * appear as the first item.
      */
     private final class LazySendingSubscriber implements Processor<HttpContent, HttpContent> {
+        private static final Object COMPLETE = new Object();
+
         boolean headersSent = false;
         Subscription upstream;
         final DelayedSubscriber<HttpContent> downstream = new DelayedSubscriber<>();
         @Nullable
         HttpContent first;
+        Object completion = null; // in case first hasn't been consumed we need to delay completion
 
+        private final EventLoopFlow flow;
         private final NettyHttpRequest<?> request;
         private final io.netty.handler.codec.http.HttpResponse headers;
         private final OutboundAccess outboundAccess;
@@ -591,6 +596,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             this.request = request;
             this.headers = headers;
             this.outboundAccess = outboundAccess;
+            this.flow = new EventLoopFlow(request.getChannelHandlerContext().channel().eventLoop());
         }
 
         @Override
@@ -603,6 +609,14 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         LazySendingSubscriber.this.first = null;
                         // onNext may trigger further request calls
                         s.onNext(first);
+                        if (completion != null) {
+                            if (completion == COMPLETE) {
+                                s.onComplete();
+                            } else {
+                                s.onError((Throwable) completion);
+                            }
+                            return;
+                        }
                         if (n != Long.MAX_VALUE) {
                             n--;
                             if (n == 0) {
@@ -633,6 +647,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onNext(HttpContent httpContent) {
+            if (flow.executeNow(() -> onNext0(httpContent))) {
+                onNext0(httpContent);
+            }
+        }
+
+        private void onNext0(HttpContent httpContent) {
             if (headersSent) {
                 downstream.onNext(httpContent);
             } else {
@@ -644,9 +664,19 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onError(Throwable t) {
+            if (flow.executeNow(() -> onError0(t))) {
+                onError0(t);
+            }
+        }
+
+        private void onError0(Throwable t) {
             if (headersSent) {
                 // nothing we can do
-                downstream.onError(t);
+                if (first != null) {
+                    completion = t;
+                } else {
+                    downstream.onError(t);
+                }
             } else {
                 // limited error handling
                 MutableHttpResponse<?> response;
@@ -671,8 +701,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onComplete() {
+            if (flow.executeNow(this::onComplete0)) {
+                onComplete0();
+            }
+        }
+
+        private void onComplete0() {
             if (headersSent) {
-                downstream.onComplete();
+                if (first != null) {
+                    completion = COMPLETE;
+                } else {
+                    downstream.onComplete();
+                }
             } else {
                 headersSent = true;
                 outboundAccess.writeStreamed(headers, Flux.empty());

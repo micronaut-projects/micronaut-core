@@ -18,6 +18,8 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.netty.EventLoopFlow;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -1044,6 +1046,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
+        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;
@@ -1084,12 +1087,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onNext(HttpContent httpContent) {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> onNext(httpContent));
-                return;
+            if (flow.executeNow(() -> onNext0(httpContent))) {
+                onNext0(httpContent);
             }
+        }
 
+        private void onNext0(HttpContent httpContent) {
             if (outboundHandler != this) {
                 throw new IllegalStateException("onNext before request?");
             }
@@ -1114,12 +1117,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onError(Throwable t) {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> onError(t));
-                return;
+            if (flow.executeNow(() -> onError0(t))) {
+                onError0(t);
             }
+        }
 
+        private void onError0(Throwable t) {
             if (!removed) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
@@ -1132,12 +1135,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onComplete() {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(this::onComplete);
-                return;
+            if (flow.executeNow(this::onComplete0)) {
+                onComplete0();
             }
+        }
 
+        private void onComplete0() {
             if (outboundHandler != this) {
                 // onComplete can be called immediately after onSubscribe, before request.
                 earlyComplete = true;
