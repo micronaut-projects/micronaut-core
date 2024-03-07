@@ -263,7 +263,10 @@ public class JavaParser implements Closeable {
             List<Processor> processors = getAnnotationProcessors();
             task.setProcessors(processors);
             task.generate();
-
+            return fileManager.getOutputFiles();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
             List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();
             StringBuilder error = new StringBuilder();
             for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
@@ -271,12 +274,9 @@ public class JavaParser implements Closeable {
                     error.append(diagnostic);
                 }
             }
-            if (error.length() > 0) {
+            if (!error.isEmpty()) {
                 throw new RuntimeException(error.toString());
             }
-            return fileManager.getOutputFiles();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 

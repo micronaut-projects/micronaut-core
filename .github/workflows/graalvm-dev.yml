@@ -28,7 +28,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 6
-      matrix: ${{ fromJson(needs.build_matrix.outputs.matrix) }}
+      matrix:
+        java: ['dev']
+        distribution: ['graalvm-community']
+        native_test_task: ${{ fromJson(needs.build_matrix.outputs.matrix).native_test_task }}
+        include:
+          - java: '22-ea'
+            distribution: 'graalvm'
     env:
       GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -39,7 +45,8 @@ jobs:
         uses: micronaut-projects/github-actions/graalvm/pre-build@master
         id: pre-build
         with:
-          java: 'dev'
+          java: ${{ matrix.java }}
+          distribution: ${{ matrix.distribution }}
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@master
         id: build
@@ -53,4 +60,4 @@ jobs:
         uses: micronaut-projects/github-actions/graalvm/post-build@master
         id: post-build
         with:
-          java: 'dev'
+          java: ${{ matrix.java }}

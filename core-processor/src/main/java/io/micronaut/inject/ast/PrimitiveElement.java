@@ -40,24 +40,28 @@ public final class PrimitiveElement implements ArrayableClassElement {
     private final String typeName;
     private final int arrayDimensions;
     private final String boxedTypeName;
+    private final AnnotationMetadata annotationMetadata;
 
     /**
      * Default constructor.
      * @param name The type name
      */
     private PrimitiveElement(String name, @Nullable Class<?> boxedType) {
-        this(name, boxedType == null ? "<>" : boxedType.getName(), 0);
+        this(name, boxedType == null ? "<>" : boxedType.getName(), 0, AnnotationMetadata.EMPTY_METADATA);
     }
 
     /**
      * Default constructor.
-     * @param name            The type name
-     * @param arrayDimensions The number of array dimensions
+     *
+     * @param name               The type name
+     * @param arrayDimensions    The number of array dimensions
+     * @param annotationMetadata The annotation metadata
      */
-    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions) {
+    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
         this.boxedTypeName = boxedTypeName;
+        this.annotationMetadata = annotationMetadata;
     }
 
     @Override
@@ -112,12 +116,17 @@ public final class PrimitiveElement implements ArrayableClassElement {
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return AnnotationMetadata.EMPTY_METADATA;
+        return annotationMetadata;
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions);
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata);
+    }
+
+    @Override
+    public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata);
     }
 
     @Override

@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.beans.AbstractBeanIntrospectionReference;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.naming.NameUtils;
@@ -33,18 +32,23 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
+import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
+import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
+import io.micronaut.inject.writer.EvaluatedExpressionProcessor;
 import io.micronaut.inject.writer.StringSwitchWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -66,6 +70,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA;
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.initializeAnnotationMetadata;
+import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.writeAnnotationDefault;
 import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
 
 /**
@@ -77,14 +84,14 @@ import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
  * @since 1.1
  */
 @Internal
-final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
-    private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
+final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
+    private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
     private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class)
     );
@@ -103,7 +110,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final String METHOD_IS_BUILDABLE = "isBuildable";
 
     private final VisitorContext visitorContext;
-    private final ClassWriter referenceWriter;
     private final String introspectionName;
     private final Type introspectionType;
     private final Type beanType;
@@ -119,25 +125,31 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final List<BeanMethodData> beanMethods = new ArrayList<>();
 
     private final DispatchWriter dispatchWriter;
+    private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
+    private final AnnotationMetadata annotationMetadata;
+    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, Integer> defaults = new HashMap<>();
 
     /**
      * Default constructor.
      *
      * @param classElement           The class element
-     * @param beanAnnotationMetadata The bean annotation metadata
+     * @param annotationMetadata The bean annotation metadata
      * @param visitorContext          The visitor context
      */
-    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
+    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata annotationMetadata,
                             VisitorContext visitorContext) {
-        super(computeReferenceName(targetPackage, classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
+        super(classElement);
         this.visitorContext = visitorContext;
         final String name = classElement.getName();
         this.classElement = classElement;
-        this.referenceWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS, visitorContext);
         this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
         this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
+        this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
     /**
@@ -147,7 +159,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param index                  A unique index
      * @param originatingElement     The originating element
      * @param classElement           The class element
-     * @param beanAnnotationMetadata The bean annotation metadata
+     * @param annotationMetadata The bean annotation metadata
      * @param visitorContext          The visitor context
      */
     BeanIntrospectionWriter(
@@ -156,17 +168,19 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         int index,
         ClassElement originatingElement,
         ClassElement classElement,
-        AnnotationMetadata beanAnnotationMetadata,
+        AnnotationMetadata annotationMetadata,
         VisitorContext visitorContext) {
-        super(computeReferenceName(targetPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
+        super(originatingElement);
         this.visitorContext = visitorContext;
         final String className = classElement.getName();
         this.classElement = classElement;
-        this.referenceWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS, visitorContext);
         this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
         this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
     /**
@@ -200,21 +214,21 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param genericType        The generic type
      * @param name               The property name
      * @param readMember         The read method
-     * @param writeMember        The write methodname
-     * @param isReadOnly         Is the property read only
-     * @param annotationMetadata The property annotation metadata
-     * @param typeArguments      The type arguments
+     * @param readType           The read type
+     * @param writeMember        The write member
+     * @param writeType          The write type
+     * @param isReadOnly         Is read only
      */
     void visitProperty(
-        @NonNull TypedElement type,
-        @NonNull TypedElement genericType,
+        @NonNull ClassElement type,
+        @NonNull ClassElement genericType,
         @NonNull String name,
         @Nullable MemberElement readMember,
         @Nullable MemberElement writeMember,
-        boolean isReadOnly,
-        @Nullable AnnotationMetadata annotationMetadata,
-        @Nullable Map<String, ClassElement> typeArguments) {
-        this.evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, classElement);
+        @Nullable ClassElement readType,
+        @Nullable ClassElement writeType,
+        boolean isReadOnly) {
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), classElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
             if (readMember instanceof MethodElement element) {
@@ -270,10 +284,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         beanProperties.add(new BeanPropertyData(
-            genericType,
             name,
-            annotationMetadata,
-            typeArguments,
+            genericType,
+            readType,
+            writeType,
             readDispatchIndex,
             writeDispatchIndex,
             withMethodIndex,
@@ -321,13 +335,13 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             this.evaluatedExpressionProcessor.writeEvaluatedExpressions(classWriterOutputVisitor);
 
             loadTypeMethods.clear();
-            // Second write the reference
-            writeIntrospectionReference(classWriterOutputVisitor);
         }
     }
 
-    private void buildStaticInit(ClassWriter classWriter) {
+    private void buildStaticInit(ClassWriter classWriter, boolean isEnum) {
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
+        Map<String, Integer> defaults = new HashMap<>();
+
         if (constructor != null) {
             if (!constructor.getAnnotationMetadata().isEmpty()) {
                 Type am = Type.getType(AnnotationMetadata.class);
@@ -378,6 +392,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             });
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
         }
+        if (isEnum) {
+            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class);
+            classWriter.visitField(
+                ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ENUM_CONSTANTS_REFERENCES,
+                type.getDescriptor(),
+                null,
+                null
+            );
+            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
+                pushEnumConstantReference(
+                    classWriter,
+                    staticInit,
+                    enumConstantElement
+                );
+            });
+            staticInit.putStatic(introspectionType, FIELD_ENUM_CONSTANTS_REFERENCES, type);
+        }
 
         int indexesIndex = 0;
         for (String annotationName : indexByAnnotations.keySet()) {
@@ -398,6 +429,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             annotationIndexFields.put(annotationName, newIndexField);
         }
 
+        writeAnnotationDefault(classWriter, staticInit, introspectionType, annotationMetadata, defaults, loadTypeMethods);
+        initializeAnnotationMetadata(staticInit, classWriter, introspectionType, annotationMetadata, defaults, loadTypeMethods);
+
         staticInit.returnValue();
         staticInit.visitMaxs(DEFAULT_MAX_STACK, 1);
         staticInit.visitEnd();
@@ -406,31 +440,94 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private void pushBeanPropertyReference(ClassWriter classWriter,
                                            GeneratorAdapter staticInit,
                                            BeanPropertyData beanPropertyData) {
-        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class));
-        staticInit.dup();
 
-        pushCreateArgument(
+        Runnable pushTypeArgument = () -> pushCreateArgument(
             annotationMetadata,
-            beanType.getClassName(),
+            classElement.getName(),
             introspectionType,
             classWriter,
             staticInit,
             beanPropertyData.name,
-            beanPropertyData.typedElement,
-            beanPropertyData.annotationMetadata,
-            beanPropertyData.typeArguments,
+            beanPropertyData.type,
             defaults,
             loadTypeMethods
         );
+
+        int typeLocal = -1;
+        int readTypeLocal = -1;
+        int writeTypeLocal = -1;
+
+        Type argumentType = Type.getType(Argument.class);
+        if (beanPropertyData.type.equals(beanPropertyData.readType)) {
+            typeLocal = staticInit.newLocal(argumentType);
+            pushTypeArgument.run();
+            staticInit.storeLocal(typeLocal, argumentType);
+            readTypeLocal = typeLocal;
+        }
+        if (beanPropertyData.type.equals(beanPropertyData.writeType)) {
+            if (typeLocal == -1) {
+                typeLocal = staticInit.newLocal(argumentType);
+                pushTypeArgument.run();
+                staticInit.storeLocal(typeLocal, argumentType);
+            }
+            writeTypeLocal = typeLocal;
+        }
+
+        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class));
+        staticInit.dup();
+
+        if (typeLocal != -1) {
+            staticInit.loadLocal(typeLocal, argumentType);
+        } else {
+            pushTypeArgument.run();
+        }
+
+        if (beanPropertyData.readType == null) {
+            staticInit.push((String) null);
+        } else if (readTypeLocal != -1) {
+            staticInit.loadLocal(readTypeLocal, argumentType);
+        } else {
+            pushCreateArgument(
+                annotationMetadata,
+                classElement.getName(),
+                introspectionType,
+                classWriter,
+                staticInit,
+                beanPropertyData.name,
+                beanPropertyData.readType,
+                defaults,
+                loadTypeMethods
+            );
+        }
+
+        if (beanPropertyData.writeType == null) {
+            staticInit.push((String) null);
+        } else if (writeTypeLocal != -1) {
+            staticInit.loadLocal(writeTypeLocal, argumentType);
+        } else {
+            pushCreateArgument(
+                annotationMetadata,
+                classElement.getName(),
+                introspectionType,
+                classWriter,
+                staticInit,
+                beanPropertyData.name,
+                beanPropertyData.writeType,
+                defaults,
+                loadTypeMethods
+            );
+        }
         staticInit.push(beanPropertyData.getDispatchIndex);
         staticInit.push(beanPropertyData.setDispatchIndex);
         staticInit.push(beanPropertyData.withMethodDispatchIndex);
         staticInit.push(beanPropertyData.isReadOnly);
-        staticInit.push(!beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.typedElement));
+        staticInit.push(!beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type));
 
         invokeConstructor(
             staticInit,
             AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+            Argument.class,
+            Argument.class,
             Argument.class,
             int.class,
             int.class,
@@ -479,6 +576,29 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             int.class);
     }
 
+    private void pushEnumConstantReference(ClassWriter classWriter,
+                                           GeneratorAdapter staticInit,
+                                           EnumConstantElement enumConstantElement) {
+        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class));
+        staticInit.dup();
+        // 1: value
+        staticInit.getStatic(getTypeReference(enumConstantElement.getOwningType()), enumConstantElement.getName(), getTypeReference(enumConstantElement.getOwningType()));
+        // 2: annotation metadata
+        AnnotationMetadata annotationMetadata = enumConstantElement.getAnnotationMetadata();
+        if (annotationMetadata.isEmpty()) {
+            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+        } else {
+            pushAnnotationMetadata(classWriter, staticInit, annotationMetadata);
+        }
+
+        invokeConstructor(
+            staticInit,
+            AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class,
+            Enum.class,
+            AnnotationMetadata.class
+        );
+    }
+
     private boolean hasAssociatedConstructorArgument(String name, TypedElement typedElement) {
         if (constructor != null) {
             ParameterElement[] parameters = constructor.getParameters();
@@ -492,18 +612,24 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        final Type superType = Type.getType(AbstractInitializableBeanIntrospection.class);
+        boolean isEnum = classElement.isEnum();
+        final Type superType = isEnum ? Type.getType(AbstractEnumBeanIntrospectionAndReference.class) : Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
 
         ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
-        classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
+        classWriter.visit(
+            V17,
+            ACC_SYNTHETIC | ACC_FINAL | ACC_PUBLIC,
             introspectionType.getInternalName(),
             null,
             superType.getInternalName(),
-            null);
+            null
+        );
 
-        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, getOriginatingElement());
 
-        buildStaticInit(classWriter);
+        annotateAsGeneratedAndService(classWriter, introspectionName);
+
+        buildStaticInit(classWriter, isEnum);
 
         final GeneratorAdapter constructorWriter = startConstructor(classWriter);
 
@@ -513,13 +639,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         constructorWriter.push(beanType);
 
         // 2nd argument: The annotation metadata
-        if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+        if (annotationMetadata == null || annotationMetadata.isEmpty()) {
             constructorWriter.visitInsn(ACONST_NULL);
         } else {
-            // retrieved from BeanIntrospectionReference.$ANNOTATION_METADATA
-            constructorWriter.getStatic(
-                targetClassType,
-                FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            constructorWriter.getStatic(introspectionType, FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         }
 
         if (constructor != null) {
@@ -554,17 +677,34 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 FIELD_BEAN_METHODS_REFERENCES,
                 Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class));
         }
-
-        invokeConstructor(
-            constructorWriter,
-            AbstractInitializableBeanIntrospection.class,
-            Class.class,
-            AnnotationMetadata.class,
-            AnnotationMetadata.class,
-            Argument[].class,
-            AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
-            AbstractInitializableBeanIntrospection.BeanMethodRef[].class
-        );
+        if (isEnum) {
+            constructorWriter.getStatic(introspectionType,
+                FIELD_ENUM_CONSTANTS_REFERENCES,
+                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class)
+            );
+            invokeConstructor(
+                constructorWriter,
+                AbstractEnumBeanIntrospectionAndReference.class,
+                Class.class,
+                AnnotationMetadata.class,
+                AnnotationMetadata.class,
+                Argument[].class,
+                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+                AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+                AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class
+            );
+        } else {
+            invokeConstructor(
+                constructorWriter,
+                AbstractInitializableBeanIntrospectionAndReference.class,
+                Class.class,
+                AnnotationMetadata.class,
+                AnnotationMetadata.class,
+                Argument[].class,
+                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+                AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+            );
+        }
 
         constructorWriter.returnValue();
         constructorWriter.visitMaxs(2, 1);
@@ -604,6 +744,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         writeBooleanMethod(classWriter, "hasBuilder", hasBuilder);
+
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);
             method.visitEnd();
@@ -808,59 +949,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         instantiateInternal.visitEnd();
     }
 
-    private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        Type superType = Type.getType(AbstractBeanIntrospectionReference.class);
-        final String referenceName = targetClassType.getClassName();
-        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName, getOriginatingElement());
-
-        try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElements())) {
-            startService(referenceWriter, BeanIntrospectionReference.class, targetClassType.getInternalName(), superType);
-            final ClassWriter classWriter = generateClassBytes(referenceWriter);
-            for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
-                generatorAdapter.visitMaxs(1, 1);
-                generatorAdapter.visitEnd();
-            }
-            referenceStream.write(classWriter.toByteArray());
-        }
-    }
-
-    private ClassWriter generateClassBytes(ClassWriter classWriter) {
-        writeAnnotationMetadataStaticInitializer(classWriter, new HashMap<>());
-
-        GeneratorAdapter cv = startConstructor(classWriter);
-        cv.loadThis();
-        invokeConstructor(cv, AbstractBeanIntrospectionReference.class);
-        cv.returnValue();
-        cv.visitMaxs(2, 1);
-
-        // start method: BeanIntrospection load()
-        GeneratorAdapter loadMethod = startPublicMethodZeroArgs(classWriter, BeanIntrospection.class, "load");
-
-        // return new BeanIntrospection()
-        pushNewInstance(loadMethod, this.introspectionType);
-
-        loadMethod.returnValue();
-        loadMethod.visitMaxs(2, 1);
-        loadMethod.endMethod();
-
-        // start method: String getName()
-        final GeneratorAdapter nameMethod = startPublicMethodZeroArgs(classWriter, String.class, "getName");
-        nameMethod.push(beanType.getClassName());
-        nameMethod.returnValue();
-        nameMethod.visitMaxs(1, 1);
-        nameMethod.endMethod();
-
-        // start method: Class getBeanType()
-        GeneratorAdapter getBeanType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanType");
-        getBeanType.push(beanType);
-        getBeanType.returnValue();
-        getBeanType.visitMaxs(2, 1);
-        getBeanType.endMethod();
-
-        writeGetAnnotationMetadataMethod(classWriter);
-        return classWriter;
-    }
-
     private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
         MutableAnnotationMetadata.contributeDefaults(
             this.annotationMetadata,
@@ -892,12 +980,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         } else {
             throw new IllegalStateException("Unknown annotation metadata:  " + annotationMetadata);
         }
-    }
-
-    @NonNull
-    private static String computeReferenceName(String packageName, String className) {
-        final String shortName = NameUtils.getSimpleName(className);
-        return packageName + ".$" + shortName + REFERENCE_SUFFIX;
     }
 
     @NonNull
@@ -1196,29 +1278,24 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private record BeanMethodData(MethodElement methodElement, int dispatchIndex) {
     }
 
-    private record BeanPropertyData(@NonNull TypedElement typedElement, @NonNull String name,
-                                    AnnotationMetadata annotationMetadata,
-                                    @Nullable Map<String, ClassElement> typeArguments,
-                                    int getDispatchIndex, int setDispatchIndex,
-                                    int withMethodDispatchIndex, boolean isReadOnly) {
-
-        private BeanPropertyData(@NonNull TypedElement typedElement,
-                                 @NonNull String name,
-                                 @Nullable AnnotationMetadata annotationMetadata,
-                                 @Nullable Map<String, ClassElement> typeArguments,
-                                 int getDispatchIndex,
-                                 int setDispatchIndex,
-                                 int withMethodDispatchIndex,
-                                 boolean isReadOnly) {
-            this.typedElement = typedElement;
-            this.name = name;
-            this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
-            this.typeArguments = typeArguments;
-            this.getDispatchIndex = getDispatchIndex;
-            this.setDispatchIndex = setDispatchIndex;
-            this.withMethodDispatchIndex = withMethodDispatchIndex;
-            this.isReadOnly = isReadOnly;
-        }
+    /**
+     * @param name
+     * @param type
+     * @param readType
+     * @param writeType
+     * @param getDispatchIndex
+     * @param setDispatchIndex
+     * @param withMethodDispatchIndex
+     * @param isReadOnly
+     */
+    private record BeanPropertyData(@NonNull String name,
+                                    @NonNull ClassElement type,
+                                    @Nullable ClassElement readType,
+                                    @Nullable ClassElement writeType,
+                                    int getDispatchIndex,
+                                    int setDispatchIndex,
+                                    int withMethodDispatchIndex,
+                                    boolean isReadOnly) {
     }
 
     /**

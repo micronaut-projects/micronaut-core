@@ -201,7 +201,7 @@ public interface NettyEmbeddedServices {
      * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, int fd) {
+    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
         throw new UnsupportedOperationException("File descriptor channels not supported");
     }
 

@@ -1334,7 +1334,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private String path;
         private boolean exposeDefaultRoutes = true;
         private Integer fd = null;
+        private Integer acceptedFd = null;
         private boolean bind = true;
+        private boolean serverSocket = true;
 
         /**
          * Create a TCP listener configuration.
@@ -1494,6 +1496,44 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setBind(boolean bind) {
             this.bind = bind;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @return {@code true} iff a server socket should be created
+         */
+        public boolean isServerSocket() {
+            return serverSocket;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @param serverSocket {@code true} iff a server socket should be created
+         */
+        public void setServerSocket(boolean serverSocket) {
+            this.serverSocket = serverSocket;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @return The fd to register
+         */
+        public Integer getAcceptedFd() {
+            return acceptedFd;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @param acceptedFd The fd to register
+         */
+        public void setAcceptedFd(Integer acceptedFd) {
+            this.acceptedFd = acceptedFd;
         }
 
         /**

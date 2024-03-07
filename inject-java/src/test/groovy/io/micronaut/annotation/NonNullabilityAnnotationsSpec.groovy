@@ -3,13 +3,15 @@ package io.micronaut.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.beans.BeanMethod
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.MethodElement
 
 class NonNullabilityAnnotationsSpec extends AbstractTypeElementSpec {
 
     void "test map nonnull annotation for #packageName in beans"() {
         given:
-        def element = buildClassElement("""
+        def nullableMethod = buildClassElement("""
 package test;
 import ${packageName}.*;
 @jakarta.inject.Singleton
@@ -19,14 +21,19 @@ class Test {
         return "";
     }
 }
-""")
-        def nullableMethod = element.getEnclosedElement(ElementQuery.ALL_METHODS.named({ String st -> st == 'notNullableMethod' })).get()
+""") { ClassElement element ->
+            def method = element.getEnclosedElement(ElementQuery.ALL_METHODS.named({ String st -> st == 'notNullableMethod' })).get()
+
+            assert !method.isNullable()
+            assert method.isNonNull()
+            assert !method.parameters[0].isNullable()
+            assert method.parameters[0].isNonNull()
+            return method
+        }
+
 
         expect:
-        !nullableMethod.isNullable()
-        nullableMethod.isNonNull()
-        !nullableMethod.parameters[0].isNullable()
-        nullableMethod.parameters[0].isNonNull()
+        nullableMethod != null
 
         where:
         packageName                       | annotation

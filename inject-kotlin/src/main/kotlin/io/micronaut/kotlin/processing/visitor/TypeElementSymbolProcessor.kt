@@ -99,6 +99,15 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 .filterIsInstance<KSClassDeclaration>()
                 .filter { declaration: KSClassDeclaration ->
                     acceptClass(declaration)
+                            && declaration.classKind != ClassKind.ANNOTATION_CLASS
+                }
+                .filter {
+                    val className = it.qualifiedName?.asString()
+                    return@filter if (className == null) {
+                        false
+                    } else {
+                        processed.add(className)
+                    }
                 }
                 .toList()
 
@@ -111,31 +120,26 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
                 // before RepositoryMapper is going to process repositories and read entities
 
-                for (typeElement in elements) {
-                    if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
-                        val className = typeElement.qualifiedName?.asString()
-                        if (className != null && !processed.contains(className)) {
-                            processed.add(className)
-
-                            for (loadedVisitor in loadedVisitors) {
-                                if (!loadedVisitor.matches(typeElement)) {
-                                    continue
-                                }
-                                try {
-                                    typeElement.accept(
-                                        ElementVisitor(
-                                            loadedVisitor,
-                                            typeElement,
-                                            classElementsCache
-                                        ), className
-                                    )
-                                } catch (e: ProcessingException) {
-                                    BeanDefinitionProcessor.handleProcessingException(environment, e)
-                                } catch (e: Exception) {
-                                    environment.logger.error("Error processing type visitor [${loadedVisitor.visitor}]: ${e.message}", typeElement)
-                                    environment.logger.exception(e)
-                                }
-                            }
+                for (loadedVisitor in loadedVisitors) {
+                    visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                    for (typeElement in elements) {
+                        if (!loadedVisitor.matches(typeElement)) {
+                            continue
+                        }
+                        try {
+                            typeElement.accept(
+                                ElementVisitor(
+                                    loadedVisitor,
+                                    typeElement,
+                                    classElementsCache
+                                ),
+                                "ignore"
+                            )
+                        } catch (e: ProcessingException) {
+                            BeanDefinitionProcessor.handleProcessingException(environment, e)
+                        } catch (e: Exception) {
+                            environment.logger.error("Error processing type visitor [${loadedVisitor.visitor}]: ${e.message}", typeElement)
+                            environment.logger.exception(e)
                         }
                     }
                 }
@@ -152,6 +156,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun finish() {
         for (loadedVisitor in loadedVisitors) {
+            visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
             try {
                 loadedVisitor.visitor.finish(visitorContext)
             } catch (e: ProcessingException) {

@@ -6,7 +6,7 @@
 
 [Micronaut Framework](https://micronaut.io) is a modern, JVM-based, full stack Java framework designed for building modular, easily testable JVM applications with support for Java, Kotlin and the Groovy language.
 
-The Grails framework creators and developers originally developed the Micronaut framework. The framework takes inspiration from lessons learned over the years, building real-world applications from monoliths to microservices using Spring, Spring Boot, and Grails.
+The Micronaut framework was originally created by a team who had also worked on the Grails framework. The Micronaut framework takes inspiration from lessons learned over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and the Grails framework. The core team continues to develop and maintain the Micronaut project through the support of the Micronaut Foundation.
 
 Micronaut Framework aims to provide all the tools necessary to build JVM applications including:
 
