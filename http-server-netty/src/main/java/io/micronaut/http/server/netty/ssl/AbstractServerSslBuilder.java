@@ -104,7 +104,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
     }
 
     private static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
-        sslBuilder.sslProvider(NettyTlsUtils.sslProvider());
+        sslBuilder.sslProvider(NettyTlsUtils.sslProvider(ssl));
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());
