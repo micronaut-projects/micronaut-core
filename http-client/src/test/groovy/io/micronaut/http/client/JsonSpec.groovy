@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
@@ -22,9 +23,12 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 @Property(name = 'spec.name', value = 'JsonSpec')
@@ -47,12 +51,25 @@ class JsonSpec extends Specification {
         someDtos[3].data == "444"
     }
 
+    void failToParseJson() {
+        when:
+        def result = myClient.getSomeBadData().block()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.getResponse().getBody(String.class).get() == """{ "error": "not good" }"""
+    }
+
     @Requires(property = 'spec.name', value = 'JsonSpec')
+    @JacksonFeatures(enabledDeserializationFeatures = DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
     @Client('/data')
     static interface JsonClient {
 
-        @Get
+        @Get("/some")
         Flux<SomeDto> getSome();
+
+        @Get("/bad")
+        Mono<SomeDto> getSomeBadData();
 
     }
 
@@ -60,7 +77,7 @@ class JsonSpec extends Specification {
     @Controller('/data')
     static class JsonController {
 
-        @Get(produces = MediaType.APPLICATION_JSON)
+        @Get(value = "/some", produces = MediaType.APPLICATION_JSON)
         String data() {
             return """
                                 [{
@@ -73,6 +90,11 @@ class JsonSpec extends Specification {
                                     "data": "444"
                                 }]
                                 """
+        }
+
+        @Get(value = "/bad", produces = MediaType.APPLICATION_JSON)
+        String badData() {
+            return """{ "error": "not good" }"""
         }
     }
 
