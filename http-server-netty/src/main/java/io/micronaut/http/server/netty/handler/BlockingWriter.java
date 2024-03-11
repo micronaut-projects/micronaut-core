@@ -28,6 +28,13 @@ import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+/**
+ * This class writes from a {@link InputStream} to a netty channel with backpressure. There's
+ * separate implementations for HTTP/1.1 and HTTP/2.
+ *
+ * @since 4.4.0
+ * @author Jonas Konrad
+ */
 @Internal
 abstract class BlockingWriter {
     static final int QUEUE_SIZE = 2;
@@ -56,10 +63,13 @@ abstract class BlockingWriter {
         this.blockingExecutor = blockingExecutor;
     }
 
+    /**
+     * Write the message start. Called on the event loop.
+     */
     protected abstract void writeStart();
 
     /**
-     * Write some data.
+     * Write some data. Called on the event loop.
      *
      * @param buf The buffer
      * @return {@code true} iff we can continue writing immediately, {@code false} iff we should
@@ -67,11 +77,22 @@ abstract class BlockingWriter {
      */
     protected abstract boolean writeData(ByteBuf buf);
 
+    /**
+     * Write the message end. Called on the event loop.
+     */
     protected abstract void writeLast();
 
+    /**
+     * Asynchronously request a call to {@link #writeSome()} on the event loop. Called from the IO
+     * worker thread.
+     */
     protected abstract void writeSomeAsync();
 
-    void writeSome() {
+    /**
+     * Call from the event loop when the channel becomes writable or {@link #writeSomeAsync()} is
+     * called.
+     */
+    final void writeSome() {
         if (worker == null) {
             writeStart();
             worker = blockingExecutor.submit(this::work);
