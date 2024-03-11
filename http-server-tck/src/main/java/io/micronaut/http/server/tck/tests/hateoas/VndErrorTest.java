@@ -18,7 +18,10 @@ package io.micronaut.http.server.tck.tests.hateoas;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.hateoas.*;
+import io.micronaut.http.hateoas.GenericResource;
+import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.Resource;
+import io.micronaut.http.hateoas.VndError;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -36,30 +39,30 @@ import static org.junit.jupiter.api.Assertions.*;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class JsonErrorTest {
-    private static final String SPEC_NAME = "JsonErrorTest";
+public class VndErrorTest {
+    private static final String SPEC_NAME = "VndErrorTest";
 
     /**
      * @throws IOException Exception thrown while getting the server under test.
      */
     @Test
-    public void responseCanBeBoundToJsonError() throws IOException {
+    public void responseCanBeBoundToVndError() throws IOException {
         asserts(SPEC_NAME,
-                HttpRequest.GET("/jsonError"),
+                HttpRequest.GET("/vndError"),
                 (server, request) -> {
-                    Executable e = () -> server.exchange(request, JsonError.class);
+                    Executable e = () -> server.exchange(request, VndError.class);
                     HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, e);
-                    Optional<JsonError> jsonErrorOptional = ex.getResponse().getBody(JsonError.class);
-                    assertTrue(jsonErrorOptional.isPresent());
-                    JsonError jsonError = jsonErrorOptional.get();
-                    assertEquals("Not Found", jsonError.getMessage());
-                    OptionalMultiValues<Link> links = jsonError.getLinks();
+                    Optional<VndError> vndErrorOptional = ex.getResponse().getBody(VndError.class);
+                    assertTrue(vndErrorOptional.isPresent());
+                    VndError vndError = vndErrorOptional.get();
+                    assertEquals("Not Found", vndError.getMessage());
+                    OptionalMultiValues<Link> links = vndError.getLinks();
                     assertFalse(links.isEmpty());
                     links.getFirst("self").ifPresent(link -> {
-                        assertEquals("/jsonError", link.getHref());
+                        assertEquals("/vndError", link.getHref());
                         assertFalse(link.isTemplated());
                     });
-                    OptionalMultiValues<Resource> resourceOptionalMultiValues = jsonError.getEmbedded();
+                    OptionalMultiValues<Resource> resourceOptionalMultiValues = vndError.getEmbedded();
                     assertFalse(resourceOptionalMultiValues.isEmpty());
 
                     Optional<List<Resource>> errorsOptional = resourceOptionalMultiValues.get("errors");
