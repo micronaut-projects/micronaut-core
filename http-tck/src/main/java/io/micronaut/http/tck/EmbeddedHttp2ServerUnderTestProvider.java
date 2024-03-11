@@ -31,7 +31,6 @@ public class EmbeddedHttp2ServerUnderTestProvider implements ServerUnderTestProv
         mod.put("micronaut.server.http-version", "2.0");
         mod.put("micronaut.http.client.http-version", "2.0");
         mod.put("micronaut.http.client.ssl.insecure-trust-all-certificates", true);
-        mod.put("micronaut.server.netty.log-level", "info"); // todo
         return new EmbeddedServerUnderTest(mod);
     }
 }
