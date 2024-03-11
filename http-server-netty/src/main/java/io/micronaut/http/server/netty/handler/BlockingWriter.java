@@ -30,10 +30,10 @@ import java.util.concurrent.Future;
 
 @Internal
 abstract class BlockingWriter {
-    private static final Logger LOG = LoggerFactory.getLogger(BlockingWriter.class);
-
     static final int QUEUE_SIZE = 2;
     static final int CHUNK_SIZE = 64 * 1024;
+
+    private static final Logger LOG = LoggerFactory.getLogger(BlockingWriter.class);
 
     private final ByteBufAllocator alloc;
     private final InputStream stream;

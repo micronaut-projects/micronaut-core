@@ -155,6 +155,18 @@ final class HttpPipelineBuilder implements Closeable {
         ReferenceCountUtil.release(sslContext);
     }
 
+    private RequestHandler makeRequestHandler(Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler, boolean ssl) {
+        RequestHandler requestHandler = routingInBoundHandler;
+        if (webSocketUpgradeHandler.isPresent()) {
+            webSocketUpgradeHandler.get().setNext(routingInBoundHandler);
+            requestHandler = webSocketUpgradeHandler.get();
+        }
+        if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
+            requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
+        }
+        return requestHandler;
+    }
+
     /**
      * Holder class for normal or QUIC ssl handler.
      */
@@ -682,17 +694,5 @@ final class HttpPipelineBuilder implements Closeable {
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
         }
-    }
-
-    private RequestHandler makeRequestHandler(Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler, boolean ssl) {
-        RequestHandler requestHandler = routingInBoundHandler;
-        if (webSocketUpgradeHandler.isPresent()) {
-            webSocketUpgradeHandler.get().setNext(routingInBoundHandler);
-            requestHandler = webSocketUpgradeHandler.get();
-        }
-        if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
-            requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
-        }
-        return requestHandler;
     }
 }

@@ -51,6 +51,12 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * Common handler implementation for multiplexed HTTP versions (HTTP/2 and HTTP/3).
+ *
+ * @since 4.4.0
+ * @author Jonas Konrad
+ */
 @Internal
 abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
@@ -62,8 +68,14 @@ abstract class MultiplexedServerHandler {
         this.requestHandler = requestHandler;
     }
 
+    /**
+     * Flush the channel.
+     */
     abstract void flush();
 
+    /**
+     * An HTTP/2 or HTTP/3 stream.
+     */
     abstract class MultiplexedStream implements OutboundAccess {
         private HttpRequest request;
 
@@ -76,17 +88,33 @@ abstract class MultiplexedServerHandler {
         private boolean responseDone;
         private BlockingWriter blockingWriter;
 
+        /**
+         * Called when the controller consumes some HTTP request data.
+         *
+         * @param n The number of bytes that have been consumed
+         */
         abstract void notifyDataConsumed(int n);
 
         /**
+         * Reset this stream.
+         *
          * @param cause The exception that caused this stream to reset
          * @return {@code true} if this exception contained an error code and thus need not be
          * logged, {@code false} if it should be logged
          */
         abstract boolean reset(Throwable cause);
 
+        /**
+         * Close the input of the stream.
+         */
         abstract void closeInput();
 
+        /**
+         * Called when the request headers are read.
+         *
+         * @param headers The headers
+         * @param endOfStream Whether this is the last request packet
+         */
         final void onHeadersRead(HttpRequest headers, boolean endOfStream) {
             if (requestAccepted) {
                 throw new IllegalStateException("Request already accepted");
@@ -99,6 +127,14 @@ abstract class MultiplexedServerHandler {
             }
         }
 
+        /**
+         * Called when a data frame is read.
+         *
+         * @param data The input data. Release ownership is transferred to this method
+         * @param endOfStream Whether this is the last request packet
+         * @return The number of bytes that have been consumed immediately (like
+         * {@link #notifyDataConsumed(int)})
+         */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
             data.retain();
             if (streamer == null) {
@@ -142,6 +178,10 @@ abstract class MultiplexedServerHandler {
             return 0;
         }
 
+        /**
+         * Called on read complete. This makes the stream devolve into streaming mode, i.e. give up
+         * on buffering data in hopes of reading it all in one go.
+         */
         final void devolveToStreaming() {
             if (requestAccepted || streamer != null || request == null) {
                 return;
@@ -157,10 +197,20 @@ abstract class MultiplexedServerHandler {
             requestHandler.accept(ctx, request, ByteBody.of(streamer, request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)), this);
         }
 
+        /**
+         * Called on goaway.
+         *
+         * @param e The exception that should be forwarded to the stream consumer
+         */
         final void onGoAwayRead(Exception e) {
             onRstStreamRead(e);
         }
 
+        /**
+         * Called on rst.
+         *
+         * @param e The exception that should be forwarded to the stream consumer
+         */
         final void onRstStreamRead(Exception e) {
             if (streamer != null) {
                 streamer.sink.tryEmitError(e);
@@ -373,10 +423,28 @@ abstract class MultiplexedServerHandler {
         public final void closeAfterWrite() {
         }
 
+        /**
+         * Write the response headers.
+         *
+         * @param headers The response that should be transformed to headers
+         * @param endStream Whether this is the last response frame
+         * @param promise The promise to complete when the headers are written
+         */
         abstract void writeHeaders(HttpResponse headers, boolean endStream, ChannelPromise promise);
 
+        /**
+         * Write response data.
+         *
+         * @param data The data bytes
+         * @param endStream Whether this is the last response frame
+         * @param promise The promise to complete when the data is written (used for backpressure)
+         */
         abstract void writeData(ByteBuf data, boolean endStream, ChannelPromise promise);
 
+        /**
+         * This is the {@link HotObservable} that represents the request body in the streaming
+         * request case.
+         */
         private class InputStreamer implements HotObservable<HttpContent> {
             final Queue<HttpContent> queue = Queues.<HttpContent>unbounded().get();
             final Sinks.Many<HttpContent> sink = Sinks.many().unicast().onBackpressureBuffer(queue);

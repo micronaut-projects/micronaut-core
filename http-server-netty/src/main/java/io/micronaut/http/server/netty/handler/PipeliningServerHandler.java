@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -1046,7 +1045,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
-        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;

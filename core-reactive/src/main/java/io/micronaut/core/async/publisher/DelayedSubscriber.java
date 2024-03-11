@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2024 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
@@ -5,6 +20,17 @@ import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+/**
+ * This is a {@link Processor} that does not change the stream, but allows the upstream
+ * {@link org.reactivestreams.Publisher} and downstream {@link Subscriber} to be set independently
+ * in any order. If the upstream is set first, this class makes sure that any early completion
+ * is held back until the downstream has finished {@code onSubscribe}. If the downstream is set
+ * first, this class makes sure any demand is stored until the upstream becomes available.
+ *
+ * @param <T> The forwarded type
+ * @since 4.4.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class DelayedSubscriber<T> implements Processor<T, T> {
     private static final Object COMPLETE = new Object();

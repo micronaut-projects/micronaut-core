@@ -39,6 +39,12 @@ import java.nio.channels.ClosedChannelException;
 import java.util.EnumMap;
 import java.util.Map;
 
+/**
+ * HTTP/2-specific server handler.
+ *
+ * @since 4.4.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
     private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
@@ -142,7 +148,6 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onPushPromiseRead(ChannelHandlerContext ctx, int streamId, int promisedStreamId, Http2Headers headers, int padding) throws Http2Exception {
-
     }
 
     @Override
@@ -163,15 +168,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) throws Http2Exception {
-
     }
 
     @Override
     public void onUnknownFrame(ChannelHandlerContext ctx, byte frameType, int streamId, Http2Flags flags, ByteBuf payload) throws Http2Exception {
-
     }
 
-    static class ConnectionHandler extends Http2ConnectionHandler {
+    /**
+     * {@link Http2ConnectionHandler} implementation containing the {@link Http2ServerHandler}.
+     */
+    static final class ConnectionHandler extends Http2ConnectionHandler {
         private final Http2ServerHandler handler;
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler) {
@@ -217,7 +223,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
     }
 
-    public static class ConnectionHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<ConnectionHandler, ConnectionHandlerBuilder> {
+    /**
+     * {@link Http2ConnectionHandler} builder for the {@link Http2ServerHandler}.
+     */
+    public static final class ConnectionHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<ConnectionHandler, ConnectionHandlerBuilder> {
         private final Http2ServerHandler frameListener;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
