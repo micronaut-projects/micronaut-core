@@ -1047,6 +1047,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
         private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
+        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;
         private Subscription subscription;
