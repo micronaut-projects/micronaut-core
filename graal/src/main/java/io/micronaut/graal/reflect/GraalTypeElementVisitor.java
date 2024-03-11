@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,6 @@ import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
-
 /**
  * Generates the GraalVM reflect.json file at compilation time.
  *
@@ -69,6 +67,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      * The position of the visitor.
      */
     public static final int POSITION = -200;
+
+    /**
+     * There is a constant for this in {@link io.micronaut.core.annotation.AnnotationUtil#ZERO_ANNOTATION_VALUES}.
+     * However, if we use that value, we break Maven/Graal/Kotlin projects as we would need to add micronaut-core to the Kapt annotationProcessorPaths.
+     * So we define it here as well, to keep limit the number of required modules.
+     */
+    private static final AnnotationValue<?>[] LOCAL_ZERO_ANNOTATION_VALUES = new AnnotationValue[0];
 
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
 
@@ -383,10 +388,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     .member("type", type)
                     .member("accessType", accessTypes.toArray(new TypeHint.AccessType[0]));
             if (!methods.isEmpty()) {
-                builder.member("methods", methods.toArray(ZERO_ANNOTATION_VALUES));
+                builder.member("methods", methods.toArray(LOCAL_ZERO_ANNOTATION_VALUES));
             }
             if (!fields.isEmpty()) {
-                builder.member("fields", fields.toArray(ZERO_ANNOTATION_VALUES));
+                builder.member("fields", fields.toArray(LOCAL_ZERO_ANNOTATION_VALUES));
             }
             return builder
                     .build();
