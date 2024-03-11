@@ -3,6 +3,8 @@ package io.micronaut.http.client.netty
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.Cookies
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.FullHttpResponse
@@ -11,6 +13,8 @@ import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
+
+import java.nio.charset.Charset
 
 class FullNettyClientHttpResponseSpec extends Specification {
 
@@ -60,6 +64,20 @@ class FullNettyClientHttpResponseSpec extends Specification {
         cookies.get("SES").path == "/"
         cookies.get("JKL").secure
         cookies.get("JKL").domain == ".xxx.com"
+    }
+
+    void "test multiple responses can be created with the same body content"() {
+        given:
+        ByteBuf content = Unpooled.copiedBuffer("foo bar", Charset.defaultCharset())
+        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content)
+
+        when:
+        FullNettyClientHttpResponse response1 = new FullNettyClientHttpResponse(fullHttpResponse, null, null, false, ConversionService.SHARED)
+        FullNettyClientHttpResponse response2 = new FullNettyClientHttpResponse(fullHttpResponse, null, null, false, ConversionService.SHARED)
+
+        then:
+        response1.getBody(String.class).get() == "foo bar"
+        response2.getBody(String.class).get() == "foo bar"
     }
 
 }
