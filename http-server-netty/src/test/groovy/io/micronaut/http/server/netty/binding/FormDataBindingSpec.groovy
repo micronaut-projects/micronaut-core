@@ -31,6 +31,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Issue
+import spock.lang.Unroll
 
 /**
  * @author Graeme Rocher
@@ -74,6 +75,112 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         then:
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body is parsed to #parsedMapString"() {
+        when:
+        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body            | parsedMapString
+        "a=1"           | "[a:1]"
+        "a=1&b=2"       | "[a:1, b:2]"
+
+        //nothing
+        "&a=1&b=2"      | "[a:1, b:2]"
+        "a=1&&b=2"      | "[a:1, b:2]"
+        "a=1&b=2&"      | "[a:1, b:2]"
+
+        //key equals empty value
+        "z=&a=1&b=2"    | "[z:, a:1, b:2]"
+        "a=1&z=&b=2"    | "[a:1, z:, b:2]"
+        "a=1&b=2&z="    | "[a:1, b:2, z:]"
+
+        //empty key equals value
+        "=0&a=1&b=2"    | "[:0, a:1, b:2]"
+        "a=1&=0&b=2"    | "[a:1, :0, b:2]"
+        "a=1&b=2&=0"    | "[a:1, b:2, :0]"
+
+        //empty key equals empty value
+        "=&a=1&b=2"     | "[:, a:1, b:2]"
+        "a=1&=&b=2"     | "[a:1, :, b:2]"
+        "a=1&b=2&="     | "[a:1, b:2, :]"
+
+        //just key
+        "z&a=1&b=2"     | "[z:, a:1, b:2]"
+        "a=1&z&b=2"     | "[a:1, z:, b:2]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body with single key fails to parse"() {
+        // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
+        when:
+        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.BAD_REQUEST
+
+        where:
+        body            | parsedMapString
+        //just key
+        "a"             | "[a:]"
+        "&a"            | "[a:]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body with single key as the last attribute fails to parse to #parsedMapString"() {
+        // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
+        when:
+        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+
+        then:
+        result != parsedMapString
+
+        where:
+        body            | parsedMapString
+        //just key
+        "a=1&b=2&z"     | "[a:1, b:2, z:]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded Map #body is parsed to #parsedMapString"() {
+        //NOTE - Netty does not allow setting an http data attribute with an empty string key, which seems reasonable, thus fewer
+        // scenarios are exercised than the above that uses a raw String body. The key with empty value works here because it is
+        // sent as key= instead of just key, and Netty parses that correctly on the server end.
+        when:
+        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body                    | parsedMapString
+        [a:"1"]                 | "[a:1]"
+        [a:"1", b:"2"]          | "[a:1, b:2]"
+
+        //key equals empty value
+        [z:"",a:"1",b:"2"]      | "[z:, a:1, b:2]"
+        [a:"1",z:"",b:"2"]      | "[a:1, z:, b:2]"
+        [a:"1",b:"2",z:""]      | "[a:1, b:2, z:]"
+
+        //just key
+        [z:"",a:"1",b:"2"]      | "[z:, a:1, b:2]"
+        [a:"1",z:"",b:"2"]      | "[a:1, z:, b:2]"
+        [a:""]                  | "[a:]"
+        [a:"1",b:"2",z:""]      | "[a:1, b:2, z:]"
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1032')
@@ -177,6 +284,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         @Post('/pojo')
         String pojo(@Body Person person) {
             "name: $person.name, age: $person.age"
+        }
+
+        @Post('/map')
+        String map(@Body Map<String, String> formData) {
+            formData.toMapString()
         }
 
         @EqualsAndHashCode
