@@ -141,6 +141,7 @@ final class HttpPipelineBuilder implements Closeable {
         // todo: http2serverhandler support
         if (accessLogger != null && accessLogger.isEnabled()) {
             accessLogHandler = new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), NettyHttpServer.inclusionPredicate(accessLogger));
+            routingInBoundHandler.supportLoggingHandler = true;
         } else {
             accessLogHandler = null;
         }

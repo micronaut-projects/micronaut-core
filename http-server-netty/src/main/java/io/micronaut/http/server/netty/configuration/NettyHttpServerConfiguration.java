@@ -438,6 +438,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * The default compression threshold. Defaults to 1024.
+     * <p>
+     * A value {@code < 0} indicates compression should never be enabled.
      *
      * @return The compression threshold.
      */

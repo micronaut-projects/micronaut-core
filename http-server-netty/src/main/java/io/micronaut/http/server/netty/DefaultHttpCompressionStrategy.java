@@ -32,7 +32,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
+final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
     private final int compressionLevel;
@@ -56,7 +56,16 @@ class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     }
 
     @Override
+    public boolean isEnabled() {
+        return compressionThreshold >= 0;
+    }
+
+    @Override
     public boolean shouldCompress(HttpResponse response) {
+        if (!isEnabled()) {
+            return false;
+        }
+
         HttpHeaders headers = response.headers();
         String contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
         Integer contentLength = headers.getInt(HttpHeaderNames.CONTENT_LENGTH);

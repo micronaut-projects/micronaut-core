@@ -20,8 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -151,6 +153,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), "");
         // we do copy the weight and dependency id
     }
+
+    /**
+     * ONLY for NettyBodyAnnotationBinder use.
+     */
+    @Internal
+    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
