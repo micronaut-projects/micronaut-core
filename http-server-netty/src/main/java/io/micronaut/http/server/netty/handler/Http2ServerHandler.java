@@ -111,7 +111,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     @Override
-    public void onPriorityRead(ChannelHandlerContext ctx, int streamId, int streamDependency, short weight, boolean exclusive) throws Http2Exception {
+    public void onPriorityRead(ChannelHandlerContext ctx, int streamId, int streamDependency, short weight, boolean exclusive) {
+        // frame deprecated by HTTP/2 spec
     }
 
     @Override
@@ -127,27 +128,28 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     @Override
-    public void onSettingsAckRead(ChannelHandlerContext ctx) throws Http2Exception {
-
+    public void onSettingsAckRead(ChannelHandlerContext ctx) {
+        // ignore
     }
 
     @Override
-    public void onSettingsRead(ChannelHandlerContext ctx, Http2Settings settings) throws Http2Exception {
-
+    public void onSettingsRead(ChannelHandlerContext ctx, Http2Settings settings) {
+        // handled by netty (autoAckSettingsFrame=true)
     }
 
     @Override
-    public void onPingRead(ChannelHandlerContext ctx, long data) throws Http2Exception {
-
+    public void onPingRead(ChannelHandlerContext ctx, long data) {
+        // handled by netty (autoAckPingFrame=true)
     }
 
     @Override
-    public void onPingAckRead(ChannelHandlerContext ctx, long data) throws Http2Exception {
-
+    public void onPingAckRead(ChannelHandlerContext ctx, long data) {
+        // ignore
     }
 
     @Override
-    public void onPushPromiseRead(ChannelHandlerContext ctx, int streamId, int promisedStreamId, Http2Headers headers, int padding) throws Http2Exception {
+    public void onPushPromiseRead(ChannelHandlerContext ctx, int streamId, int promisedStreamId, Http2Headers headers, int padding) {
+        // should not happen on server
     }
 
     @Override
@@ -167,11 +169,13 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     @Override
-    public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) throws Http2Exception {
+    public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) {
+        // handled by netty
     }
 
     @Override
-    public void onUnknownFrame(ChannelHandlerContext ctx, byte frameType, int streamId, Http2Flags flags, ByteBuf payload) throws Http2Exception {
+    public void onUnknownFrame(ChannelHandlerContext ctx, byte frameType, int streamId, Http2Flags flags, ByteBuf payload) {
+        // §5.5 "Implementations MUST discard frames that have unknown or unsupported types."
     }
 
     /**

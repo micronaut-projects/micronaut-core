@@ -25,6 +25,7 @@ import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.DefaultHttp2PingFrame
 import io.netty.handler.codec.http2.DefaultHttp2ResetFrame
 import io.netty.handler.codec.http2.DefaultHttp2WindowUpdateFrame
 import io.netty.handler.codec.http2.Http2ChannelDuplexHandler
@@ -37,6 +38,7 @@ import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameLogger
 import io.netty.handler.codec.http2.Http2HeadersFrame
+import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
@@ -683,6 +685,37 @@ class Http2ServerHandlerSpec extends Specification {
         cleanup:
         data1.release()
         data2.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "ping response"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send a ping"
+        client.writeOutbound(new DefaultHttp2PingFrame(123))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        Http2PingFrame ack = client.readInbound()
+        ack.ack()
+        ack.content() == 123
+
+        cleanup:
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
