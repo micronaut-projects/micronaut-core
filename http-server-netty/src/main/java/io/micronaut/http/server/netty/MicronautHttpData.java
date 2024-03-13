@@ -513,7 +513,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
 
         @Override
         public void setValue(String value) throws IOException {
-            setContent(Unpooled.copiedBuffer(value.toCharArray(), factory.characterEncoding));
+            setContent(Unpooled.copiedBuffer(value, factory.characterEncoding));
         }
 
         @Override
