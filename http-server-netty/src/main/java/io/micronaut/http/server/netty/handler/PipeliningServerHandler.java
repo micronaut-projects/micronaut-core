@@ -140,7 +140,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
-        this.compressor = new Compressor(compressionStrategy);
+        if (compressionStrategy.isEnabled()) {
+            this.compressor = new Compressor(compressionStrategy);
+        } else {
+            this.compressor = null;
+        }
     }
 
     public static boolean canHaveBody(HttpResponseStatus status) {

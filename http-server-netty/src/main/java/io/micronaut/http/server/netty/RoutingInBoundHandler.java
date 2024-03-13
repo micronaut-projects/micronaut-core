@@ -120,6 +120,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
+    /**
+     * This is set to {@code true} if <i>any</i> {@link HttpPipelineBuilder} has a logging handler.
+     * When this is not set, we can do a shortcut for performance.
+     */
+    boolean supportLoggingHandler = false;
 
     /**
      * @param serverConfiguration          The Netty HTTP server configuration
@@ -218,7 +223,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 return;
             }
         }
-        if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+        if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
             ctx.channel().attr(key).set(mnRequest);

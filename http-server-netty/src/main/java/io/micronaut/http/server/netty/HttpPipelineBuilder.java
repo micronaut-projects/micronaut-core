@@ -138,6 +138,7 @@ final class HttpPipelineBuilder implements Closeable {
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
         if (accessLogger != null && accessLogger.isEnabled()) {
             accessLogHandler = new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), NettyHttpServer.inclusionPredicate(accessLogger));
+            routingInBoundHandler.supportLoggingHandler = true;
         } else {
             accessLogHandler = null;
         }
