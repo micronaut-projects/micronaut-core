@@ -21,6 +21,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
@@ -57,6 +58,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
     private final EventLoop eventLoop;
+    private final EventLoopFlow flow;
     private boolean executed;
     private final RouteMatch<?> routeMatch;
     private Subscription upstreamSubscription;
@@ -65,6 +67,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private boolean upstreamDemanded = false;
 
     FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
+        this.flow = new EventLoopFlow(eventLoop);
         this.eventLoop = eventLoop;
         this.routeMatch = routeMatch;
     }
@@ -75,11 +78,12 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onSubscribe(Subscription s) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onSubscribe(s));
-            return;
+        if (flow.executeNow(() -> onSubscribe0(s))) {
+            onSubscribe0(s);
         }
+    }
 
+    private void onSubscribe0(Subscription s) {
         upstreamSubscription = s;
         upstreamDemanded = true;
         s.request(1);
@@ -87,11 +91,12 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onNext(Object o) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onNext(o));
-            return;
+        if (flow.executeNow(() -> onNext0(o))) {
+            onNext0(o);
         }
+    }
 
+    private void onNext0(Object o) {
         try {
             addData((MicronautHttpData<?>) o);
         } catch (Exception e) {
@@ -102,11 +107,12 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
 
     @Override
     public void onComplete() {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(this::onComplete);
-            return;
+        if (flow.executeNow(this::onComplete0)) {
+            onComplete0();
         }
+    }
 
+    private void onComplete0() {
         for (Claimant claimant : claimants.values()) {
             claimant.sink.tryEmitComplete();
         }
@@ -117,12 +123,13 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     }
 
     @Override
-    public void onError(Throwable failure) {
-        if (!eventLoop.inEventLoop()) {
-            eventLoop.execute(() -> onError(failure));
-            return;
+    public void onError(Throwable t) {
+        if (flow.executeNow(() -> onError0(t))) {
+            onError0(t);
         }
+    }
 
+    private void onError0(Throwable failure) {
         for (Claimant claimant : claimants.values()) {
             claimant.sink.tryEmitError(failure);
         }
@@ -260,6 +267,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         }
 
         private void request(long n) {
+            // can't use serializer here
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> request(n));
                 return;
