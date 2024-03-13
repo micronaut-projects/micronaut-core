@@ -41,10 +41,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -54,11 +54,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test pojo body parsing"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/pojo', [
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/pojo', [
                 name:"Fred",
                 age:"10",
                 something: "else"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -68,9 +68,9 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing with missing data"() {
         when:
-        Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
+        client.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         HttpClientResponseException e = thrown()
@@ -81,8 +81,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test application/x-www-form-urlencoded String #body is parsed to #parsedMapString"() {
         when:
-        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
         result == parsedMapString
@@ -122,8 +122,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test application/x-www-form-urlencoded String #body with single key fails to parse"() {
         // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
         when:
-        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -141,8 +141,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test application/x-www-form-urlencoded String #body with single key as the last attribute fails to parse to #parsedMapString"() {
         // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
         when:
-        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
         result != parsedMapString
@@ -160,8 +160,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         // scenarios are exercised than the above that uses a raw String body. The key with empty value works here because it is
         // sent as key= instead of just key, and Netty parses that correctly on the server end.
         when:
-        String result = Flux.from(rxClient.exchange(HttpRequest.POST('/form/map', body)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst().getBody(String.class).get()
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
         result == parsedMapString
@@ -196,8 +196,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test POST SAML form multipart form data"() {
         given:
         MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
-        String data = Flux.from(rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)).blockFirst()
+        String data = client.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)
 
         expect:
         data == SAML_DATA
@@ -238,10 +238,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2263")
     void "test binding directly to a string"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/string', [
+        HttpResponse<String> response = client.exchange(HttpRequest.POST('/form/string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -251,10 +251,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test binding directly to a reactive string"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
+        HttpResponse<String> response = client.exchange(HttpRequest.POST('/form/maybe-string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK

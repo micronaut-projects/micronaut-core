@@ -36,7 +36,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test HttpStatusException'() {
         when:
-        HttpResponse response = Flux.from(rxClient
+        HttpResponse response = Flux.from(httpClient
             .exchange(HttpRequest.GET('/errors')))
                 .onErrorResume( t -> {
                     if (t instanceof HttpClientResponseException) {
@@ -59,7 +59,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test returning an arbitrary POGO'() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient
+        HttpResponse<String> response = Flux.from(httpClient
             .exchange((HttpRequest.GET('/errors/book')), String)).blockFirst()
 
         then:

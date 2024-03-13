@@ -20,7 +20,6 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.*
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 import static io.micronaut.http.MediaType.*
@@ -29,14 +28,14 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     void "test routes are filtered by consumes"() {
         when:
-        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", [x: 1]).contentType(APPLICATION_JSON_TYPE))
+        String body = httpClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", [x: 1]).contentType(APPLICATION_JSON_TYPE))
 
         then:
         noExceptionThrown()
         body == "json"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", "abc").contentType(APPLICATION_GRAPHQL_TYPE))
+        body = httpClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", "abc").contentType(APPLICATION_GRAPHQL_TYPE))
 
         then:
         noExceptionThrown()
@@ -65,14 +64,14 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     void "test routes are not filtered by content-type when consumes=all"() {
         when:
-        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "true").contentType(APPLICATION_JSON_TYPE))
+        String body = httpClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "true").contentType(APPLICATION_JSON_TYPE))
 
         then:
         noExceptionThrown()
         body == "all:true"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "graphql").contentType(APPLICATION_GRAPHQL_TYPE))
+        body = httpClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "graphql").contentType(APPLICATION_GRAPHQL_TYPE))
 
         then:
         noExceptionThrown()
@@ -101,7 +100,7 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     void "test accept matching has priority over route complexity"() {
         when:
-        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE))
+        String body = httpClient.toBlocking().retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE))
 
         then:
         noExceptionThrown()
@@ -111,7 +110,7 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
     @Unroll
     void "test pick most specific route for #uri"() {
         given:
-        String result = rxClient.toBlocking().retrieve(HttpRequest.GET("/hello$uri").accept("text/html", "*/*;q=0.8"))
+        String result = httpClient.toBlocking().retrieve(HttpRequest.GET("/hello$uri").accept("text/html", "*/*;q=0.8"))
 
         expect:
         result == expected
