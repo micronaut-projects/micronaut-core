@@ -260,7 +260,8 @@ final class HttpPipelineBuilder implements Closeable {
                 PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
                 if (quic && ch instanceof QuicStreamChannel qsc) {
-                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localAddress(), (InetSocketAddress) qsc.parent().remoteAddress(), true);
+                    // go through unsafe to get the udp address
+                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
                 }
 
                 ch.pipeline().addLast(builder.build(new FileOutputStream(path)));
