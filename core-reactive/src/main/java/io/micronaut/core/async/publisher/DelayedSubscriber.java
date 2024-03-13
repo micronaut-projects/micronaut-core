@@ -32,7 +32,7 @@ import org.reactivestreams.Subscription;
  * @author Jonas Konrad
  */
 @Internal
-public final class DelayedSubscriber<T> implements Processor<T, T> {
+public final class DelayedSubscriber<T> implements Processor<T, T>, Subscription {
     private static final Object COMPLETE = new Object();
 
     private boolean wip;
@@ -45,23 +45,7 @@ public final class DelayedSubscriber<T> implements Processor<T, T> {
 
     @Override
     public void subscribe(Subscriber<? super T> s) {
-        s.onSubscribe(new Subscription() {
-            @Override
-            public void request(long n) {
-                synchronized (DelayedSubscriber.this) {
-                    demand = Math.max(demand + n, demand);
-                }
-                work();
-            }
-
-            @Override
-            public void cancel() {
-                synchronized (DelayedSubscriber.this) {
-                    cancel = true;
-                }
-                work();
-            }
-        });
+        s.onSubscribe(this);
         synchronized (this) {
             this.downstream = s;
         }
@@ -97,6 +81,22 @@ public final class DelayedSubscriber<T> implements Processor<T, T> {
     public void onComplete() {
         synchronized (this) {
             completion = COMPLETE;
+        }
+        work();
+    }
+
+    @Override
+    public void request(long n) {
+        synchronized (this) {
+            demand = Math.max(demand + n, demand);
+        }
+        work();
+    }
+
+    @Override
+    public void cancel() {
+        synchronized (this) {
+            cancel = true;
         }
         work();
     }
