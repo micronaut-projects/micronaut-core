@@ -154,6 +154,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
+    /**
+     * ONLY for NettyBodyAnnotationBinder use.
+     */
+    @Internal
+    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
+
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -165,12 +171,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
-
-    /**
-     * ONLY for NettyBodyAnnotationBinder use.
-     */
-    @Internal
-    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
