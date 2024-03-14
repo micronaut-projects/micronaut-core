@@ -33,7 +33,7 @@ class SslFileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def response = rxClient.exchange('/test/html', String).blockFirst()
+        def response = httpClient.exchange('/test/html', String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code

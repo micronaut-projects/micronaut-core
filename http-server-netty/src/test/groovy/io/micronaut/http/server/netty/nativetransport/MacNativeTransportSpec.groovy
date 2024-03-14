@@ -4,7 +4,6 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.netty.channel.kqueue.KQueueServerSocketChannel
-import reactor.core.publisher.Flux
 import spock.lang.Requires
 import spock.util.environment.OperatingSystem
 
@@ -13,7 +12,7 @@ class MacNativeTransportSpec extends AbstractMicronautSpec {
 
     void "test a basic request works with mac native transport"() {
         when:
-        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/native-transport"))
+        String body = httpClient.toBlocking().retrieve(HttpRequest.GET("/native-transport"))
 
         then:
         noExceptionThrown()

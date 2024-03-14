@@ -6,7 +6,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 
 class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
@@ -17,7 +16,7 @@ class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
     void "test interceptor execution and order - proceed"() {
         when:
-        HttpResponse<String> response = rxClient.toBlocking().exchange("/context/path/secure?username=fred", String)
+        HttpResponse<String> response = httpClient.toBlocking().exchange("/context/path/secure?username=fred", String)
 
         then:
         response.status == HttpStatus.OK
@@ -28,7 +27,7 @@ class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
     void "test a filter on the root url"() {
         when:
-        HttpResponse response = rxClient.toBlocking().exchange("/context/path")
+        HttpResponse response = httpClient.toBlocking().exchange("/context/path")
 
         then:
         response.status == HttpStatus.OK

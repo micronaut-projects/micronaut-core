@@ -28,7 +28,7 @@ class RegexBindingSpec extends AbstractMicronautSpec {
 
     void "test regex matches"() {
         when:
-        HttpResponse response = rxClient.toBlocking().exchange(HttpRequest.GET("/test-binding/regex/blue"))
+        HttpResponse response = httpClient.toBlocking().exchange(HttpRequest.GET("/test-binding/regex/blue"))
 
         then:
         response.status() == HttpStatus.OK
@@ -36,7 +36,7 @@ class RegexBindingSpec extends AbstractMicronautSpec {
 
     void "test regex does not match"() {
         when:
-        rxClient.toBlocking().exchange(HttpRequest.GET("/test-binding/regex/yellow"))
+        httpClient.toBlocking().exchange(HttpRequest.GET("/test-binding/regex/yellow"))
 
         then:
         def e = thrown(HttpClientResponseException)
