@@ -31,8 +31,8 @@ class NettyThreadFactorySpec extends Specification {
         where:
         config                                                         | expected
         [:]                                                            | 'blocking prevented'
-        ['netty.default.thread-factory.reactor-non-blocking': 'true']  | 'blocking prevented'
-        ['netty.default.thread-factory.reactor-non-blocking': 'false'] | 'blocked'
+        ['netty.default-thread-factory-reactor-non-blocking': 'true']  | 'blocking prevented'
+        ['netty.default-thread-factory-reactor-non-blocking': 'false'] | 'blocked'
     }
 
     @Controller

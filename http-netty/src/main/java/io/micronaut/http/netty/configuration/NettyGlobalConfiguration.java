@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.configuration;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.util.ResourceLeakDetector;
@@ -26,9 +27,11 @@ import io.netty.util.ResourceLeakDetector;
  * @since 2.5.0
  */
 @ConfigurationProperties("netty")
+@BootstrapContextCompatible
 public class NettyGlobalConfiguration {
 
     private ResourceLeakDetector.Level resourceLeakDetectorLevel;
+    private boolean defaultThreadFactoryReactorNonBlocking = true;
 
     /**
      * Sets the resource leak detection level.
@@ -49,4 +52,26 @@ public class NettyGlobalConfiguration {
         return resourceLeakDetectorLevel;
     }
 
+    /**
+     * If {@code true} (the default), netty event loop threads will implement project reactor
+     * {@link reactor.core.scheduler.NonBlocking} by default. This will make reactor blocking
+     * operations throw an exception on those threads.
+     *
+     * @return Whether event loop threads should implement NonBlocking by default
+     */
+    public boolean isDefaultThreadFactoryReactorNonBlocking() {
+        return defaultThreadFactoryReactorNonBlocking;
+    }
+
+    /**
+     * If {@code true} (the default), netty event loop threads will implement project reactor
+     * {@link reactor.core.scheduler.NonBlocking} by default. This will make reactor blocking
+     * operations throw an exception on those threads.
+     *
+     * @param defaultThreadFactoryReactorNonBlocking Whether event loop threads should implement
+     *                                               NonBlocking by default
+     */
+    public void setDefaultThreadFactoryReactorNonBlocking(boolean defaultThreadFactoryReactorNonBlocking) {
+        this.defaultThreadFactoryReactorNonBlocking = defaultThreadFactoryReactorNonBlocking;
+    }
 }

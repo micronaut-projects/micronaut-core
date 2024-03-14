@@ -18,6 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -62,7 +63,7 @@ public class NettyThreadFactory {
     @Deprecated(forRemoval = true, since = "4.2.0")
     public static final int DEFAULT_EVENT_LOOP_THREADS = 1;
 
-    private final NettyThreadFactoryConfiguration configuration;
+    private final NettyGlobalConfiguration configuration;
 
     /**
      * Create a new netty ThreadFactory factory.
@@ -70,18 +71,18 @@ public class NettyThreadFactory {
      * @param configuration The configuration
      * @since 4.4.0
      */
-    public NettyThreadFactory(NettyThreadFactoryConfiguration configuration) {
+    public NettyThreadFactory(NettyGlobalConfiguration configuration) {
         this.configuration = configuration;
     }
 
     /**
      * Create a new netty ThreadFactory factory.
      *
-     * @deprecated Pass the config instead, through {@link #NettyThreadFactory(NettyThreadFactoryConfiguration)}
+     * @deprecated Pass the config instead, through {@link #NettyThreadFactory(NettyGlobalConfiguration)}
      */
     @Deprecated
     public NettyThreadFactory() {
-        this(new NettyThreadFactoryConfiguration(true));
+        this(new NettyGlobalConfiguration());
     }
 
     /**
@@ -103,7 +104,7 @@ public class NettyThreadFactory {
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
         String poolName = "default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class);
-        if (configuration.reactorNonBlocking()) {
+        if (configuration.isDefaultThreadFactoryReactorNonBlocking()) {
             return new DefaultThreadFactory(poolName) {
                 @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
                 @Override
