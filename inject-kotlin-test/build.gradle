@@ -1,6 +1,6 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
-    id "org.jetbrains.kotlin.jvm"
+    alias libs.plugins.managed.kotlin.jvm
 }
 
 dependencies {
