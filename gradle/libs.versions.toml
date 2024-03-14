@@ -279,3 +279,10 @@ wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wir
 
 [bundles]
 asm = ["asm", "asm-commons"]
+
+[plugins]
+managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
+managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "managed-kotlin" }
+managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
+managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
+managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
