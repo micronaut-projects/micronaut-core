@@ -57,6 +57,7 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | null  | null       | "application/hal+json" | 'json'      | [:]                | 1.0     | 'hal+json' | "application"
         "application/hal+xml"       | null  | null       | "application/hal+xml"  | 'xml'       | [:]                | 1.0     | 'hal+xml'  | "application"
         "application/json"          | null  | null       | "application/json"     | 'json'      | [:]                | 1.0     | 'json'     | "application"
+        "application/yaml"          | null  | null       | "application/yaml"     | 'yaml'      | [:]                | 1.0     | 'yaml'     | "application"
         "text/html;charset=utf-8"   | null  | null       | "text/html"            | 'html'      | [charset: "utf-8"] | 1.0     | 'html'     | "text"
     }
 
@@ -90,7 +91,7 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | true
         "application/hal+xml"       | true
         "application/json"          | true
-        "application/x-yaml"         | true
+        "application/yaml"          | true
         "application/xml"           | true
         "text/html;charset=utf-8"   | true
         "text/foo"                  | true
