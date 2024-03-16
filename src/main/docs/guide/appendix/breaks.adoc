@@ -5,6 +5,11 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Adoption of the IANA standard for YAML media types
+
+Micronaut now uses official **application/yaml** media type for YAML format. Before it was **application/x-yaml**.
+See https://www.rfc-editor.org/rfc/rfc9512.html for details.
+
 ==== Update to Jackson 3
 
 Micronaut Jackson Databind uses https://github.com/FasterXML/jackson/wiki/Jackson-Release-3.0[Jackson 3].

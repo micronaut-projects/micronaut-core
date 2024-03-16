@@ -42,7 +42,7 @@ class MediaTypeSpec extends Specification {
         MediaType.of('application/xhtml+xml') == MediaType.APPLICATION_XHTML_TYPE
         MediaType.of('application/xml') == MediaType.APPLICATION_XML_TYPE
         MediaType.of('application/json') == MediaType.APPLICATION_JSON_TYPE
-        MediaType.of('application/x-yaml') == MediaType.APPLICATION_YAML_TYPE
+        MediaType.of('application/yaml') == MediaType.APPLICATION_YAML_TYPE
         MediaType.of('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') == MediaType.MICROSOFT_EXCEL_OPEN_XML_TYPE
         MediaType.of('application/vnd.ms-excel') == MediaType.MICROSOFT_EXCEL_TYPE
         MediaType.of('application/hal+json') == MediaType.APPLICATION_HAL_JSON_TYPE
@@ -108,6 +108,7 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | null  | null       | "application/hal+json" | 'json'      | [:]                | 1.0     | 'hal+json' | "application"
         "application/hal+xml"       | null  | null       | "application/hal+xml"  | 'xml'       | [:]                | 1.0     | 'hal+xml'  | "application"
         "application/json"          | null  | null       | "application/json"     | 'json'      | [:]                | 1.0     | 'json'     | "application"
+        "application/yaml"          | null  | null       | "application/yaml"     | 'yaml'      | [:]                | 1.0     | 'yaml'     | "application"
         "text/html;charset=utf-8"   | null  | null       | "text/html"            | 'html'      | [charset: "utf-8"] | 1.0     | 'html'     | "text"
     }
 
@@ -141,7 +142,7 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | true
         "application/hal+xml"       | true
         "application/json"          | true
-        "application/x-yaml"        | true
+        "application/yaml"          | true
         "application/x-cue"         | true
         "application/xml"           | true
         "application/graphql"       | true
