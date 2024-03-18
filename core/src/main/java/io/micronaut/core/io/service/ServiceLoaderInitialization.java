@@ -48,6 +48,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
  *
@@ -87,7 +89,7 @@ final class ServiceLoaderFeature implements Feature {
                             List<AnnotationValue<Annotation>> values = beanInfo.getAnnotationMetadata().getAnnotationValuesByName("io.micronaut.context.annotation.Requires");
                             if (!values.isEmpty()) {
                                 for (AnnotationValue<Annotation> value : values) {
-                                    String[] classNames = new String[0];
+                                    String[] classNames = EMPTY_STRING_ARRAY;
                                     if (value.contains("classes")) {
                                         classNames = value.stringValues("classes");
                                     }

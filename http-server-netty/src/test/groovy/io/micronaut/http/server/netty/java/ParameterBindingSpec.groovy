@@ -36,7 +36,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void 'route is build correctly for @Controller("/books") method: @Get("{?max}")'() {
         given:
         HttpRequest request = HttpRequest.GET('/books')
-        def response = rxClient.toBlocking().exchange(request)
+        def response = httpClient.toBlocking().exchange(request)
         def status = response.status
 
         expect:
@@ -46,7 +46,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void 'route is build correctly for @Controller("/poetry") method: @Get("/{?max}")'() {
         given:
         HttpRequest request = HttpRequest.GET('/poetry')
-        def response = rxClient.toBlocking().exchange(request)
+        def response = httpClient.toBlocking().exchange(request)
         def status = response.status
 
         expect:
@@ -56,7 +56,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test bind HTTP parameters for URI #uri"() {
         given:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(uri, String))
+        HttpResponse<String> response = Flux.from(httpClient.exchange(uri, String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)

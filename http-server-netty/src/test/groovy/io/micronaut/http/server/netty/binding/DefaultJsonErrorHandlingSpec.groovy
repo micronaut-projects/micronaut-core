@@ -16,7 +16,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         when:
         def json = '{"title":"The Stand"'
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.POST('/errors/map', json), String
         )).blockFirst()
 

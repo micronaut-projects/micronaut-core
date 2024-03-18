@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
+
 /**
  * <p>A {@link UriMatchTemplate} that allows specifying types for the URI variables.</p>
  *
@@ -39,7 +41,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      */
     public UriTypeMatchTemplate(CharSequence templateString, Class<?>... variableTypes) {
         super(templateString, new Object[] {variableTypes});
-        this.variableTypes = variableTypes == null ? new Class<?>[0] : variableTypes;
+        this.variableTypes = variableTypes == null ? EMPTY_CLASS_ARRAY : variableTypes;
     }
 
     /**
@@ -79,7 +81,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         if (this.variables == null) {
             this.variables = new ArrayList<>();
         }
-        this.variableTypes = parserArguments != null && parserArguments.length > 0 ? (Class<?>[]) parserArguments[0] : new Class<?>[0];
+        this.variableTypes = parserArguments != null && parserArguments.length > 0 ? (Class<?>[]) parserArguments[0] : EMPTY_CLASS_ARRAY;
         return new TypedUriMatchTemplateParser(templateString, this);
     }
 

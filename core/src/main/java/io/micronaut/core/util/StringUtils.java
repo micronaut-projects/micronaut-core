@@ -307,7 +307,6 @@ public final class StringUtils {
      * @see java.util.StringTokenizer
      * @see java.lang.String#trim()
      */
-    @SuppressWarnings({"unchecked"})
     public static String[] tokenizeToStringArray(
             String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
@@ -321,11 +320,11 @@ public final class StringUtils {
             if (trimTokens) {
                 token = token.trim();
             }
-            if (!ignoreEmptyTokens || token.length() > 0) {
+            if (!ignoreEmptyTokens || !token.isEmpty()) {
                 tokens.add(token);
             }
         }
-        return tokens.toArray(new String[0]);
+        return tokens.toArray(EMPTY_STRING_ARRAY);
     }
 
     /**

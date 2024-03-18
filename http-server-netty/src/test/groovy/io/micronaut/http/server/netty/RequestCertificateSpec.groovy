@@ -20,7 +20,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
 
     void "test certificate extraction"() {
         when:
-        def response = Flux.from(rxClient
+        def response = Flux.from(httpClient
                 .exchange('/ssl', String))
                 .blockFirst()
         then:
