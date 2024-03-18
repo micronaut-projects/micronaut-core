@@ -1,6 +1,6 @@
 [versions]
 asm = "9.6"
-awaitility = "4.2.0"
+awaitility = "4.2.1"
 bcpkix = "1.70"
 blaze = "1.6.11"
 brotli4j = "1.15.0"
