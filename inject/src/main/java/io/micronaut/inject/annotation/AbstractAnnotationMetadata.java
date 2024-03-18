@@ -145,9 +145,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @Override
     public @NonNull Annotation[] synthesizeAll() {
-        if (annotationMap == null) {
-            return ZERO_ANNOTATIONS;
-        }
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
@@ -163,9 +160,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @Override
     public @NonNull Annotation[] synthesizeDeclared() {
-        if (declaredAnnotationMap == null) {
-            return ZERO_ANNOTATIONS;
-        }
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
