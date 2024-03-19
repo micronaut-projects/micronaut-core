@@ -232,7 +232,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          Class<?> reactiveValueType,
                                          Class<?> declaringType) {
 
-        Publisher<RequestBinderResult> csRequestPublisher = Mono.fromCallable(() -> bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
+        Publisher<RequestBinderResult> csRequestPublisher = Mono.fromCallable(() ->
+            bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
         Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, csRequestPublisher, returnType, errorType, valueType);
         CompletableFuture<Object> future = new CompletableFuture<>();
         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
@@ -300,7 +301,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpResponse.class.isAssignableFrom(reactiveValueType) ||
                 HttpStatus.class == reactiveValueType;
 
-        Publisher<RequestBinderResult> requestPublisher = Mono.fromCallable(() -> bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
+        Publisher<RequestBinderResult> requestPublisher = Mono.fromCallable(() ->
+            bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
         Publisher<?> publisher;
         if (!isSingle && httpClient instanceof StreamingHttpClient client) {
             publisher = httpClientResponseStreamingPublisher(client, context, requestPublisher, errorType, valueType);
@@ -315,7 +317,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     @NotNull
-    private RequestBinderResult bindRequest(MethodInvocationContext<Object, Object> context, HttpMethod httpMethod, String httpMethodName, String uri, InterceptedMethod interceptedMethod, AnnotationMetadata annotationMetadata) {
+    private RequestBinderResult bindRequest(MethodInvocationContext<Object, Object> context,
+                                            HttpMethod httpMethod,
+                                            String httpMethodName,
+                                            String uri,
+                                            InterceptedMethod interceptedMethod,
+                                            AnnotationMetadata annotationMetadata) {
         MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
         UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
@@ -574,7 +581,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (definedValue == null && !argument.isNullable()) {
             throw new IllegalArgumentException(
-            "Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behaviour".formatted(argument.getName(), context.getExecutableMethod().toString())
+            ("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable " +
+                "annotation type if that is the desired behaviour").formatted(argument.getName(), context.getExecutableMethod().toString())
             );
         }
 
