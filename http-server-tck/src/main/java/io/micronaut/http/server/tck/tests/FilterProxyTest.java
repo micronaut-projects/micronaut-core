@@ -93,7 +93,7 @@ public class FilterProxyTest {
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             MutableHttpRequest<?> newRequest = request.mutate()
                 .uri(b -> b
-                    .scheme("http")
+                    .scheme(embeddedServer.getScheme())
                     .host(embeddedServer.getHost())
                     .port(embeddedServer.getPort())
                     .replacePath("/ok")

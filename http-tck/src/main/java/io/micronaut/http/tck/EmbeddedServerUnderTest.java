@@ -45,6 +45,8 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
     private BlockingHttpClient client;
 
     public EmbeddedServerUnderTest(@NonNull Map<String, Object> properties) {
+        properties.putIfAbsent("micronaut.server.port", -1);
+        properties.putIfAbsent("micronaut.ssl.port", -1);
         this.embeddedServer = ApplicationContext.run(EmbeddedServer.class, properties);
         this.isBlockingClient = (boolean) properties.getOrDefault(BLOCKING_CLIENT_PROPERTY, true);
     }
@@ -84,6 +86,11 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
             embeddedServer.getApplicationContext().close();
             embeddedServer.close();
         }
+    }
+
+    @Override
+    public Optional<String> getScheme() {
+        return Optional.ofNullable(embeddedServer).map(EmbeddedServer::getScheme);
     }
 
     @Override

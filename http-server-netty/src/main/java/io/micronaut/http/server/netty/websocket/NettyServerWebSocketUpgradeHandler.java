@@ -41,7 +41,7 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
@@ -133,7 +133,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
         if (isWebSocketUpgrade(request)) {
             NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
@@ -171,7 +171,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
                                HttpResponse<?> actualResponse,
-                               PipeliningServerHandler.OutboundAccess outboundAccess) {
+                               OutboundAccess outboundAccess) {
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
