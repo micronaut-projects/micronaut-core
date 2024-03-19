@@ -26,6 +26,7 @@ import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import io.netty.util.internal.SystemPropertyUtil;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import reactor.core.scheduler.NonBlocking;
@@ -71,6 +72,7 @@ public class NettyThreadFactory {
      * @param configuration The configuration
      * @since 4.4.0
      */
+    @Inject
     public NettyThreadFactory(NettyGlobalConfiguration configuration) {
         this.configuration = configuration;
     }
