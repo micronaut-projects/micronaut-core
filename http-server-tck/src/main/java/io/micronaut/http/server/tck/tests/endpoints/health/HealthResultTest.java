@@ -19,9 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.server.tck.tests.forms.FormsSubmissionsWithListsTest;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.json.JsonMapper;
@@ -34,26 +33,28 @@ import java.util.Collections;
 import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
-        "java:S5960", // We're allowed assertions, as these are used in tests only
-        "checkstyle:MissingJavadocType",
-        "checkstyle:DesignForExtension"
+    "java:S5960", // We're allowed assertions, as these are used in tests only
+    "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
 public class HealthResultTest {
+
     private static final String SPEC_NAME = "HealthResultTest";
 
     /**
      * This test verifies the available JSON Mapper is able to serialize a {@link HealthResult}.
+     *
      * @throws IOException Exception thrown while getting the server under test.
      */
     @Test
     public void healthResultSerialization() throws IOException {
         // standard header name with mixed case
         asserts(SPEC_NAME,
-                HttpRequest.GET("/healthresult"),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                        .status(HttpStatus.OK)
-                        .body("{\"name\":\"db\",\"status\":\"DOWN\",\"details\":{\"foo\":\"bar\"}}")
-                        .build()));
+            HttpRequest.GET("/healthresult"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("{\"name\":\"db\",\"status\":\"DOWN\",\"details\":{\"foo\":\"bar\"}}")
+                .build()));
     }
 
     @Controller("/healthresult")
@@ -68,8 +69,8 @@ public class HealthResultTest {
         @Get
         String index() throws IOException {
             return jsonMapper.writeValueAsString(HealthResult.builder("db", HealthStatus.DOWN)
-                    .details(Collections.singletonMap("foo", "bar"))
-                    .build());
+                .details(Collections.singletonMap("foo", "bar"))
+                .build());
         }
     }
 }
