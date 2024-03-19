@@ -16,10 +16,8 @@ class NettyThreadFactorySpec extends Specification {
 
     def 'test reactor blocking detection'(Map<String, Object> config, String expected) {
         given:
-        def ctx = ApplicationContext.run(config + ['spec.name': "NettyThreadFactorySpec"])
-        def server = ctx.getBean(EmbeddedServer)
-        server.start()
-        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, config + ['spec.name': "NettyThreadFactorySpec"])
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
 
         expect:
         client.retrieve("/block") == expected
