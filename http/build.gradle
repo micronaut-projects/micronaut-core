@@ -6,23 +6,12 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-
-    annotationProcessor(platform(libs.test.boms.micronaut.serde))
-    annotationProcessor(libs.micronaut.serde.processor) {
-        exclude group: "io.micronaut", module: "json-core"
-    }
-
     api project(":context")
     api project(":core-reactive")
     implementation project(":context-propagation")
     implementation libs.managed.reactor
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.kotlinx.coroutines.reactor
-
-    compileOnly(platform(libs.test.boms.micronaut.serde))
-    compileOnly(libs.micronaut.serde.api) {
-        exclude group: "io.micronaut", module: "json-core"
-    }
 
     compileOnly libs.managed.jackson.annotations
 
