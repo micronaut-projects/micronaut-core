@@ -77,7 +77,7 @@ managed-snakeyaml = "2.2"
 managed-java-parser-core = "3.25.9"
 managed-ksp = "1.9.23-1.0.19"
 micronaut-docs = "2.0.0"
-micronaut-serde = "2.8.1"
+micronaut-serde = "2.8.2"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
