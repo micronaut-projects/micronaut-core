@@ -31,7 +31,9 @@ import io.netty.util.ResourceLeakDetector;
 public class NettyGlobalConfiguration {
 
     private ResourceLeakDetector.Level resourceLeakDetectorLevel;
-    private boolean defaultThreadFactoryReactorNonBlocking = true;
+
+    private static final boolean DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING = true;
+    private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
 
     /**
      * Sets the resource leak detection level.
@@ -53,9 +55,9 @@ public class NettyGlobalConfiguration {
     }
 
     /**
-     * If {@code true} (the default), netty event loop threads will implement project reactor
-     * {@link reactor.core.scheduler.NonBlocking} by default. This will make reactor blocking
-     * operations throw an exception on those threads.
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
+     * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
      *
      * @return Whether event loop threads should implement NonBlocking by default
      */
@@ -64,9 +66,9 @@ public class NettyGlobalConfiguration {
     }
 
     /**
-     * If {@code true} (the default), netty event loop threads will implement project reactor
-     * {@link reactor.core.scheduler.NonBlocking} by default. This will make reactor blocking
-     * operations throw an exception on those threads.
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
+     * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
      *
      * @param defaultThreadFactoryReactorNonBlocking Whether event loop threads should implement
      *                                               NonBlocking by default
