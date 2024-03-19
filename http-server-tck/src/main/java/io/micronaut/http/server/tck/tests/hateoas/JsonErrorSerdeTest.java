@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests.hateoas;
 
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
@@ -50,6 +51,22 @@ public class JsonErrorSerdeTest {
             assertTrue(resource.getLinks().getFirst("self").isPresent());
             assertEquals("/resolve", resource.getLinks().getFirst("self").get().getHref());
             assertFalse(resource.getLinks().getFirst("self").get().isTemplated());
+        }
+    }
+
+    /**
+     * @throws IOException Exception thrown while getting the server under test.
+     */
+    @Test
+    void jsonErrorShouldBeDeserializableFromAString() throws IOException {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.emptyMap())) {
+            JsonMapper jsonMapper = server.getApplicationContext().getBean(JsonMapper.class);
+            JsonError jsonError = jsonMapper.readValue(JSON_ERROR, JsonError.class);
+            assertEquals("Internal Server Error", jsonError.getMessage());
+            assertTrue(jsonError.getEmbedded().getFirst("errors").isPresent());
+            assertTrue(jsonError.getLinks().getFirst("self").isPresent());
+            assertEquals("/resolve", jsonError.getLinks().getFirst("self").get().getHref());
+            assertFalse(jsonError.getLinks().getFirst("self").get().isTemplated());
         }
     }
 }
