@@ -26,12 +26,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
 import io.micronaut.core.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+
+import java.util.*;
 
 /**
  * An abstract implementation of {@link Resource}.
@@ -42,7 +38,7 @@ import java.util.Optional;
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 @Introspected
-public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {
+public abstract class AbstractResource<Impl extends AbstractResource<Impl>> implements Resource {
 
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
@@ -150,6 +146,13 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
             if (value instanceof Map) {
                 Map<String, Object> linkMap = (Map<String, Object>) value;
                 link(name, linkMap);
+            } else if (value instanceof Collection<?> collection) {
+                for (Object o : collection) {
+                    if (o instanceof Map) {
+                        Map<String, Object> linkMap = (Map<String, Object>) o;
+                        link(name, linkMap);
+                    }
+                }
             }
         }
     }
