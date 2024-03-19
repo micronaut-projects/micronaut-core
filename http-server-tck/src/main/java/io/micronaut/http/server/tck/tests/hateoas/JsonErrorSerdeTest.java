@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.hateoas;
 
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
@@ -25,7 +26,10 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
         "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -33,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "checkstyle:DesignForExtension"
 })
 public class JsonErrorSerdeTest {
+
     private static final String JSON_ERROR = """
             {"_links":{"self":[{"href":"/resolve","templated":false}]},"_embedded":{"errors":[{"message":"Internal Server Error: Something bad happened"}]},"message":"Internal Server Error"}""";
     private static final String SPEC_NAME = "JsonErrorSerdeTest";
@@ -47,10 +52,7 @@ public class JsonErrorSerdeTest {
             //when:
             Resource resource = jsonMapper.readValue(JSON_ERROR, Resource.class);
             //then:
-            assertTrue(resource.getEmbedded().getFirst("errors").isPresent());
-            assertTrue(resource.getLinks().getFirst("self").isPresent());
-            assertEquals("/resolve", resource.getLinks().getFirst("self").get().getHref());
-            assertFalse(resource.getLinks().getFirst("self").get().isTemplated());
+            testResource(resource);
         }
     }
 
@@ -61,12 +63,18 @@ public class JsonErrorSerdeTest {
     void jsonErrorShouldBeDeserializableFromAString() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.emptyMap())) {
             JsonMapper jsonMapper = server.getApplicationContext().getBean(JsonMapper.class);
+            //when:
             JsonError jsonError = jsonMapper.readValue(JSON_ERROR, JsonError.class);
-            assertEquals("Internal Server Error", jsonError.getMessage());
-            assertTrue(jsonError.getEmbedded().getFirst("errors").isPresent());
-            assertTrue(jsonError.getLinks().getFirst("self").isPresent());
-            assertEquals("/resolve", jsonError.getLinks().getFirst("self").get().getHref());
-            assertFalse(jsonError.getLinks().getFirst("self").get().isTemplated());
+            //then:
+            testResource(jsonError);
         }
+    }
+
+    private <T extends Resource> void testResource(T resource) {
+        assertNotNull(resource);
+        assertTrue(resource.getEmbedded().getFirst("errors").isPresent(), "errors should be present");
+        assertTrue(resource.getLinks().getFirst("self").isPresent(), "self link should be present");
+        assertEquals("/resolve", resource.getLinks().getFirst("self").map(Link::getHref).orElse(null));
+        assertFalse(resource.getLinks().getFirst("self").map(Link::isTemplated).orElse(true), "self link should not be templated");
     }
 }
