@@ -55,7 +55,6 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
-import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -316,7 +315,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return finalPublisher;
     }
 
-    @NotNull
+    @NonNull
     private RequestBinderResult bindRequest(MethodInvocationContext<Object, Object> context,
                                             HttpMethod httpMethod,
                                             String httpMethodName,
@@ -439,7 +438,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return body;
     }
 
-    @NotNull
+    @NonNull
     private ClientArgumentRequestBinder<Object> buildDefaultBinder(Map<String, Object> pathParams, List<Argument<?>> bodyArguments) {
         return (ctx, uriCtx, value, req) -> {
             Argument<?> argument = ctx.getArgument();
@@ -460,7 +459,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         };
     }
 
-    @NotNull
+    @NonNull
     private Optional<Object> bindArguments(MethodInvocationContext<Object, Object> context,
                                            Map<String, MutableArgumentValue<?>> parameters,
                                            ClientArgumentRequestBinder<Object> defaultBinder,
@@ -486,7 +485,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return bindingErrorResult;
     }
 
-    @NotNull
+    @NonNull
     private static MediaType[] getAcceptTypes(MethodInvocationContext<Object, Object> context, MutableHttpRequest<?> request) {
         final MediaType[] acceptTypes;
         Collection<MediaType> accept = request.accept();
@@ -683,7 +682,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             return new RequestBinderResult(request, null, false);
         }
 
-        static RequestBinderResult withErrorResult(Object errorResult) {
+        static RequestBinderResult withErrorResult(@Nullable Object errorResult) {
             return new RequestBinderResult(null, errorResult, true);
         }
     }
