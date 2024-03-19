@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     testImplementation(projects.httpServerNetty)
+    implementation(projects.jacksonDatabind)
     testImplementation(projects.httpClient)
     testImplementation(projects.httpClientTck)
     testImplementation(libs.junit.platform.engine)

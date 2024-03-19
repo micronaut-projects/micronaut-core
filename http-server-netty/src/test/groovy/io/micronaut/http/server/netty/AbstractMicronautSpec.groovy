@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -37,8 +38,8 @@ abstract class AbstractMicronautSpec extends Specification {
     @Shared int serverPort = embeddedServer.getPort()
     @Shared URL server = embeddedServer.getURL()
     @Shared @AutoCleanup ApplicationContext applicationContext = embeddedServer.applicationContext
-    @Shared @AutoCleanup HttpClient rxClient = applicationContext.createBean(HttpClient, server)
-
+    @Shared @AutoCleanup HttpClient httpClient = applicationContext.createBean(HttpClient, server)
+    @Shared @AutoCleanup BlockingHttpClient client = httpClient.toBlocking()
 
     Collection<String> configurationNames() {
         ['io.micronaut.configuration.jackson','io.micronaut.web.router']

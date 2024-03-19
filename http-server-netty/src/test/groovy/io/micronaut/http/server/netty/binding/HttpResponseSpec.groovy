@@ -43,7 +43,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test custom HTTP response for java action #action"() {
 
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
+        HttpResponse<?> response = Flux.from(httpClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -85,7 +85,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
+        HttpResponse<?> response = Flux.from(httpClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -121,7 +121,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test content encoding"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String))
+        HttpResponse<String> response = Flux.from(httpClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -138,7 +138,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test custom headers"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
+        HttpResponse<?> response = Flux.from(httpClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)

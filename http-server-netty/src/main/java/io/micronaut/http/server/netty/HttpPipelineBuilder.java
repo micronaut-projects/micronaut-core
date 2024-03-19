@@ -247,8 +247,8 @@ final class HttpPipelineBuilder implements Closeable {
                 path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
             }
             if (quic && ch instanceof QuicStreamChannel qsc) {
-                path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localAddress()));
-                path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteAddress()));
+                path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
+                path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
             }
             path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
             path = path.replace("{timestamp}", Instant.now().toString());
@@ -261,7 +261,7 @@ final class HttpPipelineBuilder implements Closeable {
                 PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
                 if (quic && ch instanceof QuicStreamChannel qsc) {
-                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localAddress(), (InetSocketAddress) qsc.parent().remoteAddress(), true);
+                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
                 }
 
                 ch.pipeline().addLast(builder.build(new FileOutputStream(path)));

@@ -241,9 +241,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             List<ClassElement> classElements = new ArrayList<>();
 
             populateClassElements(stereotypes, packageElement, classElements);
-            return classElements.toArray(new ClassElement[0]);
+            return classElements.toArray(ClassElement.ZERO_CLASS_ELEMENTS);
         }
-        return new ClassElement[0];
+        return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     @NonNull

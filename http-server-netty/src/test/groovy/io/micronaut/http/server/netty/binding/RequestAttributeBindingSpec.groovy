@@ -14,15 +14,13 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
-import spock.lang.Issue
-
 import jakarta.annotation.Nullable
 
 class RequestAttributeBindingSpec extends AbstractMicronautSpec {
 
     void "test request attribute binding from a filter"() {
         given:
-        BlockingHttpClient client = rxClient.toBlocking()
+        BlockingHttpClient client = httpClient.toBlocking()
 
         expect:
         client.retrieve("/attribute/filter/implicit") == "Sally"

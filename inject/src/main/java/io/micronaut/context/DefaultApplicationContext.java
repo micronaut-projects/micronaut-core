@@ -60,6 +60,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Creates a default implementation of the {@link ApplicationContext} interface.
  *
@@ -901,7 +903,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         public Environment start() {
             if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
                 startBootstrapEnvironment();
             }
             return super.start();
@@ -915,7 +917,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                 refreshablePropertySources.addAll(bootstrapEnvironment.getRefreshablePropertySources());
 
-                String[] environmentNamesArray = getActiveNames().toArray(new String[0]);
+                String[] environmentNamesArray = getActiveNames().toArray(EMPTY_STRING_ARRAY);
                 BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
                 for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {

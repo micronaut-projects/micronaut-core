@@ -92,6 +92,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static io.micronaut.core.annotation.AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
+import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Support method for {@link io.micronaut.core.annotation.AnnotationMetadata}.
  *
@@ -180,23 +184,23 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             ConfigurationProperties.class.getName(),
-            Map.of("cliPrefix", new String[0], "excludes", new String[0], "includes", new String[0])
+            Map.of("cliPrefix", EMPTY_STRING_ARRAY, "excludes", EMPTY_STRING_ARRAY, "includes", EMPTY_STRING_ARRAY)
         );
         coreAnnotationsDefaults.put(
             EachProperty.class.getName(),
-            Map.of("excludes", new String[0], "includes", new String[0], "list", false)
+            Map.of("excludes", EMPTY_STRING_ARRAY, "includes", EMPTY_STRING_ARRAY, "list", false)
         );
         coreAnnotationsDefaults.put(
             ConfigurationReader.class.getName(),
-            Map.of("excludes", new String[0], "includes", new String[0])
+            Map.of("excludes", EMPTY_STRING_ARRAY, "includes", EMPTY_STRING_ARRAY)
         );
         coreAnnotationsDefaults.put(
             Bean.class.getName(),
-            Map.of("typed", new AnnotationClassValue[0])
+            Map.of("typed", ZERO_ANNOTATION_CLASS_VALUES)
         );
         coreAnnotationsDefaults.put(
             Requires.class.getName(),
-            Map.ofEntries(Map.entry("beans", new AnnotationClassValue[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("condition", TrueCondition.class), Map.entry("entities", new AnnotationClassValue[0]), Map.entry("env", new String[0]), Map.entry("missing", new AnnotationClassValue[0]), Map.entry("missingBeans", new AnnotationClassValue[0]), Map.entry("missingClasses", new String[0]), Map.entry("missingConfigurations", new String[0]), Map.entry("notEnv", new String[0]), Map.entry("notOs", new String[0]), Map.entry("os", new String[0]), Map.entry("resources", new String[0]), Map.entry("sdk", "MICRONAUT"))
+            Map.ofEntries(Map.entry("beans", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("classes", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("condition", TrueCondition.class), Map.entry("entities", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("env", EMPTY_STRING_ARRAY), Map.entry("missing", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("missingBeans", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("missingClasses", EMPTY_STRING_ARRAY), Map.entry("missingConfigurations", EMPTY_STRING_ARRAY), Map.entry("notEnv", EMPTY_STRING_ARRAY), Map.entry("notOs", EMPTY_STRING_ARRAY), Map.entry("os", EMPTY_STRING_ARRAY), Map.entry("resources", EMPTY_STRING_ARRAY), Map.entry("sdk", "MICRONAUT"))
         );
         coreAnnotationsDefaults.put(
             Replaces.class.getName(),
@@ -209,7 +213,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             Introspected.class.getName(),
-            Map.ofEntries(Map.entry("accessKind", new String[]{"METHOD"}), Map.entry("annotationMetadata", true), Map.entry("builder", new AnnotationValue("io.micronaut.core.annotation.Introspected$IntrospectionBuilder", Map.of(), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER)), Map.entry("classNames", new String[0]), Map.entry("classes", new AnnotationClassValue[0]), Map.entry("excludedAnnotations", new AnnotationClassValue[0]), Map.entry("excludes", new String[0]), Map.entry("includedAnnotations", new AnnotationClassValue[0]), Map.entry("includes", new String[0]), Map.entry("indexed", new AnnotationValue[0]), Map.entry("packages", new String[0]), Map.entry("visibility", new String[]{"DEFAULT"}), Map.entry("withPrefix", "with"))
+            Map.ofEntries(Map.entry("accessKind", new String[]{"METHOD"}), Map.entry("annotationMetadata", true), Map.entry("builder", new AnnotationValue("io.micronaut.core.annotation.Introspected$IntrospectionBuilder", Map.of(), AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER)), Map.entry("classNames", EMPTY_STRING_ARRAY), Map.entry("classes", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("excludedAnnotations", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("excludes", EMPTY_STRING_ARRAY), Map.entry("includedAnnotations", ZERO_ANNOTATION_CLASS_VALUES), Map.entry("includes", EMPTY_STRING_ARRAY), Map.entry("indexed", ZERO_ANNOTATION_VALUES), Map.entry("packages", EMPTY_STRING_ARRAY), Map.entry("visibility", new String[]{"DEFAULT"}), Map.entry("withPrefix", "with"))
         );
         coreAnnotationsDefaults.put(
             MapFormat.class.getName(),
@@ -241,7 +245,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.Introduction",
-            Map.of("interfaces", new AnnotationClassValue[0])
+            Map.of("interfaces", ZERO_ANNOTATION_CLASS_VALUES)
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.Adapter",

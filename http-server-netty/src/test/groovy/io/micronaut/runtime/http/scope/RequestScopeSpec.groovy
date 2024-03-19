@@ -48,7 +48,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
     void "test dependent beans leak"() {
         when:
         (0..100).each {
-            rxClient.toBlocking().retrieve(HttpRequest.GET("/test-simple-request-scope"), String)
+            httpClient.toBlocking().retrieve(HttpRequest.GET("/test-simple-request-scope"), String)
         }
         def controller = applicationContext.getBean(SimpleTestController)
         then:
@@ -76,7 +76,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
 
         when:
-        def result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
+        def result = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 1, count within request 1"
@@ -92,7 +92,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
+        result = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 2, count within request 1"
@@ -108,7 +108,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
+        result = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 3, count within request 1"
@@ -124,7 +124,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-stream"), String)
+        result = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-stream"), String)
 
         then:
         result == "message count 4, count within request 1"
@@ -139,7 +139,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test request scope bean that injects the request"() {
         when:
-        String result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-aware"), String)
+        String result = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-aware"), String)
 
         then:
         result == "OK"

@@ -1217,13 +1217,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private Stream<ProcessedAnnotation> flattenRepeatable(@NonNull ProcessedAnnotation processedAnnotation) {
         // In a case of a repeatable container process it as a stream of repeatable annotation values
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
-        List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-        boolean isRepeatableAnnotationContainer = !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
-                .allMatch(value -> {
-                    T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
-                    return annotationMirror != null && getRepeatableContainerNameForType(annotationMirror) != null;
-                });
-        if (isRepeatableAnnotationContainer) {
+        if (isRepeatableAnnotationContainer(annotationValue)) {
             // Repeatable annotations container is being added with values
             // We will add every repeatable annotation separately to properly detect its container and run transformations
             Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
@@ -1237,10 +1231,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     containerValues,
                                     getRetentionPolicy(annotationValue.getAnnotationName())))
                     ),
-                    repeatableAnnotations.stream().map(this::toProcessedAnnotation)
+                    annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream().map(this::toProcessedAnnotation)
             );
         }
         return Stream.of(processedAnnotation);
+    }
+
+    /**
+     * @param annotationValue The annotation value
+     * @return true if the annotation is a repeatable container
+     */
+    protected boolean isRepeatableAnnotationContainer(AnnotationValue<?> annotationValue) {
+        List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+        return !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
+                .allMatch(value -> {
+                    T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
+                    return annotationMirror != null && getRepeatableContainerNameForType(annotationMirror) != null;
+                });
     }
 
     @NonNull
@@ -1294,8 +1301,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             repeatableContainer = AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().get(annotationName);
         }
         if (repeatableContainer == null) {
-            T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-            repeatableContainer = annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
+            repeatableContainer = findRepeatableContainerNameForType(annotationName);
         }
         if (isStereotype) {
             if (repeatableContainer != null) {
@@ -1352,6 +1358,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+    }
+
+    /**
+     * Find the repeatable container for given annotation type.
+     * @param annotationName The repeatable annotation
+     * @return The repeatable container if exists
+     */
+    @Nullable
+    protected String findRepeatableContainerNameForType(@NonNull String annotationName) {
+        T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
+        return annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
     }
 
     /**

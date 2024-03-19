@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Implementation of the {@link CommandLine} interface.
  *
@@ -38,7 +40,7 @@ class DefaultCommandLine implements CommandLine {
     private LinkedHashMap<String, Object> undeclaredOptions = new LinkedHashMap<>();
     private LinkedHashMap<Option, Object> declaredOptions = new LinkedHashMap<>();
     private List<String> remainingArgs = new ArrayList<>();
-    private String[] rawArguments = new String[0];
+    private String[] rawArguments = EMPTY_STRING_ARRAY;
 
     @Override
     public CommandLine parseNew(String[] args) {

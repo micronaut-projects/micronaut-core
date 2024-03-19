@@ -17,6 +17,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 
@@ -30,6 +31,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 
 /**
  * Extends {@link UriTemplate} and adds the ability to match a URI to a given template using the
@@ -57,7 +60,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @param templateString The template string
      */
     public UriMatchTemplate(CharSequence templateString) {
-        this(templateString, new Object[0]);
+        this(templateString, EMPTY_OBJECT_ARRAY);
     }
 
     /**

@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -53,7 +52,7 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.toBlocking().retrieve(request) == result
+        httpClient.toBlocking().retrieve(request) == result
 
         where:
         uri                       | result                       | headers

@@ -69,6 +69,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import static io.micronaut.inject.ast.beans.BeanParameterElement.ZERO_BEAN_PARAMETER_ELEMENTS;
+
 /**
  * Abstract implementation of the {@link BeanElementBuilder} interface that should be implemented by downstream language specific implementations.
  *
@@ -290,7 +292,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     .map(InternalBeanParameter::new)
                     .toArray(BeanParameterElement[]::new);
         } else {
-            return new BeanParameterElement[0];
+            return ZERO_BEAN_PARAMETER_ELEMENTS;
         }
     }
 

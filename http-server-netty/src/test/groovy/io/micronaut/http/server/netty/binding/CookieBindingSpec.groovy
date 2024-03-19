@@ -22,7 +22,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 /**
@@ -37,7 +36,7 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.toBlocking().retrieve(request) == result
+        httpClient.toBlocking().retrieve(request) == result
 
         where:
         uri                | result              | headers

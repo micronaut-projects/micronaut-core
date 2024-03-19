@@ -25,6 +25,8 @@ import io.micronaut.http.client.annotation.Client;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * This class collects information about HTTP client protocol version settings, such as the
  * {@link PlaintextMode} and the ALPN configuration.
@@ -110,7 +112,7 @@ public final class HttpVersionSelection {
         if (legacyHttpVersion != null) {
             return forLegacyVersion(legacyHttpVersion);
         } else {
-            String[] alpnModes = clientConfiguration.getAlpnModes().toArray(new String[0]);
+            String[] alpnModes = clientConfiguration.getAlpnModes().toArray(EMPTY_STRING_ARRAY);
             return new HttpVersionSelection(
                 clientConfiguration.getPlaintextMode(),
                 true,
