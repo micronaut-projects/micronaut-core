@@ -503,7 +503,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 ArgumentConversionContext conversionContext = ConversionContext.of(argument);
                 binder.bind(conversionContext, uriContext, definedValue, request);
                 if (conversionContext.hasErrors()) {
-                    return Optional.of(interceptedMethod.handleException(new ConversionErrorException(argument, conversionContext.getLastError().get())));
+                    return conversionContext.getLastError().map(e -> interceptedMethod.handleException(new ConversionErrorException(argument, e)));
                 }
             }
         }
