@@ -38,6 +38,7 @@ import java.util.*;
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 @Introspected
+@SuppressWarnings("java:S119") // Impl is a better name than T
 public abstract class AbstractResource<Impl extends AbstractResource<Impl>> implements Resource {
 
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
@@ -148,9 +149,8 @@ public abstract class AbstractResource<Impl extends AbstractResource<Impl>> impl
                 link(name, linkMap);
             } else if (value instanceof Collection<?> collection) {
                 for (Object o : collection) {
-                    if (o instanceof Map) {
-                        Map<String, Object> linkMap = (Map<String, Object>) o;
-                        link(name, linkMap);
+                    if (o instanceof Map aMap) {
+                        link(name, aMap);
                     }
                 }
             }
