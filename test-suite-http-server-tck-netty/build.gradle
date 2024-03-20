@@ -24,7 +24,6 @@ dependencies {
     testImplementation(libs.micronaut.validation) {
         exclude(group: "io.micronaut")
     }
-
 }
 
 configurations {
