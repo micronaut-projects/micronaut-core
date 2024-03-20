@@ -692,15 +692,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return uri;
     }
 
-    private record RequestBinderResult(MutableHttpRequest<?> request,
-                                       Object errorResult,
-                                       boolean isError) {
-
-        private RequestBinderResult(@Nullable MutableHttpRequest<?> request, @Nullable Object errorResult, boolean isError) {
-            this.request = request;
-            this.errorResult = errorResult;
-            this.isError = isError;
-        }
+    private record RequestBinderResult(
+        @Nullable MutableHttpRequest<?> request,
+        @Nullable Object errorResult,
+        boolean isError
+    ) {
 
         static RequestBinderResult withRequest(@NonNull MutableHttpRequest<?> request) {
             Objects.requireNonNull(request, "Bound HTTP request must not be null");
