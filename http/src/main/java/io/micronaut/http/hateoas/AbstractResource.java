@@ -18,6 +18,7 @@ package io.micronaut.http.hateoas;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
@@ -25,9 +26,13 @@ import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import io.micronaut.core.annotation.Nullable;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * An abstract implementation of {@link Resource}.
