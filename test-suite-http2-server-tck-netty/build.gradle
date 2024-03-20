@@ -15,6 +15,7 @@ micronautBuild {
 
 dependencies {
     implementation(projects.httpServerTck)
+    implementation(projects.jacksonDatabind)
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
@@ -24,7 +25,6 @@ dependencies {
         exclude(group: "io.micronaut")
     }
     testRuntimeOnly(libs.bcpkix)
-
 }
 
 configurations {
