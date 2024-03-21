@@ -83,6 +83,28 @@ public class UploadControllerSpec {
     }
 
     @Test
+    public void testFileUploadWithParameters() {
+
+        String parameters = "{\"param1\":\"val1\", \"param2\": 2}";
+
+        MultipartBody body = MultipartBody.builder()
+            .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
+            .addPart("parameters", "", MediaType.APPLICATION_JSON_TYPE, parameters.getBytes())
+            .build();
+
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+            HttpRequest.POST("/upload/parameters", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .accept(MediaType.TEXT_PLAIN_TYPE),
+            String.class
+        ));
+        HttpResponse<String> response = flowable.blockFirst();
+
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded. Parameters received: " + parameters, response.getBody().get());
+    }
+
+    @Test
     public void testFileUploadOutputStream() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
