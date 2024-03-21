@@ -53,7 +53,7 @@ class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
     void "test annotations"() {
         when:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -106,35 +106,35 @@ class Test {
 }
 
 ''')
-            def property = introspection.getBeanProperties().iterator().next()
-            def readProperty = introspection.getBeanReadProperties()[0]
-            def writeProperty = introspection.getBeanWriteProperties()[0]
+        def property = introspection.getBeanProperties().iterator().next()
+        def readProperty = introspection.getBeanReadProperties()[0]
+        def writeProperty = introspection.getBeanWriteProperties()[0]
         then:
-            property.hasAnnotation("test.A1")
-            property.hasAnnotation("test.A2")
-            !property.hasAnnotation("test.A3")
-            property.hasAnnotation("test.A4")
-            !property.hasAnnotation("test.A5")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
-            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
-            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A5")
-            readProperty.hasAnnotation("test.A1")
-            readProperty.hasAnnotation("test.A2")
-            !readProperty.hasAnnotation("test.A3")
-            readProperty.hasAnnotation("test.A4")
-            !readProperty.hasAnnotation("test.A5")
-            writeProperty.hasAnnotation("test.A1")
-            writeProperty.hasAnnotation("test.A2")
-            !writeProperty.hasAnnotation("test.A3")
-            writeProperty.hasAnnotation("test.A4")
-            !writeProperty.hasAnnotation("test.A5")
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        !property.hasAnnotation("test.A3")
+        property.hasAnnotation("test.A4")
+        !property.hasAnnotation("test.A5")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A5")
+        readProperty.hasAnnotation("test.A1")
+        readProperty.hasAnnotation("test.A2")
+        !readProperty.hasAnnotation("test.A3")
+        readProperty.hasAnnotation("test.A4")
+        !readProperty.hasAnnotation("test.A5")
+        writeProperty.hasAnnotation("test.A1")
+        writeProperty.hasAnnotation("test.A2")
+        !writeProperty.hasAnnotation("test.A3")
+        writeProperty.hasAnnotation("test.A4")
+        !writeProperty.hasAnnotation("test.A5")
     }
 
     void "test TYPE_USE annotations"() {
         when:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -186,31 +186,31 @@ class Test {
 }
 
 ''')
-            def property = introspection.getBeanProperties()[0]
-            def readProperty = introspection.getBeanReadProperties()[0]
-            def writeProperty = introspection.getBeanWriteProperties()[0]
+        def property = introspection.getBeanProperties()[0]
+        def readProperty = introspection.getBeanReadProperties()[0]
+        def writeProperty = introspection.getBeanWriteProperties()[0]
         then:
-            property.hasAnnotation("test.A1")
-            property.hasAnnotation("test.A2")
-            property.hasAnnotation("test.A3")
-            !property.hasAnnotation("test.A4")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
-            property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
-            !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
-            readProperty.hasAnnotation("test.A1")
-            readProperty.hasAnnotation("test.A2")
-            readProperty.hasAnnotation("test.A3")
-            !readProperty.hasAnnotation("test.A4")
-            writeProperty.hasAnnotation("test.A1")
-            writeProperty.hasAnnotation("test.A2")
-            writeProperty.hasAnnotation("test.A3")
-            !writeProperty.hasAnnotation("test.A4")
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        property.hasAnnotation("test.A3")
+        !property.hasAnnotation("test.A4")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+        readProperty.hasAnnotation("test.A1")
+        readProperty.hasAnnotation("test.A2")
+        readProperty.hasAnnotation("test.A3")
+        !readProperty.hasAnnotation("test.A4")
+        writeProperty.hasAnnotation("test.A1")
+        writeProperty.hasAnnotation("test.A2")
+        writeProperty.hasAnnotation("test.A3")
+        !writeProperty.hasAnnotation("test.A4")
     }
 
     void "test different setter / getter"() {
         when:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -249,23 +249,23 @@ class Test {
 ''')
         def property = introspection.getBeanProperties().iterator().next()
         then:
-            property.asArgument().getType() == OptionalMultiValues
-            property.getType() == OptionalMultiValues
+        property.asArgument().getType() == OptionalMultiValues
+        property.getType() == OptionalMultiValues
 //            property.hasAnnotation("test.A1")
-            property.hasAnnotation("test.A2")
+        property.hasAnnotation("test.A2")
 //            property.hasAnnotation("test.A3")
-            property.isReadOnly()
-            introspection.getBeanReadProperties().size() == 1
-            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
-            introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
-            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
-            introspection.getBeanReadProperties().iterator().next().getType() == OptionalMultiValues
-            introspection.getBeanWriteProperties().size() == 0
+        property.isReadOnly()
+        introspection.getBeanReadProperties().size() == 1
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+        introspection.getBeanReadProperties().iterator().next().getType() == OptionalMultiValues
+        introspection.getBeanWriteProperties().size() == 0
     }
 
     void "test different setter / getter - ignoreSettersWithDifferingType"() {
         when:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -304,22 +304,120 @@ class Test {
 ''')
         def property = introspection.getBeanProperties().iterator().next()
         then:
-            property.asArgument().getType() == Map // The property is defined by it's writer type
-            property.hasAnnotation("test.A1")
-            property.hasAnnotation("test.A2")
-            !property.hasAnnotation("test.A3")
-            property.getType() == Map
-            !property.isReadOnly()
-            introspection.getBeanReadProperties().size() == 1
-            introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
-            introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
-            !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
-            introspection.getBeanReadProperties()[0].getType() == OptionalMultiValues
-            introspection.getBeanWriteProperties().size() == 1
-            introspection.getBeanWriteProperties()[0].getType() == Map
-            introspection.getBeanWriteProperties()[0].hasAnnotation("test.A1")
-            introspection.getBeanWriteProperties()[0].hasAnnotation("test.A2")
-            !introspection.getBeanWriteProperties()[0].hasAnnotation("test.A3")
+        property.asArgument().getType() == Map // The property is defined by it's writer type
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        !property.hasAnnotation("test.A3")
+        property.getType() == Map
+        !property.isReadOnly()
+        introspection.getBeanReadProperties().size() == 1
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+        introspection.getBeanReadProperties()[0].getType() == OptionalMultiValues
+        introspection.getBeanWriteProperties().size() == 1
+        introspection.getBeanWriteProperties()[0].getType() == Map
+        introspection.getBeanWriteProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanWriteProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanWriteProperties()[0].hasAnnotation("test.A3")
+    }
+
+    void "test bytes[] in a constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			byte[] bytes
+	) {
+		super(bytes);
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final byte[] bytes;
+
+    public FormulaCreationDto(byte[] bytes) {
+        this.bytes = bytes;
+    }
+
+    public byte[] getBytes() {
+        return this.bytes;
+    }
+
+}
+''')
+        expect:
+        introspection.instantiate(true, List.of(), new byte[] {123}).getBytes()
+    }
+
+    void "test Boolean in a constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			Boolean percent
+	) {
+		super(Optional.of(percent));
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final boolean percent;
+
+    public FormulaCreationDto(Optional<Boolean> percent) {
+        this.percent = percent.orElse(false);
+    }
+
+    public boolean isPercent() {
+        return this.percent;
+    }
+
+}
+''')
+        expect:
+        introspection.instantiate(true, List.of(), true).isPercent()
     }
 
     void "test expressions in introspection properties with type use"() {
@@ -491,12 +589,10 @@ class Test {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
 package mixed;
-
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Nullable;
 import java.util.Optional;
-
 @Introspected
 class Test {
     @Nullable
@@ -616,7 +712,7 @@ class Test<T extends CharSequence> {
 ''')
         expect:
         introspection.getRequiredProperty("array", CharSequence[].class)
-            .type == CharSequence[].class
+                .type == CharSequence[].class
         introspection.beanMethods.first().returnType.type == CharSequence[].class
     }
 
@@ -647,7 +743,7 @@ class Test {
 
     void "test optional property type is defined by its setter"() {
         given:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -701,16 +797,16 @@ class Test {
 }
 ''')
         expect:
-            introspection.getPropertyNames().length == 4
-            introspection.getProperty("foo").get().type == Optional.class
-            introspection.getProperty("lng").get().type == OptionalLong.class
-            introspection.getProperty("dbl").get().type == OptionalDouble.class
-            introspection.getProperty("ingr").get().type == OptionalInt.class
+        introspection.getPropertyNames().length == 4
+        introspection.getProperty("foo").get().type == Optional.class
+        introspection.getProperty("lng").get().type == OptionalLong.class
+        introspection.getProperty("dbl").get().type == OptionalDouble.class
+        introspection.getProperty("ingr").get().type == OptionalInt.class
 
-            introspection.getProperty("foo").get().isReadOnly()
-            introspection.getProperty("lng").get().isReadOnly()
-            introspection.getProperty("dbl").get().isReadOnly()
-            introspection.getProperty("ingr").get().isReadOnly()
+        introspection.getProperty("foo").get().isReadOnly()
+        introspection.getProperty("lng").get().isReadOnly()
+        introspection.getProperty("dbl").get().isReadOnly()
+        introspection.getProperty("ingr").get().isReadOnly()
     }
 
     void "test property type is not defined by its not accessible field"() {
@@ -1672,11 +1768,11 @@ class Test {}
 
     void "test introspection class member configuration works 2"() {
         when:
-            BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+        BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
 
         then:
-            noExceptionThrown()
-            introspection != null
+        noExceptionThrown()
+        introspection != null
     }
 
     void "test bean introspection with property of generic interface"() {
@@ -1862,7 +1958,7 @@ interface Foo {
 
         then:
         introspection.getRequiredProperty("bar", String)
-                     .get(test) == 'good'
+                .get(test) == 'good'
     }
 
     void "test generate bean introspection for @ConfigurationProperties interface"() {
@@ -2651,7 +2747,7 @@ class Book {
         context?.close()
     }
 
-    void "test default constructor"() {
+    void "test default constructor "() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
 package test;
@@ -3928,26 +4024,20 @@ public enum Test {
     void "test enum bean with annotations"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
-
 import io.micronaut.core.annotation.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 @Introspected
 public enum Test {
-
     @JsonProperty("X")
     A(0),
     @JsonProperty("Y")
     B(1),
     @JsonProperty("Z")
     C(2);
-
     private final int number;
-
     Test(int number) {
         this.number = number;
     }
-
     public int getNumber() {
         return number;
     }
@@ -5055,7 +5145,7 @@ class Book {
 
     void "test type_use annotations"() {
         given:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.*;
@@ -5080,22 +5170,22 @@ class Test {
     }
 }
 ''')
-            def nameField = introspection.getProperty("name").orElse(null)
-            def secondNameField = introspection.getProperty("secondName").orElse(null)
+        def nameField = introspection.getProperty("name").orElse(null)
+        def secondNameField = introspection.getProperty("secondName").orElse(null)
 
         expect:
-            nameField
-            secondNameField
+        nameField
+        secondNameField
 
-            nameField.hasStereotype(TypeUseRuntimeAnn)
-            nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
-            !secondNameField.hasStereotype(TypeUseClassAnn)
-            !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
+        nameField.hasStereotype(TypeUseRuntimeAnn)
+        nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
+        !secondNameField.hasStereotype(TypeUseClassAnn)
+        !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
     }
 
     void "test subtypes"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import java.util.List;
@@ -5131,18 +5221,18 @@ class Holder<A extends Animal> {
         ''')
 
         expect:
-            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
-            animalListArgument instanceof GenericPlaceholder
-            animalListArgument.isTypeVariable()
+        def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+        animalListArgument instanceof GenericPlaceholder
+        animalListArgument.isTypeVariable()
 
-            def animal = introspection.getProperty("animal").get().asArgument()
-            animal instanceof GenericPlaceholder
-            animal.isTypeVariable()
+        def animal = introspection.getProperty("animal").get().asArgument()
+        animal instanceof GenericPlaceholder
+        animal.isTypeVariable()
     }
 
     void "test private property 1"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.DecimalMin;
@@ -5162,12 +5252,12 @@ class OptionalDoubleHolder {
         ''')
 
         expect:
-            introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
-            introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
+        introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
+        introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
     }
     void "test private property 2"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.NotBlank;
@@ -5186,8 +5276,8 @@ class OptionalStringHolder {
         ''')
 
         expect:
-            introspection.getProperty("optionalString").get().getType() == Optional.class
-            introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
+        introspection.getProperty("optionalString").get().getType() == Optional.class
+        introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
 
     }
 
@@ -5243,5 +5333,4 @@ class Massive {
         }
     }
 }
-
 

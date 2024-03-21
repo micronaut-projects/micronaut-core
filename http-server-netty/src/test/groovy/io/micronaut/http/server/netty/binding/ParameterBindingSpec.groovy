@@ -38,7 +38,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
         HttpRequest req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
-        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
         HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -94,7 +94,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test list to single error"() {
         given:
         HttpRequest req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
-        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
         HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)

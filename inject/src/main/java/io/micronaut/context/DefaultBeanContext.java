@@ -147,6 +147,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * The default context implementations.
  *
@@ -293,7 +295,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
             configuredEagerSingletonAnnotations.add(ann.getName());
         }
-        this.eagerInitStereotypes = configuredEagerSingletonAnnotations.toArray(new String[0]);
+        this.eagerInitStereotypes = configuredEagerSingletonAnnotations.toArray(EMPTY_STRING_ARRAY);
         this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beanContextConfiguration = contextConfiguration;

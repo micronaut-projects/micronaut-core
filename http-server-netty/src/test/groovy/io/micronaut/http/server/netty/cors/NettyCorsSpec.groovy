@@ -50,7 +50,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test non cors request"() {
         when:
-        HttpResponse response = rxClient.toBlocking().exchange('/test')
+        HttpResponse response = httpClient.toBlocking().exchange('/test')
         Set<String> headerNames = response.getHeaders().names()
 
         then:
@@ -61,7 +61,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request without configuration"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                            .header(ORIGIN, 'fooBar.com')
         )).blockFirst()
@@ -76,7 +76,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with a controller that returns map"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -98,7 +98,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with controlled method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -120,7 +120,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with controlled headers"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCEPT, 'application/json')
@@ -144,7 +144,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with invalid method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/test', [:])
                         .header(ORIGIN, 'foo.com')
 
@@ -165,7 +165,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with invalid header"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
@@ -177,7 +177,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid header"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'bar.com')
@@ -195,7 +195,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'foo.com')
@@ -212,7 +212,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'foo.com')
@@ -235,7 +235,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled headers"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
@@ -259,7 +259,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled headers but http method doesn't exists"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
@@ -278,7 +278,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error response routes"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -292,7 +292,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error responses with no handler"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error-checked')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -306,7 +306,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to http error responses"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error-response')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()

@@ -35,6 +35,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 
+import static io.micronaut.core.util.ArrayUtils.EMPTY_CHAR_ARRAY;
+
 /**
  * {@link JsonParser} implementation that iterates over a {@link JsonNode}.
  *
@@ -173,7 +175,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         if (text != null) {
             return text.toCharArray();
         } else {
-            return new char[0];
+            return EMPTY_CHAR_ARRAY;
         }
     }
 

@@ -90,7 +90,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         // this class doesn't really have lifecycle management (we don't make the user release()
         // it), so we have to copy the data to a non-refcounted buffer.
         this.unpooledContent = Unpooled.buffer(fullHttpResponse.content().readableBytes());
-        unpooledContent.writeBytes(fullHttpResponse.content());
+        unpooledContent.writeBytes(fullHttpResponse.content(), 0, fullHttpResponse.content().readableBytes());
         this.handlerRegistry = handlerRegistry;
         this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;

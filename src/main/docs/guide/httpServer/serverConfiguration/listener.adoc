@@ -111,7 +111,7 @@ micronaut:
   netty:
     listeners:
       systemd:
-        fd: 0 # inetd-style socket activation typically uses fd 0 (stdin)
+        accepted-fd: 0 # inetd-style socket activation typically uses fd 0 (stdin)
         bind: false # do not bind, we only use the server channel as the parent
 ----
 

@@ -38,6 +38,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
+
 /**
  * <p>Main entry point for running a Micronaut application.</p>
  *
@@ -298,7 +300,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(String... args) {
-        return run(new Class<?>[0], args);
+        return run(EMPTY_CLASS_ARRAY, args);
     }
 
     /**

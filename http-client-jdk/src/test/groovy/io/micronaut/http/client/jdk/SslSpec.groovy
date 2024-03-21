@@ -8,13 +8,17 @@ import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
 import java.security.GeneralSecurityException
+import java.time.Duration
 
 // See http-client/src/test/groovy/io/micronaut/http/client/SslSpec.groovy
 class SslSpec extends Specification {
 
     void 'bad server ssl cert'() {
         given:
-        def client = HttpClient.create(new URL(url))
+        def cfg = new DefaultHttpClientConfiguration()
+        cfg.connectTimeout = Duration.ofSeconds(50)
+        cfg.readTimeout = Duration.ofSeconds(50)
+        def client = HttpClient.create(new URL(url), cfg)
 
         when:
         client.toBlocking().exchange('/')

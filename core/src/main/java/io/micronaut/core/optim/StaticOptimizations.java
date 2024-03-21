@@ -39,6 +39,7 @@ public abstract class StaticOptimizations {
 
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
     private static final Map<Class<?>, StackTraceElement[]> CHECKED = new ConcurrentHashMap<>();
+    private static final StackTraceElement[] EMPTY_STACK_TRACE_ELEMENT_ARRAY = new StackTraceElement[0];
 
     private static boolean cacheEnvironment = false;
 
@@ -84,7 +85,7 @@ public abstract class StaticOptimizations {
         if (CAPTURE_STACKTRACE_ON_READ) {
             return new Exception().getStackTrace();
         }
-        return new StackTraceElement[0];
+        return EMPTY_STACK_TRACE_ELEMENT_ARRAY;
     }
 
     /**

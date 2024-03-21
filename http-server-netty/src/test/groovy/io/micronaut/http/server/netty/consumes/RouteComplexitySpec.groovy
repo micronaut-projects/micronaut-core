@@ -6,50 +6,48 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
-
 import jakarta.annotation.Nullable
 
 class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
         when:
-        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))
+        String body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))
 
         then:
         noExceptionThrown()
         body == "fallback"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))
+        body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))
 
         then:
         noExceptionThrown()
         body == "csv"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))
+        body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))
+        body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/list"))
+        body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/list"))
 
         then:
         noExceptionThrown()
         body == "list"
 
         when:
-        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/length/abc"))
+        body = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/length/abc"))
 
         then:
         noExceptionThrown()

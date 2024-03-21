@@ -67,6 +67,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 import static io.micronaut.inject.annotation.AnnotationMetadataWriter.isSupportedMapValue;
 
 /**
@@ -840,7 +841,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The descriptor for the class
      */
     protected static String getTypeDescriptor(String type) {
-        return getTypeDescriptor(type, new String[0]);
+        return getTypeDescriptor(type, EMPTY_STRING_ARRAY);
     }
 
     /**
@@ -909,6 +910,39 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      */
     protected static void pushCastToType(GeneratorAdapter ga, TypedElement type) {
         pushCastToType(ga, JavaModelUtils.getTypeReference(type));
+    }
+
+    /**
+     * @param ga   The {@link MethodVisitor}
+     * @param to The type
+     */
+    protected static void pushCastFromObjectToType(GeneratorAdapter ga, TypedElement to) {
+        Type toType = JavaModelUtils.getTypeReference(to);
+        if (JavaModelUtils.isPrimitive(toType)) {
+            ga.unbox(toType);
+        } else if (!to.getName().equals(Object.class.getName())) {
+            ga.checkCast(toType);
+        }
+    }
+
+    /**
+     * Cast from one type to another.
+     *
+     * @param ga   The {@link MethodVisitor}
+     * @param from The from type
+     * @param to   The to type
+     */
+    protected static void pushCastToType(GeneratorAdapter ga, TypedElement from, TypedElement to) {
+        Type toType = JavaModelUtils.getTypeReference(to);
+        if (from.isPrimitive() && to.isPrimitive()) {
+            if (!from.getType().equals(to.getType())) {
+                ga.cast(JavaModelUtils.getTypeReference(from), toType);
+            }
+        } else if (from.isPrimitive()) {
+            ga.box(JavaModelUtils.getTypeReference(from));
+        } else if (!to.getType().getName().equals(Object.class.getName())) {
+            pushCastToType(ga, toType);
+        }
     }
 
     /**

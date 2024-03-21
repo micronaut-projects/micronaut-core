@@ -21,7 +21,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -46,6 +45,8 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 
 /**
  * A runtime representation of the annotation and its values.
@@ -683,21 +684,21 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     public Class<?>[] classValues(@NonNull String member) {
         if (StringUtils.isEmpty(member)) {
-            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+            return EMPTY_CLASS_ARRAY;
         }
         Object o = values.get(member);
         Class<?>[] type = resolveClassValues(o);
         if (type != null) {
             return type;
         }
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public AnnotationClassValue<?>[] annotationClassValues(@NonNull String member) {
         if (StringUtils.isEmpty(member)) {
-            return AnnotationClassValue.EMPTY_ARRAY;
+            return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
         }
         Object o = values.get(member);
         if (o instanceof AnnotationClassValue<?> annotationClassValue) {
@@ -706,7 +707,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
             return annotationClassValues;
         }
-        return AnnotationClassValue.EMPTY_ARRAY;
+        return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
     }
 
     @Override
@@ -1622,7 +1623,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                     for (AnnotationValue<?> annotationValue : annotationValues) {
                         list.addAll(Arrays.asList(annotationValue.classValues()));
                     }
-                    return list.toArray(new Class[0]);
+                    return list.toArray(EMPTY_CLASS_ARRAY);
                 }
             }
             return null;
@@ -1644,7 +1645,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                         list.add(aClass);
                     }
                 }
-                return list.toArray(new Class[0]);
+                return list.toArray(EMPTY_CLASS_ARRAY);
 
             }
         }

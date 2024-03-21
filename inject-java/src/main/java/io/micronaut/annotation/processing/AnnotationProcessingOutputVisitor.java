@@ -50,6 +50,8 @@ import java.util.Optional;
  */
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
 
+    private static final Element[] ELEMENTS_EMPTY_ARRAY = new Element[0];
+
     private final Filer filer;
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
@@ -91,7 +93,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                 if (nativeType instanceof JavaNativeElement javaNativeElement) {
                     nativeOriginatingElements = new Element[] { javaNativeElement.element() };
                 } else {
-                    nativeOriginatingElements = new Element[0];
+                    nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
                 }
             } else {
                 // other compilers like the IntelliJ compiler support multiple
@@ -102,10 +104,10 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                         list.add(javaNativeElement.element());
                     }
                 }
-                nativeOriginatingElements = list.toArray(new Element[0]);
+                nativeOriginatingElements = list.toArray(ELEMENTS_EMPTY_ARRAY);
             }
         } else {
-            nativeOriginatingElements = new Element[0];
+            nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
         }
         javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
         return javaFileObject.openOutputStream();

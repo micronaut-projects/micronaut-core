@@ -34,9 +34,9 @@ public interface RequestHandler {
      * @param ctx            The context this request came in on
      * @param request        The request line and headers
      * @param body           The request body
-     * @param outboundAccess The {@link PipeliningServerHandler.OutboundAccess} to use for writing the response
+     * @param outboundAccess The {@link OutboundAccess} to use for writing the response
      */
-    void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess);
+    void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess);
 
     /**
      * Handle an error that is not bound to a request, i.e. happens outside a
@@ -53,7 +53,7 @@ public interface RequestHandler {
      * fully consumed.<br>
      * This is used for cleaning up the request.
      *
-     * @param attachment Object passed to {@link io.micronaut.http.server.netty.handler.PipeliningServerHandler.OutboundAccess#attachment(Object)}
+     * @param attachment Object passed to {@link OutboundAccess#attachment(Object)}
      */
     default void responseWritten(Object attachment) {
     }
