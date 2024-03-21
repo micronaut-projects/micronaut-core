@@ -68,11 +68,11 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         countFilter.requests.clear()
         controller.countThreshold = Integer.MAX_VALUE
         controller.count = 0
-        countClient.getCount()
+        int fallbackResult = countClient.getCount()
 
         then:"The fallback is called"
-        countClient.getCount() == 9999
-        countFilter.requests.size() == 12 //TODO - This seems like a bug in the way blocking retry works with fallback, but is the same as the behavior before HttpClientIntroductionAdvice refactoring
+        fallbackResult == 9999
+        countFilter.requests.size() == 6
     }
 
     void "test simply retry with reactive publisher"() {
