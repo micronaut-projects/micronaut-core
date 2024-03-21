@@ -29,10 +29,8 @@ import io.netty.util.ResourceLeakDetector;
 @ConfigurationProperties("netty")
 @BootstrapContextCompatible
 public class NettyGlobalConfiguration {
-
-    private ResourceLeakDetector.Level resourceLeakDetectorLevel;
-
     private static final boolean DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING = true;
+    private ResourceLeakDetector.Level resourceLeakDetectorLevel;
     private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
 
     /**
