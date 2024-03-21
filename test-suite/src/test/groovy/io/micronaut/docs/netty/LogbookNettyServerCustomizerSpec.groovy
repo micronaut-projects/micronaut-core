@@ -141,6 +141,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'micronaut.server.http-version'       : '2.0',
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.netty.legacy-multiplex-handlers': true,
                 'spec.name'                           : 'LogbookNettyServerCustomizerSpec'
         ])
 
@@ -344,6 +345,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
+                'micronaut.server.netty.legacy-multiplex-handlers': true,
                 'spec.name'                    : 'LogbookNettyServerCustomizerSpec'
         ])
 

@@ -24,6 +24,7 @@ dependencies {
     testImplementation(libs.micronaut.validation) {
         exclude(group: "io.micronaut")
     }
+    testRuntimeOnly(libs.bcpkix)
 }
 
 configurations {

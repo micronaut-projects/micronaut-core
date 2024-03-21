@@ -103,6 +103,10 @@ public interface ServerUnderTest extends ApplicationContextProvider, Closeable, 
      */
     <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
 
+    default Optional<String> getScheme() {
+        return Optional.of("http");
+    }
+
     @NonNull
     default Optional<Integer> getPort() {
         return Optional.empty();
