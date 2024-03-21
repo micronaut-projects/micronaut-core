@@ -65,6 +65,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
+    private boolean strictConversionChecking = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
 
@@ -94,7 +95,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public boolean isStrictConversionChecking() {
+        return strictConversionChecking;
+    }
+
     @NonNull
+    @Override
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
         return this;
@@ -389,6 +395,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
         this.allowEmptyProviders = shouldAllow;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder strictConversionChecking(boolean strict) {
+        this.strictConversionChecking = strict;
         return this;
     }
 

@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.websocket
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -21,25 +22,30 @@ class UpgradeSpec extends Specification {
     @Unroll("#description")
     void "test websocket upgrade"(List<HeaderTuple> headers, String description) {
         given:
+        ApplicationContext context = ApplicationContext.run()
+        ConversionService conversionService = context.getBean(ConversionService)
         final DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test")
         for (HeaderTuple header : headers) {
             nettyRequest.headers().set(header.name, header.value)
         }
 
         def mock = Mock(NettyEmbeddedServices)
-        mock.getRequestArgumentSatisfier() >> new RequestArgumentSatisfier(null)
+        mock.getRequestArgumentSatisfier() >> new RequestArgumentSatisfier(null, context)
         NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(mock, Mock(WebSocketSessionRepository))
 
         when:
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
-                ConversionService.SHARED,
+                conversionService,
                 new HttpServerConfiguration()
         )
 
         then:
         handler.acceptInboundMessage(request)
+
+        cleanup:
+        context.close()
 
         where:
         headers << [
