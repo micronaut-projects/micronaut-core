@@ -137,7 +137,9 @@ public abstract class EnclosedElementsQuery<C, N> {
                 if (element.isPrivate() || element.getName().startsWith("$")) {
                     return false;
                 }
-                if (element instanceof MemberElement memberElement && !memberElement.isAccessible()) {
+                // exclude when not accessible from type
+                if (element instanceof MemberElement memberElement && !result.getOnlyAccessibleFromType()
+                    .filter(fromType -> memberElement.isAccessible(fromType)).isPresent()) {
                     return false;
                 }
             }
