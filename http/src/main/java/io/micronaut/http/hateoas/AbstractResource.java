@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package io.micronaut.http.hateoas;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -44,7 +43,7 @@ import java.util.Optional;
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 @Serdeable
-@Introspected
+@SuppressWarnings("java:S119") // Impl is a better name than T
 public abstract class AbstractResource<Impl extends AbstractResource<Impl>> implements Resource {
 
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
@@ -155,9 +154,8 @@ public abstract class AbstractResource<Impl extends AbstractResource<Impl>> impl
                 link(name, linkMap);
             } else if (value instanceof Collection<?> collection) {
                 for (Object o : collection) {
-                    if (o instanceof Map) {
-                        Map<String, Object> linkMap = (Map<String, Object>) o;
-                        link(name, linkMap);
+                    if (o instanceof Map aMap) {
+                        link(name, aMap);
                     }
                 }
             }
