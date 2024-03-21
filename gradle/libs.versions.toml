@@ -52,7 +52,7 @@ spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
 testcontainers = "1.19.7"
-vertx = "4.5.3"
+vertx = "4.5.5"
 wiremock = "2.33.2"
 
 #
