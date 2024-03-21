@@ -18,8 +18,11 @@ package io.micronaut.http.client.retry
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Retryable
@@ -49,6 +52,7 @@ class HttpClientRetryWithFallbackSpec extends Specification{
 
     void "test simple blocking retry"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
         controller.countThreshold = 3
@@ -56,20 +60,25 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         when:"A method is annotated retry"
         int result = countClient.getCount()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
 
         when:"The threshold can never be met"
+        countFilter.requests.clear()
         controller.countThreshold = Integer.MAX_VALUE
         controller.count = 0
         countClient.getCount()
 
         then:"The fallback is called"
         countClient.getCount() == 9999
+        countFilter.requests.size() == 12 //TODO - This seems like a bug in the way blocking retry works with fallback, but is the same as the behavior before HttpClientIntroductionAdvice refactoring
     }
 
-    void "test simply retry with rxjava"() {
+    void "test simply retry with reactive publisher"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
+        countFilter.requests.clear()
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
         controller.countThreshold = 3
@@ -78,16 +87,31 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         when:"A method is annotated retry"
         int result = Mono.from(countClient.getCountSingle()).block()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
 
         when:"The threshold can never be met"
+        countFilter.requests.clear()
         controller.countThreshold = Integer.MAX_VALUE
         controller.count = 0
         Publisher<Integer> single = countClient.getCountSingle()
 
         then:"The original exception is thrown"
         Mono.from(single).block() == 9999
+        countFilter.requests.size() == 6
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
+    @ClientFilter("/retry-fallback/**")
+    static class CountFilter {
+
+        Set<MutableHttpRequest> requests = new HashSet<>()
+
+        @RequestFilter
+        void filter(MutableHttpRequest<?> request) {
+            requests.add(request)
+        }
     }
 
     @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
