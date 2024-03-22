@@ -4,9 +4,18 @@
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
 name: GraalVM Dev CI
+#on:
+#  schedule:
+#    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
 on:
-  schedule:
-    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
+  push:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
+  pull_request:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
 jobs:
   build_matrix:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
