@@ -168,7 +168,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                 .toList();
         }
 
-        if (patterns != null) {
+        if (patterns != null && (beanLevel.appendContextPath == null || beanLevel.appendContextPath)) {
             patterns = prependContextPath(patterns);
         }
 
@@ -189,7 +189,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             order,
             methodLevel.executeOn == null ? beanLevel.executeOn : methodLevel.executeOn,
             beanLevel.serviceId, // only present on bean level
-            beanLevel.excludeServiceId // only present on bean level
+            beanLevel.excludeServiceId, // only present on bean level
+            beanLevel.appendContextPath // Define if contextPath is appended
         );
     }
 
@@ -224,6 +225,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         OptionalInt order = annotationMetadata.intValue(Order.class);
         String[] serviceId = annotationMetadata.stringValues(annotationType, "serviceId"); // only on ClientFilter
         String[] excludeServiceId = annotationMetadata.stringValues(annotationType, "excludeServiceId"); // only on ClientFilter
+        Optional<Boolean> appendContextPath = annotationMetadata.booleanValue(annotationType, "appendContextPath");
         return new FilterMetadata(
             annotationMetadata.enumValue(annotationType, "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT),
             ArrayUtils.isNotEmpty(patterns) ? Arrays.asList(patterns) : null,
@@ -231,7 +233,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : null,
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
-            ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null
+            ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
+            appendContextPath.orElse(null)
         );
     }
 
@@ -242,7 +245,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         @Nullable FilterOrder order,
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
-        @Nullable List<String> excludeServiceId
+        @Nullable List<String> excludeServiceId,
+        @Nullable Boolean appendContextPath
     ) {
     }
 

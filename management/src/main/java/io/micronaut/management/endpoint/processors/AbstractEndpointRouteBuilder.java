@@ -168,7 +168,10 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         if (path.charAt(0) == '/') {
             path = path.substring(1);
         }
-        return uriNamingStrategy.resolveUri(path);
+        var completePath = endpointDefaultConfiguration.getContextPath() == null
+            ? uriNamingStrategy.resolveUri(path)
+            : NameUtils.hyphenate(StringUtils.prependUri(endpointDefaultConfiguration.getContextPath(), path));
+        return completePath.charAt(0) == '/' ? completePath : "/".concat(completePath);
     }
 
     /**

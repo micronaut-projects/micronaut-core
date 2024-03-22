@@ -41,6 +41,11 @@ public class EndpointDefaultConfiguration {
     public static final String PATH = "endpoints.all.path";
 
     /**
+     * The context for endpoints settings.
+     */
+    public static final String CONTEXT_PATH = "endpoints.all.context.path";
+
+    /**
      * The path for endpoints settings.
      */
     public static final String PORT = "endpoints.all.port";
@@ -50,10 +55,16 @@ public class EndpointDefaultConfiguration {
      */
     public static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
 
+    /**
+     * The default context path.
+     */
+    public static final String DEFAULT_ENDPOINT_CONTEXT_PATH = null;
+
     private Boolean enabled;
     private Boolean sensitive;
     private Integer port;
     private String path = DEFAULT_ENDPOINT_BASE_PATH;
+    private String contextPath = DEFAULT_ENDPOINT_CONTEXT_PATH;
 
     /**
      *
@@ -61,6 +72,14 @@ public class EndpointDefaultConfiguration {
      */
     public String getPath() {
         return path;
+    }
+
+    /**
+     *
+     * @return endpoints Context Path (defaults is null)
+     */
+    public @Nullable String getContextPath() {
+        return contextPath;
     }
 
     /**
@@ -102,6 +121,16 @@ public class EndpointDefaultConfiguration {
     public void setPath(String path) {
         if (StringUtils.isNotEmpty(path)) {
             this.path = path;
+        }
+    }
+
+    /**
+     * The endpoints context path. Default value is null.
+     * @param contextPath The Context Path
+     */
+    public void setContextPath(String contextPath) {
+        if (StringUtils.isNotEmpty(contextPath)) {
+            this.contextPath = contextPath;
         }
     }
 
