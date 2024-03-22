@@ -26,13 +26,7 @@ import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import io.micronaut.core.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * An abstract implementation of {@link Resource}.
