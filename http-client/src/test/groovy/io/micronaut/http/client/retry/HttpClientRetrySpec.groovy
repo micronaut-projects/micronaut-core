@@ -15,13 +15,17 @@
  */
 package io.micronaut.http.client.retry
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Retryable
@@ -31,32 +35,39 @@ import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
 /**
  * @author graemerocher
  * @since 1.0
  */
 class HttpClientRetrySpec extends Specification {
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'HttpClientRetrySpec'
+    ])
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
 
     void "test simple blocking retry"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
 
         when:"A method is annotated retry"
         int result = countClient.getCount()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
+
 
         when:"The threshold can never be met"
+        countFilter.requests.clear()
         controller.countThreshold = 10
         controller.count = 0
         countClient.getCount()
@@ -64,10 +75,13 @@ class HttpClientRetrySpec extends Specification {
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
+        countFilter.requests.size() == 6
     }
 
-    void "test simply retry with rxjava"() {
+    void "test simply retry with reactive publisher"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
+        countFilter.requests.clear()
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
         controller.countThreshold = 3
@@ -76,10 +90,12 @@ class HttpClientRetrySpec extends Specification {
         when:"A method is annotated retry"
         int result = Mono.from(countClient.getCountSingle()).block()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
 
         when:"The threshold can never be met"
+        countFilter.requests.clear()
         controller.countThreshold = 10
         controller.count = 0
         Publisher<Integer> single = countClient.getCountSingle()
@@ -88,6 +104,7 @@ class HttpClientRetrySpec extends Specification {
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
+        countFilter.requests.size() == 6
 
     }
 
@@ -100,12 +117,26 @@ class HttpClientRetrySpec extends Specification {
         result == 'Good'
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetrySpec')
+    @ClientFilter("/retry-test/**")
+    static class CountFilter {
+
+        Set<MutableHttpRequest> requests = new HashSet<>()
+
+        @RequestFilter
+        void filter(MutableHttpRequest<?> request) {
+            requests.add(request)
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpClientRetrySpec')
     @Client("/retry-test")
     @Retryable(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetrySpec')
     @Controller("/retry-test")
     static class CountController implements CountService {
         int count = 0
@@ -135,6 +166,7 @@ class HttpClientRetrySpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetrySpec')
     @Controller("/retry-test/json")
     static class JsonController {
         boolean first = true
@@ -159,6 +191,7 @@ class HttpClientRetrySpec extends Specification {
         Publisher<Integer> getCountSingle()
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetrySpec')
     @Client("/retry-test/json")
     @Retryable(delay = "10ms", attempts = "2", maxDelay = "1s")
     static interface RetryableClient {

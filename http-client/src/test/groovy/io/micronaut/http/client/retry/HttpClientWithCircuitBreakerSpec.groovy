@@ -15,10 +15,14 @@
  */
 package io.micronaut.http.client.retry
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.CircuitBreaker
@@ -37,7 +41,9 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'HttpClientWithCircuitBreakerSpec'
+    ])
 
     @Shared
     @AutoCleanup
@@ -45,24 +51,28 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
     void "test simple blocking retry"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
 
         when:"A method is annotated retry"
         int result = countClient.getCount()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
 
         when:"The threshold can never be met"
         controller.countThreshold = Integer.MAX_VALUE
         controller.countValue = 0
+        countFilter.requests.clear()
         countClient.getCount()
 
         then:"The original exception is thrown"
         HttpClientResponseException e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
         controller.countValue == 6
+        countFilter.requests.size() == 6
 
         when:"the method is called again"
         countClient.getCount()
@@ -71,10 +81,13 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         e = thrown(HttpClientResponseException)
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
         controller.countValue == 6
+        countFilter.requests.size() == 6
     }
 
-    void "test simply retry with rxjava"() {
+    void "test simply retry with reactive publisher"() {
         given:
+        CountFilter countFilter = context.getBean(CountFilter)
+        countFilter.requests.clear()
         CountClient countClient = context.getBean(CountClient)
         CountController controller = context.getBean(CountController)
         controller.countThreshold = 3
@@ -83,12 +96,14 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         when:"A method is annotated retry"
         int result = Mono.from(countClient.getCountSingle()).block()
 
-        then:"It executes until successful"
+        then:"It executes new requests until successful"
         result == 3
+        result == countFilter.requests.size()
 
         when:"The threshold can never be met"
         controller.countThreshold = Integer.MAX_VALUE
         controller.countRx = 0
+        countFilter.requests.clear()
         Publisher<Integer> single = countClient.getCountSingle()
         Mono.from(single).block()
 
@@ -96,6 +111,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
         controller.countRx == 6
+        countFilter.requests.size() == 6
 
         when:"The method is called again"
         single = countClient.getCountSingle()
@@ -105,14 +121,29 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
         controller.countRx == 6
+        countFilter.requests.size() == 6
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
+    @ClientFilter("/circuit-breaker-test/**")
+    static class CountFilter {
+
+        Set<MutableHttpRequest> requests = new HashSet<>()
+
+        @RequestFilter
+        void filter(MutableHttpRequest<?> request) {
+            requests.add(request)
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
     @Client("/circuit-breaker-test")
     @CircuitBreaker(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
     @Controller("/circuit-breaker-test")
     static class CountController implements CountService {
         int countValue = 0

@@ -144,6 +144,4 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }
-
-
 }

@@ -49,6 +49,7 @@ graalvmNative {
     }
     binaries {
         all {
+            buildArgs.add("-H:+ReportExceptionStackTraces")
             resources.autodetect()
         }
     }
