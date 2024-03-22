@@ -16,9 +16,11 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanInfo;
+import io.micronaut.core.beans.EnumBeanIntrospection;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
@@ -68,58 +70,17 @@ final class ServiceLoaderFeature implements Feature {
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
         for (Set<String> typeNameSet : allTypeNames) {
             Iterator<String> i = typeNameSet.iterator();
-            serviceLoop: while (i.hasNext()) {
+            while (i.hasNext()) {
                 String typeName = i.next();
                 try {
                     final Class<?> c = access.findClassByName(typeName);
                     if (c != null) {
-                        if (GraalReflectionConfigurer.class.isAssignableFrom(c)) {
-                            continue;
-                        } else if (BeanInfo.class.isAssignableFrom(c)) {
-                            RuntimeClassInitialization.initializeAtBuildTime(c);
-                            BeanInfo<?> beanInfo;
-                            try {
-                                beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
-                            } catch (Exception e) {
-                                // not loadable at runtime either, remove it
-                                i.remove();
-                                continue;
-                            }
-                            Class<?> beanType = beanInfo.getBeanType();
-                            List<AnnotationValue<Annotation>> values = beanInfo.getAnnotationMetadata().getAnnotationValuesByName("io.micronaut.context.annotation.Requires");
-                            if (!values.isEmpty()) {
-                                for (AnnotationValue<Annotation> value : values) {
-                                    String[] classNames = EMPTY_STRING_ARRAY;
-                                    if (value.contains("classes")) {
-                                        classNames = value.stringValues("classes");
-                                    }
-                                    if (value.contains("beans")) {
-                                        ArrayUtils.concat(classNames, value.stringValues("beans"));
-                                    }
-                                    if (value.contains("condition")) {
-                                        Object o = value.getValues().get("condition");
-                                        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
-                                            annotationClassValue.getType().ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
-                                        }
-                                    }
-                                    for (String className : classNames) {
-                                        if (access.findClassByName(className) == null) {
-                                            i.remove();
-                                            continue serviceLoop;
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
+                    } else {
+                        i.remove();
                     }
-                    final Class<?> exec = access.findClassByName(typeName + "$Exec");
-                    if (exec != null) {
-                        RuntimeClassInitialization.initializeAtBuildTime(exec);
-                    }
-
 
                 } catch (NoClassDefFoundError | InstantiationException e) {
                     i.remove();
