@@ -120,14 +120,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
     @Unroll
     void "test application/x-www-form-urlencoded String #body with single key fails to parse"() {
-        // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
         when:
         String result = client.exchange(HttpRequest.POST('/form/map', body)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
-        def ex = thrown(HttpClientResponseException)
-        ex.status == HttpStatus.BAD_REQUEST
+        result == parsedMapString
 
         where:
         body            | parsedMapString
@@ -139,13 +137,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
     @Unroll
     void "test application/x-www-form-urlencoded String #body with single key as the last attribute fails to parse to #parsedMapString"() {
-        // NOTE - Parsing is expected to fail here unless HttpPostStandardRequestDecoder is corrected
         when:
         String result = client.exchange(HttpRequest.POST('/form/map', body)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
 
         then:
-        result != parsedMapString
+        result == parsedMapString
 
         where:
         body            | parsedMapString
