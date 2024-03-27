@@ -168,7 +168,7 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
             case SERVER_SOCKET -> new EpollServerSocketChannel(fd);
             case CLIENT_SOCKET -> new EpollSocketChannel(fd);
             case DOMAIN_SOCKET -> new EpollDomainSocketChannel(fd);
-            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel(fd);
+            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel(fd, true);
             case DATAGRAM_SOCKET -> new EpollDatagramChannel(fd);
         };
     }
