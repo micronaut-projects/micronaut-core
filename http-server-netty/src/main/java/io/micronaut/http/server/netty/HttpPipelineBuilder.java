@@ -433,6 +433,7 @@ final class HttpPipelineBuilder implements Closeable {
 
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
+                .compressor(embeddedServices.getHttpCompressionStrategy())
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
                 .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
             server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->

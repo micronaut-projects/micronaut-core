@@ -16,11 +16,14 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
+import io.netty.handler.codec.http2.DefaultHttp2Connection;
+import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2ConnectionDecoder;
@@ -252,9 +255,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return super.initialSettings(settings);
         }
 
+        public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
+            if (compressionStrategy.isEnabled()) {
+                frameListener.compressor(new Compressor(compressionStrategy));
+            }
+            return this;
+        }
+
         @Override
         public ConnectionHandler build() {
-            frameListener(frameListener);
+            connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
+            frameListener(new DelegatingDecompressorFrameListener(connection(), frameListener, false));
             return super.build();
         }
 
@@ -313,7 +324,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         @Override
-        void writeData(ByteBuf data, boolean endStream, ChannelPromise promise) {
+        void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise) {
             if (endStream && closeInput) {
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
