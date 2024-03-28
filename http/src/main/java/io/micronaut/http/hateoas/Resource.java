@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.value.OptionalMultiValues;
-import io.micronaut.serde.annotation.Serdeable;
 
 /**
  * Represents a REST resource in a hateoas architecture.
@@ -28,7 +27,6 @@ import io.micronaut.serde.annotation.Serdeable;
  * @author Graeme Rocher
  * @since 1.1
  */
-@Serdeable
 @Introspected
 public interface Resource {
 

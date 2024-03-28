@@ -17,6 +17,7 @@ package io.micronaut.http.hateoas;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -24,15 +25,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.serde.annotation.Serdeable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * An abstract implementation of {@link Resource}.
@@ -42,10 +36,9 @@ import java.util.Optional;
  * @since 1.1
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
-@Serdeable
+@Introspected
 @SuppressWarnings("java:S119") // Impl is a better name than T
 public abstract class AbstractResource<Impl extends AbstractResource<Impl>> implements Resource {
-
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
 
