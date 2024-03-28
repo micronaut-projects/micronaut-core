@@ -28,7 +28,6 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoop;
@@ -862,20 +861,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (compressor == null) {
                 return;
             }
-            ChannelHandler compressionHandler = compressor.prepare(request, response);
-            if (compressionHandler != null) {
+            Compressor.Session compressionSession = compressor.prepare(ctx, request, response);
+            if (compressionSession != null) {
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
                 if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
-                outboundHandler.compressionChannel = new EmbeddedChannel(
-                    ctx.channel().id(),
-                    ctx.channel().metadata().hasDisconnect(),
-                    ctx.channel().config(),
-                    compressionHandler
-                );
+                outboundHandler.compressionSession = compressionSession;
             }
         }
     }
@@ -886,14 +880,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         final OutboundAccessImpl outboundAccess;
 
-        EmbeddedChannel compressionChannel;
+        Compressor.Session compressionSession;
 
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
         }
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean close) {
-            if (this.compressionChannel == null) {
+            if (this.compressionSession == null) {
                 write(content, flush, close);
             } else {
                 // slow path
@@ -902,47 +896,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void writeCompressing0(HttpContent content, boolean flush, boolean close) {
-            EmbeddedChannel compressionChannel = this.compressionChannel;
-            if (content.content().isReadable()) {
-                compressionChannel.writeOutbound(content.content());
-            } else {
-                content.content().release();
-            }
+            Compressor.Session compressionSession = this.compressionSession;
+            compressionSession.push(content.content());
             boolean last = content instanceof LastHttpContent;
             if (last) {
-                compressionChannel.finish();
-                this.compressionChannel = null;
+                compressionSession.finish();
             }
             if (content instanceof HttpResponse hr) {
                 assert last;
 
-                // fix content-length if necessary
-                if (hr.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
-                    long newContentLength = 0;
-                    for (Object outboundMessage : compressionChannel.outboundMessages()) {
-                        newContentLength += ((ByteBuf) outboundMessage).readableBytes();
-                    }
-                    hr.headers().set(HttpHeaderNames.CONTENT_LENGTH, newContentLength);
-                }
+                compressionSession.fixContentLength(hr);
 
                 // this can happen in FullHttpResponse, just send the full body.
                 write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
             }
-            // this is a bit awkward. we go over all the compressed data, *except the last buffer*, and forward them with
-            // flush=false and close=false. only for the last buffer we use those flags.
-            ByteBuf nextToSend = null;
-            while (true) {
-                ByteBuf buf = compressionChannel.readOutbound();
-                if (buf == null) {
-                    break;
-                }
-                if (nextToSend != null) {
-                    write(new DefaultHttpContent(nextToSend), false, false);
-                }
-                nextToSend = buf;
-            }
-            // send the last buffer with the flags.
-            if (nextToSend == null) {
+            ByteBuf toSend = compressionSession.poll();
+            // send the compressed buffer with the flags.
+            if (toSend == null) {
                 if (last) {
                     HttpHeaders trailingHeaders = ((LastHttpContent) content).trailingHeaders();
                     write(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
@@ -952,9 +922,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } // else just don't send anything
             } else {
                 if (last) {
-                    write(new DefaultLastHttpContent(nextToSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
+                    write(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
                 } else {
-                    write(new DefaultHttpContent(nextToSend), flush, close);
+                    write(new DefaultHttpContent(toSend), flush, close);
                 }
             }
         }
@@ -968,13 +938,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Discard the remaining data.
          */
         void discard() {
-            EmbeddedChannel compressionChannel = this.compressionChannel;
-            if (compressionChannel != null) {
-                try {
-                    compressionChannel.finishAndReleaseAll();
-                } catch (DecompressionException ignored) {
-                }
-                this.compressionChannel = null;
+            Compressor.Session compressionSession = this.compressionSession;
+            if (compressionSession != null) {
+                compressionSession.discard();
             }
         }
     }

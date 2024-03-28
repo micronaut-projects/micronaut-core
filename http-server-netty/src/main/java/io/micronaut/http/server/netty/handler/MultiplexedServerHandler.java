@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.body.ByteBody;
@@ -63,9 +64,15 @@ abstract class MultiplexedServerHandler {
 
     ChannelHandlerContext ctx;
     private final RequestHandler requestHandler;
+    @Nullable
+    private Compressor compressor;
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
+    }
+
+    final void compressor(@Nullable Compressor compressor) {
+        this.compressor = compressor;
     }
 
     /**
@@ -87,6 +94,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean responseDone;
         private BlockingWriter blockingWriter;
+        private Compressor.Session compressionSession;
 
         /**
          * Called when the controller consumes some HTTP request data.
@@ -226,6 +234,9 @@ abstract class MultiplexedServerHandler {
             if (blockingWriter != null) {
                 blockingWriter.discard();
             }
+            if (compressionSession != null) {
+                compressionSession.discard();
+            }
             requestHandler.responseWritten(attachment);
             return true;
         }
@@ -246,11 +257,23 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
+            prepareCompression(response, true);
+
             ByteBuf content = response.content();
             boolean empty = !content.isReadable();
+
+            if (compressionSession != null) {
+                compressionSession.push(content);
+                compressionSession.finish();
+                compressionSession.fixContentLength(response);
+                content = compressionSession.poll();
+                empty = content == null;
+            }
+
             writeHeaders(response, empty, ctx.voidPromise());
             if (!empty) {
-                writeData(content, true, ctx.voidPromise());
+                // bypass writeDataCompressing
+                writeData0(content, true, ctx.voidPromise());
             }
             if (!finish()) {
                 throw new IllegalStateException("Response already written");
@@ -268,6 +291,7 @@ abstract class MultiplexedServerHandler {
                 ctx.executor().execute(() -> writeStreamed(response, content));
                 return;
             }
+            prepareCompression(response, false);
 
             writeHeaders(response, false, ctx.voidPromise());
             content.subscribe(new Subscriber<>() {
@@ -364,6 +388,8 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
+            prepareCompression(response, false);
+
             blockingWriter = new BlockingWriter(ctx.alloc(), stream, executorService) {
                 int lastSuspend = 0;
 
@@ -423,6 +449,18 @@ abstract class MultiplexedServerHandler {
         public final void closeAfterWrite() {
         }
 
+        private void prepareCompression(HttpResponse headers, boolean full) {
+            if (compressor != null) {
+                Compressor.Session session = compressor.prepare(ctx, request, headers);
+                if (session != null) {
+                    if (!full) {
+                        headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                    compressionSession = session;
+                }
+            }
+        }
+
         /**
          * Write the response headers.
          *
@@ -432,6 +470,32 @@ abstract class MultiplexedServerHandler {
          */
         abstract void writeHeaders(HttpResponse headers, boolean endStream, ChannelPromise promise);
 
+        private void writeData(ByteBuf data, boolean endStream, ChannelPromise promise) {
+            if (compressionSession == null) {
+                writeData0(data, endStream, promise);
+            } else {
+                writeDataCompressing(data, endStream, promise);
+            }
+        }
+
+        private void writeDataCompressing(ByteBuf data, boolean endStream, ChannelPromise promise) {
+            Compressor.Session compressionChannel = this.compressionSession;
+            compressionChannel.push(data);
+            if (endStream) {
+                compressionChannel.finish();
+            }
+            ByteBuf compressed = compressionChannel.poll();
+            if (compressed == null) {
+                if (endStream) {
+                    writeData0(Unpooled.EMPTY_BUFFER, true, promise);
+                } else {
+                    promise.trySuccess();
+                }
+            } else {
+                writeData0(compressed, endStream, promise);
+            }
+        }
+
         /**
          * Write response data.
          *
@@ -439,7 +503,7 @@ abstract class MultiplexedServerHandler {
          * @param endStream Whether this is the last response frame
          * @param promise The promise to complete when the data is written (used for backpressure)
          */
-        abstract void writeData(ByteBuf data, boolean endStream, ChannelPromise promise);
+        abstract void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise);
 
         /**
          * This is the {@link HotObservable} that represents the request body in the streaming

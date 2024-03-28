@@ -17,10 +17,15 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliEncoder;
 import io.netty.handler.codec.compression.BrotliOptions;
+import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
 import io.netty.handler.codec.compression.SnappyFrameEncoder;
@@ -52,6 +57,8 @@ final class Compressor {
     private final SnappyOptions snappyOptions;
 
     Compressor(HttpCompressionStrategy strategy) {
+        assert strategy.isEnabled();
+
         this.strategy = strategy;
         // only use configured compression level for gzip and deflate, other algos have different semantics for the level
         this.brotliOptions = Brotli.isAvailable() ? StandardCompressionOptions.brotli() : null;
@@ -64,7 +71,7 @@ final class Compressor {
     }
 
     @Nullable
-    ChannelHandler prepare(HttpRequest request, HttpResponse response) {
+    Session prepare(ChannelHandlerContext ctx, HttpRequest request, HttpResponse response) {
         // from HttpContentEncoder: isPassthru
         int code = response.status().code();
         if (code < 200 || code == 204 || code == 304 ||
@@ -92,13 +99,14 @@ final class Compressor {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
-        return switch (encoding) {
+        ChannelHandler handler = switch (encoding) {
             case BR -> makeBrotliEncoder();
             case ZSTD -> new ZstdEncoder(zstdOptions.compressionLevel(), zstdOptions.blockSize(), zstdOptions.maxEncodeSize());
             case SNAPPY -> new SnappyFrameEncoder();
             case GZIP -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
             case DEFLATE -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
         };
+        return new Session(ctx, handler);
     }
 
     private BrotliEncoder makeBrotliEncoder() {
@@ -183,6 +191,82 @@ final class Compressor {
 
         Algorithm(CharSequence contentEncoding) {
             this.contentEncoding = contentEncoding;
+        }
+    }
+
+    static class Session {
+        private final EmbeddedChannel compressionChannel;
+        private boolean finished = false;
+
+        private Session(ChannelHandlerContext ctx, ChannelHandler handler) {
+            compressionChannel = new EmbeddedChannel(
+                ctx.channel().id(),
+                ctx.channel().metadata().hasDisconnect(),
+                ctx.channel().config(),
+                handler
+            );
+        }
+
+        void push(ByteBuf data) {
+            if (finished) {
+                throw new IllegalStateException("Compression already finished");
+            }
+            if (data.isReadable()) {
+                compressionChannel.writeOutbound(data);
+            } else {
+                data.release();
+            }
+        }
+
+        void finish() {
+            if (!finished) {
+                compressionChannel.finish();
+                finished = true;
+            }
+        }
+
+        void discard() {
+            if (!finished) {
+                try {
+                    compressionChannel.finishAndReleaseAll();
+                } catch (DecompressionException ignored) {
+                }
+                finished = true;
+            }
+        }
+
+        void fixContentLength(HttpResponse hr) {
+            if (!finished) {
+                throw new IllegalStateException("Compression not finished yet");
+            }
+            // fix content-length if necessary
+            if (hr.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                long newContentLength = 0;
+                for (Object outboundMessage : compressionChannel.outboundMessages()) {
+                    newContentLength += ((ByteBuf) outboundMessage).readableBytes();
+                }
+                hr.headers().set(HttpHeaderNames.CONTENT_LENGTH, newContentLength);
+            }
+        }
+
+        @Nullable
+        ByteBuf poll() {
+            int n = compressionChannel.outboundMessages().size();
+            if (n == 0) {
+                return null;
+            } else if (n == 1) {
+                return compressionChannel.readOutbound();
+            }
+
+            CompositeByteBuf buf = compressionChannel.alloc().compositeBuffer(n);
+            while (true) {
+                ByteBuf item = compressionChannel.readOutbound();
+                if (item == null) {
+                    break;
+                }
+                buf.addComponent(true, item);
+            }
+            return buf;
         }
     }
 }
