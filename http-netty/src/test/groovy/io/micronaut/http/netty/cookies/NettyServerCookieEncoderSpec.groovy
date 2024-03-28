@@ -36,13 +36,19 @@ class NettyServerCookieEncoderSpec extends Specification {
 
         when:
         long maxAge = 2592000
+        cookie = Cookie.of("id", "a3fWa").maxAge(maxAge)
+        String result = cookieEncoder.encode(cookie).get(0)
         String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge)
         String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge + 1) // To prevent flakiness
-        cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
-        String result = cookieEncoder.encode(cookie).get(0);
+        String expected3 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge - 1) // To prevent flakiness
 
         then:
-        expected == result || expected2 == result
+        expected == result || expected2 == result || expected3 == result
+    }
+
+    void "ServerCookieEncoder is NettyServerCookieEncoder"() {
+        expect:
+        ServerCookieEncoder.INSTANCE instanceof NettyServerCookieEncoder
     }
 
     private static String expires(Long maxAgeSeconds) {
