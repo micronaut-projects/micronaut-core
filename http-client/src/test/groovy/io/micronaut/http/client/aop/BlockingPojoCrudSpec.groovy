@@ -35,16 +35,13 @@ class BlockingPojoCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run([
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name':'BlockingPojoCrudSpec',
     ])
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
     void "test CRUD operations on generated client that returns blocking responses"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         Book book = client.get(99)

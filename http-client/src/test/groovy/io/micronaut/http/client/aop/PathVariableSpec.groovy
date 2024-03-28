@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.PathVariable
@@ -29,14 +30,11 @@ class PathVariableSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, Collections.singletonMap("spec.name", "PathVariableSpec"))
 
     void "test send and receive with path variable"() {
         given:
-        UserClient userClient = context.getBean(UserClient)
+        UserClient userClient = embeddedServer.applicationContext.getBean(UserClient)
         User user = userClient.get("Fred")
 
         expect:
@@ -52,11 +50,13 @@ class PathVariableSpec extends Specification {
 
     }
 
+    @Requires(property = "spec.name", value = "PathVariableSpec")
     @Client('/path-variables')
     static interface UserClient extends MyApi {
 
     }
 
+    @Requires(property = "spec.name", value = "PathVariableSpec")
     @Controller('/path-variables')
     static class UserController implements MyApi {
 
