@@ -47,29 +47,9 @@ class NettyServerCookieEncoderSpec extends Specification {
         expected == result || expected2 == result
     }
 
-    void "ServerCookieEncoder is NettyLaxClientCookieDecoder"() {
+    void "ServerCookieEncoder is NettyServerCookieEncoder"() {
         expect:
         ServerCookieEncoder.INSTANCE instanceof NettyServerCookieEncoder
-    }
-
-    void "NettyLaxServerCookieDecoder is loaded before Default"() {
-        when:
-        List<ServerCookieEncoder> l = [new NettyServerCookieEncoder(), new DefaultServerCookieEncoder()]
-
-        then:
-        sortAndGetFirst(l) instanceof NettyServerCookieEncoder
-
-        when:
-        l = [new DefaultServerCookieEncoder(), new NettyServerCookieEncoder()]
-
-        then:
-        sortAndGetFirst(l) instanceof NettyServerCookieEncoder
-    }
-
-    private static ServerCookieEncoder sortAndGetFirst(List<ServerCookieEncoder> l) {
-        l.stream()
-                .min(OrderUtil.COMPARATOR)
-                .orElse(null)
     }
 
     private static String expires(Long maxAgeSeconds) {

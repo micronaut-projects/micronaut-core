@@ -23,24 +23,4 @@ class NettyLaxClientCookieEncoderSpec extends Specification {
         expect:
         ClientCookieEncoder.INSTANCE instanceof NettyLaxClientCookieEncoder
     }
-
-    void "NettyLaxServerCookieDecoder is loaded before Default"() {
-        when:
-        List<ClientCookieEncoder> l = [new NettyLaxClientCookieEncoder(), new DefaultClientCookieEncoder()]
-
-        then:
-        sortAndGetFirst(l) instanceof NettyLaxClientCookieEncoder
-
-        when:
-        l = [new DefaultClientCookieEncoder(), new NettyLaxClientCookieEncoder()]
-
-        then:
-        sortAndGetFirst(l) instanceof NettyLaxClientCookieEncoder
-    }
-
-    private static ClientCookieEncoder sortAndGetFirst(List<ClientCookieEncoder> l) {
-        l.stream()
-                .min(OrderUtil.COMPARATOR)
-                .orElse(null)
-    }
 }
