@@ -1,8 +1,9 @@
 package io.micronaut.http.netty.cookies
 
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.cookie.ClientCookieEncoder
 import io.micronaut.http.cookie.Cookie
-
+import io.micronaut.http.cookie.DefaultClientCookieEncoder
 import spock.lang.Specification
 
 class NettyLaxClientCookieEncoderSpec extends Specification {
@@ -16,5 +17,30 @@ class NettyLaxClientCookieEncoderSpec extends Specification {
 
         then:
         "SID=31d4d96e407aad42" == cookieEncoder.encode(cookie)
+    }
+
+    void "ClientCookieEncoder is NettyLaxClientCookieDecoder"() {
+        expect:
+        ClientCookieEncoder.INSTANCE instanceof NettyLaxClientCookieEncoder
+    }
+
+    void "NettyLaxServerCookieDecoder is loaded before Default"() {
+        when:
+        List<ClientCookieEncoder> l = [new NettyLaxClientCookieEncoder(), new DefaultClientCookieEncoder()]
+
+        then:
+        sortAndGetFirst(l) instanceof NettyLaxClientCookieEncoder
+
+        when:
+        l = [new DefaultClientCookieEncoder(), new NettyLaxClientCookieEncoder()]
+
+        then:
+        sortAndGetFirst(l) instanceof NettyLaxClientCookieEncoder
+    }
+
+    private static ClientCookieEncoder sortAndGetFirst(List<ClientCookieEncoder> l) {
+        l.stream()
+                .min(OrderUtil.COMPARATOR)
+                .orElse(null)
     }
 }

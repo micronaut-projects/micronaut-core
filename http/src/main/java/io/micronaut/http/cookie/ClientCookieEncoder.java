@@ -18,6 +18,8 @@ package io.micronaut.http.cookie;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 
 /**
  * Encodes a {@link Cookie} into a String. Typically used to set the {@link io.micronaut.http.HttpHeaders#COOKIE} value for example in an HTTP Client.
@@ -27,15 +29,16 @@ import io.micronaut.core.io.service.SoftServiceLoader;
  * @since 4.3.0
  */
 @FunctionalInterface
-public interface ClientCookieEncoder {
+public interface ClientCookieEncoder extends Ordered {
     /**
      * The default {@link ServerCookieEncoder} instance.
      */
     ClientCookieEncoder INSTANCE = SoftServiceLoader
-            .load(ClientCookieEncoder.class)
-            .firstOr("io.micronaut.http.cookie.DefaultClientCookieEncoder", ClientCookieEncoder.class.getClassLoader())
-            .map(ServiceDefinition::load)
-            .orElse(null);
+        .load(ClientCookieEncoder.class)
+        .collectAll()
+        .stream()
+        .min(OrderUtil.COMPARATOR)
+        .orElse(null);
 
     /**
      * Encodes a {@link Cookie} into a String. Typically used to set the {@link io.micronaut.http.HttpHeaders#COOKIE} value for example in an HTTP Client.

@@ -1,5 +1,6 @@
 package io.micronaut.http.cookie;
 
+import io.micronaut.core.order.Ordered;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -30,6 +31,13 @@ class DefaultServerCookieEncoderTest {
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
         String result = cookieEncoder.encode(cookie).get(0);
         assertTrue(expected.equals(result) || expected2.equals(result));
+    }
+
+
+    @Test
+    void orderIsLowestPrecedence() {
+        ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+        assertEquals(Ordered.LOWEST_PRECEDENCE, cookieEncoder.getOrder());
     }
 
     private static String expires(Long maxAgeSeconds) {

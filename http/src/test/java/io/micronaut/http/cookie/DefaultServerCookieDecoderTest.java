@@ -1,5 +1,6 @@
 package io.micronaut.http.cookie;
 
+import io.micronaut.core.order.Ordered;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -37,5 +38,11 @@ class DefaultServerCookieDecoderTest {
         assertTrue(cookie.isHttpOnly());
         assertTrue(cookie.isSecure());
         assertTrue(cookie.getSameSite().isEmpty());
+    }
+
+    @Test
+    void orderIsLowestPrecedence() {
+        ServerCookieDecoder decoder = new DefaultServerCookieDecoder();
+        assertEquals(Ordered.LOWEST_PRECEDENCE, decoder.getOrder());
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.Ordered;
 
 import java.net.HttpCookie;
 import java.util.List;
@@ -36,5 +37,10 @@ public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
                 .stream()
                 .map(httpCookie -> (Cookie) new CookieHttpCookieAdapter(httpCookie))
                 .toList();
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
     }
 }

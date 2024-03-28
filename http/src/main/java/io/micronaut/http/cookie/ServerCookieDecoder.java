@@ -16,8 +16,11 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 
 import java.util.List;
 
@@ -27,15 +30,16 @@ import java.util.List;
  * @since 4.3.0
  */
 @FunctionalInterface
-public interface ServerCookieDecoder {
+public interface ServerCookieDecoder extends Ordered {
     /**
      * The default {@link ServerCookieDecoder} instance.
      */
     ServerCookieDecoder INSTANCE = SoftServiceLoader
-            .load(ServerCookieDecoder.class)
-            .firstOr("io.micronaut.http.cookie.DefaultServerCookieDecoder", ServerCookieDecoder.class.getClassLoader())
-            .map(ServiceDefinition::load)
-            .orElse(null);
+        .load(ServerCookieDecoder.class)
+        .collectAll()
+        .stream()
+        .min(OrderUtil.COMPARATOR)
+        .orElse(null);
 
     /**
      *

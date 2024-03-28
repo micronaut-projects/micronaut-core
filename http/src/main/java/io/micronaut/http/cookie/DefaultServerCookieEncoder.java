@@ -17,6 +17,7 @@ package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 
 import java.net.HttpCookie;
@@ -85,4 +86,8 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
         return gmtDateTime.format(FORMATTER);
     }
 
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
+    }
 }

@@ -1,6 +1,8 @@
 package io.micronaut.http.netty.cookies
 
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.cookie.Cookie
+import io.micronaut.http.cookie.DefaultServerCookieEncoder
 import io.micronaut.http.cookie.SameSite
 import io.micronaut.http.cookie.ServerCookieEncoder
 import spock.lang.Specification
@@ -43,6 +45,31 @@ class NettyServerCookieEncoderSpec extends Specification {
 
         then:
         expected == result || expected2 == result
+    }
+
+    void "ServerCookieEncoder is NettyLaxClientCookieDecoder"() {
+        expect:
+        ServerCookieEncoder.INSTANCE instanceof NettyServerCookieEncoder
+    }
+
+    void "NettyLaxServerCookieDecoder is loaded before Default"() {
+        when:
+        List<ServerCookieEncoder> l = [new NettyServerCookieEncoder(), new DefaultServerCookieEncoder()]
+
+        then:
+        sortAndGetFirst(l) instanceof NettyServerCookieEncoder
+
+        when:
+        l = [new DefaultServerCookieEncoder(), new NettyServerCookieEncoder()]
+
+        then:
+        sortAndGetFirst(l) instanceof NettyServerCookieEncoder
+    }
+
+    private static ServerCookieEncoder sortAndGetFirst(List<ServerCookieEncoder> l) {
+        l.stream()
+                .min(OrderUtil.COMPARATOR)
+                .orElse(null)
     }
 
     private static String expires(Long maxAgeSeconds) {

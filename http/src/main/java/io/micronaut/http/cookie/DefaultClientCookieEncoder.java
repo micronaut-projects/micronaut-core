@@ -16,6 +16,7 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.order.Ordered;
 
 /**
  * @author Sergio del Amo
@@ -24,9 +25,14 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 public final class DefaultClientCookieEncoder implements ClientCookieEncoder {
     private static final String EQUAL = "=";
-    
+
     @Override
     public String encode(Cookie cookie) {
         return cookie.getName() + EQUAL + (cookie.getValue() != null ? cookie.getValue() : "");
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
     }
 }
