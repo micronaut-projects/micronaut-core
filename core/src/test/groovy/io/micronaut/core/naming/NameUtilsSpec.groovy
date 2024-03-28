@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -328,6 +328,12 @@ class NameUtilsSpec extends Specification {
         "getFoo"  | ["get"]         | true
         'get$foo' | ["get"]         | true
         'get_foo' | ["get"]         | true
+        'getfRo'  | ["get"]         | true
+        'get$__$A'| ["get"]         | true
+        'getf_A'  | ["get"]         | false
+        'getF_A'  | ["get"]         | true
+        'getF$A'  | ["get"]         | true
+        'getA'    | ["get"]         | true
         "getfoo"  | ["get"]         | false
         "a"       | ["get"]         | false
         "foo"     | ["with"]        | false
@@ -355,6 +361,12 @@ class NameUtilsSpec extends Specification {
         "setFoo"  | ["set"]         | true
         'set$foo' | ["set"]         | true
         'set_foo' | ["set"]         | true
+        'setfRo'  | ["set"]         | true
+        'set$__$A'| ["set"]         | true
+        'setf_A'  | ["set"]         | false
+        'setF_A'  | ["set"]         | true
+        'setF$A'  | ["set"]         | true
+        'setA'    | ["set"]         | true
         "setfoo"  | ["set"]         | false
         "a"       | ["set"]         | false
         "foo"     | ["with"]        | false
@@ -369,6 +381,7 @@ class NameUtilsSpec extends Specification {
         "setfoo"  | ["set", "with"] | false
         "withFoo" | ["set", "with"] | true
         "withfoo" | ["set", "with"] | false
+        "setorXyz"| ["set"]         | false
     }
 
     void "test getPropertyNameForGetter (#getter, #prefixes)"() {
@@ -386,6 +399,13 @@ class NameUtilsSpec extends Specification {
         "is"      | [""]            | "is"
         "getFoo"  | ["get", "with"] | "foo"
         "withFoo" | ["get", "with"] | "foo"
+        'get$foo' | ["get"]         | '$foo'
+        'get_foo' | ["get"]         | '_foo'
+        'getfRo'  | ["get"]         | 'fRo'
+        'get$__$A'| ["get"]         | '$__$A'
+        'getF_A'  | ["get"]         | 'f_A'
+        'getF$A'  | ["get"]         | 'f$A'
+        'getA'    | ["get"]         | 'a'
     }
 
     void "test getPropertyNameForSetter (#setter, #prefixes)"() {
@@ -403,6 +423,13 @@ class NameUtilsSpec extends Specification {
         "is"      | [""]            | "is"
         "setFoo"  | ["set", "with"] | "foo"
         "withFoo" | ["set", "with"] | "foo"
+        'set$foo' | ["set"]         | '$foo'
+        'set_foo' | ["set"]         | '_foo'
+        'setfRo'  | ["set"]         | 'fRo'
+        'set$__$A'| ["set"]         | '$__$A'
+        'setF_A'  | ["set"]         | 'f_A'
+        'setF$A'  | ["set"]         | 'f$A'
+        'setA'    | ["set"]         | 'a'
     }
 
     void "test getterNameFor (#name, #prefixes)"() {
@@ -418,6 +445,13 @@ class NameUtilsSpec extends Specification {
         "fooBar" | ["with"]        | "withFooBar"
         "fooBar" | ["set", "with"] | "setFooBar"
         "fooBar" | ["with", "set"] | "withFooBar"
+        '$foo'   | ["get"]         | 'get$foo'
+        '_foo'   | ["get"]         | 'get_foo'
+        'fRo'    | ["get"]         | 'getfRo'
+        '$__$A'  | ["get"]         | 'get$__$A'
+        'f_A'    | ["get"]         | 'getF_A'
+        'f$A'    | ["get"]         | 'getF$A'
+        'a'      | ["get"]         | 'getA'
     }
 
     void "test setterNameFor (#name, #prefixes)"() {
@@ -433,6 +467,13 @@ class NameUtilsSpec extends Specification {
         "fooBar" | ["with"]        | "withFooBar"
         "fooBar" | ["set", "with"] | "setFooBar"
         "fooBar" | ["with", "set"] | "withFooBar"
+        '$foo'   | ["set"]         | 'set$foo'
+        '_foo'   | ["set"]         | 'set_foo'
+        'fRo'    | ["set"]         | 'setfRo'
+        '$__$A'  | ["set"]         | 'set$__$A'
+        'f_A'    | ["set"]         | 'setF_A'
+        'f$A'    | ["set"]         | 'setF$A'
+        'a'      | ["set"]         | 'setA'
     }
 
 }
