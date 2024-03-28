@@ -2,7 +2,6 @@ package io.micronaut.http.netty.cookies
 
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.cookie.Cookie
-import io.micronaut.http.cookie.DefaultServerCookieEncoder
 import io.micronaut.http.cookie.SameSite
 import io.micronaut.http.cookie.ServerCookieEncoder
 import spock.lang.Specification
