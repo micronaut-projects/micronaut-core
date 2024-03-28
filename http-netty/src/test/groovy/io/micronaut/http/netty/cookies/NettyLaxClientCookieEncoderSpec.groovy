@@ -1,6 +1,5 @@
 package io.micronaut.http.netty.cookies
 
-import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.cookie.ClientCookieEncoder
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.DefaultClientCookieEncoder
