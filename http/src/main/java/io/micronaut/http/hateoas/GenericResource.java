@@ -18,8 +18,8 @@ package io.micronaut.http.hateoas;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ObjectUtils;
-import io.micronaut.serde.annotation.Serdeable;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,7 +31,7 @@ import java.util.Map;
  * @since 3.4.0
  * @author yawkat
  */
-@Serdeable
+@Introspected
 public final class GenericResource extends AbstractResource<GenericResource> {
     private final Map<String, Object> additionalProperties = new LinkedHashMap<>();
 

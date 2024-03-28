@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.serde.annotation.Serdeable;
 
 import java.util.List;
 
@@ -30,7 +29,6 @@ import java.util.List;
  * @since 1.1
  */
 @Produces(MediaType.APPLICATION_VND_ERROR)
-@Serdeable
 public class VndError extends JsonError {
 
     /**

@@ -22,8 +22,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.serde.annotation.Serdeable;
-
 import java.util.Optional;
 
 /**
@@ -32,7 +30,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.1
  */
-@Serdeable
 @Produces(MediaType.APPLICATION_JSON)
 public class JsonError extends AbstractResource<JsonError> {
 
