@@ -2,7 +2,6 @@ package io.micronaut.http.netty.cookies
 
 import io.micronaut.http.cookie.ClientCookieEncoder
 import io.micronaut.http.cookie.Cookie
-import io.micronaut.http.cookie.DefaultClientCookieEncoder
 import spock.lang.Specification
 
 class NettyLaxClientCookieEncoderSpec extends Specification {
