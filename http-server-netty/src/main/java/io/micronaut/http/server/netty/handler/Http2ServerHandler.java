@@ -20,7 +20,9 @@ import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
@@ -228,6 +230,22 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 return true;
             });
         }
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent upgrade) {
+                FullHttpRequest fhr = upgrade.upgradeRequest();
+                io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
+                Http2ServerHandler.Http2Stream stream = handler.new Http2Stream(cs);
+                cs.setProperty(handler.streamKey, stream);
+                boolean empty = !fhr.content().isReadable();
+                stream.onHeadersRead(fhr, empty);
+                if (!empty) {
+                    stream.onDataRead(fhr.content(), true);
+                }
+            }
+            super.userEventTriggered(ctx, evt);
+        }
     }
 
     /**
@@ -287,6 +305,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         void notifyDataConsumed(int n) {
+            if (stream.id() == 1) {
+                // ignore for upgrade stream
+                return;
+            }
             try {
                 connectionHandler.connection().local().flowController().consumeBytes(stream, n);
             } catch (Http2Exception e) {
