@@ -194,7 +194,7 @@ final class Compressor {
         }
     }
 
-    static class Session {
+    static final class Session {
         private final EmbeddedChannel compressionChannel;
         private boolean finished = false;
 
