@@ -31,16 +31,13 @@ class ServerSentEventProxyingSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'spec.name': 'ServerSentEventProxyingSpec'
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+            ['spec.name': 'ServerSentEventProxyingSpec']
     )
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
     @AutoCleanup
-    SseClient sseClient = context.createBean(SseClient, embeddedServer.getURL())
+    SseClient sseClient = embeddedServer.applicationContext.createBean(SseClient, embeddedServer.getURL())
 
     void "test a request expecting a full response intercepted by a proxy providing a streaming response"() {
         given:
