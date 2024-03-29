@@ -158,6 +158,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * ONLY for NettyBodyAnnotationBinder use.
      */
     @Internal
+    @SuppressWarnings("VisibilityModifier")
     public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
     private final NettyHttpHeaders headers;

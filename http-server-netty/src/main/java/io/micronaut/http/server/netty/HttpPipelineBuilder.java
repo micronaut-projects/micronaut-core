@@ -502,7 +502,8 @@ final class HttpPipelineBuilder implements Closeable {
             final Http2FrameCodec frameCodec;
             final Http2ConnectionHandler connectionHandler;
             if (server.getServerConfiguration().isLegacyMultiplexHandlers()) {
-                connectionHandler = frameCodec = createHttp2FrameCodec();
+                frameCodec = createHttp2FrameCodec();
+                connectionHandler = frameCodec;
             } else {
                 connectionHandler = createHttp2ServerHandler(false);
                 frameCodec = null;
