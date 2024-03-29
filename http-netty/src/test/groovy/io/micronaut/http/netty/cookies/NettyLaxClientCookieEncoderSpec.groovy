@@ -2,7 +2,6 @@ package io.micronaut.http.netty.cookies
 
 import io.micronaut.http.cookie.ClientCookieEncoder
 import io.micronaut.http.cookie.Cookie
-
 import spock.lang.Specification
 
 class NettyLaxClientCookieEncoderSpec extends Specification {
@@ -16,5 +15,10 @@ class NettyLaxClientCookieEncoderSpec extends Specification {
 
         then:
         "SID=31d4d96e407aad42" == cookieEncoder.encode(cookie)
+    }
+
+    void "ClientCookieEncoder is NettyLaxClientCookieDecoder"() {
+        expect:
+        ClientCookieEncoder.INSTANCE instanceof NettyLaxClientCookieEncoder
     }
 }

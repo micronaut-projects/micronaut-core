@@ -7,8 +7,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class DefaultServerCookieEncoderTest {
 
@@ -30,6 +29,11 @@ class DefaultServerCookieEncoderTest {
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
         String result = cookieEncoder.encode(cookie).get(0);
         assertTrue(expected.equals(result) || expected2.equals(result));
+    }
+
+    @Test
+    void serverCookieEncoderIsDefaultServerCookieEncoder() {
+        assertInstanceOf(DefaultServerCookieEncoder.class, ServerCookieEncoder.INSTANCE);
     }
 
     private static String expires(Long maxAgeSeconds) {
