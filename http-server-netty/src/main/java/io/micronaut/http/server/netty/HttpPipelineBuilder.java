@@ -31,6 +31,7 @@ import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
@@ -498,26 +499,48 @@ final class HttpPipelineBuilder implements Closeable {
 
             // todo: move to Http2ServerHandler (upgrade request is a bit difficult)
 
-            final Http2FrameCodec connectionHandler = createHttp2FrameCodec();
+            final Http2FrameCodec frameCodec;
+            final Http2ConnectionHandler connectionHandler;
+            if (server.getServerConfiguration().isLegacyMultiplexHandlers()) {
+                frameCodec = createHttp2FrameCodec();
+                connectionHandler = frameCodec;
+            } else {
+                connectionHandler = createHttp2ServerHandler(false);
+                frameCodec = null;
+            }
             final String fallbackHandlerName = "http1-fallback-handler";
             HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                 if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-
-                    return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
-                        @Override
-                        protected void initChannel(@NonNull Http2StreamChannel ch) {
-                            StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
-                            streamPipeline.insertHttp2FrameHandlers();
-                            streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                    class Http2ServerUpgradeCodecImpl extends Http2ServerUpgradeCodec {
+                        public Http2ServerUpgradeCodecImpl(Http2ConnectionHandler connectionHandler) {
+                            super(connectionHandler);
                         }
-                    })) {
+
+                        public Http2ServerUpgradeCodecImpl(Http2FrameCodec http2Codec, ChannelHandler... handlers) {
+                            super(http2Codec, handlers);
+                        }
+
                         @Override
                         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
                             super.upgradeTo(ctx, upgradeRequest);
                             pipeline.remove(fallbackHandlerName);
+                            new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
                             onRequestPipelineBuilt();
                         }
-                    };
+                    }
+
+                    if (frameCodec == null) {
+                        return new Http2ServerUpgradeCodecImpl(connectionHandler);
+                    } else {
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
+                            @Override
+                            protected void initChannel(@NonNull Http2StreamChannel ch) {
+                                StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                                streamPipeline.insertHttp2FrameHandlers();
+                                streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                            }
+                        }));
+                    }
                 } else {
                     return null;
                 }
