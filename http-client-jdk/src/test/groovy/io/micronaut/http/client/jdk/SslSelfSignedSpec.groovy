@@ -19,25 +19,23 @@ class SslSelfSignedSpec extends Specification {
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
-    ApplicationContext context
     EmbeddedServer embeddedServer
     HttpClient client
 
     void setup() {
-        context = ApplicationContext.run([
+        embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'SslSelfSignedSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
-        embeddedServer = context.getBean(EmbeddedServer).start()
-        client = context.createBean(HttpClient, embeddedServer.getURL())
+        client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
     }
 
     void cleanup() {
         client.close()
-        context.close()
+        embeddedServer.close()
     }
 
     void "expect the url to be https"() {

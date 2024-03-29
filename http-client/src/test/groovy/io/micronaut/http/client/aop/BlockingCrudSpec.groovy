@@ -44,12 +44,9 @@ class BlockingCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run([
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'BlockingCrudSpec',
     ])
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test configured client"() {
         given:
@@ -65,7 +62,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test CRUD operations on generated client that returns blocking responses"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         Book book = client.get(99)
@@ -130,7 +127,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test DELETE operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         client.delete(null)
@@ -141,7 +138,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test POST operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         Book book = client.save(null)
@@ -152,7 +149,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test PUT operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         Book book = client.update(5, null)
@@ -163,7 +160,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test GET operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        BookClient client = embeddedServer.applicationContext.getBean(BookClient)
 
         when:
         Book book = client.get(null)
@@ -174,7 +171,7 @@ class BlockingCrudSpec extends Specification {
 
     void "test a declarative client void method and 404 response"() {
         given:
-        VoidNotFoundClient client = context.getBean(VoidNotFoundClient)
+        VoidNotFoundClient client = embeddedServer.applicationContext.getBean(VoidNotFoundClient)
 
         when:
         client.call()
@@ -186,7 +183,7 @@ class BlockingCrudSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2959')
     void "test annotation stereotype"() {
         given:
-        def client = context.getBean(StereotypeClient)
+        def client = embeddedServer.applicationContext.getBean(StereotypeClient)
 
         expect:
         client.list().size() == 0

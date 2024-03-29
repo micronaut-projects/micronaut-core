@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
@@ -32,14 +33,11 @@ import spock.lang.Specification
 class ParameterSpec extends Specification {
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, Collections.singletonMap("spec.name", "ParameterSpec"))
 
     void "test send and receive parameter"() {
         given:
-        UserClient userClient = context.getBean(UserClient)
+        UserClient userClient = embeddedServer.applicationContext.getBean(UserClient)
         User user = userClient.get("Fred")
 
         expect:
@@ -55,11 +53,13 @@ class ParameterSpec extends Specification {
 
     }
 
+    @Requires(property = "spec.name", value = "ParameterSpec")
     @Client('/parameters')
     static interface UserClient extends MyApi {
 
     }
 
+    @Requires(property = "spec.name", value = "ParameterSpec")
     @Controller('/parameters')
     static class UserController implements MyApi {
 

@@ -38,6 +38,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -46,16 +47,15 @@ import spock.lang.Specification
  */
 class ClientFilterSpec extends Specification{
 
+    @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run([
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'ClientFilterSpec',
     ])
 
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
     void "test client filter includes header"() {
         given:
-        MyApi myApi = context.getBean(MyApi)
+        MyApi myApi = embeddedServer.applicationContext.getBean(MyApi)
 
         expect:
         myApi.name() == 'Fred'
@@ -63,7 +63,7 @@ class ClientFilterSpec extends Specification{
 
     void "test method-based client filter includes header"() {
         given:
-        MyMethodApi myApi = context.getBean(MyMethodApi)
+        MyMethodApi myApi = embeddedServer.applicationContext.getBean(MyMethodApi)
 
         expect:
         myApi.name() == 'Fred'
@@ -71,7 +71,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a client with no service ids doesn't match a filter with a service id"() {
         given:
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange("/filters/name", String.class)
@@ -103,7 +103,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a client filter that throws an exception"() {
         given:
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange("/filter-exception/name", String.class)
@@ -118,7 +118,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a client filter matching to the root"() {
         given:
-        RootApi rootApi = context.getBean(RootApi)
+        RootApi rootApi = embeddedServer.applicationContext.getBean(RootApi)
 
         expect:
         rootApi.name() == 'processed'
@@ -304,8 +304,8 @@ class ClientFilterSpec extends Specification{
 
     void "filter always observes a response"() {
         given:
-        ObservesResponseClient client = context.getBean(ObservesResponseClient)
-        ObservesResponseFilter filter = context.getBean(ObservesResponseFilter)
+        ObservesResponseClient client = embeddedServer.applicationContext.getBean(ObservesResponseClient)
+        ObservesResponseFilter filter = embeddedServer.applicationContext.getBean(ObservesResponseFilter)
 
         when:
         Mono.from(client.monoVoid()).block() == null

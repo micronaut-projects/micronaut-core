@@ -10,13 +10,10 @@ import spock.lang.Shared
 class UploadBrowserSpec extends GebSpec {
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
                     'spec.name': UploadBrowserSpec.simpleName,
             ], Environment.TEST)
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     def "submitting a form without a file triggers an error"() {
         given:

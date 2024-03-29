@@ -38,14 +38,13 @@ class CompressionSpec extends Specification {
 
     def compression(ChannelHandler decompressor, CharSequence contentEncoding) {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'CompressionSpec'] + serverOptions())
-        def server = ctx.getBean(EmbeddedServer).start()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CompressionSpec'] + serverOptions())
 
         byte[] uncompressed = new byte[1024]
         ThreadLocalRandom.current().nextBytes(uncompressed)
-        ctx.getBean(Ctrl).data = uncompressed
+        server.applicationContext.getBean(Ctrl).data = uncompressed
 
-        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
 
         when:
         byte[] compressed = client.retrieve(HttpRequest.GET("/compress").header("Accept-Encoding", contentEncoding.toString()), byte[])
@@ -67,7 +66,6 @@ class CompressionSpec extends Specification {
         cleanup:
         client.close()
         server.stop()
-        ctx.close()
 
         where:
         contentEncoding            | decompressor
@@ -78,14 +76,13 @@ class CompressionSpec extends Specification {
 
     def compressionLevel(int threshold, int actual, boolean compressed) {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'CompressionSpec', 'micronaut.server.netty.compression-threshold': threshold] + serverOptions())
-        def server = ctx.getBean(EmbeddedServer).start()
+        def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CompressionSpec', 'micronaut.server.netty.compression-threshold': threshold] + serverOptions())
 
         byte[] uncompressed = new byte[actual]
         ThreadLocalRandom.current().nextBytes(uncompressed)
-        ctx.getBean(Ctrl).data = uncompressed
+        server.applicationContext.getBean(Ctrl).data = uncompressed
 
-        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
 
         when:
         def response = client.exchange(HttpRequest.GET("/compress").header("Accept-Encoding", "gzip"), byte[])
@@ -97,7 +94,6 @@ class CompressionSpec extends Specification {
         cleanup:
         client.close()
         server.stop()
-        ctx.close()
 
         where:
         threshold | actual | compressed
@@ -110,9 +106,8 @@ class CompressionSpec extends Specification {
 
     def decompression(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'CompressionSpec'] + serverOptions())
-        def server = ctx.getBean(EmbeddedServer).start()
-        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CompressionSpec'] + serverOptions())
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
 
         def compChannel = new EmbeddedChannel(compressor)
         byte[] uncompressed = new byte[1024]
@@ -132,12 +127,11 @@ class CompressionSpec extends Specification {
         when:
         client.exchange(HttpRequest.POST("/decompress", ByteBufUtil.getBytes(compressed)).header(HttpHeaderNames.CONTENT_ENCODING, contentEncoding))
         then:
-        ctx.getBean(Ctrl).data == uncompressed
+        server.applicationContext.getBean(Ctrl).data == uncompressed
 
         cleanup:
         client.close()
         server.stop()
-        ctx.close()
 
         where:
         contentEncoding            | compressor
