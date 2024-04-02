@@ -4,7 +4,7 @@ NOTE: Bean import is currently only supported in the Java language as other lang
 
 For example, to import the JSR-330 TCK into an application, add a dependency on the TCK:
 
-dependency::jakarta.inject:jakarta.inject-tck:2.0.1[]
+dependency::jakarta.inject-tck[groupId="jakarta.inject", version="2.0.1"]
 
 Then define the `@Import` annotation on your `Application` class:
 
