@@ -643,10 +643,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
-            channel.writeInbound(compressed);
             boolean last = message instanceof LastHttpContent;
-            if (last) {
-                channel.finish();
+            try {
+                channel.writeInbound(compressed);
+                if (last) {
+                    channel.finish();
+                }
+            } catch (DecompressionException e) {
+                delegate.handleUpstreamError(e);
+                channel.releaseInbound();
+                if (last) {
+                    // need to handle the last content
+                    inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
+                }
+                return;
             }
 
             while (true) {
