@@ -177,14 +177,6 @@ class ClientIntroductionAdviceSpec extends Specification {
             }
             return "<answer>success</answer>"
         }
-
-        @Get(value = "/xml-annotated", produces = MediaType.APPLICATION_XML)
-        String xmlAnnotated(HttpRequest<?> request) {
-            if (!request.accept().contains(MediaType.APPLICATION_XML_TYPE)) {
-                throw new IllegalStateException("Accept should be set to XML")
-            }
-            return "<answer>success</answer>"
-        }
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
@@ -259,7 +251,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         String xml()
 
         @Consumes(MediaType.APPLICATION_XML)
-        @Get("/xml-annotated")
+        @Get("/xml")
         String xmlAnnotated()
 
     }
