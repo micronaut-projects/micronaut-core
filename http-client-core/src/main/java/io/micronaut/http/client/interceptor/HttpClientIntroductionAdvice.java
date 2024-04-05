@@ -400,6 +400,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         // The original query can be added by getting it from the request.getUri() and appending
         request.uri(URI.create(appendQuery(uri, uriContext.getQueryParameters())));
 
+        final MediaType[] acceptTypes;
+        Collection<MediaType> accept = request.accept();
+        if (accept.isEmpty()) {
+            String[] consumesMediaType = context.stringValues(Consumes.class);
+            if (ArrayUtils.isEmpty(consumesMediaType)) {
+                acceptTypes = DEFAULT_ACCEPT_TYPES;
+            } else {
+                acceptTypes = MediaType.of(consumesMediaType);
+            }
+            request.accept(acceptTypes);
+        }
+
         if (body != null && !request.getContentType().isPresent()) {
             MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
             if (ArrayUtils.isEmpty(contentTypes)) {
@@ -510,24 +522,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return bindingErrorResult;
     }
 
-    @NonNull
-    private static MediaType[] getAcceptTypes(MethodInvocationContext<Object, Object> context, MutableHttpRequest<?> request) {
-        final MediaType[] acceptTypes;
-        Collection<MediaType> accept = request.accept();
-        if (accept.isEmpty()) {
-            String[] consumesMediaType = context.stringValues(Consumes.class);
-            if (ArrayUtils.isEmpty(consumesMediaType)) {
-                acceptTypes = DEFAULT_ACCEPT_TYPES;
-            } else {
-                acceptTypes = MediaType.of(consumesMediaType);
-            }
-            request.accept(acceptTypes);
-        } else {
-            acceptTypes = accept.toArray(MediaType.EMPTY_ARRAY);
-        }
-        return acceptTypes;
-    }
-
     private Publisher<?> httpClientResponsePublisher(HttpClient httpClient,
                                                      Publisher<RequestBinderResult> requestPublisher,
                                                      ReturnType<?> returnType,
@@ -560,9 +554,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 request.getHeaders().remove(HttpHeaders.ACCEPT);
             }
 
-            final MediaType[] acceptTypes = getAcceptTypes(context, request);
+            Collection<MediaType> acceptTypes = request.accept();
 
-            if (streamingHttpClient instanceof SseClient sseClient && Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            if (streamingHttpClient instanceof SseClient sseClient && acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
                 if (reactiveValueArgument.getType() == Event.class) {
                     return sseClient.eventStream(
                         request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
@@ -639,8 +633,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
-    private boolean isJsonParsedMediaType(MediaType[] acceptTypes) {
-        return Arrays.stream(acceptTypes).anyMatch(mediaType ->
+    private boolean isJsonParsedMediaType(Collection<MediaType> acceptTypes) {
+        return acceptTypes.stream().anyMatch(mediaType ->
                 mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE) ||
                         mediaType.getExtension().equals(MediaType.EXTENSION_JSON) ||
                         jsonMediaTypeCodec.getMediaTypes().contains(mediaType)

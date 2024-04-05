@@ -1,11 +1,13 @@
 package io.micronaut.http.client
 
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
@@ -28,6 +30,30 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         expect:
         myService.index() == 'success'
+    }
+
+    void "test accept type defaults to json"() {
+        given:
+        AcceptTypeClient client = server.applicationContext.getBean(AcceptTypeClient)
+
+        expect:
+        client.index() == 'success'
+    }
+
+    void "test accept type can be explicitly set"() {
+        given:
+        AcceptTypeClient client = server.applicationContext.getBean(AcceptTypeClient)
+
+        expect:
+        client.xml() == '<answer>success</answer>'
+    }
+
+    void "test accept type can be explicitly set via annotation"() {
+        given:
+        AcceptTypeClient client = server.applicationContext.getBean(AcceptTypeClient)
+
+        expect:
+        client.xmlAnnotated() == '<answer>success</answer>'
     }
 
     void "service id appears in exceptions"() {
@@ -133,6 +159,35 @@ class ClientIntroductionAdviceSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Controller('/accept')
+    static class AcceptTypeController {
+
+        @Get
+        String index(HttpRequest<?> request) {
+            if (!request.accept().contains(MediaType.APPLICATION_JSON_TYPE)) {
+                throw new IllegalStateException("Accept should default to JSON")
+            }
+            return "success"
+        }
+
+        @Get(value = "/xml", produces = MediaType.APPLICATION_XML)
+        String xml(HttpRequest<?> request) {
+            if (!request.accept().contains(MediaType.APPLICATION_XML_TYPE)) {
+                throw new IllegalStateException("Accept should be set to XML")
+            }
+            return "<answer>success</answer>"
+        }
+
+        @Get(value = "/xml-annotated", produces = MediaType.APPLICATION_XML)
+        String xmlAnnotated(HttpRequest<?> request) {
+            if (!request.accept().contains(MediaType.APPLICATION_XML_TYPE)) {
+                throw new IllegalStateException("Accept should be set to XML")
+            }
+            return "<answer>success</answer>"
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/policies')
     static class PolicyController {
         @Get
@@ -192,6 +247,21 @@ class ClientIntroductionAdviceSpec extends Specification {
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client('/aop')
     static interface MyClient extends MyApi {
+    }
+
+    @Client('/accept')
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    static interface AcceptTypeClient {
+        @Get
+        String index()
+
+        @Get(value = "/xml", consumes = MediaType.APPLICATION_XML)
+        String xml()
+
+        @Consumes(MediaType.APPLICATION_XML)
+        @Get("/xml-annotated")
+        String xmlAnnotated()
+
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
