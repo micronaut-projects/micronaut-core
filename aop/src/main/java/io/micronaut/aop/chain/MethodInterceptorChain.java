@@ -37,6 +37,8 @@ import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Objects;
 
+import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
+
 /**
  * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
@@ -50,7 +52,6 @@ import java.util.Objects;
 @UsedByGeneratedCode
 public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
-    private static final Object[] EMPTY_ARRAY = new Object[0];
     private final @Nullable InterceptorKind kind;
 
     /**
@@ -78,7 +79,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             T target,
             ExecutableMethod<T, R> executionHandle,
             @Nullable InterceptorKind kind) {
-        super(interceptors, target, executionHandle, EMPTY_ARRAY);
+        super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
         this.kind = kind;
     }
 

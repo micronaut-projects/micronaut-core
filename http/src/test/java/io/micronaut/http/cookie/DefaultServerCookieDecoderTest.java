@@ -7,6 +7,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DefaultServerCookieDecoderTest {
+    @Test
+    void serverCookieDecoderIsDefaultServerCookieDecoder() {
+        assertInstanceOf(DefaultServerCookieDecoder.class, ServerCookieDecoder.INSTANCE);
+    }
 
     @Test
     void testCookieDecoding() {

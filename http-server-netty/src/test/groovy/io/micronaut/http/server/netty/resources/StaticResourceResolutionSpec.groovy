@@ -59,7 +59,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test resources from the file system are returned"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/'+tempFile.getName()), String
         )).blockFirst()
 
@@ -75,7 +75,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test resources from the classpath are returned"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/index.html'), String
         )).blockFirst()
 
@@ -94,7 +94,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test index.html will be resolved"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/'), String
         )).blockFirst()
 
@@ -117,7 +117,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         File file = new File(tempSubDir, "nowexists.html")
         file.write("<html><head></head><body>HTML Page created after start</body></html>")
 
-        def response = rxClient.toBlocking().exchange(
+        def response = httpClient.toBlocking().exchange(
                 HttpRequest.GET('/nowexists.html'), String)
 
         then:

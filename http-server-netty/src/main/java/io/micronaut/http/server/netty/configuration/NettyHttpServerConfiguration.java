@@ -196,6 +196,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
+    private boolean legacyMultiplexHandlers = true; // TODO
 
     /**
      * Default empty constructor.
@@ -437,6 +438,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * The default compression threshold. Defaults to 1024.
+     * <p>
+     * A value {@code < 0} indicates compression should never be enabled.
      *
      * @return The compression threshold.
      */
@@ -726,6 +729,39 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    /**
+     * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
+     * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
+     * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
+     * handling and any {@link io.micronaut.http.server.netty.NettyServerCustomizer}s.
+     * <p>
+     * As of 4.4.0, this approach was replaced with a more performant HTTP/2-specific
+     * implementation. This means worse compatibility with HTTP/1.1-based code paths and
+     * customizers, however. Setting this option to {@code true} returns to the old behavior.
+     *
+     * @return Whether to enable the legacy multi-pipeline multiplex handlers for HTTP/2 connections
+     */
+    public boolean isLegacyMultiplexHandlers() {
+        return legacyMultiplexHandlers;
+    }
+
+    /**
+     * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
+     * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
+     * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
+     * handling and any {@link io.micronaut.http.server.netty.NettyServerCustomizer}s.
+     * <p>
+     * As of 4.4.0, this approach was replaced with a more performant HTTP/2-specific
+     * implementation. This means worse compatibility with HTTP/1.1-based code paths and
+     * customizers, however. Setting this option to {@code true} returns to the old behavior.
+     *
+     * @param legacyMultiplexHandlers  Whether to enable the legacy multi-pipeline multiplex
+     *                                 handlers for HTTP/2 connections
+     */
+    public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
+        this.legacyMultiplexHandlers = legacyMultiplexHandlers;
     }
 
     /**
@@ -1325,7 +1361,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private String path;
         private boolean exposeDefaultRoutes = true;
         private Integer fd = null;
+        private Integer acceptedFd = null;
         private boolean bind = true;
+        private boolean serverSocket = true;
 
         /**
          * Create a TCP listener configuration.
@@ -1485,6 +1523,44 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setBind(boolean bind) {
             this.bind = bind;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @return {@code true} iff a server socket should be created
+         */
+        public boolean isServerSocket() {
+            return serverSocket;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @param serverSocket {@code true} iff a server socket should be created
+         */
+        public void setServerSocket(boolean serverSocket) {
+            this.serverSocket = serverSocket;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @return The fd to register
+         */
+        public Integer getAcceptedFd() {
+            return acceptedFd;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @param acceptedFd The fd to register
+         */
+        public void setAcceptedFd(Integer acceptedFd) {
+            this.acceptedFd = acceptedFd;
         }
 
         /**

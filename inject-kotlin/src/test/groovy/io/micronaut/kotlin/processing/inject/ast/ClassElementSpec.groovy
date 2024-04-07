@@ -2589,6 +2589,28 @@ class TestNamed2 {
             returnType.getType() instanceof EnumElement
     }
 
+    void "test overridden accessor in properties"() {
+        def properties = buildClassElementMapped('test.EngineConfiguration', '''
+package test
+
+import io.micronaut.core.util.Toggleable
+
+class EngineConfiguration : Toggleable {
+
+    var enabled = true
+
+    val cylinders: Int? = null
+
+    override fun isEnabled(): Boolean {
+        return enabled
+    }
+}
+
+''', {ce -> ce.getBeanProperties()})
+        expect:
+            properties.size() == 2
+    }
+
     void "test inner class not failing"() {
         def field = buildClassElementMapped('test.TestNamed3', '''
 package test

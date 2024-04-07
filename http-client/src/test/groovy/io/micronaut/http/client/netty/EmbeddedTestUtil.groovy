@@ -43,6 +43,7 @@ class EmbeddedTestUtil {
 
         private void forwardNow(ByteBuf msg) {
             if (!dest.isOpen()) {
+                msg.release()
                 return
             }
             dest.writeOneInbound(msg)
@@ -51,6 +52,8 @@ class EmbeddedTestUtil {
 
         void register() {
             source.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
+                boolean flushing = false
+
                 @Override
                 void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
                     if (!(msg instanceof ByteBuf)) {
@@ -74,7 +77,11 @@ class EmbeddedTestUtil {
 
                 @Override
                 void flush(ChannelHandlerContext ctx_) throws Exception {
-                    if (sourceQueue != null) {
+                    if (flushing) {
+                        return // avoid reentrancy
+                    }
+                    flushing = true
+                    while (sourceQueue != null) {
                         ByteBuf packet = sourceQueue
                         sourceQueue = null
 
@@ -90,6 +97,15 @@ class EmbeddedTestUtil {
                         } else {
                             destQueue.add(packet)
                         }
+                    }
+                    flushing = false
+                }
+
+                @Override
+                void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                    if (sourceQueue != null) {
+                        sourceQueue.release()
+                        sourceQueue = null
                     }
                 }
             })

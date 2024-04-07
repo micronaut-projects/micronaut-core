@@ -1,0 +1,35 @@
+[
+  {
+    "name": "io.micronaut.http.hateoas.GenericResource",
+    "queryAllDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "queryAllDeclaredConstructors": true,
+    "methods": [
+      {
+        "name": "addProperty",
+        "parameterTypes": [
+          "java.lang.String",
+          "java.lang.Object"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "io.micronaut.http.hateoas.Resource",
+    "queryAllDeclaredMethods": true,
+    "methods": [
+      {
+        "name": "deserialize",
+        "parameterTypes": [
+          "io.micronaut.http.hateoas.GenericResource"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "io.micronaut.http.hateoas.JsonError",
+    "queryAllDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "queryAllDeclaredConstructors": true
+  }
+]

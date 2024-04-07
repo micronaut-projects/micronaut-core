@@ -49,7 +49,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final ElementAnnotationMetadata annotationMetadata;
+    private final PropertyElementAnnotationMetadata annotationMetadata;
 
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
@@ -73,6 +73,16 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.owningElement = owningElement;
         this.excluded = excluded;
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getReadAnnotationMetadata());
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
     }
 
     @Override

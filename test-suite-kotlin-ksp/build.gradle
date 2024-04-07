@@ -1,7 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-test-library"
-    id "org.jetbrains.kotlin.jvm"
-    id("com.google.devtools.ksp")
+    alias libs.plugins.managed.kotlin.jvm
+    alias libs.plugins.managed.ksp
 }
 
 micronautBuild {

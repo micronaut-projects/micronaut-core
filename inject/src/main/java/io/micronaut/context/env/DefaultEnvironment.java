@@ -453,7 +453,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         propertySources.addAll(this.propertySources.values());
-        OrderUtil.sort(propertySources);
+        OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             log.debug("Processing property source: {}", propertySource.getName());
             processPropertySource(propertySource, propertySource.getConvention());

@@ -81,7 +81,7 @@ public class FilterRunner {
      */
     public static void sort(@NonNull List<GenericHttpFilter> filters) {
         checkOrdered(filters);
-        OrderUtil.sort(filters);
+        OrderUtil.sortOrdered((List) filters); // All filters are implementing ordered
     }
 
     /**
@@ -92,7 +92,7 @@ public class FilterRunner {
      */
     public static void sortReverse(@NonNull List<GenericHttpFilter> filters) {
         checkOrdered(filters);
-        OrderUtil.reverseSort(filters);
+        OrderUtil.reverseSortOrdered((List) filters); // All filters are implementing ordered
     }
 
     /**

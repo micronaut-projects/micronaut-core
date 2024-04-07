@@ -20,7 +20,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
         HttpRequest<?> req = HttpRequest.create(HttpMethod.CUSTOM, uri, httpMethod)
-        Publisher<HttpResponse<?>> exchange = rxClient.exchange(req, String)
+        Publisher<HttpResponse<?>> exchange = httpClient.exchange(req, String)
         HttpResponse<?> response = Flux.from(exchange).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -74,7 +74,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
 
     void "test exploded with no default constructor"() {
         when:
-        Flux<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.create(HttpMethod.CUSTOM, "/parameter/exploded?title=The%20Stand", "REPORT"), String)
+        Flux<HttpResponse<String>> exchange = httpClient.exchange(HttpRequest.create(HttpMethod.CUSTOM, "/parameter/exploded?title=The%20Stand", "REPORT"), String)
         HttpResponse<String> response = exchange.blockFirst()
 
         then:

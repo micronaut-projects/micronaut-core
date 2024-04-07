@@ -17,6 +17,8 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 
@@ -26,7 +28,7 @@ import io.micronaut.core.type.ArgumentCoercible;
  * @param <T> The type of the bean
  * @since 4.0.0
  */
-public interface BeanInfo<T> extends AnnotationMetadataProvider, ArgumentCoercible<T> {
+public interface BeanInfo<T> extends AnnotationMetadataProvider, ArgumentCoercible<T>, Ordered {
     /**
      * @return The bean type
      */
@@ -44,5 +46,10 @@ public interface BeanInfo<T> extends AnnotationMetadataProvider, ArgumentCoercib
     @Override
     default Argument<T> asArgument() {
         return getGenericBeanType();
+    }
+
+    @Override
+    default int getOrder() {
+        return OrderUtil.getOrder(getAnnotationMetadata());
     }
 }

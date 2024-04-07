@@ -20,8 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -151,6 +153,13 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), "");
         // we do copy the weight and dependency id
     }
+
+    /**
+     * ONLY for NettyBodyAnnotationBinder use.
+     */
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
+    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
@@ -470,7 +479,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Override
     public boolean isServerPushSupported() {
         ChannelHandlerContext http2ConnectionHandlerContext = findConnectionHandler();
-        return http2ConnectionHandlerContext != null && ((Http2ConnectionHandler) http2ConnectionHandlerContext.handler()).connection().remote().allowPushTo();
+        return http2ConnectionHandlerContext != null &&
+            ((Http2ConnectionHandler) http2ConnectionHandlerContext.handler()).connection().remote().allowPushTo() &&
+            channelHandlerContext.channel() instanceof Http2StreamChannel;
     }
 
     @Override
@@ -481,6 +492,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
             if (!connectionHandler.connection().remote().allowPushTo()) {
                 throw new UnsupportedOperationException("Server push not supported by this client: Client is HTTP2 but does not report support for this feature");
+            }
+
+            if (!(channelHandlerContext.channel() instanceof Http2StreamChannel streamChannel)) {
+                throw new UnsupportedOperationException("Server push currently not supported by new HTTP2 server handler. Enable the micronaut.server.netty.legacy-multiplex-handlers property");
             }
 
             URI configuredUri = request.getUri();
@@ -529,7 +544,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 inboundRequest.headers()
             );
 
-            int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
+            int ourStream = streamChannel.stream().id();
             HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())

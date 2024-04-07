@@ -15,22 +15,12 @@
  */
 package io.micronaut.core.io.service;
 
-import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
-import io.micronaut.core.util.ArrayUtils;
-import org.graalvm.nativeimage.ImageSingletons;
-import org.graalvm.nativeimage.hosted.Feature;
-import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
-import org.graalvm.nativeimage.hosted.RuntimeReflection;
-
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -45,8 +35,11 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -66,53 +59,18 @@ final class ServiceLoaderFeature implements Feature {
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
         for (Set<String> typeNameSet : allTypeNames) {
             Iterator<String> i = typeNameSet.iterator();
-            serviceLoop: while (i.hasNext()) {
+            while (i.hasNext()) {
                 String typeName = i.next();
                 try {
                     final Class<?> c = access.findClassByName(typeName);
                     if (c != null) {
-                        if (GraalReflectionConfigurer.class.isAssignableFrom(c)) {
-                            continue;
-                        } else if (BeanInfo.class.isAssignableFrom(c)) {
-                            RuntimeClassInitialization.initializeAtBuildTime(c);
-                            BeanInfo<?> beanInfo;
-                            try {
-                                beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
-                            } catch (Exception e) {
-                                // not loadable at runtime either, remove it
-                                i.remove();
-                                continue;
-                            }
-                            Class<?> beanType = beanInfo.getBeanType();
-                            List<AnnotationValue<Annotation>> values = beanInfo.getAnnotationMetadata().getAnnotationValuesByName("io.micronaut.context.annotation.Requires");
-                            if (!values.isEmpty()) {
-                                for (AnnotationValue<Annotation> value : values) {
-                                    String[] classNames = new String[0];
-                                    if (value.contains("classes")) {
-                                        classNames = value.stringValues("classes");
-                                    }
-                                    if (value.contains("beans")) {
-                                        ArrayUtils.concat(classNames, value.stringValues("beans"));
-                                    }
-                                    if (value.contains("condition")) {
-                                        Object o = value.getValues().get("condition");
-                                        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
-                                            annotationClassValue.getType().ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
-                                        }
-                                    }
-                                    for (String className : classNames) {
-                                        if (access.findClassByName(className) == null) {
-                                            i.remove();
-                                            continue serviceLoop;
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
+                    } else {
+                        i.remove();
                     }
+
                 } catch (NoClassDefFoundError | InstantiationException e) {
                     i.remove();
                 }

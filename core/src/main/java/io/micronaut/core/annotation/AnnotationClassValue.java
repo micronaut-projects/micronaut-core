@@ -34,7 +34,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
     /**
      * An empty array of class values.
      */
-    public static final AnnotationClassValue<?>[] EMPTY_ARRAY = new AnnotationClassValue[0];
+    public static final AnnotationClassValue<?>[] ZERO_ANNOTATION_CLASS_VALUES = new AnnotationClassValue[0];
 
     final Class<T> theClass;
 

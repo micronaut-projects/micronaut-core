@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Command line parser that parses arguments to the command line. Written as a
  * replacement for Commons CLI because it doesn't support unknown arguments and
@@ -210,9 +212,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * An empty or null toProcess parameter results in a zero sized array.
      */
     static String[] translateCommandline(String toProcess) {
-        if (toProcess == null || toProcess.length() == 0) {
+        if (toProcess == null || toProcess.isEmpty()) {
             //no command? no string
-            return new String[0];
+            return EMPTY_STRING_ARRAY;
         }
         // parse with a simple finite state machine
 
@@ -250,7 +252,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
                     } else if ("\"".equals(nextTok)) {
                         state = inDoubleQuote;
                     } else if (" ".equals(nextTok)) {
-                        if (lastTokenHasBeenQuoted || current.length() != 0) {
+                        if (lastTokenHasBeenQuoted || !current.isEmpty()) {
                             result.add(current.toString());
                             current.setLength(0);
                         }
@@ -261,12 +263,12 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
                     break;
             }
         }
-        if (lastTokenHasBeenQuoted || current.length() != 0) {
+        if (lastTokenHasBeenQuoted || !current.isEmpty()) {
             result.add(current.toString());
         }
         if (state == inQuote || state == inDoubleQuote) {
             throw new ParseException("unbalanced quotes in " + toProcess);
         }
-        return result.toArray(new String[0]);
+        return result.toArray(EMPTY_STRING_ARRAY);
     }
 }

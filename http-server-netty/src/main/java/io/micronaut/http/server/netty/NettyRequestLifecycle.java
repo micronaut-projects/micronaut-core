@@ -26,7 +26,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
-import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
@@ -47,7 +47,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
-    private final PipeliningServerHandler.OutboundAccess outboundAccess;
+    private final OutboundAccess outboundAccess;
     private final boolean validateUrl;
 
     /**
@@ -56,7 +56,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     private NettyHttpRequest<?> nettyRequest;
 
-    NettyRequestLifecycle(RoutingInBoundHandler rib, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
         this.rib = rib;
         this.validateUrl = rib.serverConfiguration.isValidateUrl();

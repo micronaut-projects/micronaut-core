@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.publisher.DelayedSubscriber;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -42,6 +43,7 @@ import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
@@ -53,7 +55,7 @@ import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -119,6 +121,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
+    /**
+     * This is set to {@code true} if <i>any</i> {@link HttpPipelineBuilder} has a logging handler.
+     * When this is not set, we can do a shortcut for performance.
+     */
+    boolean supportLoggingHandler = false;
 
     /**
      * @param serverConfiguration          The Netty HTTP server configuration
@@ -194,7 +201,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
         if (serverConfiguration.isValidateUrl()) {
             try {
@@ -217,7 +224,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 return;
             }
         }
-        if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+        if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
             ctx.channel().attr(key).set(mnRequest);
@@ -228,7 +235,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,
+    public void writeResponse(OutboundAccess outboundAccess,
                               NettyHttpRequest<?> nettyHttpRequest,
                               HttpResponse<?> response,
                               Throwable throwable) {
@@ -286,7 +293,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @SuppressWarnings("unchecked")
     private void encodeHttpResponse(
-        PipeliningServerHandler.OutboundAccess outboundAccess,
+        OutboundAccess outboundAccess,
         NettyHttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse,
         Object body) {
@@ -362,7 +369,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         MediaType mediaType,
         Object body,
         NettyBodyWriter<Object> nettyMessageBodyWriter,
-        PipeliningServerHandler.OutboundAccess outboundAccess) {
+        OutboundAccess outboundAccess) {
         try {
             nettyMessageBodyWriter.writeTo(
                 nettyRequest,
@@ -429,7 +436,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         return httpContentPublisher;
     }
 
-    private void writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    private void writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request, OutboundAccess outboundAccess) {
         // default Connection header if not set explicitly
         closeConnectionIfError(message, request, outboundAccess);
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
@@ -445,7 +452,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void writeFinalFullNettyResponse(MutableHttpResponse<?> message,
                                              NettyHttpRequest<?> request,
-                                             PipeliningServerHandler.OutboundAccess outboundAccess,
+                                             OutboundAccess outboundAccess,
                                              ByteBuf byteBuf) {
         // default Connection header if not set explicitly
         closeConnectionIfError(message, request, outboundAccess);
@@ -463,12 +470,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private void writeStreamedWithErrorHandling(NettyHttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess, StreamedHttpResponse streamed) {
+    private void writeStreamedWithErrorHandling(NettyHttpRequest<?> request, OutboundAccess outboundAccess, StreamedHttpResponse streamed) {
         LazySendingSubscriber sub = new LazySendingSubscriber(request, streamed, outboundAccess);
         streamed.subscribe(sub);
     }
 
-    private void closeConnectionIfError(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    private void closeConnectionIfError(MutableHttpResponse<?> message, HttpRequest<?> request, OutboundAccess outboundAccess) {
         boolean decodeError = request instanceof NettyHttpRequest<?> nettyRequest &&
             nettyRequest.getNativeRequest().decoderResult().isFailure();
 
@@ -556,7 +563,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             ByteBuf buffer = (ByteBuf) byteBuffer.asNativeBuffer();
             writeFinalFullNettyResponse(outgoingResponse,
                 (NettyHttpRequest<?>) request,
-                (PipeliningServerHandler.OutboundAccess) nettyContext,
+                (OutboundAccess) nettyContext,
                 buffer);
         }
 
@@ -576,25 +583,30 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * appear as the first item.
      */
     private final class LazySendingSubscriber implements Processor<HttpContent, HttpContent> {
+        private static final Object COMPLETE = new Object();
+
         boolean headersSent = false;
         Subscription upstream;
-        Subscriber<? super HttpContent> downstream;
+        final DelayedSubscriber<HttpContent> downstream = new DelayedSubscriber<>();
         @Nullable
         HttpContent first;
+        Object completion = null; // in case first hasn't been consumed we need to delay completion
 
+        private final EventLoopFlow flow;
         private final NettyHttpRequest<?> request;
         private final io.netty.handler.codec.http.HttpResponse headers;
-        private final PipeliningServerHandler.OutboundAccess outboundAccess;
+        private final OutboundAccess outboundAccess;
 
-        private LazySendingSubscriber(NettyHttpRequest<?> request, io.netty.handler.codec.http.HttpResponse headers, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        private LazySendingSubscriber(NettyHttpRequest<?> request, io.netty.handler.codec.http.HttpResponse headers, OutboundAccess outboundAccess) {
             this.request = request;
             this.headers = headers;
             this.outboundAccess = outboundAccess;
+            this.flow = new EventLoopFlow(request.getChannelHandlerContext().channel().eventLoop());
         }
 
         @Override
         public void subscribe(Subscriber<? super HttpContent> s) {
-            s.onSubscribe(new Subscription() {
+            downstream.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
                     HttpContent first = LazySendingSubscriber.this.first;
@@ -602,6 +614,14 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         LazySendingSubscriber.this.first = null;
                         // onNext may trigger further request calls
                         s.onNext(first);
+                        if (completion != null) {
+                            if (completion == COMPLETE) {
+                                s.onComplete();
+                            } else {
+                                s.onError((Throwable) completion);
+                            }
+                            return;
+                        }
                         if (n != Long.MAX_VALUE) {
                             n--;
                             if (n == 0) {
@@ -621,7 +641,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     upstream.cancel();
                 }
             });
-            downstream = s;
+            downstream.subscribe(s);
         }
 
         @Override
@@ -632,6 +652,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onNext(HttpContent httpContent) {
+            if (flow.executeNow(() -> onNext0(httpContent))) {
+                onNext0(httpContent);
+            }
+        }
+
+        private void onNext0(HttpContent httpContent) {
             if (headersSent) {
                 downstream.onNext(httpContent);
             } else {
@@ -643,9 +669,19 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onError(Throwable t) {
+            if (flow.executeNow(() -> onError0(t))) {
+                onError0(t);
+            }
+        }
+
+        private void onError0(Throwable t) {
             if (headersSent) {
                 // nothing we can do
-                downstream.onError(t);
+                if (first != null) {
+                    completion = t;
+                } else {
+                    downstream.onError(t);
+                }
             } else {
                 // limited error handling
                 MutableHttpResponse<?> response;
@@ -670,8 +706,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void onComplete() {
+            if (flow.executeNow(this::onComplete0)) {
+                onComplete0();
+            }
+        }
+
+        private void onComplete0() {
             if (headersSent) {
-                downstream.onComplete();
+                if (first != null) {
+                    completion = COMPLETE;
+                } else {
+                    downstream.onComplete();
+                }
             } else {
                 headersSent = true;
                 outboundAccess.writeStreamed(headers, Flux.empty());

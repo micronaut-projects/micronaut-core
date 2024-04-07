@@ -1,9 +1,9 @@
 [versions]
-asm = "9.6"
-awaitility = "4.2.0"
+asm = "9.7"
+awaitility = "4.2.1"
 bcpkix = "1.70"
 blaze = "1.6.11"
-brotli4j = "1.15.0"
+brotli4j = "1.16.0"
 caffeine = "2.9.3"
 compile-testing = "0.21.0"
 
@@ -30,52 +30,52 @@ jakarta-el = "5.0.1"
 jakarta-el-impl = "5.0.0-M1"
 jazzer = "0.22.1"
 jcache = "1.1.1"
-junit5 = "5.9.3"
-junit-platform="1.9.3"
-logback = "1.4.14"
+junit5 = "5.10.2"
+junit-platform="1.10.2"
+logback = "1.5.3"
 logbook-netty = "2.16.0"
 log4j = "2.22.1"
-micronaut-aws = "4.4.1"
-micronaut-groovy = "4.1.0"
-micronaut-session = "4.1.0"
+micronaut-aws = "4.4.3"
+micronaut-groovy = "4.2.0"
+micronaut-session = "4.2.0"
 micronaut-sql = "5.3.0"
 micronaut-test = "4.1.1"
-micronaut-validation = "4.2.0"
-micronaut-rxjava2 = "2.2.1"
-micronaut-rxjava3 = "3.2.0"
-micronaut-reactor = "3.2.1"
-neo4j-java-driver = "5.15.0"
+micronaut-validation = "4.4.4"
+micronaut-rxjava2 = "2.3.0"
+micronaut-rxjava3 = "3.2.1"
+micronaut-reactor = "3.3.0"
+neo4j-java-driver = "5.17.0"
 selenium = "4.9.1"
-slf4j = "2.0.11"
+slf4j = "2.0.12"
 smallrye = "6.2.6"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.19.4"
-vertx = "3.9.16"
+testcontainers = "1.19.7"
+vertx = "4.5.7"
 wiremock = "2.33.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.18"
+managed-groovy = "4.0.20"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.16.1"
-managed-jackson-databind = "2.16.1"
-managed-kotlin = "1.9.22"
+managed-jackson-databind = "2.17.0"
+managed-kotlin = "1.9.23"
 managed-kotlin-coroutines = "1.7.3"
 managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.106.Final"
-managed-netty-iouring = "0.0.24.Final"
-managed-netty-http3 = "0.0.24.Final"
-managed-netty-tcnative = "2.0.62.Final"
+managed-netty = "4.1.108.Final"
+managed-netty-iouring = "0.0.25.Final"
+managed-netty-http3 = "0.0.28.Final"
+managed-netty-tcnative = "2.0.65.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.5.11"
 managed-snakeyaml = "2.2"
-managed-java-parser-core = "3.25.8"
-managed-ksp = "1.9.22-1.0.17"
+managed-java-parser-core = "3.25.10"
+managed-ksp = "1.9.23-1.0.20"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -273,3 +273,10 @@ wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wir
 
 [bundles]
 asm = ["asm", "asm-commons"]
+
+[plugins]
+managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
+managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "managed-kotlin" }
+managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
+managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
+managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }

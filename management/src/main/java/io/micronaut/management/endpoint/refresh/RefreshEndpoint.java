@@ -25,6 +25,8 @@ import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import java.util.Map;
 import java.util.Set;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * <p>Exposes an {@link Endpoint} to refresh application state via a {@link RefreshEvent}.</p>
  *
@@ -60,14 +62,14 @@ public class RefreshEndpoint {
 
         if (force != null && force) {
             eventPublisher.publishEvent(new RefreshEvent());
-            return new String[0];
+            return EMPTY_STRING_ARRAY;
         } else {
             Map<String, Object> changes = environment.refreshAndDiff();
             if (!changes.isEmpty()) {
                 eventPublisher.publishEvent(new RefreshEvent(changes));
             }
             Set<String> keys = changes.keySet();
-            return keys.toArray(new String[0]);
+            return keys.toArray(EMPTY_STRING_ARRAY);
         }
     }
 }

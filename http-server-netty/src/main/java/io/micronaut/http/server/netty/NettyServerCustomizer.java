@@ -116,6 +116,7 @@ public interface NettyServerCustomizer {
         /**
          * The channel is a channel representing an individual HTTP2 stream.
          */
+        // todo: deprecate
         REQUEST_STREAM,
         /**
          * The channel is a channel representing an individual HTTP2 stream, created for a push promise.

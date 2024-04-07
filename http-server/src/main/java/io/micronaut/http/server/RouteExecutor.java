@@ -692,6 +692,7 @@ public final class RouteExecutor {
                     return CompletableFuture.completedStage(newNotFoundError(request));
                 }
             }
+            boolean explicitResponse = false;
             if (asyncBody instanceof HttpResponse<?> httpResponse) {
                 mutableResponse = httpResponse.toMutableResponse();
                 final Argument<?> bodyArgument = routeInfo.getReturnType() // CompletionStage
@@ -706,6 +707,7 @@ public final class RouteExecutor {
                         return mutableResponse.body(innerBody);
                     });
                 }
+                explicitResponse = true;
             } else if (asyncBody instanceof HttpStatus status) {
                 mutableResponse = forStatus(routeInfo, status);
             } else {
@@ -713,7 +715,7 @@ public final class RouteExecutor {
                     .body(asyncBody);
             }
             if (mutableResponse.body() == null) {
-                if (routeInfo.isVoid()) {
+                if (routeInfo.isVoid() || explicitResponse) {
                     return CompletableFuture.completedStage(voidResponse(routeInfo));
                 }
                 return CompletableFuture.completedStage(newNotFoundError(request));

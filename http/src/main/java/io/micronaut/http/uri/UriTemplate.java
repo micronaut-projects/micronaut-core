@@ -34,6 +34,8 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
+
 /**
  * <p>A Fast Implementation of URI Template specification. See <a href="https://tools.ietf.org/html/rfc6570">rfc6570</a> and
  * <a href="https://medialize.github.io/URI.js/uri-template.html">URI.js</a>.</p>
@@ -82,7 +84,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @param templateString The template string
      */
     public UriTemplate(CharSequence templateString) {
-        this(templateString, new Object[0]);
+        this(templateString, EMPTY_OBJECT_ARRAY);
     }
 
     /**
@@ -197,7 +199,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The new URI template
      */
     public UriTemplate nest(CharSequence uriTemplate) {
-        return nest(uriTemplate, new Object[0]);
+        return nest(uriTemplate, EMPTY_OBJECT_ARRAY);
     }
 
     /**

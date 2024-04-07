@@ -52,17 +52,14 @@ class ReadTimeoutSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             "micronaut.http.client.readTimeout": '3s',
             'spec.name': 'ReadTimeoutSpec'
-    )
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+            ])
 
     @Shared
     @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
 
     void "test read timeout setting"() {
@@ -321,12 +318,10 @@ class ReadTimeoutSpec extends Specification {
 
     void "test disable read timeout"() {
         given:
-
-        ApplicationContext clientContext = ApplicationContext.run([
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name'                         : 'ReadTimeoutSpec',
                 'micronaut.http.client.read-timeout': '-1s'])
-        def server = clientContext.getBean(EmbeddedServer).start()
-        HttpClient client = clientContext.createBean(HttpClient, server.getURL())
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
         when:
         def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/client'), String)
 
@@ -335,7 +330,7 @@ class ReadTimeoutSpec extends Specification {
 
         cleanup:
         client.close()
-        clientContext.close()
+        server.close()
     }
 
     @Requires(property = 'spec.name', value = 'ReadTimeoutSpec')

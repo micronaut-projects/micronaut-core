@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -320,7 +321,14 @@ public class CorsSimpleRequestTest {
     }
 
     private RequestSupplier createRequestFor(String host, String origin) {
-        return server -> createRequest(server.getPort().map(p -> "http://" + host + ":" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), origin);
+        return server -> {
+            Optional<Integer> port = server.getPort();
+            Optional<String> scheme = server.getScheme();
+            if (port.isEmpty() || scheme.isEmpty()) {
+                throw new RuntimeException("Unknown port or scheme for " + server);
+            }
+            return createRequest(scheme.get() + "://" + host + ":" + port.get() + "/refresh", origin);
+        };
     }
 
     static void isForbidden(ServerUnderTest server, HttpRequest<?> request) {

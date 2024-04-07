@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -74,6 +75,7 @@ public class SslConfiguration implements Toggleable {
     private String[] protocols;
     private String protocol = DEFAULT_PROTOCOL;
     private Duration handshakeTimeout = Duration.ofSeconds(10);
+    private boolean preferOpenssl = true;
 
     /**
      * @return Whether SSL is enabled.
@@ -265,6 +267,28 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * Whether an OpenSSL-backed TLS implementation should be preferred if it's on the classpath.
+     * {@code true} by default.
+     *
+     * @return Whether OpenSSL should be preferred
+     */
+    @Experimental
+    public boolean isPreferOpenssl() {
+        return preferOpenssl;
+    }
+
+    /**
+     * Whether an OpenSSL-backed TLS implementation should be preferred if it's on the classpath.
+     * {@code true} by default.
+     *
+     * @param preferOpenssl Whether OpenSSL should be preferred
+     */
+    @Experimental
+    public void setPreferOpenssl(boolean preferOpenssl) {
+        this.preferOpenssl = preferOpenssl;
+    }
+
+    /**
      * Reads an existing config.
      *
      * @param defaultSslConfiguration The default SSL config
@@ -295,6 +319,7 @@ public class SslConfiguration implements Toggleable {
             defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
             defaultSslConfiguration.getClientAuthentication().ifPresent(ca -> this.clientAuthentication = ca);
             this.handshakeTimeout = defaultSslConfiguration.getHandshakeTimeout();
+            this.preferOpenssl = defaultSslConfiguration.isPreferOpenssl();
         }
     }
 

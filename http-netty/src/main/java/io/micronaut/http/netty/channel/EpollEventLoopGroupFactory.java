@@ -26,6 +26,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollDatagramChannel;
+import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerDomainSocketChannel;
 import io.netty.channel.epoll.EpollServerSocketChannel;
@@ -35,6 +36,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -51,6 +54,7 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 @Order(100)
 public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
+    private static final Logger LOG = LoggerFactory.getLogger(EpollEventLoopGroupFactory.class);
 
     /**
      * Creates an EpollEventLoopGroup.
@@ -133,6 +137,7 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> EpollServerSocketChannel.class;
             case CLIENT_SOCKET -> EpollSocketChannel.class;
+            case DOMAIN_SOCKET -> EpollDomainSocketChannel.class;
             case DOMAIN_SERVER_SOCKET -> EpollServerDomainSocketChannel.class;
             case DATAGRAM_SOCKET -> EpollDatagramChannel.class;
         };
@@ -148,17 +153,22 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> new EpollServerSocketChannel();
             case CLIENT_SOCKET -> new EpollSocketChannel();
+            case DOMAIN_SOCKET -> new EpollDomainSocketChannel();
             case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel();
             case DATAGRAM_SOCKET -> new EpollDatagramChannel();
         };
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, int fd) {
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+        if (parent != null) {
+            LOG.warn("epoll does not support FD-based channels with a parent channel. This may cause issues with HTTP2.");
+        }
         return switch (type) {
             case SERVER_SOCKET -> new EpollServerSocketChannel(fd);
             case CLIENT_SOCKET -> new EpollSocketChannel(fd);
-            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel(fd);
+            case DOMAIN_SOCKET -> new EpollDomainSocketChannel(fd);
+            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel(fd, true);
             case DATAGRAM_SOCKET -> new EpollDatagramChannel(fd);
         };
     }

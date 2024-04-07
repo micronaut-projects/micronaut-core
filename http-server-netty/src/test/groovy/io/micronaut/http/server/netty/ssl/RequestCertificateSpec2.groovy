@@ -146,6 +146,7 @@ class RequestCertificateSpec2 extends Specification {
                 'micronaut.ssl.trust-store.path'      : 'file://' + trustStorePath.toString(),
                 'micronaut.ssl.trust-store.type'      : 'JKS',
                 'micronaut.ssl.trust-store.password'  : '123456',
+                'micronaut.ssl.prefer-openssl'        : false, // openssl impl just closes the connection, different error
         ])
 
         def server = ctx.getBean(EmbeddedServer)
@@ -165,7 +166,7 @@ class RequestCertificateSpec2 extends Specification {
         def response = future.get()
         then:
         def e = thrown ExecutionException
-        e.cause instanceof SSLHandshakeException
+        e.cause instanceof SSLHandshakeException || e.cause.cause instanceof SSLHandshakeException
 
         cleanup:
         vertx.close()

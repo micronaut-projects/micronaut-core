@@ -50,6 +50,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
  * {@link io.micronaut.core.beans.BeanIntrospectionReference} instances at compilation time.
@@ -88,6 +90,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
+        boolean ignoreSettersWithDifferingType = introspected.booleanValue("ignoreSettersWithDifferingType").orElse(true);
         final String[] packages = introspected.stringValues("packages");
         final List<String> classes = Stream.concat(
             Arrays.stream(introspected.annotationClassValues("classes")).map(AnnotationClassValue::getName),
@@ -119,7 +122,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 processElement(
                     metadata,
                     indexedAnnotations,
-                    getExternalPropertyElementQuery(element, ce),
+                    getExternalPropertyElementQuery(element, ce, ignoreSettersWithDifferingType),
                     ce,
                     writer
                 );
@@ -129,7 +132,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
             } else {
                 for (String aPackage : packages) {
-                    ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
+                    ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(EMPTY_STRING_ARRAY));
                     int j = 0;
                     for (ClassElement classElement : elements) {
                         if (classElement.isAbstract() || !classElement.isPublic() || isIntrospected(context, classElement)) {
@@ -150,7 +153,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
                         processElement(metadata,
                             indexedAnnotations,
-                            getExternalPropertyElementQuery(element, classElement),
+                            getExternalPropertyElementQuery(element, classElement, ignoreSettersWithDifferingType),
                             classElement,
                             writer);
                     }
@@ -164,7 +167,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 metadata ? element.getAnnotationMetadata() : null,
                 context
             );
-            processElement(metadata, indexedAnnotations, element, writer);
+            processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType);
         }
     }
 
@@ -237,9 +240,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     @NonNull
-    private static PropertyElementQuery getExternalPropertyElementQuery(ClassElement defined, ClassElement current) {
+    private static PropertyElementQuery getExternalPropertyElementQuery(ClassElement defined,
+                                                                        ClassElement current,
+                                                                        boolean ignoreSettersWithDifferingType) {
         AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(defined, current);
-        return PropertyElementQuery.of(hierarchy).ignoreSettersWithDifferingType(true);
+        return PropertyElementQuery.of(hierarchy).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType);
     }
 
     @NonNull
@@ -268,11 +273,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private void processElement(boolean metadata,
                                 Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 ClassElement ce,
-                                BeanIntrospectionWriter writer) {
+                                BeanIntrospectionWriter writer,
+                                boolean ignoreSettersWithDifferingType) {
 
         processElement(metadata,
             indexedAnnotations,
-            PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(true),
+            PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType),
             ce,
             writer
         );
@@ -385,23 +391,20 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
             AnnotationMetadata annotationMetadata;
             if (metadata) {
-                annotationMetadata = beanProperty.getTargetAnnotationMetadata();
-                if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
-                    annotationMetadata = hierarchy.merge();
-                }
+                annotationMetadata = mergeAnnotations(beanProperty);
             } else {
                 annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
             }
 
             writer.visitProperty(
-                beanProperty.getType(),
-                beanProperty.getGenericType(),
+                beanProperty.getType().withAnnotationMetadata(annotationMetadata),
+                beanProperty.getGenericType().withAnnotationMetadata(annotationMetadata),
                 beanProperty.getName(),
                 beanProperty.getReadMember().orElse(null),
                 beanProperty.getWriteMember().orElse(null),
-                beanProperty.isReadOnly(),
-                annotationMetadata,
-                beanProperty.getGenericType().getTypeArguments()
+                beanProperty.getReadType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
+                beanProperty.getWriteType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
+                beanProperty.isReadOnly()
             );
 
             for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
@@ -421,6 +424,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
 
         addExecutableMethods(ce, writer, beanProperties);
+    }
+
+    private AnnotationMetadata mergeAnnotations(AnnotationMetadata annotationMetadata) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+            return hierarchy.merge();
+        }
+        return annotationMetadata;
     }
 
     private void addExecutableMethods(ClassElement ce, BeanIntrospectionWriter writer, List<PropertyElement> beanProperties) {

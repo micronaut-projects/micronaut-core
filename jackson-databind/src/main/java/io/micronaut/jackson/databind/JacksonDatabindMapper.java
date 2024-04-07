@@ -72,6 +72,9 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectReader specializedReader;
     private final ObjectWriter specializedWriter;
 
+    private TypeCache<ObjectReader> cachedReader;
+    private TypeCache<ObjectWriter> cachedWriter;
+
     @Inject
     @Internal
     public JacksonDatabindMapper(ObjectMapper objectMapper) {
@@ -118,12 +121,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedReader != null) {
             return specializedReader;
         }
+        TypeCache<ObjectReader> cachedReader = this.cachedReader;
+        if (cachedReader != null && cachedReader.type == type) {
+            return cachedReader.cachedValue;
+        }
         ObjectReader reader = objectMapper.readerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
         @SuppressWarnings("rawtypes")
         Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
         if (view.isPresent()) {
             reader = reader.withView(view.get());
         }
+        this.cachedReader = new TypeCache<>(type, reader);
         return reader;
     }
 
@@ -131,12 +139,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedWriter != null) {
             return specializedWriter;
         }
+        TypeCache<ObjectWriter> cachedWriter = this.cachedWriter;
+        if (cachedWriter != null && cachedWriter.type == type) {
+            return cachedWriter.cachedValue;
+        }
         ObjectWriter writer = objectMapper.writerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
         @SuppressWarnings("rawtypes")
         Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
         if (view.isPresent()) {
             writer = writer.withView(view.get());
         }
+        this.cachedWriter = new TypeCache<>(type, writer);
         return writer;
     }
 
@@ -266,5 +279,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         JsonParser parser = treeCodec.treeAsTokens(tree);
         parser.setCodec(objectMapper);
         return parser;
+    }
+
+    private record TypeCache<T>(Argument<?> type, T cachedValue) {
     }
 }

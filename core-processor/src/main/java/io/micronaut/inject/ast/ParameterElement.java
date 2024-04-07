@@ -37,6 +37,13 @@ import java.util.function.Predicate;
 public interface ParameterElement extends TypedElement {
 
     /**
+     * Constant for an empty parameter element array.
+     *
+     * @since 4.4.0
+     */
+    ParameterElement[] ZERO_PARAMETER_ELEMENTS = new ParameterElement[0];
+
+    /**
      * @return The type of the parameter
      */
     @Override
