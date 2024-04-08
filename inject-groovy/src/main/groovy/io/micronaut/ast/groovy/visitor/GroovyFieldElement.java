@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.expr.ConstantExpression;
 
 import java.lang.reflect.Modifier;
 import java.util.Map;
@@ -147,6 +148,15 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public boolean isPackagePrivate() {
         return !Modifier.isPublic(fieldNode.getModifiers()) && !Modifier.isProtected(fieldNode.getModifiers()) && !Modifier.isPrivate(fieldNode.getModifiers());
+    }
+
+    @Override
+    public Object getConstantValue() {
+        if (fieldNode.hasInitialExpression()
+                && fieldNode.getInitialValueExpression() instanceof ConstantExpression constExpression) {
+            return constExpression.getValue();
+        }
+        return null;
     }
 
     @NonNull
