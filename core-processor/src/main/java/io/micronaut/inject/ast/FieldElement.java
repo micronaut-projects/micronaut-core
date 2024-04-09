@@ -44,7 +44,7 @@ public interface FieldElement extends TypedElement, MemberElement {
      * field initialized to a compile-time constant, or {@code null}
      * otherwise
      *
-     * @since 4.4.2
+     * @since 4.5.0
      */
     default Object getConstantValue() {
         return null;
