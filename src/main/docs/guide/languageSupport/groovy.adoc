@@ -163,48 +163,6 @@ The above example results in the following routes:
 * `/book/{id}` - Maps to `BookController.show(String id)`
 * `/book/{id}/author` - Maps to `AuthorController.index`
 
-== Using GORM in a Groovy application
-
-https://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails. It supports multiple database types. The following table summarizes the modules needed to use GORM, and links to documentation.
-
-.GORM Modules
-|===
-|Dependency|Description
-
-|`io.micronaut.groovy:micronaut-hibernate-gorm`
-|Configures https://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications. See the <<hibernateSupport, Hibernate Support>> docs
-
-|`io.micronaut.groovy:micronaut-mongo-gorm`
-|Configures https://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications. See the <<mongoSupport, Mongo Support>> docs.
-
-|`io.micronaut.groovy:micronaut-neo4j-gorm`
-|Configures https://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications. See the <<neo4jSupport, Neo4j Support>> docs.
-
-|===
-
-Once you have configured a GORM implementation per the instructions linked in the table above you can use all features of GORM.
-
-https://gorm.grails.org/latest/hibernate/manual/index.html#dataServices[GORM Data Services] can also participate in dependency injection and life cycle methods:
-
-[source,groovy]
-.GORM Data Service VehicleService.groovy
-----
-@Service(Vehicle)
-abstract class VehicleService {
-    @PostConstruct
-    void init() {
-       // do something on initialization
-    }
-
-    abstract Vehicle findVehicle(@NotBlank String name)
-
-    abstract Vehicle saveVehicle(@NotBlank String name)
-}
-
-----
-
-You can also define the service as an interface instead of an abstract class to have GORM implement the methods for you.
-
 == Serverless Functions with Groovy
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.

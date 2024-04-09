@@ -16,20 +16,11 @@ This table summarizes the configuration modules and dependencies to add to your 
 |`io.micronaut.sql:micronaut-hibernate-jpa`
 |Configures Hibernate/JPA `EntityManagerFactory` beans
 
-|`io.micronaut.groovy:micronaut-hibernate-gorm`
-|Configures https://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications
-
 |`io.micronaut.mongodb:micronaut-mongo-reactive`
 |Configures the https://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver]
 
-|`io.micronaut.groovy:micronaut-mongo-gorm`
-|Configures https://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications
-
 |`io.micronaut.neo4j:micronaut-neo4j-bolt`
 |Configures the https://github.com/neo4j/neo4j-java-driver[Bolt Java Driver] for https://neo4j.com[Neo4j]
-
-|`io.micronaut.groovy:micronaut-neo4j-gorm`
-|Configures https://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications
 
 |`io.micronaut.sql:micronaut-vertx-mysql-client`
 |Configures the https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-mysql-client[Reactive MySQL Client]
@@ -52,9 +43,5 @@ For example, to add support for MongoDB, add the following dependency:
 ----
 compile "io.micronaut.mongodb:micronaut-mongo-reactive"
 ----
-
-For Groovy users, the Micronaut framework provides special support for https://gorm.grails.org[GORM].
-
-WARNING: With GORM for Hibernate you cannot have both the `hibernate-jpa` and `hibernate-gorm` dependencies.
 
 The following sections go into more detail about configuration options and the exposed beans for each implementation.
