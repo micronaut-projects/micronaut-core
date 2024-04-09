@@ -75,8 +75,16 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
+        final Argument<T> finalType;
+        if (type.isPrimitive()) {
+            Class<?> wrapperType = type.getWrapperType();
+            finalType = (Argument<T>) Argument.of(wrapperType, type.getAnnotationMetadata());
+        } else {
+            finalType = type;
+        }
+
         Collection<BeanDefinition<MessageBodyReader>> beanDefinitions = beanLocator.getBeanDefinitions(
-            Argument.of(MessageBodyReader.class, type),
+            Argument.of(MessageBodyReader.class, finalType),
             newMediaTypeQualifier(Argument.of(MessageBodyReader.class), mediaTypes, Consumes.class)
         );
         if (beanDefinitions.size() == 1) {
@@ -88,7 +96,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                     if (typeArguments.isEmpty()) {
                         return false;
                     } else {
-                        return type.equalsType(typeArguments.get(0));
+                        return finalType.equalsType(typeArguments.get(0));
                     }
                 }).toList();
             if (exactMatch.size() == 1) {
