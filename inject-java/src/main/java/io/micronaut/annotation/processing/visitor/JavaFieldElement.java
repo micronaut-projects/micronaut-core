@@ -86,6 +86,11 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
+    @Override
+    public Object getConstantValue() {
+        return variableElement.getConstantValue();
+    }
+
     @NonNull
     @Override
     public ClassElement getType() {
