@@ -51,7 +51,7 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
-public class NettyConverters implements TypeConverterRegistrar {
+public final class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;

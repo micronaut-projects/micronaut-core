@@ -1,8 +1,8 @@
 package io.micronaut.http.body
 
 import io.micronaut.context.annotation.Property
-import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.TypeConverterRegistrar
 import io.micronaut.core.type.Argument
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -10,7 +10,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.server.netty.converters.NettyConverters
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -27,11 +26,10 @@ class MessageBodyReaderForPrimitivesSpec extends Specification {
     @Inject MessageBodyHandlerRegistry messageBodyHandlerRegistry
     @Inject TestClient client
 
-    @Prototype
-    @MockBean(NettyConverters)
-    NettyConverters nettyConverters() {
+    @MockBean(bean = TypeConverterRegistrar, named = "NettyConverters")
+    TypeConverterRegistrar nettyConverters() {
         // block loading the Netty converters, which is analogous to http-server-netty not being loaded
-        Mock(NettyConverters.class)
+        Mock(TypeConverterRegistrar.class)
     }
 
     def 'test boolean output'() {
