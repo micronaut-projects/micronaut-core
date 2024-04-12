@@ -16,7 +16,11 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -253,6 +257,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     public static final class ConnectionHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<ConnectionHandler, ConnectionHandlerBuilder> {
         private final Http2ServerHandler frameListener;
+        private Http2AccessLogManager.Factory accessLogManagerFactory;
+        private Http2AccessLogManager accessLogManager;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
@@ -273,6 +279,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return super.initialSettings(settings);
         }
 
+        public ConnectionHandlerBuilder accessLogManagerFactory(@Nullable Http2AccessLogManager.Factory accessLogManagerFactory) {
+            this.accessLogManagerFactory = accessLogManagerFactory;
+            return this;
+        }
+
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
             if (compressionStrategy.isEnabled()) {
                 frameListener.compressor(new Compressor(compressionStrategy));
@@ -283,12 +294,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            frameListener(new DelegatingDecompressorFrameListener(connection(), frameListener, false));
+            Http2FrameListener fl = new DelegatingDecompressorFrameListener(connection(), frameListener, false);
+            if (accessLogManagerFactory != null) {
+                accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
+                fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+            }
+            frameListener(fl);
             return super.build();
         }
 
         @Override
         protected ConnectionHandler build(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings) throws Exception {
+            if (accessLogManager != null) {
+                encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
+            }
             ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener);
             frameListener.init(ch);
             return ch;
