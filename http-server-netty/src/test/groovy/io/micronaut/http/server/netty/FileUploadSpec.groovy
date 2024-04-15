@@ -2,9 +2,11 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Part
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
@@ -34,6 +36,26 @@ class FileUploadSpec extends Specification {
         server.stop()
     }
 
+    def 'wrong content type'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'FileUploadSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+
+        when:
+        def response = client.retrieve(HttpRequest.POST(
+                '/multipart/deserialize',
+                MultipartBody.builder().addPart('metadata', 'metadata', MediaType.APPLICATION_OCTET_STREAM_TYPE, '{"foo":"bar"}'.bytes).build())
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)
+        then:
+        response == 'Metadata: null'
+
+        cleanup:
+        client.close()
+        server.stop()
+    }
+
     @Controller('/multipart')
     @Requires(property = 'spec.name', value = 'FileUploadSpec')
     @Produces(MediaType.TEXT_PLAIN)
@@ -43,5 +65,12 @@ class FileUploadSpec extends Specification {
             def bytes = data.inputStream.bytes
             return "Uploaded ${bytes.length} bytes"
         }
+
+        @Post(value = '/deserialize', consumes = MediaType.MULTIPART_FORM_DATA)
+        String completeFileUpload(@Nullable @Part("metadata") Metadata metadata) {
+            return "Metadata: " + metadata
+        }
     }
+
+    record Metadata(@Nullable String foo) {}
 }
