@@ -96,7 +96,13 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
 
             @Override
             public Optional<T> getValue() {
-                return completableFuture.getNow(Optional.empty());
+                Optional<T> res = completableFuture.getNow(Optional.empty());
+                //noinspection OptionalAssignedToNull
+                if (res == null) {
+                    // tricky: If the Mono completes without an element, the future will return null here.
+                    res = Optional.empty();
+                }
+                return res;
             }
         };
     }
