@@ -8,7 +8,6 @@ caffeine = "2.9.3"
 compile-testing = "0.21.0"
 
 geb = "7.0"
-gorm = "7.3.4"
 # be sure to update graal version in gradle.properties as well
 graal-svm = "23.1.2"
 h2 = "2.2.224"
@@ -110,6 +109,8 @@ managed-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", ver
 managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson-databind" }
 managed-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "managed-jackson" }
 managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "managed-jackson" }
+managed-jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "managed-jackson" }
+managed-jackson-dataformat-xml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-xml", version.ref = "managed-jackson" }
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
@@ -175,7 +176,6 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-gorm = { module = "org.grails:grails-datastore-core", version.ref = "gorm" }
 graal = { module = "org.graalvm.nativeimage:svm", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
