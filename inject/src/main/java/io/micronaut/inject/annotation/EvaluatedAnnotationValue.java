@@ -18,11 +18,15 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpression;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * An EvaluatedAnnotationValue is a {@link AnnotationValue} that contains one or more expressions.
@@ -54,6 +58,29 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
         );
         this.evaluationContext = evaluationContext;
         this.annotationValue = annotationValue;
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+        return super.getAnnotations(member, type).stream().map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext)).collect(Collectors.toList());
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+        return super.<T>getAnnotations(member)
+            .stream()
+            .map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext))
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+        return super.getAnnotation(member, type).map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext));
+    }
+
+    @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+        return super.<T>getAnnotation(member).map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext));
     }
 
     /**
