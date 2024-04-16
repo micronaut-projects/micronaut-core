@@ -243,7 +243,7 @@ class StubIntroduction implements Interceptor {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked == 1
-        result == '#{\'foo\'}' // TODO: investigate nesting
+        result == 'foo'
     }
 
     void 'test apply introduction with expressions'() {
