@@ -71,7 +71,8 @@ import java.io.OutputStream;
     MediaType.APPLICATION_JSON_FEED,
     MediaType.APPLICATION_JSON_PATCH,
     MediaType.APPLICATION_JSON_MERGE_PATCH,
-    MediaType.APPLICATION_JSON_PROBLEM
+    MediaType.APPLICATION_JSON_PROBLEM,
+    MediaType.APPLICATION_JSON_SCHEMA
 })
 @Consumes({
     MediaType.APPLICATION_JSON,
@@ -81,7 +82,8 @@ import java.io.OutputStream;
     MediaType.APPLICATION_JSON_FEED,
     MediaType.APPLICATION_JSON_PATCH,
     MediaType.APPLICATION_JSON_MERGE_PATCH,
-    MediaType.APPLICATION_JSON_PROBLEM
+    MediaType.APPLICATION_JSON_PROBLEM,
+    MediaType.APPLICATION_JSON_SCHEMA
 })
 @BootstrapContextCompatible
 @Requires(beans = JsonMapper.class)

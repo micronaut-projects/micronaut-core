@@ -12,7 +12,7 @@ dependencies {
     api(libs.managed.ksp.api)
     api(libs.managed.ksp)
     implementation(libs.managed.kotlin.compiler.embeddable)
-    implementation "com.squareup.okio:okio:3.8.0"
+    implementation "com.squareup.okio:okio:3.9.0"
     implementation "io.github.classgraph:classgraph:4.8.149"
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
