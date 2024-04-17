@@ -197,7 +197,9 @@ abstract class MultiplexedServerHandler {
             streamer = new InputStreamer();
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
-                    streamer.sink.tryEmitNext(new DefaultHttpContent(buf));
+                    if (streamer.sink.tryEmitNext(new DefaultHttpContent(buf)) != Sinks.EmitResult.OK) {
+                        buf.release();
+                    }
                 }
                 bufferedContent = null;
             }
