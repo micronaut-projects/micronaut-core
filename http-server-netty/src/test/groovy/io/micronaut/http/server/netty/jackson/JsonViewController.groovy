@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.annotation.JsonView
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -28,6 +29,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 @Controller("/jsonview")
+@Requires(property = "spec.name", value = "JsonViewServerFilterSpec")
 class JsonViewController {
 
     static TestModel TEST_MODEL = new TestModel(firstName: "Bob", lastName: "Jones", birthdate: "08/01/1980", password: "secret")

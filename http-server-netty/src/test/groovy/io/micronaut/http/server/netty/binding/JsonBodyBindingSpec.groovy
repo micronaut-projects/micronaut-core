@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.binding
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpHeaders
@@ -25,6 +26,11 @@ import spock.lang.Issue
 import java.util.concurrent.CompletableFuture
 
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
+
+    @Override
+    Map<String, Object> getConfiguration() {
+        return super.getConfiguration() + ['test.controller': 'JsonController']
+    }
 
     void "test JSON is not parsed when the body is a raw body type"() {
         when:
@@ -304,6 +310,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     }
 
     @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
+    @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
 
         @Post("/params")

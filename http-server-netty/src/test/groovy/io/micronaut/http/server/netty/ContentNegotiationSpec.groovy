@@ -1,6 +1,8 @@
 package io.micronaut.http.server.netty
 
 import groovy.transform.InheritConstructors
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -28,6 +30,7 @@ import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingC
 import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.XML
 
 @MicronautTest
+@Property(name = "spec.name", value = "ContentNegotiationSpec")
 class ContentNegotiationSpec extends Specification {
 
     @Inject
@@ -171,6 +174,7 @@ class ContentNegotiationSpec extends Specification {
     }
 
     @Controller("/negotiate")
+    @Requires(property = "spec.name", value = "ContentNegotiationSpec")
     static class NegotiatingController {
 
         public static final String XML = "<hello>world</hello>"
