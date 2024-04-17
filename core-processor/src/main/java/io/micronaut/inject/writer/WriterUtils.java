@@ -261,7 +261,7 @@ public final class WriterUtils {
                 writer.push(0);
                 writer.storeLocal(maskLocal);
                 int maskIndex = 1;
-                int paramIndex = 0;
+                int paramIndex = fromIndex;
                 for (ParameterElement parameter : params) {
                     if (parameter instanceof KotlinParameterElement kp && kp.hasDefault()) {
                         writeMask(writer, argumentValuePusher, argumentValueIsPresentPusher, kp, paramIndex, maskIndex, maskLocal);

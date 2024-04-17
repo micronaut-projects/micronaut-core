@@ -25,9 +25,6 @@ import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-// Netty + HTTP/2 on JDKs less than 9 require tcnative setup
-// which is not included in this test suite
-//@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2AccessLoggerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'micronaut.server.ssl.enabled': true,
@@ -38,7 +35,6 @@ class Http2AccessLoggerSpec extends Specification {
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE",
             'micronaut.server.netty.access-logger.enabled': true,
-            'micronaut.server.netty.legacy-multiplex-handlers': true,
             'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)

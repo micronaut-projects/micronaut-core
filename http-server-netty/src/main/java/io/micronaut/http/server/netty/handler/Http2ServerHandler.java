@@ -16,7 +16,11 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -186,7 +190,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     /**
      * {@link Http2ConnectionHandler} implementation containing the {@link Http2ServerHandler}.
      */
-    static final class ConnectionHandler extends Http2ConnectionHandler {
+    public static final class ConnectionHandler extends Http2ConnectionHandler {
         private final Http2ServerHandler handler;
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler) {
@@ -236,15 +240,27 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent upgrade) {
                 FullHttpRequest fhr = upgrade.upgradeRequest();
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
-                Http2ServerHandler.Http2Stream stream = handler.new Http2Stream(cs);
-                cs.setProperty(handler.streamKey, stream);
-                boolean empty = !fhr.content().isReadable();
-                stream.onHeadersRead(fhr, empty);
-                if (!empty) {
-                    stream.onDataRead(fhr.content(), true);
-                }
+                handleFakeRequest(cs, fhr);
             }
             super.userEventTriggered(ctx, evt);
+        }
+
+        /**
+         * Handle a request on the given stream that did not actually come in as an HTTP/2 request.
+         * This is used for the h2c upgrade request which is an HTTP/1.1 request that expects an
+         * HTTP/2 response, and for push promises where the request is initiated by the application.
+         *
+         * @param onStream The stream that the response should be sent on
+         * @param fhr      The fake request
+         */
+        public void handleFakeRequest(io.netty.handler.codec.http2.Http2Stream onStream, FullHttpRequest fhr) {
+            Http2Stream stream = handler.new Http2Stream(onStream);
+            onStream.setProperty(handler.streamKey, stream);
+            boolean empty = !fhr.content().isReadable();
+            stream.onHeadersRead(fhr, empty);
+            if (!empty) {
+                stream.onDataRead(fhr.content(), true);
+            }
         }
     }
 
@@ -253,6 +269,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     public static final class ConnectionHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<ConnectionHandler, ConnectionHandlerBuilder> {
         private final Http2ServerHandler frameListener;
+        private Http2AccessLogManager.Factory accessLogManagerFactory;
+        private Http2AccessLogManager accessLogManager;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
@@ -273,6 +291,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return super.initialSettings(settings);
         }
 
+        public ConnectionHandlerBuilder accessLogManagerFactory(@Nullable Http2AccessLogManager.Factory accessLogManagerFactory) {
+            this.accessLogManagerFactory = accessLogManagerFactory;
+            return this;
+        }
+
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
             if (compressionStrategy.isEnabled()) {
                 frameListener.compressor(new Compressor(compressionStrategy));
@@ -283,12 +306,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            frameListener(new DelegatingDecompressorFrameListener(connection(), frameListener, false));
+            Http2FrameListener fl = new DelegatingDecompressorFrameListener(connection(), frameListener, false);
+            if (accessLogManagerFactory != null) {
+                accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
+                fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+            }
+            frameListener(fl);
             return super.build();
         }
 
         @Override
         protected ConnectionHandler build(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings) throws Exception {
+            if (accessLogManager != null) {
+                encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
+            }
             ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener);
             frameListener.init(ch);
             return ch;

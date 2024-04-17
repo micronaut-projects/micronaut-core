@@ -25,6 +25,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
@@ -90,6 +91,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -119,6 +121,7 @@ final class HttpPipelineBuilder implements Closeable {
     private final SslContext sslContext;
     private final QuicSslContext quicSslContext;
     private final HttpAccessLogHandler accessLogHandler;
+    private final Http2AccessLogManager.Factory accessLogManagerFactory;
 
     private final NettyServerCustomizer serverCustomizer;
 
@@ -139,12 +142,15 @@ final class HttpPipelineBuilder implements Closeable {
         quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
-        // todo: http2serverhandler support
         if (accessLogger != null && accessLogger.isEnabled()) {
-            accessLogHandler = new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), NettyHttpServer.inclusionPredicate(accessLogger));
+            String loggerName = accessLogger.getLoggerName();
+            Predicate<String> uriInclusion = NettyHttpServer.inclusionPredicate(accessLogger);
+            accessLogHandler = new HttpAccessLogHandler(loggerName, accessLogger.getLogFormat(), uriInclusion);
+            accessLogManagerFactory = new Http2AccessLogManager.Factory(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), accessLogger.getLogFormat(), uriInclusion);
             routingInBoundHandler.supportLoggingHandler = true;
         } else {
             accessLogHandler = null;
+            accessLogManagerFactory = null;
         }
     }
 
@@ -435,6 +441,7 @@ final class HttpPipelineBuilder implements Closeable {
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .compressor(embeddedServices.getHttpCompressionStrategy())
+                .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
                 .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
             server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->
@@ -496,8 +503,6 @@ final class HttpPipelineBuilder implements Closeable {
          */
         void configureForH2cSupport() {
             insertIdleStateHandler();
-
-            // todo: move to Http2ServerHandler (upgrade request is a bit difficult)
 
             final Http2FrameCodec frameCodec;
             final Http2ConnectionHandler connectionHandler;
