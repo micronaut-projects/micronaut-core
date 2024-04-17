@@ -238,8 +238,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
     Environment removePropertySource(PropertySource propertySource);
 
     /**
-     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA
-     * or GORM).
+     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA).
      *
      * @param pkg The package to add
      * @return This environment
@@ -294,8 +293,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
     }
 
     /**
-     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA
-     * or GORM).
+     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA).
      *
      * @param pkg The package to add
      * @return This environment

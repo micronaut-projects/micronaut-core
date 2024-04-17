@@ -26,11 +26,11 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
+import spock.lang.IgnoreIf
 import spock.lang.Specification
-
-import jakarta.inject.Inject
 
 /**
  * @author Christophe Roudet
@@ -108,6 +108,7 @@ class HttpAccessLoggerSpec extends Specification {
 
     }
 
+    @IgnoreIf({ instance instanceof Http2AccessLoggerSpec }) // micronaut-session uses channel attributes to get the request, which is broken
      void "test simple session - access logger"() {
         when:
         appender.events.clear()

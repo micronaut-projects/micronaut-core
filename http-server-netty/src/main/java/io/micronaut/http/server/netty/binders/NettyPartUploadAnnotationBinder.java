@@ -78,8 +78,8 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         if (skipClaimed && nettyRequest.formRouteCompleter().isClaimed(inputName)) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<T> completableFuture = Mono.from(nettyRequest.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, context).orElse(null))
+        CompletableFuture<Optional<T>> completableFuture = Mono.from(nettyRequest.formRouteCompleter().claimFieldsComplete(inputName))
+            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, context))
             .toFuture();
 
         return new PendingRequestBindingResult<>() {
@@ -96,7 +96,13 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
 
             @Override
             public Optional<T> getValue() {
-                return Optional.ofNullable(completableFuture.getNow(null));
+                Optional<T> res = completableFuture.getNow(Optional.empty());
+                //noinspection OptionalAssignedToNull
+                if (res == null) {
+                    // tricky: If the Mono completes without an element, the future will return null here.
+                    res = Optional.empty();
+                }
+                return res;
             }
         };
     }

@@ -23,6 +23,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.netty.MicronautHttpData;
@@ -76,7 +77,16 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
             publisher = request.formRouteCompleter()
                 .claimFields(inputName, (data, flux) -> flux.mapNotNull(partData -> conversionService.convert(partData, nestedType).orElse(null)));
         } else {
-            Flux<? extends MicronautHttpData<?>> raw = request.formRouteCompleter().claimFieldsRaw(inputName);
+            Flux<? extends MicronautHttpData<?>> raw;
+            if (CompletedPart.class.isAssignableFrom(contentTypeClass)) {
+                // For CompletedPart, only include completed fields. Otherwise, if the publisher is
+                // only subscribed to after all components have been received (e.g. because another
+                // argument delays execution of the controller), each component will have
+                // isCompleted=true, so the part will show up many times in the publisher.
+                raw = request.formRouteCompleter().claimFieldsComplete(inputName);
+            } else {
+                raw = request.formRouteCompleter().claimFieldsRaw(inputName);
+            }
             Flux<?> mnTypeIfNecessary;
             if (contentTypeClass == PartData.class || ClassUtils.isJavaLangType(contentTypeClass)) {
                 mnTypeIfNecessary = raw
