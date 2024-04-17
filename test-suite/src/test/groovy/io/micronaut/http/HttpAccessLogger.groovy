@@ -29,7 +29,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
-import spock.lang.IgnoreIf
+import spock.lang.PendingFeatureIf
 import spock.lang.Specification
 
 /**
@@ -108,8 +108,9 @@ class HttpAccessLoggerSpec extends Specification {
 
     }
 
-    @IgnoreIf({ instance instanceof Http2AccessLoggerSpec }) // micronaut-session uses channel attributes to get the request, which is broken
-     void "test simple session - access logger"() {
+    @PendingFeatureIf({ instance instanceof Http2AccessLoggerSpec })
+    // micronaut-session uses channel attributes to get the request, which is broken
+    void "test simple session - access logger"() {
         when:
         appender.events.clear()
         Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
