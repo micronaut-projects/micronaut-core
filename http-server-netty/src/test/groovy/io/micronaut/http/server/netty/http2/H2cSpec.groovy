@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
@@ -52,6 +53,7 @@ import java.util.concurrent.TimeUnit
 //@Property(name = "micronaut.server.port", value = "8912")
 @Property(name = "micronaut.http.client.plaintext-mode", value = "h2c")
 @Property(name = "micronaut.server.ssl.enabled", value = "false")
+@Property(name = "spec.name", value = "H2cSpec")
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5005')
 class H2cSpec extends Specification {
     @Inject
@@ -228,6 +230,7 @@ class H2cSpec extends Specification {
     }
 
     @Controller("/h2c")
+    @Requires(property = "spec.name", value = "H2cSpec")
     static class TestController {
         @Get("/test")
         String test(HttpRequest<?> request) {
