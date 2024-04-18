@@ -89,6 +89,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -842,6 +843,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    public @NonNull Optional<ShutdownState> reportShutdownState() {
+        List<Listener> listeners = activeListeners;
+        if (listeners == null) {
+            return Optional.empty();
+        }
+        return CombinedShutdownState.combineShutdownState(
+            listeners,
+            l -> l.config.getName(),
+            n -> Map.entry("other", new SingleShutdownState("And " + n + " other listeners"))
+        );
+    }
+
+    @Override
     public void onApplicationEvent(RefreshEvent event) {
         // if anything under HttpServerConfiguration.PREFIX changes re-build
         // the NettyHttpServerInitializer in the server bootstrap to apply changes
@@ -984,6 +998,24 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 close,
                 activeConnections.stream().map(HttpPipelineBuilder.ConnectionPipeline::shutdownGracefully)
             ));
+        }
+
+        @Override
+        public @NonNull Optional<ShutdownState> reportShutdownState() {
+            Iterator<HttpPipelineBuilder.ConnectionPipeline> itr = activeConnections.iterator();
+            if (!itr.hasNext()) {
+                return Optional.empty();
+            }
+            HttpPipelineBuilder.ConnectionPipeline first = itr.next();
+            if (!itr.hasNext() && first.channel instanceof DatagramChannel) {
+                // HTTP/3 only has one connection
+                return first.reportShutdownState();
+            }
+            return CombinedShutdownState.combineShutdownState(
+                activeConnections,
+                c -> "c:" + HttpPipelineBuilder.toString(c.channel.remoteAddress()) + " s:" + HttpPipelineBuilder.toString(c.channel.localAddress()) + " cid:" + c.channel.id().asLongText(),
+                n -> Map.entry("other", new SingleShutdownState("And " + n + " other connections"))
+            );
         }
     }
 

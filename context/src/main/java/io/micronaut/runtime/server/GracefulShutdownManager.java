@@ -19,6 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -45,5 +47,13 @@ public final class GracefulShutdownManager {
      */
     public CompletionStage<?> shutdownGracefully() {
         return GracefulShutdownLifecycle.shutdownAll(delegates.stream());
+    }
+
+    public Optional<GracefulShutdownLifecycle.ShutdownState> reportShutdownState() {
+        return GracefulShutdownLifecycle.CombinedShutdownState.combineShutdownState(
+            delegates,
+            d -> d.getClass().getSimpleName(),
+            n -> Map.entry("other", new GracefulShutdownLifecycle.SingleShutdownState("And " + n + " other beans"))
+        );
     }
 }

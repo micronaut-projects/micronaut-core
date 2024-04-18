@@ -15,12 +15,20 @@
  */
 package io.micronaut.runtime.server;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 /**
@@ -45,7 +53,20 @@ public interface GracefulShutdownLifecycle {
      *
      * @return A future that completes when this bean is fully shut down
      */
+    @NonNull
     CompletionStage<?> shutdownGracefully();
+
+    /**
+     * After a call to {@link #shutdownGracefully()} report the state of the shutdown. If
+     * {@link #shutdownGracefully()} has not been called the behavior of this method is undefined.
+     *
+     * @return The current shutdown progress, or {@link Optional#empty()} if the shutdown is
+     * complete or no state can be reported
+     */
+    @NonNull
+    default Optional<ShutdownState> reportShutdownState() {
+        return Optional.empty();
+    }
 
     /**
      * Combine the given futures.
@@ -53,7 +74,8 @@ public interface GracefulShutdownLifecycle {
      * @param stages The input futures
      * @return A future that completes when all inputs have completed
      */
-    static CompletionStage<?> allOf(Stream<CompletionStage<?>> stages) {
+    @NonNull
+    static CompletionStage<?> allOf(@NonNull Stream<CompletionStage<?>> stages) {
         return CompletableFuture.allOf(stages.map(CompletionStage::toCompletableFuture).toArray(CompletableFuture[]::new));
     }
 
@@ -63,7 +85,8 @@ public interface GracefulShutdownLifecycle {
      * @param stages The input lifecycles
      * @return A future that completes when all inputs have completed shutdown
      */
-    static CompletionStage<?> shutdownAll(Stream<? extends GracefulShutdownLifecycle> stages) {
+    @NonNull
+    static CompletionStage<?> shutdownAll(@NonNull Stream<? extends GracefulShutdownLifecycle> stages) {
         return CompletableFuture.allOf(stages.map(l -> {
             CompletionStage<?> s;
             try {
@@ -74,6 +97,66 @@ public interface GracefulShutdownLifecycle {
             }
             return s.toCompletableFuture();
         }).toArray(CompletableFuture[]::new));
+    }
+
+    /**
+     * State of a graceful shutdown operation.
+     */
+    sealed interface ShutdownState {
+    }
+
+    /**
+     * Complex shutdown state composed of many {@link ShutdownState}s. This is used e.g. to report
+     * state of multiple open connections.
+     *
+     * @param members The member states
+     */
+    record CombinedShutdownState(
+        @JsonValue @NonNull Map<String, ShutdownState> members) implements ShutdownState {
+        private static final int MAX_REPORT_ENTRIES = 20;
+
+        /**
+         * Combine the state of multiple {@link GracefulShutdownLifecycle}s into a
+         * {@link CombinedShutdownState}.
+         *
+         * @param parts         The individual {@link GracefulShutdownLifecycle}s
+         * @param key           The function to create the {@link #members} map key
+         * @param overflowValue Entry to add to the {@link #members} when there are too many entries
+         * @param <G>           The {@link GracefulShutdownLifecycle} type
+         * @return The combined state, or {@link Optional#empty()} if none of the inputs reported
+         * any state
+         */
+        @NonNull
+        public static <G extends GracefulShutdownLifecycle> Optional<ShutdownState> combineShutdownState(@NonNull Collection<? extends G> parts, @NonNull Function<G, String> key, @NonNull IntFunction<Map.Entry<String, ShutdownState>> overflowValue) {
+            Map<String, ShutdownState> memberStates = CollectionUtils.newLinkedHashMap(Math.min(MAX_REPORT_ENTRIES, parts.size()));
+            int remaining = parts.size();
+            for (G part : parts) {
+                remaining--;
+                Optional<ShutdownState> shutdownState = part.reportShutdownState();
+                if (shutdownState.isEmpty()) {
+                    continue;
+                }
+                String k = key.apply(part);
+                memberStates.put(k, shutdownState.get());
+                if (memberStates.size() >= MAX_REPORT_ENTRIES) {
+                    Map.Entry<String, ShutdownState> o = overflowValue.apply(remaining);
+                    memberStates.put(o.getKey(), o.getValue());
+                    break;
+                }
+            }
+            if (memberStates.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(new CombinedShutdownState(memberStates));
+        }
+    }
+
+    /**
+     * A single shutdown state.
+     *
+     * @param description A readable description of the current state
+     */
+    record SingleShutdownState(@JsonValue @NonNull String description) implements ShutdownState {
     }
 }
 

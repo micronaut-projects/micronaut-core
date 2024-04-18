@@ -16,10 +16,12 @@
 package io.micronaut.management.health.indicator;
 
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.annotation.Readiness;
 import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownManager;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
@@ -37,12 +39,20 @@ import java.util.concurrent.CompletionStage;
 @Readiness
 @Internal
 final class GracefulShutdownHealthIndicator implements HealthIndicator, GracefulShutdownLifecycle {
+    private static final String NAME = "gracefulShutdown";
+
+    private final BeanProvider<GracefulShutdownManager> manager;
     private volatile boolean shuttingDown = false;
+
+    GracefulShutdownHealthIndicator(BeanProvider<GracefulShutdownManager> manager) {
+        this.manager = manager;
+    }
 
     @Override
     public Publisher<HealthResult> getResult() {
-        return Mono.just(HealthResult.builder("gracefulShutdown")
+        return Mono.just(HealthResult.builder(NAME)
             .status(shuttingDown ? HealthStatus.DOWN : HealthStatus.UP)
+            .details(manager.get().reportShutdownState().orElse(null))
             .build());
     }
 

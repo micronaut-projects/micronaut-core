@@ -314,6 +314,15 @@ class GracefulShutdownSpec extends Specification {
         TimeUnit.SECONDS.sleep(1)
         def shFuture = gracefulShutdown.shutdownGracefully().toCompletableFuture()
         TimeUnit.SECONDS.sleep(1)
+
+        then:
+        gracefulShutdown.reportShutdownState().get()
+                .members()["NettyHttpServer"] // select bean
+                .members().values().first() // select listener
+                .members().values().first() // select connection
+                .description() == "Waiting to write response"
+
+        when:
         sink.tryEmitNext("bar")
         sink.tryEmitComplete()
 
@@ -384,14 +393,14 @@ class GracefulShutdownSpec extends Specification {
                 .path("/graceful-shutdown/simple")
                 .method("GET")
                 .authority("localhost")
-                .scheme("https")
+                .scheme("https"), true
         ).stream(duplexHandler.newStream()), ch.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE))
         def stream2 = duplexHandler.newStream()
         ch.writeAndFlush(new DefaultHttp2HeadersFrame(new DefaultHttp2Headers()
                 .path("/graceful-shutdown/single")
                 .method("GET")
                 .authority("localhost")
-                .scheme("https")
+                .scheme("https"), true
         ).stream(stream2), ch.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE))
         TimeUnit.SECONDS.sleep(1)
         def shFuture = gracefulShutdown.shutdownGracefully().toCompletableFuture()
@@ -406,6 +415,14 @@ class GracefulShutdownSpec extends Specification {
         goAway.errorCode() == Http2Error.NO_ERROR.code()
         goAway.lastStreamId() == stream2.id()
         !shFuture.isDone()
+
+        new PollingConditions().eventually {
+            gracefulShutdown.reportShutdownState().get()
+                    .members()["NettyHttpServer"] // select bean
+                    .members().values().first() // select listener
+                    .members().values().first() // select connection
+                    .description() == "Waiting for client to terminate the HTTP/2 connection. Still active streams: 1"
+        }
 
         when:
         sink.tryEmitValue("foo")
@@ -520,6 +537,12 @@ class GracefulShutdownSpec extends Specification {
             headers1.headers().status().toString() == "200"
             connectionHandler.goAwayReceived
             !shFuture.isDone()
+
+            gracefulShutdown.reportShutdownState().get()
+                    .members()["NettyHttpServer"] // select bean
+                    .members().values().first() // select listener
+                    .members().values().first() // select connection
+                    .description() == "Waiting for client to terminate the HTTP/2 connection. Still active streams: -1"
         }
 
         when:

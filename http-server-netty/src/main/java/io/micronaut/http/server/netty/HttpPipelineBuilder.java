@@ -93,6 +93,7 @@ import java.nio.channels.ClosedChannelException;
 import java.security.cert.Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -180,6 +181,14 @@ final class HttpPipelineBuilder implements Closeable {
         return requestHandler;
     }
 
+    static String toString(@Nullable SocketAddress address) {
+        if (address instanceof InetSocketAddress inet) {
+            return inet.getHostString() + ":" + inet.getPort();
+        } else {
+            return "unknown";
+        }
+    }
+
     /**
      * Holder class for normal or QUIC ssl handler.
      */
@@ -240,7 +249,7 @@ final class HttpPipelineBuilder implements Closeable {
     }
 
     final class ConnectionPipeline implements GracefulShutdownLifecycle {
-        private final Channel channel;
+        final Channel channel;
         private final ChannelPipeline pipeline;
 
         @Nullable
@@ -375,9 +384,9 @@ final class HttpPipelineBuilder implements Closeable {
                         }, new ChannelInitializer<QuicStreamChannel>() {
                             @Override
                             protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
-
                             }
                         }, null, null, true);
+
                         ch.pipeline().addLast(connectionHandler);
                         Http3GracefulShutdown gracefulShutdown = new Http3GracefulShutdown(ch.pipeline().lastContext(), maxStreamId);
                         activeChannels.add(gracefulShutdown);
@@ -385,9 +394,17 @@ final class HttpPipelineBuilder implements Closeable {
                     }
                 })
                 .build());
-            specificGracefulShutdown = () -> {
-                shuttingDown.set(true);
-                return GracefulShutdownLifecycle.shutdownAll(activeChannels.stream());
+            specificGracefulShutdown = new GracefulShutdownLifecycle() {
+                @Override
+                public @NonNull CompletionStage<?> shutdownGracefully() {
+                    shuttingDown.set(true);
+                    return GracefulShutdownLifecycle.shutdownAll(activeChannels.stream());
+                }
+
+                @Override
+                public @NonNull Optional<ShutdownState> reportShutdownState() {
+                    return CombinedShutdownState.combineShutdownState(activeChannels, Http3GracefulShutdown::key, n -> Map.entry("other", new SingleShutdownState("And " + n + " other connections")));
+                }
             };
         }
 
@@ -654,6 +671,13 @@ final class HttpPipelineBuilder implements Closeable {
                 return specificGracefulShutdown.shutdownGracefully();
             }
         }
+
+        @Override
+        public Optional<ShutdownState> reportShutdownState() {
+            return Optional.of(Optional.ofNullable(this.specificGracefulShutdown)
+                .flatMap(GracefulShutdownLifecycle::reportShutdownState)
+                .orElse(new SingleShutdownState("Waiting for connection channel to close")));
+        }
     }
 
     final class StreamPipeline {
@@ -785,6 +809,11 @@ final class HttpPipelineBuilder implements Closeable {
         }
 
         @Override
+        public @NonNull Optional<ShutdownState> reportShutdownState() {
+            return Optional.of(new SingleShutdownState("Waiting for client to terminate the HTTP/2 connection. Still active streams: " + numberOfActiveStreams()));
+        }
+
+        @Override
         public CompletionStage<?> shutdownGracefully() {
             if (ctx.executor().inEventLoop()) {
                 shutdownGracefully0();
@@ -805,6 +834,8 @@ final class HttpPipelineBuilder implements Closeable {
             ctx.flush();
         }
 
+        protected abstract int numberOfActiveStreams();
+
         protected abstract ChannelFuture goAway();
     }
 
@@ -814,6 +845,11 @@ final class HttpPipelineBuilder implements Closeable {
         public Http2GracefulShutdown(ChannelHandlerContext ctx, Http2ConnectionHandler connectionHandler) {
             super(ctx);
             this.connectionHandler = connectionHandler;
+        }
+
+        @Override
+        protected int numberOfActiveStreams() {
+            return connectionHandler.connection().numActiveStreams();
         }
 
         @Override
@@ -828,6 +864,16 @@ final class HttpPipelineBuilder implements Closeable {
         public Http3GracefulShutdown(ChannelHandlerContext ctx, AtomicLong maxStreamId) {
             super(ctx);
             this.maxStreamId = maxStreamId;
+        }
+
+        String key() {
+            QuicChannel quicChannel = (QuicChannel) ctx.channel();
+            return "c:" + HttpPipelineBuilder.toString(quicChannel.remoteSocketAddress()) + " s:" + HttpPipelineBuilder.toString(quicChannel.localSocketAddress()) + " cid:" + quicChannel.id().asLongText();
+        }
+
+        @Override
+        protected int numberOfActiveStreams() {
+            return -1; // not sure how to count these
         }
 
         @Override
