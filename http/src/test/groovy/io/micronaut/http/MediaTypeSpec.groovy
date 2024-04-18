@@ -35,6 +35,7 @@ class MediaTypeSpec extends Specification {
         MediaType.of('application/problem+json') == MediaType.APPLICATION_JSON_PROBLEM_TYPE
         MediaType.of('application/json-patch+json') == MediaType.APPLICATION_JSON_PATCH_TYPE
         MediaType.of('application/merge-patch+json') == MediaType.APPLICATION_JSON_MERGE_PATCH_TYPE
+        MediaType.of('application/schema+json') == MediaType.APPLICATION_JSON_SCHEMA_TYPE
     }
 
     void "test media type"() {

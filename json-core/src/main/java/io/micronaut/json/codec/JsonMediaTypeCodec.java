@@ -51,7 +51,8 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
         MediaType.APPLICATION_JSON_FEED_TYPE,
         MediaType.APPLICATION_JSON_PATCH_TYPE,
         MediaType.APPLICATION_JSON_MERGE_PATCH_TYPE,
-        MediaType.APPLICATION_JSON_PROBLEM_TYPE
+        MediaType.APPLICATION_JSON_PROBLEM_TYPE,
+        MediaType.APPLICATION_JSON_SCHEMA_TYPE
     );
 
     /**

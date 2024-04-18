@@ -8,7 +8,6 @@ caffeine = "2.9.3"
 compile-testing = "0.21.0"
 
 geb = "7.0"
-gorm = "7.3.4"
 # be sure to update graal version in gradle.properties as well
 graal-svm = "23.1.2"
 h2 = "2.2.224"
@@ -32,11 +31,11 @@ jazzer = "0.22.1"
 jcache = "1.1.1"
 junit5 = "5.10.2"
 junit-platform="1.10.2"
-logback = "1.5.3"
+logback = "1.5.5"
 logbook-netty = "2.16.0"
 log4j = "2.22.1"
-micronaut-aws = "4.4.3"
-micronaut-groovy = "4.2.0"
+micronaut-aws = "4.5.0"
+micronaut-groovy = "4.3.0"
 micronaut-session = "4.2.0"
 micronaut-sql = "5.3.0"
 micronaut-test = "4.1.1"
@@ -46,7 +45,7 @@ micronaut-rxjava3 = "3.2.1"
 micronaut-reactor = "3.3.0"
 neo4j-java-driver = "5.17.0"
 selenium = "4.9.1"
-slf4j = "2.0.12"
+slf4j = "2.0.13"
 smallrye = "6.2.6"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
@@ -59,14 +58,14 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.20"
+managed-groovy = "4.0.21"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.16.1"
 managed-jackson-databind = "2.17.0"
 managed-kotlin = "1.9.23"
 managed-kotlin-coroutines = "1.7.3"
 managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.108.Final"
+managed-netty = "4.1.109.Final"
 managed-netty-iouring = "0.0.25.Final"
 managed-netty-http3 = "0.0.28.Final"
 managed-netty-tcnative = "2.0.65.Final"
@@ -110,6 +109,8 @@ managed-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", ver
 managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson-databind" }
 managed-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "managed-jackson" }
 managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "managed-jackson" }
+managed-jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "managed-jackson" }
+managed-jackson-dataformat-xml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-xml", version.ref = "managed-jackson" }
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
@@ -175,7 +176,6 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-gorm = { module = "org.grails:grails-datastore-core", version.ref = "gorm" }
 graal = { module = "org.graalvm.nativeimage:svm", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 

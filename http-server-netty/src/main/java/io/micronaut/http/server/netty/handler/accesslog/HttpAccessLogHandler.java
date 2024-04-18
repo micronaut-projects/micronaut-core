@@ -56,8 +56,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      */
     public static final String HTTP_ACCESS_LOGGER = "HTTP_ACCESS_LOGGER";
 
+    static final String H2_PROTOCOL_NAME = "HTTP/2.0";
     private static final AttributeKey<AccessLogHolder> ACCESS_LOGGER = AttributeKey.valueOf("ACCESS_LOGGER");
-    private static final String H2_PROTOCOL_NAME = "HTTP/2.0";
 
     private final Logger logger;
     private final AccessLogFormatParser accessLogFormatParser;
