@@ -1,20 +1,4 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.server.netty.types
-
 
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
@@ -28,6 +12,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.server.types.files.FileCustomizableResponseType
@@ -39,6 +24,7 @@ import reactor.core.publisher.Mono
 import spock.lang.IgnoreIf
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -234,6 +220,27 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == "My file content".bytes
     }
 
+    void "test when an reactive attached system file is returned"() {
+        given:
+        def file = Files.createTempFile("test", ".txt").toFile().tap {
+            it << "System file!"
+        }
+
+        when:
+        def response = httpClient.toBlocking().exchange("/test-stream/reactive-system?path=$file.absolutePath", byte[].class)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.TEXT_PLAIN
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == "System file!".bytes
+
+        cleanup:
+        file.delete()
+    }
+
     void "test when an attached file is returned with a name"() {
         when:
         def response = httpClient.toBlocking().exchange('/test/different-name', String)
@@ -412,6 +419,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         Mono<FileCustomizableResponseType> reactiveStream() {
             def stream = new ByteArrayInputStream("My file content".bytes)
             Mono.just(new StreamedFile(stream, MediaType.TEXT_PLAIN_TYPE))
+        }
+
+        @Get('/reactive-system')
+        Mono<FileCustomizableResponseType> reactiveStream(@QueryValue Path path) {
+            Mono.just(new SystemFile(path.toFile(), MediaType.TEXT_PLAIN_TYPE))
         }
     }
 
