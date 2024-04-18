@@ -72,7 +72,7 @@ We can also create a client - don't forget Micronaut framework can act as a clie
 [source,bash]
 .Create a client
 ----
-mn> create-client helloClient
+mn> create-client hello
 | Rendered template Client.groovy to destination src/main/groovy/hello/world/HelloClient.groovy
 ----
 
@@ -98,7 +98,7 @@ Now let's create a controller:
 [source,bash]
 .Create a controller
 ----
-mn> create-controller helloController
+mn> create-controller hello
 | Rendered template Controller.groovy to destination src/main/groovy/hello/world/HelloController.groovy
 | Rendered template ControllerSpec.groovy to destination src/test/groovy/hello/world/HelloControllerSpec.groovy
 mn>
