@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -562,7 +562,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     <T> NettyBodyWriter<T> specialize(NettyBodyWriter<T> original, Argument<T> bodyType, MediaType mediaType, T body) {
         if (original instanceof CompatNettyWriteClosure<T> cnwc && cnwc.delegate instanceof DynamicMessageBodyWriter dyn) {
-            return (NettyBodyWriter<T>) new CompatNettyWriteClosure<>(dyn.find((Argument<Object>) bodyType, mediaType, body));
+            return (NettyBodyWriter<T>) wrap(dyn.find((Argument<Object>) bodyType, mediaType, body));
         } else {
             return original;
         }
@@ -572,6 +572,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         private final MessageBodyWriter<T> delegate;
 
         CompatNettyWriteClosure(MessageBodyWriter<T> delegate) {
+            assert !(delegate instanceof NettyBodyWriter) : "please create using wrap()";
             this.delegate = delegate;
         }
 
