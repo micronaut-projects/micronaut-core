@@ -30,10 +30,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.types.files.FileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import jakarta.inject.Inject
 import jakarta.inject.Named
+import reactor.core.publisher.Mono
 import spock.lang.IgnoreIf
 
 import java.nio.file.Files
@@ -219,6 +221,19 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == tempFileContents
     }
 
+    void "test when an reactive attached streamed file is returned"() {
+        when:
+        def response = httpClient.toBlocking().exchange('/test-stream/reactive-stream', byte[].class)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.TEXT_PLAIN
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == "My file content".bytes
+    }
+
     void "test when an attached file is returned with a name"() {
         when:
         def response = httpClient.toBlocking().exchange('/test/different-name', String)
@@ -393,6 +408,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
             return new StreamedFile(input, MediaType.TEXT_PLAIN_TYPE)
         }
 
+        @Get('/reactive-stream')
+        Mono<FileCustomizableResponseType> reactiveStream() {
+            def stream = new ByteArrayInputStream("My file content".bytes)
+            Mono.just(new StreamedFile(stream, MediaType.TEXT_PLAIN_TYPE))
+        }
     }
 
     @CompileStatic
