@@ -16,9 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2FrameListener;
@@ -42,23 +40,8 @@ public final class Http2AccessLogFrameListener extends Http2FrameListenerDecorat
     }
 
     private void logHeaders(ChannelHandlerContext ctx, int streamId, Http2Headers headers) throws Http2Exception {
-        if (!manager.logger.isInfoEnabled()) {
-            return;
-        }
         HttpRequest request = HttpConversionUtil.toHttpRequest(streamId, headers, false);
-        if (manager.uriInclusion != null && !manager.uriInclusion.test(request.uri())) {
-            return;
-        }
-
-        AccessLog accessLog;
-        if (manager.logForReuse != null) {
-            accessLog = manager.logForReuse;
-            manager.logForReuse = null;
-        } else {
-            accessLog = manager.formatParser.newAccessLogger();
-        }
-        manager.connection.stream(streamId).setProperty(manager.accessLogKey, accessLog);
-        accessLog.onRequestHeaders((SocketChannel) ctx.channel(), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
+        manager.logHeaders(ctx, streamId, request);
     }
 
     @Override
