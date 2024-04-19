@@ -24,7 +24,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.ByteBody;
-import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -86,7 +86,7 @@ import java.util.concurrent.ExecutorService;
  * @since 4.0.0
  */
 @Internal
-public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownLifecycle {
+public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
     private final RequestHandler requestHandler;

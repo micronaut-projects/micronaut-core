@@ -20,7 +20,7 @@ import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -40,7 +40,7 @@ public interface NettyEmbeddedServer
                 ChannelPipelineCustomizer,
                 RefreshEventListener,
                 NettyServerCustomizer.Registry,
-                GracefulShutdownLifecycle {
+    GracefulShutdownCapable {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.

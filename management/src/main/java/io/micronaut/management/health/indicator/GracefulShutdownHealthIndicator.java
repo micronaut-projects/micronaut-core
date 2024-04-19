@@ -20,7 +20,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.annotation.Readiness;
-import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.micronaut.runtime.server.GracefulShutdownManager;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -38,7 +38,7 @@ import java.util.concurrent.CompletionStage;
 @Singleton
 @Readiness
 @Internal
-final class GracefulShutdownHealthIndicator implements HealthIndicator, GracefulShutdownLifecycle {
+final class GracefulShutdownHealthIndicator implements HealthIndicator, GracefulShutdownCapable {
     private static final String NAME = "gracefulShutdown";
 
     private final BeanProvider<GracefulShutdownManager> manager;

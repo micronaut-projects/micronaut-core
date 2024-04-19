@@ -37,7 +37,7 @@ import java.util.stream.Stream;
  * @author Jonas Konrad
  * @since 4.5.0
  */
-public interface GracefulShutdownLifecycle {
+public interface GracefulShutdownCapable {
 
     /**
      * Trigger a graceful shutdown. The returned {@link CompletionStage} will complete when the
@@ -86,7 +86,7 @@ public interface GracefulShutdownLifecycle {
      * @return A future that completes when all inputs have completed shutdown
      */
     @NonNull
-    static CompletionStage<?> shutdownAll(@NonNull Stream<? extends GracefulShutdownLifecycle> stages) {
+    static CompletionStage<?> shutdownAll(@NonNull Stream<? extends GracefulShutdownCapable> stages) {
         return CompletableFuture.allOf(stages.map(l -> {
             CompletionStage<?> s;
             try {
@@ -116,18 +116,18 @@ public interface GracefulShutdownLifecycle {
         private static final int MAX_REPORT_ENTRIES = 20;
 
         /**
-         * Combine the state of multiple {@link GracefulShutdownLifecycle}s into a
+         * Combine the state of multiple {@link GracefulShutdownCapable}s into a
          * {@link CombinedShutdownState}.
          *
-         * @param parts         The individual {@link GracefulShutdownLifecycle}s
+         * @param parts         The individual {@link GracefulShutdownCapable}s
          * @param key           The function to create the {@link #members} map key
          * @param overflowValue Entry to add to the {@link #members} when there are too many entries
-         * @param <G>           The {@link GracefulShutdownLifecycle} type
+         * @param <G>           The {@link GracefulShutdownCapable} type
          * @return The combined state, or {@link Optional#empty()} if none of the inputs reported
          * any state
          */
         @NonNull
-        public static <G extends GracefulShutdownLifecycle> Optional<ShutdownState> combineShutdownState(@NonNull Collection<? extends G> parts, @NonNull Function<G, String> key, @NonNull IntFunction<Map.Entry<String, ShutdownState>> overflowValue) {
+        public static <G extends GracefulShutdownCapable> Optional<ShutdownState> combineShutdownState(@NonNull Collection<? extends G> parts, @NonNull Function<G, String> key, @NonNull IntFunction<Map.Entry<String, ShutdownState>> overflowValue) {
             Map<String, ShutdownState> memberStates = CollectionUtils.newLinkedHashMap(Math.min(MAX_REPORT_ENTRIES, parts.size()));
             int remaining = parts.size();
             for (G part : parts) {
@@ -161,5 +161,5 @@ public interface GracefulShutdownLifecycle {
 }
 
 class LogHolder {
-    static final Logger LOG = LoggerFactory.getLogger(GracefulShutdownLifecycle.class);
+    static final Logger LOG = LoggerFactory.getLogger(GracefulShutdownCapable.class);
 }

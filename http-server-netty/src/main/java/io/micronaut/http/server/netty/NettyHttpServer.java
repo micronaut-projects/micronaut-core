@@ -46,7 +46,7 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
-import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -839,7 +839,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         if (listeners == null) {
             return CompletableFuture.completedStage(null);
         }
-        return GracefulShutdownLifecycle.shutdownAll(listeners.stream());
+        return GracefulShutdownCapable.shutdownAll(listeners.stream());
     }
 
     @Override
@@ -943,7 +943,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownLifecycle {
+    private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
         Channel serverChannel;
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
@@ -994,7 +994,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             } else {
                 close = Stream.of(toCompletionStage(serverChannel.close()));
             }
-            return GracefulShutdownLifecycle.allOf(Stream.concat(
+            return GracefulShutdownCapable.allOf(Stream.concat(
                 close,
                 activeConnections.stream().map(HttpPipelineBuilder.ConnectionPipeline::shutdownGracefully)
             ));

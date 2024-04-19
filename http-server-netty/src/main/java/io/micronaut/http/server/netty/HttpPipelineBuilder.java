@@ -29,7 +29,7 @@ import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
-import io.micronaut.runtime.server.GracefulShutdownLifecycle;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -248,7 +248,7 @@ final class HttpPipelineBuilder implements Closeable {
         }
     }
 
-    final class ConnectionPipeline implements GracefulShutdownLifecycle {
+    final class ConnectionPipeline implements GracefulShutdownCapable {
         final Channel channel;
         private final ChannelPipeline pipeline;
 
@@ -257,7 +257,7 @@ final class HttpPipelineBuilder implements Closeable {
 
         private final NettyServerCustomizer connectionCustomizer;
 
-        private volatile GracefulShutdownLifecycle specificGracefulShutdown;
+        private volatile GracefulShutdownCapable specificGracefulShutdown;
 
         /**
          * @param channel The channel of this connection
@@ -394,11 +394,11 @@ final class HttpPipelineBuilder implements Closeable {
                     }
                 })
                 .build());
-            specificGracefulShutdown = new GracefulShutdownLifecycle() {
+            specificGracefulShutdown = new GracefulShutdownCapable() {
                 @Override
                 public @NonNull CompletionStage<?> shutdownGracefully() {
                     shuttingDown.set(true);
-                    return GracefulShutdownLifecycle.shutdownAll(activeChannels.stream());
+                    return GracefulShutdownCapable.shutdownAll(activeChannels.stream());
                 }
 
                 @Override
@@ -664,7 +664,7 @@ final class HttpPipelineBuilder implements Closeable {
 
         @Override
         public CompletionStage<?> shutdownGracefully() {
-            GracefulShutdownLifecycle specificGracefulShutdown = this.specificGracefulShutdown;
+            GracefulShutdownCapable specificGracefulShutdown = this.specificGracefulShutdown;
             if (specificGracefulShutdown == null) {
                 return NettyHttpServer.toCompletionStage(channel.close());
             } else {
@@ -675,7 +675,7 @@ final class HttpPipelineBuilder implements Closeable {
         @Override
         public Optional<ShutdownState> reportShutdownState() {
             return Optional.of(Optional.ofNullable(this.specificGracefulShutdown)
-                .flatMap(GracefulShutdownLifecycle::reportShutdownState)
+                .flatMap(GracefulShutdownCapable::reportShutdownState)
                 .orElse(new SingleShutdownState("Waiting for connection channel to close")));
         }
     }
@@ -735,7 +735,7 @@ final class HttpPipelineBuilder implements Closeable {
          * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
          * and netty requests, and routing.
          */
-        private GracefulShutdownLifecycle insertMicronautHandlers() {
+        private GracefulShutdownCapable insertMicronautHandlers() {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
                 channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(sslHandler.findPeerCert());
@@ -774,7 +774,7 @@ final class HttpPipelineBuilder implements Closeable {
          * {@value ChannelPipelineCustomizer#HANDLER_HTTP_SERVER_CODEC}. Used both for normal HTTP 1 connections, and
          * after a H2C negotiation failure.
          */
-        private GracefulShutdownLifecycle insertHttp1DownstreamHandlers() {
+        private GracefulShutdownCapable insertHttp1DownstreamHandlers() {
             httpVersion = HttpVersion.HTTP_1_1;
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
@@ -801,7 +801,7 @@ final class HttpPipelineBuilder implements Closeable {
         }
     }
 
-    private static abstract class Http23GracefulShutdownBase implements GracefulShutdownLifecycle {
+    private static abstract class Http23GracefulShutdownBase implements GracefulShutdownCapable {
         final ChannelHandlerContext ctx;
 
         Http23GracefulShutdownBase(ChannelHandlerContext ctx) {
