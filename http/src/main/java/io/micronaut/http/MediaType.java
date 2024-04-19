@@ -83,6 +83,21 @@ public class MediaType implements CharSequence {
     public static final String EXTENSION_XLS = "xls";
 
     /**
+     * File extension for GPS Exchange Format files.
+     */
+    public static final String EXTENSION_GPX = "gpx";
+
+    /**
+     * File extension for ZIP archive files.
+     */
+    public static final String EXTENSION_ZIP = "zip";
+
+    /**
+     * File extension for GZIP compressed files.
+     */
+    public static final String EXTENSION_GZIP = "gz";
+
+    /**
      * Default empty media type array.
      */
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
@@ -425,6 +440,36 @@ public class MediaType implements CharSequence {
     public static final MediaType IMAGE_WEBP_TYPE = new MediaType(IMAGE_WEBP);
 
     /**
+     * GPS Exchange Format: application/gpx+xml
+     */
+    public static final String APPLICATION_GPX_XML = "application/gpx+xml";
+
+    /**
+     * GPS Exchange Format: application/gpx+xml
+     */
+    public static final MediaType GPX_XML_TYPE = new MediaType(APPLICATION_GPX_XML, EXTENSION_GPX);
+
+    /**
+     * ZIP archive format: application/zip
+     */
+    public static final String APPLICATION_ZIP = "application/zip";
+
+    /**
+     * ZIP archive format: application/zip
+     */
+    public static final MediaType ZIP_TYPE = new MediaType(APPLICATION_ZIP);
+
+    /**
+     * GZip compressed data: application/gzip
+     */
+    public static final String APPLICATION_GZIP = "application/gzip";
+
+    /**
+     * GZip compressed data: application/gzip
+     */
+    public static final MediaType GZIP_TYPE = new MediaType(APPLICATION_GZIP);
+
+    /**
      * Parameter {@code "charset"}.
      */
     public static final String CHARSET_PARAMETER = "charset";
@@ -645,6 +690,12 @@ public class MediaType implements CharSequence {
                 return IMAGE_GIF_TYPE;
             case IMAGE_WEBP:
                 return IMAGE_WEBP_TYPE;
+            case APPLICATION_GPX_XML:
+                return GPX_XML_TYPE;
+            case APPLICATION_GZIP:
+                return GZIP_TYPE;
+            case APPLICATION_ZIP:
+                return ZIP_TYPE;
             default:
                 return new MediaType(mediaType);
         }
