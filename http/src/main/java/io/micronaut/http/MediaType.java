@@ -440,32 +440,32 @@ public class MediaType implements CharSequence {
     public static final MediaType IMAGE_WEBP_TYPE = new MediaType(IMAGE_WEBP);
 
     /**
-     * GPS Exchange Format: application/gpx+xml
+     * GPS Exchange Format: application/gpx+xml.
      */
     public static final String APPLICATION_GPX_XML = "application/gpx+xml";
 
     /**
-     * GPS Exchange Format: application/gpx+xml
+     * GPS Exchange Format: application/gpx+xml.
      */
     public static final MediaType GPX_XML_TYPE = new MediaType(APPLICATION_GPX_XML, EXTENSION_GPX);
 
     /**
-     * ZIP archive format: application/zip
+     * ZIP archive format: application/zip.
      */
     public static final String APPLICATION_ZIP = "application/zip";
 
     /**
-     * ZIP archive format: application/zip
+     * ZIP archive format: application/zip.
      */
     public static final MediaType ZIP_TYPE = new MediaType(APPLICATION_ZIP);
 
     /**
-     * GZip compressed data: application/gzip
+     * GZip compressed data: application/gzip.
      */
     public static final String APPLICATION_GZIP = "application/gzip";
 
     /**
-     * GZip compressed data: application/gzip
+     * GZip compressed data: application/gzip.
      */
     public static final MediaType GZIP_TYPE = new MediaType(APPLICATION_GZIP);
 
