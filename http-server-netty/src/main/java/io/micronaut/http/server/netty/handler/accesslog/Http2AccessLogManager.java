@@ -18,6 +18,9 @@ package io.micronaut.http.server.netty.handler.accesslog;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http2.Http2Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +50,25 @@ public final class Http2AccessLogManager {
         this.formatParser = new AccessLogFormatParser(factory.spec);
         this.logger = factory.logger == null ? LoggerFactory.getLogger(HttpAccessLogHandler.HTTP_ACCESS_LOGGER) : factory.logger;
         this.uriInclusion = factory.uriInclusion;
+    }
+
+    public void logHeaders(ChannelHandlerContext ctx, int streamId, HttpRequest request) {
+        if (!logger.isInfoEnabled()) {
+            return;
+        }
+        if (uriInclusion != null && !uriInclusion.test(request.uri())) {
+            return;
+        }
+
+        AccessLog accessLog;
+        if (logForReuse != null) {
+            accessLog = logForReuse;
+            logForReuse = null;
+        } else {
+            accessLog = formatParser.newAccessLogger();
+        }
+        connection.stream(streamId).setProperty(accessLogKey, accessLog);
+        accessLog.onRequestHeaders((SocketChannel) ctx.channel(), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
     }
 
     public record Factory(Logger logger, String spec, Predicate<String> uriInclusion) {

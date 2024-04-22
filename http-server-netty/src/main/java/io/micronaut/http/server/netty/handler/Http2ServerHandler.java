@@ -61,6 +61,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private Http2ConnectionHandler connectionHandler;
     private Http2Connection.PropertyKey streamKey;
     private boolean reading = false;
+    private boolean upgradedFromHttp1 = false;
 
     static {
         for (Http2Error value : Http2Error.values()) {
@@ -192,10 +193,13 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     public static final class ConnectionHandler extends Http2ConnectionHandler {
         private final Http2ServerHandler handler;
+        @Nullable
+        private final Http2AccessLogManager accessLogManager;
 
-        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler) {
+        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, Http2AccessLogManager accessLogManager) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
             this.handler = handler;
+            this.accessLogManager = accessLogManager;
         }
 
         @Override
@@ -238,7 +242,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
             if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent upgrade) {
+                handler.upgradedFromHttp1 = true;
                 FullHttpRequest fhr = upgrade.upgradeRequest();
+                if (accessLogManager != null) {
+                    accessLogManager.logHeaders(ctx, 1, fhr);
+                }
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
                 handleFakeRequest(cs, fhr);
             }
@@ -320,7 +328,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManager != null) {
                 encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
             }
-            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener);
+            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener, accessLogManager);
             frameListener.init(ch);
             return ch;
         }
@@ -336,7 +344,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         void notifyDataConsumed(int n) {
-            if (stream.id() == 1) {
+            if (stream.id() == 1 && upgradedFromHttp1) {
                 // ignore for upgrade stream
                 return;
             }
