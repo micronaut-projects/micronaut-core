@@ -215,7 +215,7 @@ public class ConnectionManager {
         SslContext oldWebsocketSslContext = websocketSslContext;
         if (configuration.getSslConfiguration().isEnabled()) {
             sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
-            websocketSslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forLegacyVersion(HttpVersion.HTTP_1_1));
+            websocketSslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
         } else {
             sslContext = null;
             websocketSslContext = null;
@@ -376,7 +376,9 @@ public class ConnectionManager {
             }
         }
         ReferenceCountUtil.release(sslContext);
+        ReferenceCountUtil.release(websocketSslContext);
         sslContext = null;
+        websocketSslContext = null;
     }
 
     /**
