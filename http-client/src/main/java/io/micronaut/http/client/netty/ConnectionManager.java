@@ -22,7 +22,6 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -144,7 +143,6 @@ public class ConnectionManager {
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
     private volatile SslContext sslContext;
-    private volatile SslContext websocketSslContext;
     private volatile /* QuicSslContext */ Object http3SslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
@@ -166,7 +164,6 @@ public class ConnectionManager {
         this.udpBootstrap = from.udpBootstrap;
         this.configuration = from.configuration;
         this.sslContext = from.sslContext;
-        this.websocketSslContext = from.websocketSslContext;
         this.http3SslContext = from.http3SslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
@@ -212,13 +209,10 @@ public class ConnectionManager {
 
     final void refresh() {
         SslContext oldSslContext = sslContext;
-        SslContext oldWebsocketSslContext = websocketSslContext;
         if (configuration.getSslConfiguration().isEnabled()) {
             sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
-            websocketSslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
         } else {
             sslContext = null;
-            websocketSslContext = null;
         }
         if (httpVersion.isHttp3()) {
             http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
@@ -230,7 +224,6 @@ public class ConnectionManager {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
         ReferenceCountUtil.release(oldSslContext);
-        ReferenceCountUtil.release(oldWebsocketSslContext);
     }
 
     /**
@@ -376,9 +369,7 @@ public class ConnectionManager {
             }
         }
         ReferenceCountUtil.release(sslContext);
-        ReferenceCountUtil.release(websocketSslContext);
         sslContext = null;
-        websocketSslContext = null;
     }
 
     /**
@@ -448,17 +439,17 @@ public class ConnectionManager {
      */
     @Nullable
     private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
-        final SslContext sslCtx;
         if (requestKey.isSecure()) {
-            sslCtx = websocketSslContext;
-            //Allow wss requests to be sent if SSL is disabled but a proxy is present
-            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
+            if (configuration.getSslConfiguration().isEnabled()) {
+                return nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
+            } else if (configuration.getProxyAddress().isEmpty()){
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
+            } else {
+                return null;
             }
         } else {
-            sslCtx = null;
+            return null;
         }
-        return sslCtx;
     }
 
     /**
