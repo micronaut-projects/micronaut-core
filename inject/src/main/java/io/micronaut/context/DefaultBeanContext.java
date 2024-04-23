@@ -2887,21 +2887,22 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                           boolean throwNoSuchBean) {
         final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
         BeanResolutionContext.Segment<?, ?> injectionPointSegment = null;
-        if (CollectionUtils.isNotEmpty(path)) {
-            @SuppressWarnings("java:S2259") // false positive
+        if (path != null) {
             final Iterator<BeanResolutionContext.Segment<?, ?>> i = path.iterator();
-            injectionPointSegment = i.next();
-            BeanResolutionContext.Segment<?, ?> segment = null;
             if (i.hasNext()) {
-                segment = i.next();
-                if (segment.getDeclaringType().hasStereotype(INTRODUCTION_TYPE)) {
-                    segment = i.hasNext() ? i.next() : null;
+                injectionPointSegment = i.next();
+                BeanResolutionContext.Segment<?, ?> segment = null;
+                if (i.hasNext()) {
+                    segment = i.next();
+                    if (segment.getDeclaringType().hasStereotype(INTRODUCTION_TYPE)) {
+                        segment = i.hasNext() ? i.next() : null;
+                    }
                 }
-            }
-            if (segment != null) {
-                T ip = (T) segment.getInjectionPoint();
-                if (ip != null && beanType.isInstance(ip)) {
-                    return new BeanRegistration<>(BeanIdentifier.of(InjectionPoint.class.getName()), null, ip);
+                if (segment != null) {
+                    T ip = (T) segment.getInjectionPoint();
+                    if (ip != null && beanType.isInstance(ip)) {
+                        return new BeanRegistration<>(BeanIdentifier.of(InjectionPoint.class.getName()), null, ip);
+                    }
                 }
             }
         }
