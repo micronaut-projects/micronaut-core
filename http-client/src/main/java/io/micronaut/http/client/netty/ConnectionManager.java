@@ -454,6 +454,7 @@ public class ConnectionManager {
                         sslCtx = websocketSslContext;
                         if (sslCtx == null) {
                             sslCtx = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
+                            websocketSslContext = sslCtx;
                         }
                     }
                 }
