@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.CloseableInboundByteBody;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -52,7 +52,7 @@ record HttpToHttpsRedirectHandler(
 ) implements RequestHandler {
 
     @Override
-    public void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
         UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));

@@ -3,7 +3,7 @@ package io.micronaut.http.server.netty.body
 import spock.lang.Specification
 
 class UpstreamBalancerSpec extends Specification {
-    def 'slowest'(List<Integer> steps, int expect) {
+    def 'slowest'(List<Long> steps, int expect) {
         given:
         long combined = 0
         def pair = UpstreamBalancer.slowest(new BufferConsumer.Upstream() {
@@ -18,14 +18,14 @@ class UpstreamBalancerSpec extends Specification {
             }
 
             @Override
-            void discard() {
+            void allowDiscard() {
             }
         })
         def left = pair.left()
         def right = pair.right()
 
         when:
-        for (Integer step : steps) {
+        for (Long step : steps) {
             if (step < 0) {
                 left.onBytesConsumed(-step)
             } else {
@@ -45,10 +45,11 @@ class UpstreamBalancerSpec extends Specification {
         [1, -1]  | 1
         [2, -1]  | 1
         [-1, 2]  | 1
-        // todo: saturate tests
+        [Long.MAX_VALUE, Long.MAX_VALUE, -1]  | 1
+        [-Long.MAX_VALUE, -Long.MAX_VALUE, 1] | 1
     }
 
-    def 'fastest'(List<Integer> steps, int expect) {
+    def 'fastest'(List<Long> steps, long expect) {
         given:
         long combined = 0
         def pair = UpstreamBalancer.fastest(new BufferConsumer.Upstream() {
@@ -56,17 +57,21 @@ class UpstreamBalancerSpec extends Specification {
             void onBytesConsumed(long bytesConsumed) {
                 assert bytesConsumed > 0
                 combined += bytesConsumed
+                // clamp
+                if (combined < 0) {
+                    combined = Long.MAX_VALUE;
+                }
             }
 
             @Override
-            void discard() {
+            void allowDiscard() {
             }
         })
         def left = pair.left()
         def right = pair.right()
 
         when:
-        for (Integer step : steps) {
+        for (Long step : steps) {
             if (step < 0) {
                 left.onBytesConsumed(-step)
             } else {
@@ -86,5 +91,7 @@ class UpstreamBalancerSpec extends Specification {
         [1, -1]  | 1
         [2, -1]  | 2
         [-1, 2]  | 2
+        [Long.MAX_VALUE, Long.MAX_VALUE]   | Long.MAX_VALUE
+        [-Long.MAX_VALUE, -Long.MAX_VALUE] | Long.MAX_VALUE
     }
 }

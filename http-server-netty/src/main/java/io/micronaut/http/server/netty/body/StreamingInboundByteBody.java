@@ -16,10 +16,11 @@ import reactor.core.publisher.Sinks;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.OptionalLong;
 
-final class StreamingInboundByteBody extends NettyInboundByteBody implements BufferConsumer, CloseableInboundByteBody {
+public final class StreamingInboundByteBody extends NettyInboundByteBody implements BufferConsumer, CloseableInboundByteBody {
     private Upstream upstream;
     private List<@Nullable ByteBuf> buffered;
     private BufferConsumer primary;
@@ -61,8 +62,8 @@ final class StreamingInboundByteBody extends NettyInboundByteBody implements Buf
             UpstreamBalancer.UpstreamPair pair = switch (backpressureMode) {
                 case SLOWEST -> UpstreamBalancer.slowest(upstream);
                 case FASTEST -> UpstreamBalancer.fastest(upstream);
-                case ORIGINAL -> new UpstreamBalancer.UpstreamPair(upstream, Upstream.IGNORE);
-                case NEW -> new UpstreamBalancer.UpstreamPair(Upstream.IGNORE, upstream);
+                case ORIGINAL -> UpstreamBalancer.first(upstream);
+                case NEW -> UpstreamBalancer.first(upstream).flip();
             };
 
             upstream = pair.left();
@@ -73,6 +74,15 @@ final class StreamingInboundByteBody extends NettyInboundByteBody implements Buf
                     node.buffered.add(buf == null ? null : buf.retainedSlice());
                 }
             }
+            // cannot use COWArrayList here
+            List<StreamingInboundByteBody> oldSplit = split;
+            if (oldSplit == null) {
+                oldSplit = Collections.emptyList();
+            }
+            List<StreamingInboundByteBody> newSplit = new ArrayList<>(oldSplit.size() + 1);
+            newSplit.addAll(oldSplit);
+            newSplit.add(node);
+            split = newSplit;
             return node;
         }
     }
@@ -172,7 +182,6 @@ final class StreamingInboundByteBody extends NettyInboundByteBody implements Buf
 
     @Override
     public void close() {
-        List<@Nullable ByteBuf> buffered;
         synchronized (this) {
             if (this.primary != null) {
                 return;
@@ -186,7 +195,7 @@ final class StreamingInboundByteBody extends NettyInboundByteBody implements Buf
                 @Override
                 public void complete() {
                 }
-            }).onBytesConsumed(Long.MAX_VALUE);
+            }).allowDiscard();
         }
     }
 }

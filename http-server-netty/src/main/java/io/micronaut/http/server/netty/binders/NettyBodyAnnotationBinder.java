@@ -21,25 +21,38 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
+import io.micronaut.http.body.CloseableImmediateInboundByteBody;
+import io.micronaut.http.body.ImmediateInboundByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.ImmediateByteBody;
+import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.web.router.RouteInfo;
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
+    private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
     final HttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
@@ -49,6 +62,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         super(conversionService);
         this.httpServerConfiguration = httpServerConfiguration;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
+    }
+
+    public static boolean isRaw(Argument<?> bodyType) {
+        return RAW_BODY_TYPES.contains(bodyType.getType());
     }
 
     @Override
@@ -82,12 +99,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (!(source instanceof NettyHttpRequest<?> nhr)) {
             return super.bindFullBody(context, source);
         }
-        if (nhr.byteBody() instanceof ImmediateByteBody imm && imm.empty()) {
+        if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
             return BindingResult.empty();
         }
 
-        ExecutionFlow<ImmediateByteBody> buffered = nhr.byteBody()
-            .buffer(nhr.getChannelHandlerContext().alloc());
+        ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffered = nhr.byteBody().buffer();
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -124,16 +140,23 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         };
     }
 
-    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateByteBody imm) throws Throwable {
-        if (!DefaultHttpContentProcessorResolver.isRaw(context.getArgument())) {
+    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateInboundByteBody imm) throws Throwable {
+        if (!isRaw(context.getArgument())) {
             if (nhr.isFormOrMultipartData()) {
-                return imm.processSingle(
-                        new FormDataHttpContentProcessor(nhr, httpServerConfiguration),
-                        httpServerConfiguration.getDefaultCharset(),
-                        nhr.getChannelHandlerContext().alloc()
-                    )
+                FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
+                ByteBuf buf = ImmediateNettyInboundByteBody.toByteBuf(imm);
+                List<InterfaceHttpData> result = new ArrayList<>();
+                if (buf.isReadable()) {
+                    processor.add(new DefaultLastHttpContent(buf), result);
+                } else {
+                    buf.release();
+                }
+                Optional<T> converted = new ImmediateMultiObjectBody(result)
+                    .single(httpServerConfiguration.getDefaultCharset(), nhr.getChannelHandlerContext().alloc())
                     .convert(conversionService, context)
                     .map(o -> (T) o.claimForExternal());
+                nhr.setLegacyBody(converted.orElse(null));
+                return converted;
             }
             MessageBodyReader<T> reader = null;
             final RouteInfo<?> routeInfo = nhr.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
@@ -147,8 +170,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 }
                 if (reader != null) {
                     try {
-                        //noinspection unchecked
-                        return Optional.ofNullable((T) imm.processSingle(httpServerConfiguration, reader, context.getArgument(), mediaType, nhr.getHeaders()).claimForExternal());
+                        T result = reader.read(context.getArgument(), mediaType, nhr.getHeaders(), imm.toByteBuffer());
+                        nhr.setLegacyBody(result);
+                        return Optional.ofNullable(result);
                     } catch (CodecException ce) {
                         if (ce.getCause() instanceof Exception e) {
                             context.reject(e);
@@ -161,8 +185,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
         }
         //noinspection unchecked
-        return imm.rawContent(httpServerConfiguration)
+        Optional<T> converted = new ImmediateSingleObjectBody(imm.toByteBuffer().asNativeBuffer())
             .convert(conversionService, context)
             .map(o -> (T) o.claimForExternal());
+        nhr.setLegacyBody(converted.orElse(null));
+        return converted;
     }
 }

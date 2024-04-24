@@ -31,10 +31,12 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.multipart.InterfaceHttpPostRequestDecoder;
+import io.netty.util.ReferenceCountUtil;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -45,10 +47,14 @@ import java.util.Collection;
  * @since 1.0
  */
 @Internal
-public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
+public class FormDataHttpContentProcessor {
 
+    protected final NettyHttpRequest<?> nettyHttpRequest;
+    protected final long advertisedLength;
+    protected final long requestMaxSize;
+    protected final AtomicLong receivedLength = new AtomicLong();
+    protected final HttpServerConfiguration configuration;
     private final InterfaceHttpPostRequestDecoder decoder;
-    private final boolean enabled;
     private final long partMaxSize;
 
     /**
@@ -69,7 +75,10 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
     public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
-        super(nettyHttpRequest, configuration);
+        this.nettyHttpRequest = nettyHttpRequest;
+        this.advertisedLength = nettyHttpRequest.getContentLength();
+        this.requestMaxSize = configuration.getMaxRequestSize();
+        this.configuration = configuration;
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
@@ -80,18 +89,10 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
         } else {
             this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
         }
-        this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
-            multipart.isEnabled();
         this.partMaxSize = multipart.getMaxFileSize();
     }
 
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    @Override
-    protected void onData(ByteBufHolder message, Collection<Object> out) {
+    protected void onData(ByteBufHolder message, Collection<? super InterfaceHttpData> out) {
         boolean skip;
         synchronized (this) {
             if (destroyed) {
@@ -163,22 +164,28 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
         }
     }
 
-    @Override
-    public void add(ByteBufHolder message, Collection<Object> out) throws Throwable {
+    public void add(ByteBufHolder message, Collection<? super InterfaceHttpData> out) throws Throwable {
         try {
-            super.add(message, out);
+            long receivedLength1 = this.receivedLength.addAndGet(message.content().readableBytes());
+
+            ReferenceCountUtil.touch(message);
+            if (advertisedLength > requestMaxSize) {
+                fireExceedsLength(advertisedLength, requestMaxSize, message);
+            } else if (receivedLength1 > requestMaxSize) {
+                fireExceedsLength(receivedLength1, requestMaxSize, message);
+            } else {
+                onData(message, out);
+            }
         } catch (Throwable e) {
             cancel();
             throw e;
         }
     }
 
-    @Override
-    public void complete(Collection<Object> out) {
+    public void complete() {
         cancel();
     }
 
-    @Override
     public void cancel() {
         pleaseDestroy = true;
         destroyIfRequested();
@@ -199,4 +206,13 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
         }
     }
 
+    /**
+     * @param receivedLength The length of the content received
+     * @param expected The expected length of the content
+     * @param message The message to release
+     */
+    protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
+        message.release();
+        throw new ContentLengthExceededException(expected, receivedLength);
+    }
 }

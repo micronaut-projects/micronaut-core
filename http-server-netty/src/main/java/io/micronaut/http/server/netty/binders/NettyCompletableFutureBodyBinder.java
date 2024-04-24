@@ -21,9 +21,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.ByteBody;
-import io.micronaut.http.server.netty.body.ImmediateByteBody;
 
 import java.util.Arrays;
 import java.util.List;
@@ -67,15 +66,15 @@ final class NettyCompletableFutureBodyBinder
     @Override
     public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            ByteBody rootBody = nhr.byteBody();
-            if (rootBody instanceof ImmediateByteBody immediate && immediate.empty()) {
+            InboundByteBody rootBody = nhr.byteBody();
+            if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
 
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
             CompletableFuture<Object> future = rootBody
-                .buffer(nhr.getChannelHandlerContext().alloc())
+                .buffer()
                 .map(bytes -> {
                     Optional<Object> value;
                     try {

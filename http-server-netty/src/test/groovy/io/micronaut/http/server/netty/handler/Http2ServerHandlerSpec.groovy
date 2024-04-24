@@ -1,9 +1,9 @@
 package io.micronaut.http.server.netty.handler
 
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.body.CloseableInboundByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.ByteBody
+import io.micronaut.http.server.netty.body.NettyInboundByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
@@ -49,7 +49,6 @@ import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -110,7 +109,8 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 Assertions.assertEquals(HttpMethod.GET, request.method())
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
@@ -156,8 +156,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).cast(ByteBuf).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                NettyInboundByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         serverSubscription = s
@@ -249,7 +249,8 @@ class Http2ServerHandlerSpec extends Specification {
         long demand = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -342,7 +343,8 @@ class Http2ServerHandlerSpec extends Specification {
         long read = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStream(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new InputStream() {
                     @Override
                     int read() throws IOException {
@@ -420,8 +422,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).cast(ByteBuf).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                NettyInboundByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         s.request(Long.MAX_VALUE)
@@ -495,7 +497,8 @@ class Http2ServerHandlerSpec extends Specification {
         Subscriber<? super HttpContent> subscriber = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -563,11 +566,11 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "closeIfNoSubscriber"() {
         given:
-        ByteBody b = null
+        CloseableInboundByteBody b = null
         OutboundAccess oa = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
                 b = body
                 oa = outboundAccess
             }
@@ -594,7 +597,7 @@ class Http2ServerHandlerSpec extends Specification {
         when:"send some data, then close the request"
         def data1 = randomData(500)
         client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
-        b.release()
+        b.close()
         EmbeddedTestUtil.advance(server, client)
         then:"no reset yet"
         client.readInbound() == null
@@ -625,7 +628,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean cancelled = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -696,7 +700,8 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
             }
 
             @Override

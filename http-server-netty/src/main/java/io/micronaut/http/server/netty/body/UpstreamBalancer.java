@@ -1,7 +1,10 @@
 package io.micronaut.http.server.netty.body;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import io.micronaut.core.annotation.Internal;
+
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 /**
  * This class merges the backpressure of two data streams. The bytes signaled to the
@@ -26,35 +29,40 @@ import java.util.concurrent.atomic.AtomicLong;
  * The last two cases can be combined into sending {@code min(n, abs(l-r))} upstream. So we
  * only need to test for the first case.
  */
-final class UpstreamBalancer extends AtomicLong {
+@Internal
+public final class UpstreamBalancer {
+    private static final AtomicLongFieldUpdater<UpstreamBalancer> DELTA = AtomicLongFieldUpdater.newUpdater(UpstreamBalancer.class, "delta");
+    private static final AtomicIntegerFieldUpdater<UpstreamBalancer> DISCARD_FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "discardFlags");
+
     private final BufferConsumer.Upstream upstream;
-    private final AtomicInteger discardFlags = new AtomicInteger();
+    private volatile long delta;
+    private volatile int discardFlags;
 
     private UpstreamBalancer(BufferConsumer.Upstream upstream) {
         this.upstream = upstream;
     }
 
-    static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
-        if (upstream == BufferConsumer.Upstream.IGNORE) {
-            return UpstreamPair.IGNORE;
-        }
+    public static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new SlowestUpstreamImpl(false), balancer.new SlowestUpstreamImpl(true));
     }
 
     static UpstreamPair fastest(BufferConsumer.Upstream upstream) {
-        if (upstream == BufferConsumer.Upstream.IGNORE) {
-            return UpstreamPair.IGNORE;
-        }
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new FastestUpstreamImpl(false), balancer.new FastestUpstreamImpl(true));
+    }
+
+    static UpstreamPair first(BufferConsumer.Upstream upstream) {
+        UpstreamBalancer balancer = new UpstreamBalancer(upstream);
+        return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
     }
 
     private static long subtractSaturating(long dest, long n) {
         assert n >= 0;
         long sum = dest - n;
-        if (sum > dest) {
-            sum = Long.MIN_VALUE;
+        // also prevent MIN_VALUE to avoid some edge cases
+        if (sum > dest || sum == Long.MIN_VALUE) {
+            sum = -Long.MAX_VALUE;
         }
         return sum;
     }
@@ -71,7 +79,7 @@ final class UpstreamBalancer extends AtomicLong {
     private void addSlowest(boolean inv, long n) {
         assert n > 0;
 
-        long oldValue = getAndUpdate(prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
+        long oldValue = DELTA.getAndUpdate(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
         if (oldValue < 0 != inv) {
             long actual = Math.min(n, Math.abs(oldValue));
             if (actual > 0) {
@@ -83,7 +91,7 @@ final class UpstreamBalancer extends AtomicLong {
     private void addFastest(boolean inv, long n) {
         assert n > 0;
 
-        long newValue = updateAndGet(prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
+        long newValue = DELTA.updateAndGet(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
         if (newValue > 0 != inv) {
             long actual = Math.min(n, Math.abs(newValue));
             if (actual > 0) {
@@ -100,23 +108,24 @@ final class UpstreamBalancer extends AtomicLong {
         }
 
         @Override
-        public void discard() {
+        public void allowDiscard() {
             int mask = inv ? 2 : 1;
             while (true) {
-                int current = discardFlags.get();
+                int current = discardFlags;
                 if ((current & mask) != 0) {
                     // already discarded
                     return;
                 }
                 int next = current | mask;
-                if (discardFlags.compareAndSet(current, next)) {
+                if (DISCARD_FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
                     if (next == 3) {
                         // both streams discarded
-                        upstream.discard();
+                        upstream.allowDiscard();
                     } else {
                         // only we are discarded right now. Special case for slow mode, need to
                         // prevent stall
-                        if (getClass() == SlowestUpstreamImpl.class) {
+                        if (getClass() == SlowestUpstreamImpl.class ||
+                            getClass() == PassthroughUpstreamImpl.class) {
                             onBytesConsumed(Long.MAX_VALUE);
                         }
                     }
@@ -149,7 +158,31 @@ final class UpstreamBalancer extends AtomicLong {
         }
     }
 
-    record UpstreamPair(BufferConsumer.Upstream left, BufferConsumer.Upstream right) {
-        private static final UpstreamPair IGNORE = new UpstreamPair(BufferConsumer.Upstream.IGNORE, BufferConsumer.Upstream.IGNORE);
+    private final class IgnoringUpstreamImpl extends UpstreamImpl {
+        IgnoringUpstreamImpl() {
+            super(true);
+        }
+
+        @Override
+        public void onBytesConsumed(long bytesConsumed) {
+            // ignored
+        }
+    }
+
+    private final class PassthroughUpstreamImpl extends UpstreamImpl {
+        PassthroughUpstreamImpl() {
+            super(false);
+        }
+
+        @Override
+        public void onBytesConsumed(long bytesConsumed) {
+            upstream.onBytesConsumed(bytesConsumed);
+        }
+    }
+
+    public record UpstreamPair(BufferConsumer.Upstream left, BufferConsumer.Upstream right) {
+        UpstreamPair flip() {
+            return new UpstreamPair(right, left);
+        }
     }
 }

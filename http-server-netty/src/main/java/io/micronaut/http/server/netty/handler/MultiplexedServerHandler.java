@@ -20,7 +20,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.BufferConsumer;
+import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
+import io.micronaut.http.server.netty.body.StreamingInboundByteBody;
+import io.micronaut.http.server.netty.body.UpstreamBalancer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -29,8 +32,6 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -42,14 +43,10 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
-import reactor.util.concurrent.Queues;
 
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -131,7 +128,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, ByteBody.empty(), this);
+                requestHandler.accept(ctx, headers, ImmediateNettyInboundByteBody.empty(), this);
             }
         }
 
@@ -167,7 +164,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, ByteBody.of(fullBody), this);
+                    requestHandler.accept(ctx, request, new ImmediateNettyInboundByteBody(fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -175,12 +172,9 @@ abstract class MultiplexedServerHandler {
                     bufferedContent.add(data);
                 }
             } else {
-                DefaultHttpContent c = endOfStream ? new DefaultLastHttpContent(data) : new DefaultHttpContent(data);
-                if (streamer.sink.tryEmitNext(c) != Sinks.EmitResult.OK) {
-                    c.release();
-                }
+                streamer.add(data);
                 if (endOfStream) {
-                    streamer.sink.tryEmitComplete();
+                    streamer.complete();
                 }
             }
             return 0;
@@ -197,14 +191,13 @@ abstract class MultiplexedServerHandler {
             streamer = new InputStreamer();
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
-                    if (streamer.sink.tryEmitNext(new DefaultHttpContent(buf)) != Sinks.EmitResult.OK) {
-                        buf.release();
-                    }
+                    streamer.add(buf);
                 }
                 bufferedContent = null;
             }
             requestAccepted = true;
-            requestHandler.accept(ctx, request, ByteBody.of(streamer, request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)), this);
+            // todo request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)
+            requestHandler.accept(ctx, request, streamer.dest, this);
         }
 
         /**
@@ -511,48 +504,62 @@ abstract class MultiplexedServerHandler {
          * This is the {@link HotObservable} that represents the request body in the streaming
          * request case.
          */
-        private class InputStreamer implements HotObservable<HttpContent> {
-            final Queue<HttpContent> queue = Queues.<HttpContent>unbounded().get();
-            final Sinks.Many<HttpContent> sink = Sinks.many().unicast().onBackpressureBuffer(queue);
-            final Flux<HttpContent> flux = sink.asFlux()
-                .doOnNext(this::onNext);
+        private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
+            private final BufferConsumer.Upstream incomingDataCounter;
+            final StreamingInboundByteBody dest;
 
-            private void onNext(HttpContent c) {
-                onNext(c.content().readableBytes());
-            }
-
-            private void onNext(int n) {
-                EventLoop eventLoop = ctx.channel().eventLoop();
-                if (!eventLoop.inEventLoop()) {
-                    eventLoop.execute(() -> onNext(n));
-                    return;
-                }
-
-                notifyDataConsumed(n);
-                if (queue.isEmpty()) {
-                    // flush any window updates
-                    flush();
-                }
+            InputStreamer() {
+                // Upstream.onBytesConsumed is less strict than notifyDataConsumed, in that it can
+                // signal consumed bytes that haven't yet come in. We use the UpstreamBalancer here
+                // to limit the onBytesConsumed to the number of bytes that have actually arrived.
+                UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.slowest(this);
+                dest = new StreamingInboundByteBody(pair.left());
+                incomingDataCounter = pair.right();
             }
 
             @Override
-            public void closeIfNoSubscriber() {
+            public void onBytesConsumed(long bytesConsumed) {
                 EventLoop eventLoop = ctx.channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
-                    eventLoop.execute(this::closeIfNoSubscriber);
+                    long finalBytesConsumed = bytesConsumed;
+                    eventLoop.execute(() -> onBytesConsumed(finalBytesConsumed));
                     return;
                 }
 
-                if (sink.currentSubscriberCount() == 0) {
-                    // this prevents further onData calls from leaking items
-                    sink.tryEmitError(SubscribedTooLateException.INSTANCE);
-                    closeInput();
+                for (int i = 0; bytesConsumed > Integer.MAX_VALUE && i < 100; i++) {
+                    notifyDataConsumed(Integer.MAX_VALUE);
+                    bytesConsumed -= Integer.MAX_VALUE;
                 }
+                if (bytesConsumed > Integer.MAX_VALUE) {
+                    LOG.debug("Clamping onBytesConsumed({})", bytesConsumed);
+                    // so many bytes consumed at once, weird! just clamp.
+                    bytesConsumed = Integer.MAX_VALUE;
+                }
+                notifyDataConsumed(Math.toIntExact(bytesConsumed));
+                // flush any window updates
+                flush();
             }
 
             @Override
-            public void subscribe(Subscriber<? super HttpContent> s) {
-                flux.subscribe(s);
+            public void allowDiscard() {
+                EventLoop eventLoop = ctx.channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    eventLoop.execute(this::allowDiscard);
+                    return;
+                }
+
+                closeInput();
+            }
+
+            @Override
+            public void add(ByteBuf buf) {
+                incomingDataCounter.onBytesConsumed(buf.readableBytes());
+                dest.add(buf);
+            }
+
+            @Override
+            public void complete() {
+                dest.complete();
             }
         }
     }

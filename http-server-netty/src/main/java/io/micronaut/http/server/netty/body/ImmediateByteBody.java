@@ -61,10 +61,6 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     @Override
     public MultiObjectBody processMulti(FormDataHttpContentProcessor processor) throws Throwable {
         ByteBuf data = prepareClaim();
-        Object item = processor.processSingle(data);
-        if (item != null) {
-            return next(new ImmediateSingleObjectBody(item));
-        }
 
         return next(processMultiImpl(processor, data));
     }
@@ -90,7 +86,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
             processor.add(new DefaultLastHttpContent(data), out);
         }
         data.release();
-        processor.complete(out);
+        processor.complete();
         return new ImmediateMultiObjectBody(out);
     }
 

@@ -42,7 +42,7 @@ import java.util.function.Function;
  */
 @Internal
 public final class ImmediateSingleObjectBody extends ManagedBody<Object> implements HttpBody, MultiObjectBody {
-    ImmediateSingleObjectBody(Object value) {
+    public ImmediateSingleObjectBody(Object value) {
         super(value);
     }
 

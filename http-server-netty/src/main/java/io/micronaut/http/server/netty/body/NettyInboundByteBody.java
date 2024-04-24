@@ -7,6 +7,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.body.InboundByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,14 @@ public abstract class NettyInboundByteBody implements InboundByteBody {
     }
 
     protected abstract Flux<ByteBuf> toByteBufPublisher();
+
+    public static Flux<ByteBuf> toByteBufs(InboundByteBody body) {
+        if (body instanceof NettyInboundByteBody net) {
+            return net.toByteBufPublisher();
+        } else {
+            return Flux.from(body.toByteArrayPublisher()).map(Unpooled::wrappedBuffer);
+        }
+    }
 
     @Override
     public @NonNull Publisher<byte[]> toByteArrayPublisher() {

@@ -24,8 +24,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.http.server.RequestLifecycle;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.NettyInboundByteBody;
+import io.micronaut.http.server.netty.body.StreamingMultiObjectBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -33,6 +35,7 @@ import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,10 +142,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         // the FormRouteCompleter can process data.
         if (nettyRequest.hasFormRouteCompleter()) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
-            ByteBody rootBody = nettyRequest.byteBody();
+            InboundByteBody rootBody = nettyRequest.byteBody();
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
-                rootBody.processMulti(processor).handleForm(formRouteCompleter);
+                new StreamingMultiObjectBody(HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyInboundByteBody.toByteBufs(rootBody).map(DefaultHttpContent::new))).handleForm(formRouteCompleter);
                 nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);

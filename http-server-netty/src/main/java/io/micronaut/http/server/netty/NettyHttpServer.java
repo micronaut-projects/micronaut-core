@@ -168,15 +168,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             nettyEmbeddedServices.getExecutorSelector()
                 .select(TaskExecutors.BLOCKING).orElse(null)
         );
-        HttpContentProcessorResolver httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
-            nettyEmbeddedServices.getApplicationContext(),
-            () -> serverConfiguration
-        );
         this.routingHandler = new RoutingInBoundHandler(
             serverConfiguration,
             nettyEmbeddedServices,
             ioExecutor,
-            httpContentProcessorResolver,
             httpRequestTerminatedEventPublisher,
             applicationContext.getConversionService()
         );

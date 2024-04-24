@@ -23,6 +23,7 @@ import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -376,7 +377,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             boolean full = request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, ByteBody.of(((FullHttpRequest) request).content()), outboundAccess);
+                requestHandler.accept(ctx, request, new ImmediateNettyInboundByteBody(((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (message instanceof HttpContent) {
@@ -385,7 +386,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, request, ByteBody.empty(), outboundAccess);
+                requestHandler.accept(ctx, request, ImmediateNettyInboundByteBody.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -471,7 +472,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, request, ByteBody.of(fullBody), outboundAccess);
+                requestHandler.accept(ctx, request, new ImmediateNettyInboundByteBody(fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }

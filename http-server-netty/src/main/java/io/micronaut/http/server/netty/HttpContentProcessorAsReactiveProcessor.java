@@ -51,7 +51,7 @@ public final class HttpContentProcessorAsReactiveProcessor {
      * @param <T> The output element type
      */
     @NonNull
-    public static <T> Flux<T> asPublisher(HttpContentProcessor processor, Publisher<HttpContent> streamed) {
+    public static <T> Flux<T> asPublisher(FormDataHttpContentProcessor processor, Publisher<HttpContent> streamed) {
         return Flux.concat(Flux.from(streamed)
             .doOnError(e -> {
                 try {
@@ -71,9 +71,8 @@ public final class HttpContentProcessorAsReactiveProcessor {
                 }
             }), Flux.defer(() -> {
             try {
-                List<T> out = new ArrayList<>(1);
-                processor.complete((List) out);
-                return Flux.fromIterable(out);
+                processor.complete();
+                return Flux.empty();
             } catch (Throwable ex) {
                 return Flux.error(ex);
             }

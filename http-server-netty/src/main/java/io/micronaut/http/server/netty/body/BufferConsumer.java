@@ -1,10 +1,20 @@
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBuf;
 
+@Internal
 public interface BufferConsumer {
+    /**
+     * Consume a buffer. Release ownership is transferred to this consumer.
+     *
+     * @param buf The buffer to consume
+     */
     void add(ByteBuf buf);
 
+    /**
+     * Signal completion of the stream.
+     */
     void complete();
 
     /**
@@ -12,16 +22,6 @@ public interface BufferConsumer {
      * Calls to {@link #onBytesConsumed(long)} may happen at the same time on different threads.
      */
     interface Upstream {
-        Upstream IGNORE = new Upstream() {
-            @Override
-            public void onBytesConsumed(long bytesConsumed) {
-            }
-
-            @Override
-            public void discard() {
-            }
-        };
-
         /**
          * Called when a number of bytes has been consumed by the downstream.
          *
@@ -29,6 +29,11 @@ public interface BufferConsumer {
          */
         void onBytesConsumed(long bytesConsumed);
 
-        void discard();
+        /**
+         * Allow the upstream to discard any further messages. Note that this does not actually
+         * mean the messages must be discarded: If another consumer still needs the body data, it
+         * may continue to be read and continue to be forwarded to this consumer.
+         */
+        void allowDiscard();
     }
 }
