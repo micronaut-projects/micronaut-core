@@ -229,6 +229,72 @@ class H2cSpec extends Specification {
         content.release()
     }
 
+    def 'prior knowledge'() {
+        given:
+        def responseFuture = new CompletableFuture()
+
+        def group = new NioEventLoopGroup(1)
+        def bootstrap = new Bootstrap()
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+                .group(group)
+                .channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
+                        def http2Connection = new DefaultHttp2Connection(false)
+                        def inboundAdapter = new InboundHttp2ToHttpAdapterBuilder(http2Connection)
+                                .maxContentLength(1000000)
+                                .validateHttpHeaders(true)
+                                .propagateSettings(true)
+                                .build()
+                        def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+                                .connection(http2Connection)
+                                .frameListener(new DelegatingDecompressorFrameListener(http2Connection, inboundAdapter))
+                                .build()
+
+                        ch.pipeline()
+                                .addLast(connectionHandler)
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                                        ctx.read()
+                                        if (msg instanceof HttpMessage) {
+                                            if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 3) {
+                                                responseFuture.completeExceptionally(new AssertionError("Response must be on stream 3"));
+                                            }
+                                            responseFuture.complete(ReferenceCountUtil.retain(msg))
+                                        }
+                                        super.channelRead(ctx, msg)
+                                    }
+
+                                    @Override
+                                    void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                        super.exceptionCaught(ctx, cause)
+                                        cause.printStackTrace()
+                                        responseFuture.completeExceptionally(cause)
+                                    }
+                                })
+
+                    }
+                })
+
+        def channel = (SocketChannel) bootstrap.connect().await().channel()
+
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test')
+        request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
+        channel.writeAndFlush(request)
+        channel.read()
+
+        expect:
+        def resp = responseFuture.get(10, TimeUnit.SECONDS)
+        resp != null
+
+        cleanup:
+        channel.close()
+        resp.release()
+        group.shutdownGracefully()
+    }
+
     @Controller("/h2c")
     @Requires(property = "spec.name", value = "H2cSpec")
     static class TestController {
