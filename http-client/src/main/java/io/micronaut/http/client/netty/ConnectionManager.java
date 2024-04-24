@@ -144,6 +144,7 @@ public class ConnectionManager {
     private final HttpClientConfiguration configuration;
     private volatile SslContext sslContext;
     private volatile /* QuicSslContext */ Object http3SslContext;
+    private volatile SslContext websocketSslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
 
@@ -165,6 +166,7 @@ public class ConnectionManager {
         this.configuration = from.configuration;
         this.sslContext = from.sslContext;
         this.http3SslContext = from.http3SslContext;
+        this.websocketSslContext = from.websocketSslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
@@ -209,6 +211,8 @@ public class ConnectionManager {
 
     final void refresh() {
         SslContext oldSslContext = sslContext;
+        SslContext oldWebsocketSslContext = websocketSslContext;
+        websocketSslContext = null;
         if (configuration.getSslConfiguration().isEnabled()) {
             sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
         } else {
@@ -224,6 +228,7 @@ public class ConnectionManager {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
         ReferenceCountUtil.release(oldSslContext);
+        ReferenceCountUtil.release(oldWebsocketSslContext);
     }
 
     /**
@@ -369,7 +374,9 @@ public class ConnectionManager {
             }
         }
         ReferenceCountUtil.release(sslContext);
+        ReferenceCountUtil.release(websocketSslContext);
         sslContext = null;
+        websocketSslContext = null;
     }
 
     /**
@@ -439,17 +446,22 @@ public class ConnectionManager {
      */
     @Nullable
     private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
+        SslContext sslCtx = websocketSslContext;
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
-                return nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
+                if (sslCtx == null) {
+                    synchronized (this) {
+                        sslCtx = websocketSslContext;
+                        if (sslCtx == null) {
+                            sslCtx = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
+                        }
+                    }
+                }
             } else if (configuration.getProxyAddress().isEmpty()){
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
-            } else {
-                return null;
             }
-        } else {
-            return null;
         }
+        return sslCtx;
     }
 
     /**
