@@ -1,6 +1,6 @@
 At times, you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans, etc.
 
-The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
+The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean. If a bean is used somewhere but it's requirements aren't met then `NoSuchBeanException` will be thrown. That's probably not what you want. If you want a bean to conditionally depend on a bean then mark the injection site as `@Nullable` (this is done automatically if you're using Kotlin and declare the bean with a `?`), or alternatively declare it as `Optional<Bean>`. Finally you can inject a container of interfaces, in which case unloaded beans just won't appear in the collection.
 
 Consider the following example:
 
