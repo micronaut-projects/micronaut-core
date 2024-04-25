@@ -24,6 +24,8 @@ import io.netty.handler.codec.compression.SnappyFrameDecoder
 import io.netty.handler.codec.compression.SnappyFrameEncoder
 import io.netty.handler.codec.compression.ZlibCodecFactory
 import io.netty.handler.codec.compression.ZlibWrapper
+import io.netty.handler.codec.compression.ZstdDecoder
+import io.netty.handler.codec.compression.ZstdEncoder
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import jakarta.inject.Singleton
@@ -72,6 +74,7 @@ class CompressionSpec extends Specification {
         HttpHeaderValues.GZIP      | ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP)
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB)
         HttpHeaderValues.SNAPPY    | new SnappyFrameDecoder()
+        HttpHeaderValues.ZSTD      | new ZstdDecoder()
     }
 
     def compressionLevel(int threshold, int actual, boolean compressed) {
@@ -142,6 +145,7 @@ class CompressionSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+        HttpHeaderValues.ZSTD      | new ZstdEncoder()
     }
 
     @Requires(property = "spec.name", value = "CompressionSpec")

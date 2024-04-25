@@ -15,6 +15,7 @@ import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.compression.SnappyFrameEncoder
 import io.netty.handler.codec.compression.ZlibCodecFactory
 import io.netty.handler.codec.compression.ZlibWrapper
+import io.netty.handler.codec.compression.ZstdEncoder
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -414,6 +415,7 @@ class PipeliningServerHandlerSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+        HttpHeaderValues.ZSTD      | new ZstdEncoder()
     }
 
     def 'decompression full to full'(ChannelHandler compressor, CharSequence contentEncoding) {
@@ -465,6 +467,7 @@ class PipeliningServerHandlerSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+        HttpHeaderValues.ZSTD      | new ZstdEncoder()
     }
 
     def 'decompression parts to stream'(ChannelHandler compressor, CharSequence contentEncoding) {
@@ -523,6 +526,7 @@ class PipeliningServerHandlerSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+        HttpHeaderValues.ZSTD      | new ZstdEncoder()
     }
 
     def 'empty streaming response while in queue'() {

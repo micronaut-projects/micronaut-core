@@ -34,6 +34,7 @@ dependencies {
     compileOnly libs.managed.netty.incubator.codec.http3
     compileOnly libs.brotli4j
 
+    testRuntimeOnly libs.zstdjni
     testImplementation libs.jmh.core
     testAnnotationProcessor libs.jmh.generator.annprocess
 
