@@ -20,10 +20,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
+import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
 import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
 import io.micronaut.http.server.netty.body.StreamingInboundByteBody;
-import io.micronaut.http.server.netty.body.UpstreamBalancer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -63,6 +63,7 @@ abstract class MultiplexedServerHandler {
     private final RequestHandler requestHandler;
     @Nullable
     private Compressor compressor;
+    BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
@@ -141,7 +142,6 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            data.retain();
             if (streamer == null) {
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
@@ -164,7 +164,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, new ImmediateNettyInboundByteBody(fullBody), this);
+                    requestHandler.accept(ctx, request, PipeliningServerHandler.createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -196,8 +196,8 @@ abstract class MultiplexedServerHandler {
                 bufferedContent = null;
             }
             requestAccepted = true;
-            // todo request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)
-            requestHandler.accept(ctx, request, streamer.dest, this);
+            streamer.dest.setExpectedLengthFrom(request.headers());
+            requestHandler.accept(ctx, request, new StreamingInboundByteBody(streamer.dest), this);
         }
 
         /**
@@ -216,7 +216,7 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             if (streamer != null) {
-                streamer.sink.tryEmitError(e);
+                streamer.error(e);
             }
             finish();
         }
@@ -505,26 +505,52 @@ abstract class MultiplexedServerHandler {
          * request case.
          */
         private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
-            private final BufferConsumer.Upstream incomingDataCounter;
-            final StreamingInboundByteBody dest;
+            final StreamingInboundByteBody.SharedBuffer dest;
+            /**
+             * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream
+             * hasn't consumed ({@link #onBytesConsumed(long)}). May be negative if the downstream
+             * has signaled more consumption.
+             */
+            long unacknowledged = 0;
 
             InputStreamer() {
-                // Upstream.onBytesConsumed is less strict than notifyDataConsumed, in that it can
-                // signal consumed bytes that haven't yet come in. We use the UpstreamBalancer here
-                // to limit the onBytesConsumed to the number of bytes that have actually arrived.
-                UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.slowest(this);
-                dest = new StreamingInboundByteBody(pair.left());
-                incomingDataCounter = pair.right();
+                dest = new StreamingInboundByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            }
+
+            @Override
+            public void start() {
+                // TODO
             }
 
             @Override
             public void onBytesConsumed(long bytesConsumed) {
+                if (bytesConsumed < 0) {
+                    throw new IllegalArgumentException("Negative bytes consumed");
+                }
+
                 EventLoop eventLoop = ctx.channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
-                    long finalBytesConsumed = bytesConsumed;
-                    eventLoop.execute(() -> onBytesConsumed(finalBytesConsumed));
+                    eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                     return;
                 }
+
+                long oldUnacknowledged = unacknowledged;
+                if (oldUnacknowledged > 0) {
+                    notifyDataConsumedLong(Math.min(bytesConsumed, oldUnacknowledged));
+                }
+                long newUnacknowledged = oldUnacknowledged - bytesConsumed;
+                if (newUnacknowledged > oldUnacknowledged) {
+                    // overflow, clamp
+                    newUnacknowledged = Long.MIN_VALUE;
+                }
+                unacknowledged = newUnacknowledged;
+            }
+
+            private void notifyDataConsumedLong(long bytesConsumed) {
+                if (bytesConsumed == 0) {
+                    return;
+                }
+                assert bytesConsumed > 0;
 
                 for (int i = 0; bytesConsumed > Integer.MAX_VALUE && i < 100; i++) {
                     notifyDataConsumed(Integer.MAX_VALUE);
@@ -553,7 +579,12 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void add(ByteBuf buf) {
-                incomingDataCounter.onBytesConsumed(buf.readableBytes());
+                assert ctx.channel().eventLoop().inEventLoop();
+
+                if (unacknowledged < 0) {
+                    notifyDataConsumedLong(Math.min(buf.readableBytes(), -unacknowledged));
+                }
+                unacknowledged += buf.readableBytes();
                 dest.add(buf);
             }
 
@@ -561,19 +592,11 @@ abstract class MultiplexedServerHandler {
             public void complete() {
                 dest.complete();
             }
-        }
-    }
 
-    private static final class SubscribedTooLateException extends RuntimeException {
-        static final SubscribedTooLateException INSTANCE = new SubscribedTooLateException();
-
-        SubscribedTooLateException() {
-            super("Subscribed too late to message body (after closeIfNoSubscriber)");
-        }
-
-        @Override
-        public Throwable fillInStackTrace() {
-            return this;
+            @Override
+            public void error(Throwable e) {
+                dest.error(e);
+            }
         }
     }
 }

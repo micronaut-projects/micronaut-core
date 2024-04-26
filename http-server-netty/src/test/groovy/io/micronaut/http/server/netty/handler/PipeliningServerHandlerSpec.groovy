@@ -348,7 +348,8 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.writeInbound(req)
         then:
         // no read call until request
-        mon.read == 1
+        // ok i reconsidered this. similar to http/2, PipeliningServerHandler now accepts 64K before downstream demand happens.
+        mon.read == 2
 
         when:
         subscription.request(1)

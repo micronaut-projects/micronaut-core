@@ -86,7 +86,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
             processor.add(new DefaultLastHttpContent(data), out);
         }
         data.release();
-        processor.complete();
+        processor.complete(out);
         return new ImmediateMultiObjectBody(out);
     }
 

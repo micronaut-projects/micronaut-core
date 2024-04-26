@@ -75,6 +75,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10L; // 10MB
 
     /**
+     * The default max buffer size.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_MAX_REQUEST_BUFFER_SIZE = 1024 * 1024 * 10L; // 10MB
+
+    /**
      * The default read idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
@@ -126,6 +132,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String host;
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
+    private long maxRequestBufferSize = DEFAULT_MAX_REQUEST_BUFFER_SIZE;
     private Duration readIdleTimeout = null;
     private Duration writeIdleTimeout = null;
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
@@ -259,6 +266,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public long getMaxRequestSize() {
         return maxRequestSize;
+    }
+
+    /**
+     * @return The maximum number of bytes from the request that may be buffered if the application requests buffering
+     */
+    public long getMaxRequestBufferSize() {
+        return maxRequestBufferSize;
     }
 
     /**
@@ -411,6 +425,22 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setMaxRequestSize(@ReadableBytes long maxRequestSize) {
         this.maxRequestSize = maxRequestSize;
+    }
+
+    /**
+     * Sets the maximum number of request bytes that will be buffered. Fully streamed requests can
+     * still exceed this value. Default value ({@value #DEFAULT_MAX_REQUEST_BUFFER_SIZE} =&gt; // 10MB).
+     * Currently limited to {@code 2^31}, if you need longer request bodies, stream them.<br>
+     * Note that there is always some internal buffering, so a very low value (< ~64K) will
+     * essentially act like a request size limit.
+     *
+     * @param maxRequestBufferSize The maximum number of bytes from the request that may be buffered if the application requests buffering
+     */
+    public void setMaxRequestBufferSize(@ReadableBytes long maxRequestBufferSize) {
+        if (maxRequestBufferSize > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("max-request-buffer-size must be < " + Integer.MAX_VALUE);
+        }
+        this.maxRequestBufferSize = maxRequestBufferSize;
     }
 
     /**

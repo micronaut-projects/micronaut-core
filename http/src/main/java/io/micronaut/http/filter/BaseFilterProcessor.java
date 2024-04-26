@@ -24,14 +24,16 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
@@ -39,6 +41,7 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -85,23 +88,24 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                 Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
                 if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
                     if (annotation == Body.class) {
-                        return Optional.of((RequiresRequestBodyBinder<T>) (context, source) -> {
-                            if (source instanceof FullHttpRequest<?> fullHttpRequest) {
-                                ByteBuffer<?> contents = fullHttpRequest.contents();
-                                if (contents != null) {
+                        return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
+                            if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
+                                return fullHttpRequest.byteBody().split(InboundByteBody.SplitBackpressureMode.FASTEST).buffer().map(imm -> {
                                     Argument<T> t = context.getArgument();
                                     if (t.isAssignableFrom(ByteBuffer.class)) {
-                                        return () -> Optional.of((T) contents);
+                                        return () -> Optional.of((T) imm.toByteBuffer());
                                     } else if (t.isAssignableFrom(byte[].class)) {
-                                        byte[] bytes = contents.toByteArray();
+                                        byte[] bytes = imm.toByteArray();
                                         return () -> Optional.of((T) bytes);
                                     } else if (t.isAssignableFrom(String.class)) {
-                                        String str = contents.toString(StandardCharsets.UTF_8);
+                                        String str = imm.toString(StandardCharsets.UTF_8);
                                         return () -> Optional.of((T) str);
+                                    } else {
+                                        return ArgumentBinder.BindingResult.UNSATISFIED;
                                     }
-                                }
+                                });
                             }
-                            return ArgumentBinder.BindingResult.UNSATISFIED;
+                            return ExecutionFlow.just(ArgumentBinder.BindingResult.UNSATISFIED);
                         });
                     } else {
                         return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
@@ -252,6 +256,12 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
      *
      * @param <T> Arg type
      */
-    public interface RequiresRequestBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+    public interface AsyncBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+        @Override
+        default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+            throw new UnsupportedOperationException();
+        }
+
+        ExecutionFlow<BindingResult<T>> bindAsync(ArgumentConversionContext<T> context, HttpRequest<?> source);
     }
 }

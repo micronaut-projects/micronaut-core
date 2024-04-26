@@ -15,15 +15,18 @@ import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.Objects;
 
 @Internal
 public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody implements CloseableImmediateInboundByteBody {
+    private final long length;
     @Nullable
     private ByteBuf buffer;
 
     public ImmediateNettyInboundByteBody(@NonNull ByteBuf buffer) {
         this.buffer = Objects.requireNonNull(buffer, "buffer");
+        this.length = buffer.readableBytes();
     }
 
     public static CloseableImmediateInboundByteBody empty() {
@@ -53,11 +56,7 @@ public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody im
 
     @Override
     public long length() {
-        ByteBuf b = buffer;
-        if (b == null) {
-            throw new IllegalStateException("Body already claimed. expectedContentLength() is only allowed before the body is processed.");
-        }
-        return b.readableBytes();
+        return length;
     }
 
     @NonNull
@@ -105,6 +104,16 @@ public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody im
     @Override
     public @NonNull ByteBuffer<?> toByteBuffer() {
         return NettyByteBufferFactory.DEFAULT.wrap(claim());
+    }
+
+    @Override
+    public @NonNull String toString(Charset charset) {
+        ByteBuf b = claim();
+        try {
+            return b.toString(charset);
+        } finally {
+            b.release();
+        }
     }
 
     @Override

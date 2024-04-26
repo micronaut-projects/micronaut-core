@@ -23,6 +23,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -69,6 +70,10 @@ public class FormDataHttpContentProcessor {
      * {@code true} if the decoder has been destroyed or will be destroyed in the near future.
      */
     private boolean destroyed = false;
+    /**
+     * Whether we received a LastHttpContent
+     */
+    private boolean receivedLast = false;
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -166,6 +171,7 @@ public class FormDataHttpContentProcessor {
 
     public void add(ByteBufHolder message, Collection<? super InterfaceHttpData> out) throws Throwable {
         try {
+            receivedLast |= message instanceof LastHttpContent;
             long receivedLength1 = this.receivedLength.addAndGet(message.content().readableBytes());
 
             ReferenceCountUtil.touch(message);
@@ -182,7 +188,10 @@ public class FormDataHttpContentProcessor {
         }
     }
 
-    public void complete() {
+    public void complete(Collection<? super InterfaceHttpData> out) throws Throwable {
+        if (!receivedLast) {
+            add(LastHttpContent.EMPTY_LAST_CONTENT, out);
+        }
         cancel();
     }
 

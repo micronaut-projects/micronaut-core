@@ -71,8 +71,9 @@ public final class HttpContentProcessorAsReactiveProcessor {
                 }
             }), Flux.defer(() -> {
             try {
-                processor.complete();
-                return Flux.empty();
+                List<T> out = new ArrayList<>(1);
+                processor.complete((List) out);
+                return Flux.fromIterable(out);
             } catch (Throwable ex) {
                 return Flux.error(ex);
             }

@@ -5,6 +5,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import org.reactivestreams.Publisher;
 
+import java.nio.charset.Charset;
 import java.util.OptionalLong;
 
 public interface ImmediateInboundByteBody extends InboundByteBody {
@@ -28,6 +29,11 @@ public interface ImmediateInboundByteBody extends InboundByteBody {
 
     @NonNull
     ByteBuffer<?> toByteBuffer();
+
+    @NonNull
+    default String toString(Charset charset) {
+        return new String(toByteArray(), charset);
+    }
 
     @Override
     @NonNull

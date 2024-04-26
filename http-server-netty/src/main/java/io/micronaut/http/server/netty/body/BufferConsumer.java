@@ -17,11 +17,20 @@ public interface BufferConsumer {
      */
     void complete();
 
+    void error(Throwable e);
+
     /**
      * This interface manages the backpressure for data consumptions. It is highly concurrent:
      * Calls to {@link #onBytesConsumed(long)} may happen at the same time on different threads.
      */
     interface Upstream {
+        /**
+         * Signal that we want to start consuming bytes. This is an optional hint to the upstream,
+         * the upstream may ignore it and send bytes immediately. This is used for CONTINUE
+         * support.
+         */
+        void start();
+
         /**
          * Called when a number of bytes has been consumed by the downstream.
          *

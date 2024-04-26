@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
@@ -31,6 +32,7 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.CloseableImmediateInboundByteBody;
 import io.micronaut.http.body.ImmediateInboundByteBody;
+import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
@@ -103,7 +105,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             return BindingResult.empty();
         }
 
-        ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffered = nhr.byteBody().buffer();
+        // If there's an error during conversion, the body must stay available, so we split here.
+        // This costs us nothing because we need to buffer anyway.
+        ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffered = nhr.byteBody().split(InboundByteBody.SplitBackpressureMode.FASTEST).buffer();
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -151,6 +155,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 } else {
                     buf.release();
                 }
+                processor.complete(result);
                 Optional<T> converted = new ImmediateMultiObjectBody(result)
                     .single(httpServerConfiguration.getDefaultCharset(), nhr.getChannelHandlerContext().alloc())
                     .convert(conversionService, context)
@@ -169,8 +174,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                     reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
                 }
                 if (reader != null) {
+                    ByteBuffer<?> byteBuffer = imm.toByteBuffer();
+                    boolean success = false;
                     try {
-                        T result = reader.read(context.getArgument(), mediaType, nhr.getHeaders(), imm.toByteBuffer());
+                        T result = reader.read(context.getArgument(), mediaType, nhr.getHeaders(), byteBuffer);
+                        success = true;
                         nhr.setLegacyBody(result);
                         return Optional.ofNullable(result);
                     } catch (CodecException ce) {
@@ -180,6 +188,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                             context.reject(ce);
                         }
                         return Optional.empty();
+                    } finally {
+                        if (!success && byteBuffer instanceof ReferenceCounted rc) {
+                            rc.release();
+                        }
                     }
                 }
             }

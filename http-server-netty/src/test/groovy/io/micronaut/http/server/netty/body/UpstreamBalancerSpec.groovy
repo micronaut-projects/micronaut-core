@@ -8,6 +8,10 @@ class UpstreamBalancerSpec extends Specification {
         long combined = 0
         def pair = UpstreamBalancer.slowest(new BufferConsumer.Upstream() {
             @Override
+            void start() {
+            }
+
+            @Override
             void onBytesConsumed(long bytesConsumed) {
                 assert bytesConsumed > 0
                 combined += bytesConsumed
@@ -53,6 +57,10 @@ class UpstreamBalancerSpec extends Specification {
         given:
         long combined = 0
         def pair = UpstreamBalancer.fastest(new BufferConsumer.Upstream() {
+            @Override
+            void start() {
+            }
+
             @Override
             void onBytesConsumed(long bytesConsumed) {
                 assert bytesConsumed > 0

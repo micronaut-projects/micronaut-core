@@ -41,7 +41,9 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.CloseableInboundByteBody;
+import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -55,7 +57,6 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.ServerHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
@@ -201,6 +202,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+    }
+
+    @Override
+    public final InboundByteBody byteBody() {
+        return body;
     }
 
     public final void setLegacyBody(Object legacyBody) {
@@ -392,6 +398,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             }
         }
         body.close();
+        if (formRouteCompleter != null) {
+            formRouteCompleter.release();
+        }
         if (attributes != null) {
             attributes.values().forEach(this::releaseIfNecessary);
         }

@@ -1,7 +1,6 @@
-package io.micronaut.http.server;
+package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.InboundByteBody;
 
 public interface ServerHttpRequest<B> extends HttpRequest<B> {

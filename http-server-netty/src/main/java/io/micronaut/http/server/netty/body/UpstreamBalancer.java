@@ -32,11 +32,19 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 @Internal
 public final class UpstreamBalancer {
     private static final AtomicLongFieldUpdater<UpstreamBalancer> DELTA = AtomicLongFieldUpdater.newUpdater(UpstreamBalancer.class, "delta");
-    private static final AtomicIntegerFieldUpdater<UpstreamBalancer> DISCARD_FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "discardFlags");
+    private static final AtomicIntegerFieldUpdater<UpstreamBalancer> FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "flags");
+
+    private static final int FLAG_DISCARD_A = 1;
+    private static final int FLAG_DISCARD_B = 2;
+    private static final int MASK_DISCARD = FLAG_DISCARD_A | FLAG_DISCARD_B;
+
+    private static final int FLAG_START_A = 4;
+    private static final int FLAG_START_B = 8;
+    private static final int MASK_START = FLAG_START_A | FLAG_START_B;
 
     private final BufferConsumer.Upstream upstream;
     private volatile long delta;
-    private volatile int discardFlags;
+    private volatile int flags;
 
     private UpstreamBalancer(BufferConsumer.Upstream upstream) {
         this.upstream = upstream;
@@ -55,6 +63,20 @@ public final class UpstreamBalancer {
     static UpstreamPair first(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
+    }
+
+    private int getAndSetFlag(int flag) {
+        while (true) {
+            int current = this.flags;
+            if ((current & flag) != 0) {
+                // already set
+                return current;
+            }
+            int next = current | flag;
+            if (FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
+                return current;
+            }
+        }
     }
 
     private static long subtractSaturating(long dest, long n) {
@@ -77,6 +99,10 @@ public final class UpstreamBalancer {
     }
 
     private void addSlowest(boolean inv, long n) {
+        if (n == 0) {
+            return;
+        }
+
         assert n > 0;
 
         long oldValue = DELTA.getAndUpdate(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
@@ -89,6 +115,10 @@ public final class UpstreamBalancer {
     }
 
     private void addFastest(boolean inv, long n) {
+        if (n == 0) {
+            return;
+        }
+
         assert n > 0;
 
         long newValue = DELTA.updateAndGet(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
@@ -109,29 +139,18 @@ public final class UpstreamBalancer {
 
         @Override
         public void allowDiscard() {
-            int mask = inv ? 2 : 1;
-            while (true) {
-                int current = discardFlags;
-                if ((current & mask) != 0) {
-                    // already discarded
-                    return;
+            int flag = inv ? FLAG_DISCARD_B : FLAG_DISCARD_A;
+            int prev = getAndSetFlag(flag);
+            if ((prev & MASK_DISCARD) != MASK_DISCARD && ((prev | flag) & MASK_DISCARD) == MASK_DISCARD) {
+                // both streams discarded
+                upstream.allowDiscard();
+            } else if ((prev & flag) != flag) {
+                // only we are discarded right now. Special case for slow mode, need to
+                // prevent stall
+                if (getClass() == SlowestUpstreamImpl.class ||
+                    getClass() == PassthroughUpstreamImpl.class) {
+                    onBytesConsumed(Long.MAX_VALUE);
                 }
-                int next = current | mask;
-                if (DISCARD_FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
-                    if (next == 3) {
-                        // both streams discarded
-                        upstream.allowDiscard();
-                    } else {
-                        // only we are discarded right now. Special case for slow mode, need to
-                        // prevent stall
-                        if (getClass() == SlowestUpstreamImpl.class ||
-                            getClass() == PassthroughUpstreamImpl.class) {
-                            onBytesConsumed(Long.MAX_VALUE);
-                        }
-                    }
-                    return;
-                }
-                // retry
             }
         }
     }
@@ -139,6 +158,16 @@ public final class UpstreamBalancer {
     private final class SlowestUpstreamImpl extends UpstreamImpl {
         SlowestUpstreamImpl(boolean inv) {
             super(inv);
+        }
+
+        @Override
+        public void start() {
+            int flag = inv ? FLAG_START_A : FLAG_START_B;
+            int prev = getAndSetFlag(flag);
+            if ((prev & MASK_START) != MASK_START && ((prev | flag) & MASK_START) == MASK_START) {
+                // both downstreams signalled start
+                upstream.start();
+            }
         }
 
         @Override
@@ -153,6 +182,11 @@ public final class UpstreamBalancer {
         }
 
         @Override
+        public void start() {
+            upstream.start();
+        }
+
+        @Override
         public void onBytesConsumed(long bytesConsumed) {
             addFastest(inv, bytesConsumed);
         }
@@ -164,6 +198,10 @@ public final class UpstreamBalancer {
         }
 
         @Override
+        public void start() {
+        }
+
+        @Override
         public void onBytesConsumed(long bytesConsumed) {
             // ignored
         }
@@ -172,6 +210,11 @@ public final class UpstreamBalancer {
     private final class PassthroughUpstreamImpl extends UpstreamImpl {
         PassthroughUpstreamImpl() {
             super(false);
+        }
+
+        @Override
+        public void start() {
+            upstream.start();
         }
 
         @Override
