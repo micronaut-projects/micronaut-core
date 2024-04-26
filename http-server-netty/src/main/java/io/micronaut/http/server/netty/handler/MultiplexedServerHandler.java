@@ -37,6 +37,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -188,7 +189,7 @@ abstract class MultiplexedServerHandler {
             if (requestAccepted || streamer != null || request == null) {
                 return;
             }
-            streamer = new InputStreamer();
+            streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     streamer.add(buf);
@@ -505,21 +506,31 @@ abstract class MultiplexedServerHandler {
          * request case.
          */
         private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
-            final StreamingInboundByteBody.SharedBuffer dest;
+            final StreamingInboundByteBody.SharedBuffer dest = new StreamingInboundByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
             /**
              * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream
              * hasn't consumed ({@link #onBytesConsumed(long)}). May be negative if the downstream
              * has signaled more consumption.
              */
             long unacknowledged = 0;
+            boolean sendContinue;
 
-            InputStreamer() {
-                dest = new StreamingInboundByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            InputStreamer(boolean sendContinue) {
+                this.sendContinue = sendContinue;
             }
 
             @Override
             public void start() {
-                // TODO
+                EventLoop eventLoop = ctx.channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    eventLoop.execute(this::start);
+                    return;
+                }
+
+                if (sendContinue) {
+                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, ctx.voidPromise());
+                    sendContinue = false;
+                }
             }
 
             @Override

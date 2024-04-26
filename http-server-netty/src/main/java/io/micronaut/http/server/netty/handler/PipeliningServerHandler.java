@@ -963,8 +963,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
      */
-    private final class ContinueOutboundHandler extends OutboundHandler {
-        private static final FullHttpResponse CONTINUE_11 =
+    final class ContinueOutboundHandler extends OutboundHandler {
+        static final FullHttpResponse CONTINUE_11 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
         private static final FullHttpResponse CONTINUE_10 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);

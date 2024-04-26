@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty.handler
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableInboundByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
+import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody
 import io.micronaut.http.server.netty.body.NettyInboundByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
@@ -17,6 +18,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.EmptyHttpHeaders
 import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -36,14 +38,12 @@ import io.netty.handler.codec.http2.Http2Exception
 import io.netty.handler.codec.http2.Http2Frame
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
-import io.netty.handler.codec.http2.Http2FrameLogger
 import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
-import io.netty.handler.logging.LogLevel
 import io.netty.util.AsciiString
 import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
@@ -53,6 +53,7 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.channels.ClosedChannelException
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
@@ -89,7 +90,6 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.connect(server, client)
         // adding to the pipeline writes the http2 preface, so do it after connecting the server and client
         server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(requestHandler)
-                .frameLogger(new Http2FrameLogger(LogLevel.INFO)) // TODO
                 .build())
         def duplexHandler = new DuplexHandler()
         client.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
@@ -719,6 +719,105 @@ class Http2ServerHandlerSpec extends Specification {
         Http2PingFrame ack = client.readInbound()
         ack.ack()
         ack.content() == 123
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "100-continue: no continue"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                Assertions.assertEquals(HttpMethod.POST, request.method())
+                Assertions.assertEquals("/", request.uri())
+                Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
+
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        req1.set(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        "0".contentEquals(response.headers().get(HttpHeaderNames.CONTENT_LENGTH))
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "100-continue: do continue"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+                Assertions.assertEquals(HttpMethod.POST, request.method())
+                Assertions.assertEquals("/", request.uri())
+                Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
+
+                body.buffer().onComplete((imm, t) -> {
+                    def bb = ImmediateNettyInboundByteBody.toByteBuf(imm)
+                    outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        req1.set(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def cresponse = (Http2HeadersFrame) client.readInbound()
+        "100".contentEquals(cresponse.headers().status())
+
+        when:
+        client.writeOutbound(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8), true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        "3".contentEquals(response.headers().get(HttpHeaderNames.CONTENT_LENGTH))
+        !response.isEndStream()
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == "foo"
 
         cleanup:
         client.checkException()
