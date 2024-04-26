@@ -144,6 +144,8 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
         }
         this.upstream = null;
         upstream.allowDiscard();
+        upstream.disregardBackpressure();
+        upstream.start();
         sharedBuffer.subscribe(null, upstream);
     }
 

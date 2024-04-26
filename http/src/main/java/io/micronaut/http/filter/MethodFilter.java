@@ -40,6 +40,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
@@ -150,6 +151,9 @@ record MethodFilter<T>(FilterOrder order,
                 }
             } else if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
+            } else if (argumentType.isAssignableFrom(ServerHttpRequest.class)) {
+                if (!is)
+                fulfilled[i] = ctx -> (ServerHttpRequest<?>) ctx.request;
             } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;

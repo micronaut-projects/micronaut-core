@@ -589,6 +589,17 @@ abstract class MultiplexedServerHandler {
             }
 
             @Override
+            public void disregardBackpressure() {
+                EventLoop eventLoop = ctx.channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    eventLoop.execute(this::disregardBackpressure);
+                    return;
+                }
+
+                unacknowledged = Long.MIN_VALUE;
+            }
+
+            @Override
             public void add(ByteBuf buf) {
                 assert ctx.channel().eventLoop().inEventLoop();
 

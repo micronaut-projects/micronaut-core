@@ -42,6 +42,10 @@ public final class UpstreamBalancer {
     private static final int FLAG_START_B = 8;
     private static final int MASK_START = FLAG_START_A | FLAG_START_B;
 
+    private static final int FLAG_DISREGARD_A = 16;
+    private static final int FLAG_DISREGARD_B = 32;
+    private static final int MASK_DISREGARD = FLAG_DISREGARD_A | FLAG_DISREGARD_B;
+
     private final BufferConsumer.Upstream upstream;
     private volatile long delta;
     private volatile int flags;
@@ -77,6 +81,11 @@ public final class UpstreamBalancer {
                 return current;
             }
         }
+    }
+
+    private boolean setFlagAndCheckMask(int flag, int mask) {
+        int old = getAndSetFlag(flag);
+        return (old & mask) != mask && ((old | flag) & mask) == mask;
     }
 
     private static long subtractSaturating(long dest, long n) {
@@ -140,18 +149,25 @@ public final class UpstreamBalancer {
         @Override
         public void allowDiscard() {
             int flag = inv ? FLAG_DISCARD_B : FLAG_DISCARD_A;
-            int prev = getAndSetFlag(flag);
-            if ((prev & MASK_DISCARD) != MASK_DISCARD && ((prev | flag) & MASK_DISCARD) == MASK_DISCARD) {
+            if (setFlagAndCheckMask(flag, MASK_DISCARD)) {
                 // both streams discarded
                 upstream.allowDiscard();
-            } else if ((prev & flag) != flag) {
-                // only we are discarded right now. Special case for slow mode, need to
-                // prevent stall
-                if (getClass() == SlowestUpstreamImpl.class ||
-                    getClass() == PassthroughUpstreamImpl.class) {
-                    onBytesConsumed(Long.MAX_VALUE);
-                }
             }
+        }
+
+        @Override
+        public void disregardBackpressure() {
+            int flag = inv ? FLAG_DISREGARD_B : FLAG_DISREGARD_A;
+            int old = getAndSetFlag(flag);
+            if ((old & MASK_DISREGARD) != MASK_DISREGARD && ((old | flag) & MASK_DISREGARD) == MASK_DISREGARD) {
+                upstream.disregardBackpressure();
+            } else if ((old | flag) != old) {
+                disregardBackpressureThisSide();
+            }
+        }
+
+        protected void disregardBackpressureThisSide() {
+
         }
     }
 
@@ -163,8 +179,7 @@ public final class UpstreamBalancer {
         @Override
         public void start() {
             int flag = inv ? FLAG_START_A : FLAG_START_B;
-            int prev = getAndSetFlag(flag);
-            if ((prev & MASK_START) != MASK_START && ((prev | flag) & MASK_START) == MASK_START) {
+            if (setFlagAndCheckMask(flag, MASK_START)) {
                 // both downstreams signalled start
                 upstream.start();
             }
@@ -173,6 +188,11 @@ public final class UpstreamBalancer {
         @Override
         public void onBytesConsumed(long bytesConsumed) {
             addSlowest(inv, bytesConsumed);
+        }
+
+        @Override
+        protected void disregardBackpressureThisSide() {
+            onBytesConsumed(Long.MAX_VALUE);
         }
     }
 

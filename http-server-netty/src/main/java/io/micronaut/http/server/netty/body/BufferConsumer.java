@@ -44,5 +44,14 @@ public interface BufferConsumer {
          * may continue to be read and continue to be forwarded to this consumer.
          */
         void allowDiscard();
+
+        /**
+         * Instruct the upstream to ignore backpressure from this consumer. This is slightly
+         * different from {@code onBytesConsumed(Long.MAX_VALUE)}: If there are two consumers
+         * in {@link io.micronaut.http.body.InboundByteBody.SplitBackpressureMode#FASTEST} mode,
+         * a MAX_VALUE requests all data from the common upstream, while a disregardBackpressure
+         * removes this downstream from consideration.
+         */
+        void disregardBackpressure();
     }
 }

@@ -54,6 +54,16 @@ public interface InboundByteBody {
     CloseableInboundByteBody split(@NonNull SplitBackpressureMode backpressureMode);
 
     /**
+     *
+     *
+     * @return This body
+     */
+    @NonNull
+    default InboundByteBody allowDiscard() {
+        return this;
+    };
+
+    /**
      * Get the expected length of this body, if known (either from {@code Content-Length} or from
      * previous buffering). The actual length will never exceed this value, though it may sometimes
      * be lower if there is a connection error.

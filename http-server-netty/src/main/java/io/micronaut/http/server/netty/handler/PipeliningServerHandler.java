@@ -629,6 +629,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 refreshNeedMore();
             }
         }
+
+        @Override
+        public void disregardBackpressure() {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(this::disregardBackpressure);
+                return;
+            }
+
+            requested = Long.MAX_VALUE;
+            refreshNeedMore();
+        }
     }
 
     private class DecompressingInboundHandler extends InboundHandler {
