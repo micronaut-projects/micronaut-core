@@ -15,6 +15,7 @@ import io.micronaut.http.netty.PublisherAsBlocking;
 import io.micronaut.http.netty.PublisherAsStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -29,6 +30,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 @Internal
@@ -74,12 +76,19 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
 
     @Override
     protected Flux<ByteBuf> toByteBufPublisher() {
+        AtomicLong unconsumed = new AtomicLong(0);
         Sinks.Many<ByteBuf> sink = Sinks.many().unicast().onBackpressureBuffer();
         BufferConsumer.Upstream upstream = primary(new BufferConsumer() {
             @Override
             public void add(ByteBuf buf) {
-                if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                long newLength = unconsumed.addAndGet(buf.readableBytes());
+                if (newLength > sharedBuffer.limits.maxBufferSize()) {
+                    sink.tryEmitError(new BufferLengthExceededException(sharedBuffer.limits.maxBufferSize(), newLength));
                     buf.release();
+                } else {
+                    if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                        buf.release();
+                    }
                 }
             }
 
@@ -95,7 +104,10 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
         });
         return sink.asFlux()
             .doOnSubscribe(s -> upstream.start())
-            .doOnNext(bb -> upstream.onBytesConsumed(bb.readableBytes()))
+            .doOnNext(bb -> {
+                unconsumed.addAndGet(-bb.readableBytes());
+                upstream.onBytesConsumed(bb.readableBytes());
+            })
             .doOnDiscard(ByteBuf.class, ReferenceCounted::release);
     }
 
@@ -114,43 +126,14 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
 
     @Override
     public @NonNull ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffer() {
-        // todo: optimize with sharedBuffer
-        DelayedExecutionFlow<CloseableImmediateInboundByteBody> flow = DelayedExecutionFlow.create();
-        BufferConsumer.Upstream u = primary(new BufferConsumer() {
-            private CompositeByteBuf combined;
-            private boolean done;
-
-            @Override
-            public void add(ByteBuf buf) {
-                if (combined == null) {
-                    combined = buf.alloc().compositeBuffer();
-                }
-                combined.addComponent(true, buf);
-            }
-
-            @Override
-            public void complete() {
-                if (!done) {
-                    done = true;
-                    flow.complete(combined == null ? ImmediateNettyInboundByteBody.empty() : new ImmediateNettyInboundByteBody(combined));
-                }
-            }
-
-            @Override
-            public void error(Throwable e) {
-                if (!done) {
-                    done = true;
-                    if (combined != null) {
-                        combined.release();
-                        combined = null;
-                    }
-                    flow.completeExceptionally(e);
-                }
-            }
-        });
-        u.start();
-        u.onBytesConsumed(Long.MAX_VALUE);
-        return flow;
+        BufferConsumer.Upstream upstream = this.upstream;
+        if (upstream == null) {
+            failClaim();
+        }
+        this.upstream = null;
+        upstream.start();
+        upstream.onBytesConsumed(Long.MAX_VALUE);
+        return sharedBuffer.subscribeFull(upstream).map(ImmediateNettyInboundByteBody::new);
     }
 
     @Override
@@ -199,6 +182,10 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
          * Active subscribers.
          */
         private List<@NonNull BufferConsumer> subscribers;
+        /**
+         * Active subscribers that need the fully buffered body.
+         */
+        private List<@NonNull DelayedExecutionFlow<ByteBuf>> fullSubscribers;
         /**
          * This flag is only used in tests, to verify that the BufferConsumer methods arent called
          * in a reentrant fashion.
@@ -287,7 +274,7 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
             boolean last = --reserved == 0;
             if (subscriber != null) {
                 if (subscribers == null) {
-                    subscribers = new ArrayList<>();
+                    subscribers = new ArrayList<>(1);
                 }
                 subscribers.add(subscriber);
                 if (buffer != null) {
@@ -323,6 +310,91 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
             working = false;
         }
 
+        /**
+         * Optimized version of {@link #subscribe} for subscribers that want to buffer the full
+         * body.
+         *
+         * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
+         * @return A flow that will complete when all data has arrived, with a buffer containing that data
+         */
+        ExecutionFlow<ByteBuf> subscribeFull(Upstream specificUpstream) {
+            DelayedExecutionFlow<ByteBuf> asyncFlow = DelayedExecutionFlow.create();
+            if (eventLoopFlow.executeNow(() -> {
+                ExecutionFlow<ByteBuf> res = subscribeFull0(asyncFlow, specificUpstream, false);
+                assert res == asyncFlow;
+            })) {
+                return subscribeFull0(asyncFlow, specificUpstream, true);
+            } else {
+                return asyncFlow;
+            }
+        }
+
+        /**
+         * On-loop version of {@link #subscribeFull}. The returned flow will complete when the
+         * input is buffered. The returned flow will always be identical to the {@code targetFlow}
+         * parameter IF {@code canReturnImmediate} is false. If {@code canReturnImmediate} is true,
+         * this method will SOMETIMES return an immediate ExecutionFlow instead as an optimization.
+         *
+         * @param targetFlow The delayed flow to use if {@code canReturnImmediate} is false and/or
+         *                   we have to wait for the result
+         * @param canReturnImmediate Whether we can return an immediate ExecutionFlow instead of
+         *                  {@code targetFlow}, when appropriate
+         */
+        private ExecutionFlow<ByteBuf> subscribeFull0(DelayedExecutionFlow<ByteBuf> targetFlow, Upstream specificUpstream, boolean canReturnImmediate) {
+            assert !working;
+
+            if (reserved == 0) {
+                throw new IllegalStateException("Need to reserve a spot first");
+            }
+
+            ExecutionFlow<ByteBuf> ret = targetFlow;
+
+            working = true;
+            boolean last = --reserved == 0;
+            Throwable error = this.error;
+            if (error == null && lengthSoFar > limits.maxBufferSize()) {
+                error = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
+                specificUpstream.allowDiscard();
+            }
+            if (error != null) {
+                if (canReturnImmediate) {
+                    ret = ExecutionFlow.error(error);
+                } else {
+                    targetFlow.completeExceptionally(error);
+                }
+            } else if (complete) {
+                ByteBuf buf;
+                if (buffer == null) {
+                    buf = Unpooled.EMPTY_BUFFER;
+                } else if (last) {
+                    buf = buffer;
+                    buffer = null;
+                } else {
+                    buf = buffer.retainedSlice();
+                }
+                if (canReturnImmediate) {
+                    ret = ExecutionFlow.just(buf);
+                } else {
+                    targetFlow.complete(buf);
+                }
+            } else {
+                if (fullSubscribers == null) {
+                    fullSubscribers = new ArrayList<>(1);
+                }
+                fullSubscribers.add(targetFlow);
+            }
+            if (tracker != null) {
+                if (last) {
+                    tracker.close(this);
+                } else {
+                    tracker.record();
+                }
+            }
+            working = false;
+
+            return ret;
+        }
+
         @Override
         public void add(ByteBuf buf) {
             assert !working;
@@ -350,14 +422,20 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
                     subscriber.add(buf.retainedSlice());
                 }
             }
-            if (reserved > 0) {
+            if (reserved > 0 || fullSubscribers != null) {
                 if (newLength > limits.maxBufferSize()) {
                     // new subscribers will recognize that the limit has been exceeded. Streaming
-                    // subscribers can proceed normally
+                    // subscribers can proceed normally. Need to notify buffering subscribers
                     buf.release();
                     if (buffer != null) {
                         buffer.release();
                         buffer = null;
+                    }
+                    if (fullSubscribers != null) {
+                        Exception e = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
+                        for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
+                            fullSubscriber.completeExceptionally(e);
+                        }
                     }
                 } else {
                     if (buffer == null) {
@@ -380,6 +458,19 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
                     subscriber.complete();
                 }
             }
+            if (fullSubscribers != null) {
+                ByteBuf buf;
+                if (buffer == null) {
+                    buf = Unpooled.EMPTY_BUFFER;
+                } else {
+                    buf = buffer;
+                    this.buffer = null;
+                }
+                for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
+                    fullSubscriber.complete(buf.retainedSlice());
+                }
+                buf.release();
+            }
         }
 
         @Override
@@ -392,6 +483,11 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
             if (subscribers != null) {
                 for (BufferConsumer subscriber : subscribers) {
                     subscriber.error(e);
+                }
+            }
+            if (fullSubscribers != null) {
+                for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
+                    fullSubscriber.completeExceptionally(e);
                 }
             }
         }
