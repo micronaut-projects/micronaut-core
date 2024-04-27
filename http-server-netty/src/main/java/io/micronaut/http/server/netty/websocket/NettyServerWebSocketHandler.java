@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
@@ -26,6 +27,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -38,6 +40,8 @@ import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
@@ -65,6 +69,8 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -91,6 +97,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     private final Argument<?> bodyArgument;
     private final Argument<?> pongArgument;
+    private final ThreadSelection threadSelection;
+    private final ExecutorSelector executorSelector;
 
     /**
      * Default constructor.
@@ -102,17 +110,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * @param request                    The request used to create the websocket
      * @param routeMatch                 The route match
      * @param ctx                        The channel handler context
+     * @param executorSelector
      * @param coroutineHelper            Helper for kotlin coroutines
      */
     NettyServerWebSocketHandler(
-            NettyEmbeddedServices nettyEmbeddedServices,
-            WebSocketSessionRepository webSocketSessionRepository,
-            WebSocketServerHandshaker handshaker,
-            WebSocketBean<?> webSocketBean,
-            HttpRequest<?> request,
-            UriRouteMatch<Object, Object> routeMatch,
-            ChannelHandlerContext ctx,
-            @Nullable CoroutineHelper coroutineHelper) {
+        NettyEmbeddedServices nettyEmbeddedServices,
+        WebSocketSessionRepository webSocketSessionRepository,
+        WebSocketServerHandshaker handshaker,
+        WebSocketBean<?> webSocketBean,
+        HttpRequest<?> request,
+        UriRouteMatch<Object, Object> routeMatch,
+        ChannelHandlerContext ctx,
+        ThreadSelection threadSelection,
+        ExecutorSelector executorSelector,
+        @Nullable CoroutineHelper coroutineHelper) {
         super(
                 ctx,
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
@@ -124,6 +135,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 handshaker.selectedSubprotocol(),
                 webSocketSessionRepository,
                 nettyEmbeddedServices.getApplicationContext().getConversionService());
+
+        this.threadSelection = threadSelection;
+        this.executorSelector = executorSelector;
 
         this.serverSession = createWebSocketSession(ctx);
 
@@ -345,8 +359,25 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private Object invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        return ServerRequestContext.with(originatingRequest,
-                (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
+        return this.executorSelector.select(messageHandler.getExecutableMethod(), threadSelection)
+            .map(
+                executorService -> {
+                    ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
+                    if (returnType.isReactive()) {
+                        return Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
+                            .subscribeOn(Schedulers.fromExecutor(executorService))
+                            .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
+                    } else {
+                        return executorService.submit(() -> ServerRequestContext.with(originatingRequest,
+                            (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget())));
+                    }
+                }
+            ).orElseGet(invokeWithContext(boundExecutable, messageHandler));
+    }
+
+    private Supplier<Object> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+        return () -> ServerRequestContext.with(originatingRequest,
+            (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
     }
 
     @Override
