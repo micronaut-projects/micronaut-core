@@ -2319,6 +2319,24 @@ class Test(val name:  @TypeUseRuntimeAnn String, val secondName: @TypeUseClassAn
             !secondNameField.hasStereotype(TypeUseClassAnn.name)
     }
 
+    void "test package private field instrospection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.visitor.MySuperclass
+
+@Introspected
+class Test(val name: String) : MySuperclass()
+''')
+        then:
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the package private superclass is not introspected'
+        !introspection.getProperty("field").orElse(null)
+    }
+
     void "test subtypes"() {
         given:
             BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''

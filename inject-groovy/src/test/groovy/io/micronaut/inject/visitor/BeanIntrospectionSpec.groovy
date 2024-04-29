@@ -2522,4 +2522,24 @@ class Holder<A extends Animal> {
             animal.isTypeVariable()
     }
 
+    void "test package private field instrospection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.inject.visitor.MySuperclass
+
+@Introspected
+class Test extends MySuperclass {
+
+    String name
+}
+''')
+        then:
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the package private superclass is not introspected'
+        !introspection.getProperty("field").orElse(null)
+    }
 }

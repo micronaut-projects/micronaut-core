@@ -5183,6 +5183,35 @@ class Test {
         !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
     }
 
+    void "test package private field instrospection"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.MySuperclass;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then:
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the package private superclass is not introspected'
+        !introspection.getProperty("field").orElse(null)
+    }
+
     void "test subtypes"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
@@ -5255,6 +5284,7 @@ class OptionalDoubleHolder {
         introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
         introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
     }
+
     void "test private property 2"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
