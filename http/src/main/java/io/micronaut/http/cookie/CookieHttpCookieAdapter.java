@@ -35,6 +35,9 @@ class CookieHttpCookieAdapter implements Cookie {
 
     public CookieHttpCookieAdapter(HttpCookie httpCookie) {
         this.httpCookie = httpCookie;
+        if (httpCookie.getMaxAge() == -1) { // HttpCookie.UNDEFINED_MAX_AGE = -1
+            this.httpCookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);
+        }
     }
 
     @Override
