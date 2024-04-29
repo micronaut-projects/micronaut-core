@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.body
 
+import io.micronaut.http.body.InboundByteBody.SplitBackpressureMode
 import spock.lang.Specification
 
 class UpstreamBalancerSpec extends Specification {
@@ -8,10 +9,6 @@ class UpstreamBalancerSpec extends Specification {
         long combined = 0
         def pair = UpstreamBalancer.slowest(new BufferConsumer.Upstream() {
             @Override
-            void start() {
-            }
-
-            @Override
             void onBytesConsumed(long bytesConsumed) {
                 assert bytesConsumed > 0
                 combined += bytesConsumed
@@ -19,10 +16,6 @@ class UpstreamBalancerSpec extends Specification {
                 if (combined < 0) {
                     combined = Long.MAX_VALUE;
                 }
-            }
-
-            @Override
-            void allowDiscard() {
             }
         })
         def left = pair.left()
@@ -58,10 +51,6 @@ class UpstreamBalancerSpec extends Specification {
         long combined = 0
         def pair = UpstreamBalancer.fastest(new BufferConsumer.Upstream() {
             @Override
-            void start() {
-            }
-
-            @Override
             void onBytesConsumed(long bytesConsumed) {
                 assert bytesConsumed > 0
                 combined += bytesConsumed
@@ -69,10 +58,6 @@ class UpstreamBalancerSpec extends Specification {
                 if (combined < 0) {
                     combined = Long.MAX_VALUE;
                 }
-            }
-
-            @Override
-            void allowDiscard() {
             }
         })
         def left = pair.left()
@@ -101,5 +86,174 @@ class UpstreamBalancerSpec extends Specification {
         [-1, 2]  | 2
         [Long.MAX_VALUE, Long.MAX_VALUE]   | Long.MAX_VALUE
         [-Long.MAX_VALUE, -Long.MAX_VALUE] | Long.MAX_VALUE
+    }
+
+    def 'allowDiscard combined'(SplitBackpressureMode mode) {
+        given:
+        boolean calledUpstream = false
+        def upstream = new BufferConsumer.Upstream() {
+            @Override
+            void onBytesConsumed(long bytesConsumed) {
+            }
+
+            @Override
+            void allowDiscard() {
+                calledUpstream = true
+            }
+        }
+
+        when:
+        def pairA = UpstreamBalancer.balancer(upstream, mode)
+        pairA.left().allowDiscard()
+        then:
+        !calledUpstream
+        when:
+        pairA.right().allowDiscard()
+        then:
+        calledUpstream
+
+        // now try the other order
+        when:
+        calledUpstream = false
+        def pairB = UpstreamBalancer.balancer(upstream, mode)
+        pairB.right().allowDiscard()
+        then:
+        !calledUpstream
+        when:
+        pairB.left().allowDiscard()
+        then:
+        calledUpstream
+
+        where:
+        mode << SplitBackpressureMode.values()
+    }
+
+    def 'disregardBackpressure combined'(SplitBackpressureMode mode) {
+        given:
+        boolean calledUpstream = false
+        def upstream = new BufferConsumer.Upstream() {
+            @Override
+            void onBytesConsumed(long bytesConsumed) {
+            }
+
+            @Override
+            void disregardBackpressure() {
+                calledUpstream = true
+            }
+        }
+
+        when:
+        def pairA = UpstreamBalancer.balancer(upstream, mode)
+        pairA.left().disregardBackpressure()
+        then:
+        !calledUpstream
+        when:
+        pairA.right().disregardBackpressure()
+        then:
+        calledUpstream
+
+        // now try the other order
+        when:
+        calledUpstream = false
+        def pairB = UpstreamBalancer.balancer(upstream, mode)
+        pairB.right().disregardBackpressure()
+        then:
+        !calledUpstream
+        when:
+        pairB.left().disregardBackpressure()
+        then:
+        calledUpstream
+
+        where:
+        mode << SplitBackpressureMode.values()
+    }
+
+    def 'slowest disregard does not hold back other side'() {
+        given:
+        long demand = 0
+        def pair = UpstreamBalancer.slowest(n -> demand += n)
+
+        when:
+        pair.left().onBytesConsumed(1)
+        then:
+        demand == 0
+
+        when:
+        pair.right().disregardBackpressure()
+        then:
+        demand == 1
+
+        when:
+        pair.left().onBytesConsumed(1)
+        then:
+        demand == 2
+    }
+
+    def 'fastest disregard does not exceed other side'() {
+        given:
+        long demand = 0
+        def pair = UpstreamBalancer.fastest(n -> demand += n)
+
+        when:
+        pair.left().onBytesConsumed(1)
+        then:
+        demand == 1
+
+        when:
+        pair.left().disregardBackpressure()
+        then:
+        demand == 1
+
+        when:
+        pair.right().onBytesConsumed(1)
+        then:
+        demand == 1
+
+        when:
+        pair.right().onBytesConsumed(1)
+        then:
+        demand == 2
+    }
+
+    def 'first disregard uses other side 1'() {
+        given:
+        long demand = 0
+        def pair = UpstreamBalancer.first(n -> demand += n)
+
+        when:
+        pair.left().onBytesConsumed(1)
+        then:
+        demand == 1
+
+        when:
+        pair.left().disregardBackpressure()
+        then:
+        demand == 1
+
+        when:
+        pair.right().onBytesConsumed(1)
+        then:
+        demand == 1
+
+        when:
+        pair.right().onBytesConsumed(1)
+        then:
+        demand == 2
+    }
+
+    def 'first disregard uses other side 2'() {
+        given:
+        long demand = 0
+        def pair = UpstreamBalancer.first(n -> demand += n)
+
+        when:
+        pair.right().onBytesConsumed(1)
+        then:
+        demand == 0
+
+        when:
+        pair.left().disregardBackpressure()
+        then:
+        demand == 1
     }
 }

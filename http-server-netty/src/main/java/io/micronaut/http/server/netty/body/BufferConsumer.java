@@ -13,10 +13,20 @@ public interface BufferConsumer {
     void add(ByteBuf buf);
 
     /**
-     * Signal completion of the stream.
+     * Signal normal completion of the stream.
      */
     void complete();
 
+    /**
+     * Signal that the upstream has discarded the remaining data, as requested by {@link Upstream#allowDiscard()}.
+     */
+    void discard();
+
+    /**
+     * Signal an upstream error.
+     *
+     * @param e The error
+     */
     void error(Throwable e);
 
     /**
@@ -29,7 +39,8 @@ public interface BufferConsumer {
          * the upstream may ignore it and send bytes immediately. This is used for CONTINUE
          * support.
          */
-        void start();
+        default void start() {
+        }
 
         /**
          * Called when a number of bytes has been consumed by the downstream.
@@ -43,7 +54,8 @@ public interface BufferConsumer {
          * mean the messages must be discarded: If another consumer still needs the body data, it
          * may continue to be read and continue to be forwarded to this consumer.
          */
-        void allowDiscard();
+        default void allowDiscard() {
+        }
 
         /**
          * Instruct the upstream to ignore backpressure from this consumer. This is slightly
@@ -52,6 +64,7 @@ public interface BufferConsumer {
          * a MAX_VALUE requests all data from the common upstream, while a disregardBackpressure
          * removes this downstream from consideration.
          */
-        void disregardBackpressure();
+        default void disregardBackpressure() {
+        }
     }
 }

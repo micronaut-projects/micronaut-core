@@ -4,8 +4,10 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.OptionalLong;
 
@@ -54,10 +56,15 @@ public interface InboundByteBody {
     CloseableInboundByteBody split(@NonNull SplitBackpressureMode backpressureMode);
 
     /**
-     *
+     * Signal that the upstream may discard any remaining body data. Only if all consumers of the
+     * body allow discarding will the body be discarded, otherwise it will still be sent to all
+     * consumers. It is an optional operation.
+     * <p>Discarding may be implemented e.g. by closing the input side of an HTTP/2 stream.
+     * <p>This method must be called before any primary operation.
      *
      * @return This body
      */
+    @Contract("-> this")
     @NonNull
     default InboundByteBody allowDiscard() {
         return this;
@@ -144,5 +151,31 @@ public interface InboundByteBody {
          * to buffer or drop messages, if it can't keep up.
          */
         NEW
+    }
+
+    /**
+     * Exception that is sent to subscribers when the body is discarded as a result of
+     * {@link #allowDiscard()} calls.
+     */
+    final class BodyDiscardedException extends IOException {
+        static final BodyDiscardedException INSTANCE = new BodyDiscardedException();
+
+        BodyDiscardedException() {
+        }
+
+        /**
+         * Get an instance of this exception. At the moment this is a singleton without stack trace,
+         * but this may change in the future.
+         *
+         * @return The instance
+         */
+        public static BodyDiscardedException create() {
+            return INSTANCE;
+        }
+
+        @Override
+        public Throwable fillInStackTrace() {
+            return this;
+        }
     }
 }

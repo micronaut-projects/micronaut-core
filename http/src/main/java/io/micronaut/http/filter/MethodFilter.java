@@ -152,7 +152,7 @@ record MethodFilter<T>(FilterOrder order,
             } else if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
             } else if (argumentType.isAssignableFrom(ServerHttpRequest.class)) {
-                if (!is)
+                // todo: only permit for server
                 fulfilled[i] = ctx -> (ServerHttpRequest<?>) ctx.request;
             } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
                 fulfilled[i] = ctx -> {

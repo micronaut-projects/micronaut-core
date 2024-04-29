@@ -63,15 +63,20 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
         if (upstream == null) {
             failClaim();
         }
-        UpstreamBalancer.UpstreamPair pair = switch (backpressureMode) {
-            case SLOWEST -> UpstreamBalancer.slowest(upstream);
-            case FASTEST -> UpstreamBalancer.fastest(upstream);
-            case ORIGINAL -> UpstreamBalancer.first(upstream);
-            case NEW -> UpstreamBalancer.first(upstream).flip();
-        };
+        UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
         this.sharedBuffer.reserve();
         return new StreamingInboundByteBody(sharedBuffer, upstream);
+    }
+
+    @Override
+    public @NonNull StreamingInboundByteBody allowDiscard() {
+        BufferConsumer.Upstream upstream = this.upstream;
+        if (upstream == null) {
+            failClaim();
+        }
+        upstream.allowDiscard();
+        return this;
     }
 
     @Override
@@ -98,6 +103,11 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
             }
 
             @Override
+            public void discard() {
+
+            }
+
+            @Override
             public void error(Throwable e) {
                 sink.tryEmitError(e);
             }
@@ -108,7 +118,11 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
                 unconsumed.addAndGet(-bb.readableBytes());
                 upstream.onBytesConsumed(bb.readableBytes());
             })
-            .doOnDiscard(ByteBuf.class, ReferenceCounted::release);
+            .doOnDiscard(ByteBuf.class, ReferenceCounted::release)
+            .doOnCancel(() -> {
+                upstream.allowDiscard();
+                upstream.disregardBackpressure();
+            });
     }
 
     @Override
@@ -473,6 +487,11 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
                 }
                 buf.release();
             }
+        }
+
+        @Override
+        public void discard() {
+            error(BodyDiscardedException.create());
         }
 
         @Override

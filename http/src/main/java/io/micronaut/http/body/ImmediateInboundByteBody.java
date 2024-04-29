@@ -44,6 +44,18 @@ public interface ImmediateInboundByteBody extends InboundByteBody {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}, it does nothing.
+     */
+    @Override
+    @NonNull
+    @Deprecated
+    default ImmediateInboundByteBody allowDiscard() {
+        return this;
+    }
+
+    /**
      * The length in bytes of the body.
      *
      * @return The length

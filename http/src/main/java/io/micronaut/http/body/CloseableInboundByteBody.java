@@ -1,6 +1,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 
 import java.io.Closeable;
 
@@ -16,6 +17,12 @@ import java.io.Closeable;
  */
 @Experimental
 public interface CloseableInboundByteBody extends InboundByteBody, Closeable {
+    @Override
+    @NonNull
+    default CloseableInboundByteBody allowDiscard() {
+        return this;
+    }
+
     /**
      * Clean up any resources held by this instance. See class documentation.
      */

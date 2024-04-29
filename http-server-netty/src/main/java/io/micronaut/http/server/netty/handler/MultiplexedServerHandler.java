@@ -586,6 +586,7 @@ abstract class MultiplexedServerHandler {
                 }
 
                 closeInput();
+                dest.discard(); // signal discard
             }
 
             @Override
@@ -613,6 +614,12 @@ abstract class MultiplexedServerHandler {
             @Override
             public void complete() {
                 dest.complete();
+            }
+
+            @Override
+            public void discard() {
+                // this is implemented in allowDiscard to reduce confusion about method names
+                throw new UnsupportedOperationException();
             }
 
             @Override

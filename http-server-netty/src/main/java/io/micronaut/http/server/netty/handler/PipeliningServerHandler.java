@@ -318,19 +318,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     static CloseableInboundByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
         if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = new BufferConsumer.Upstream() {
-                @Override
-                public void start() {
-                }
-
-                @Override
-                public void onBytesConsumed(long bytesConsumed) {
-                }
-
-                @Override
-                public void allowDiscard() {
-                }
-            };
+            BufferConsumer.Upstream upstream = bytesConsumed -> {};
             StreamingInboundByteBody.SharedBuffer mockBuffer = new StreamingInboundByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
             mockBuffer.add(buf); // this will trigger the exception
             return new StreamingInboundByteBody(mockBuffer);
@@ -628,6 +616,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 inboundHandler = droppingInboundHandler;
                 refreshNeedMore();
             }
+            dest.discard();
         }
 
         @Override

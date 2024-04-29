@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.InboundByteBody;
 
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,6 +68,15 @@ public final class UpstreamBalancer {
     static UpstreamPair first(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
+    }
+
+    static UpstreamPair balancer(BufferConsumer.Upstream upstream, InboundByteBody.SplitBackpressureMode mode) {
+        return switch (mode) {
+            case SLOWEST -> slowest(upstream);
+            case FASTEST -> fastest(upstream);
+            case ORIGINAL -> first(upstream);
+            case NEW -> first(upstream).flip();
+        };
     }
 
     private int getAndSetFlag(int flag) {
@@ -139,6 +149,14 @@ public final class UpstreamBalancer {
         }
     }
 
+    private void pushSomeFromIgnored() {
+        // if delta > 0, push that demand upstream.
+        long n = DELTA.getAndUpdate(this, l -> l > 0 ? 0 : l);
+        if (n > 0) {
+            upstream.onBytesConsumed(n);
+        }
+    }
+
     private abstract class UpstreamImpl implements BufferConsumer.Upstream {
         final boolean inv;
 
@@ -167,7 +185,6 @@ public final class UpstreamBalancer {
         }
 
         protected void disregardBackpressureThisSide() {
-
         }
     }
 
@@ -217,13 +234,15 @@ public final class UpstreamBalancer {
             super(true);
         }
 
-        @Override
-        public void start() {
-        }
+        // start() is ignored
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
-            // ignored
+            // don't send the demand upstream, but save it for later in case the other side calls disregardBackpressure
+            DELTA.updateAndGet(UpstreamBalancer.this, old -> addSaturating(old, bytesConsumed));
+            if ((flags & FLAG_DISREGARD_A) != 0) {
+                pushSomeFromIgnored();
+            }
         }
     }
 
@@ -239,7 +258,15 @@ public final class UpstreamBalancer {
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
+            // save already-demanded bytes to delta to calculate demand for other side in case of disregardBackpressure
+            DELTA.updateAndGet(UpstreamBalancer.this, old -> subtractSaturating(old, bytesConsumed));
             upstream.onBytesConsumed(bytesConsumed);
+        }
+
+        @Override
+        protected void disregardBackpressureThisSide() {
+            // when disregardBackpressure is called on this side, the previously "ignoring" side takes over backpressure.
+            pushSomeFromIgnored();
         }
     }
 
