@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.body.CloseableImmediateInboundByteBody;
-import io.micronaut.http.body.ImmediateInboundByteBody;
+import io.micronaut.http.body.CloseableImmediateByteBody;
+import io.micronaut.http.body.ImmediateByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -34,22 +34,22 @@ import java.nio.charset.Charset;
 import java.util.Objects;
 
 @Internal
-public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody implements CloseableImmediateInboundByteBody {
+public final class ImmediateNettyByteBody extends NettyByteBody implements CloseableImmediateByteBody {
     private final long length;
     @Nullable
     private ByteBuf buffer;
 
-    public ImmediateNettyInboundByteBody(@NonNull ByteBuf buffer) {
+    public ImmediateNettyByteBody(@NonNull ByteBuf buffer) {
         this.buffer = Objects.requireNonNull(buffer, "buffer");
         this.length = buffer.readableBytes();
     }
 
-    public static CloseableImmediateInboundByteBody empty() {
-        return new ImmediateNettyInboundByteBody(Unpooled.EMPTY_BUFFER);
+    public static CloseableImmediateByteBody empty() {
+        return new ImmediateNettyByteBody(Unpooled.EMPTY_BUFFER);
     }
 
-    public static ByteBuf toByteBuf(ImmediateInboundByteBody body) {
-        if (body instanceof ImmediateNettyInboundByteBody net) {
+    public static ByteBuf toByteBuf(ImmediateByteBody body) {
+        if (body instanceof ImmediateNettyByteBody net) {
             return net.claim();
         } else {
             return Unpooled.wrappedBuffer(body.toByteArray());
@@ -88,8 +88,8 @@ public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody im
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffer() {
-        return ExecutionFlow.just(new ImmediateNettyInboundByteBody(claim()));
+    public @NonNull ExecutionFlow<? extends CloseableImmediateByteBody> buffer() {
+        return ExecutionFlow.just(new ImmediateNettyByteBody(claim()));
     }
 
     @Override
@@ -132,7 +132,7 @@ public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody im
     }
 
     @Override
-    public @NonNull CloseableImmediateInboundByteBody split() {
+    public @NonNull CloseableImmediateByteBody split() {
         ByteBuf b = buffer;
         if (b == null) {
             failClaim();
@@ -140,6 +140,6 @@ public final class ImmediateNettyInboundByteBody extends NettyInboundByteBody im
         if (LOG.isTraceEnabled()) {
             LOG.trace("Body split at this location. This is not an error, but may aid in debugging other errors", new Exception());
         }
-        return new ImmediateNettyInboundByteBody(b.retainedSlice());
+        return new ImmediateNettyByteBody(b.retainedSlice());
     }
 }

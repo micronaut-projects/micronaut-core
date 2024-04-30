@@ -18,14 +18,14 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.body.CloseableInboundByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
-import io.micronaut.http.server.netty.body.StreamingInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
+import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -313,17 +313,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * This is a wrapper around {@link ImmediateNettyInboundByteBody#ImmediateNettyInboundByteBody(ByteBuf)}
+     * This is a wrapper around {@link ImmediateNettyByteBody#ImmediateNettyByteBody(ByteBuf)}
      * with an extra body length check.
      */
-    static CloseableInboundByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
+    static CloseableByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
         if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
             BufferConsumer.Upstream upstream = bytesConsumed -> {};
-            StreamingInboundByteBody.SharedBuffer mockBuffer = new StreamingInboundByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
+            StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
             mockBuffer.add(buf); // this will trigger the exception
-            return new StreamingInboundByteBody(mockBuffer);
+            return new StreamingNettyByteBody(mockBuffer);
         } else {
-            return new ImmediateNettyInboundByteBody(buf);
+            return new ImmediateNettyByteBody(buf);
         }
     }
 
@@ -406,7 +406,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, request, ImmediateNettyInboundByteBody.empty(), outboundAccess);
+                requestHandler.accept(ctx, request, ImmediateNettyByteBody.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -528,7 +528,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
             }
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
-            requestHandler.accept(ctx, request, new StreamingInboundByteBody(streamingInboundHandler.dest), outboundAccess);
+            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
     }
 
@@ -536,7 +536,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that exposes incoming content as a {@link Flux}.
      */
     private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
-        final StreamingInboundByteBody.SharedBuffer dest;
+        final StreamingNettyByteBody.SharedBuffer dest;
         final OutboundAccessImpl outboundAccess;
         long requested = 65536;
         boolean sendContinue;
@@ -544,7 +544,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private StreamingInboundHandler(OutboundAccessImpl outboundAccess, boolean sendContinue) {
             this.outboundAccess = outboundAccess;
             this.sendContinue = sendContinue;
-            this.dest = new StreamingInboundByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            this.dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
         }
 
         @Override

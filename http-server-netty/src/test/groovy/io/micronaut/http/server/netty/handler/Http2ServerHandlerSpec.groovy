@@ -1,10 +1,10 @@
 package io.micronaut.http.server.netty.handler
 
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.http.body.CloseableInboundByteBody
+import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody
-import io.micronaut.http.server.netty.body.NettyInboundByteBody
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody
+import io.micronaut.http.server.netty.body.NettyByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
@@ -109,7 +109,7 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 Assertions.assertEquals(HttpMethod.GET, request.method())
                 Assertions.assertEquals("/", request.uri())
@@ -156,8 +156,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
-                NettyInboundByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         serverSubscription = s
@@ -249,7 +249,7 @@ class Http2ServerHandlerSpec extends Specification {
         long demand = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
@@ -343,7 +343,7 @@ class Http2ServerHandlerSpec extends Specification {
         long read = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 outboundAccess.writeStream(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new InputStream() {
                     @Override
@@ -422,8 +422,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
-                NettyInboundByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         s.request(Long.MAX_VALUE)
@@ -497,7 +497,7 @@ class Http2ServerHandlerSpec extends Specification {
         Subscriber<? super HttpContent> subscriber = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
@@ -566,11 +566,11 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "closeIfNoSubscriber"() {
         given:
-        CloseableInboundByteBody b = null
+        CloseableByteBody b = null
         OutboundAccess oa = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 b = body
                 oa = outboundAccess
             }
@@ -628,7 +628,7 @@ class Http2ServerHandlerSpec extends Specification {
         boolean cancelled = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
@@ -700,7 +700,7 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
             }
 
@@ -732,7 +732,7 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 Assertions.assertEquals(HttpMethod.POST, request.method())
                 Assertions.assertEquals("/", request.uri())
@@ -776,13 +776,13 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 Assertions.assertEquals(HttpMethod.POST, request.method())
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
                 body.buffer().onComplete((imm, t) -> {
-                    def bb = ImmediateNettyInboundByteBody.toByteBuf(imm)
+                    def bb = ImmediateNettyByteBody.toByteBuf(imm)
                     outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
                 })
             }

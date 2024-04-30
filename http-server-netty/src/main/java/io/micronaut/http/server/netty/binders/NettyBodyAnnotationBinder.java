@@ -30,9 +30,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
-import io.micronaut.http.body.CloseableImmediateInboundByteBody;
-import io.micronaut.http.body.ImmediateInboundByteBody;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableImmediateByteBody;
+import io.micronaut.http.body.ImmediateByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
@@ -40,7 +40,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
@@ -107,7 +107,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
         // If there's an error during conversion, the body must stay available, so we split here.
         // This costs us nothing because we need to buffer anyway.
-        ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffered = nhr.byteBody().split(InboundByteBody.SplitBackpressureMode.FASTEST).buffer();
+        ExecutionFlow<? extends CloseableImmediateByteBody> buffered = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).buffer();
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -144,11 +144,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         };
     }
 
-    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateInboundByteBody imm) throws Throwable {
+    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateByteBody imm) throws Throwable {
         if (!isRaw(context.getArgument())) {
             if (nhr.isFormOrMultipartData()) {
                 FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
-                ByteBuf buf = ImmediateNettyInboundByteBody.toByteBuf(imm);
+                ByteBuf buf = ImmediateNettyByteBody.toByteBuf(imm);
                 List<InterfaceHttpData> result = new ArrayList<>();
                 if (buf.isReadable()) {
                     processor.add(new DefaultLastHttpContent(buf), result);

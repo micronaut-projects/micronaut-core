@@ -29,7 +29,7 @@ import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.NettyInboundByteBody;
+import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
@@ -72,7 +72,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
             @NonNull Flux<HttpData> multiObjectBody;
             try {
-                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyInboundByteBody.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
+                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
             } catch (Throwable e) {
                 return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
             }

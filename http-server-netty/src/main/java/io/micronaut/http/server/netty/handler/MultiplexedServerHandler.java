@@ -22,8 +22,8 @@ import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
-import io.micronaut.http.server.netty.body.StreamingInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
+import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -130,7 +130,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, ImmediateNettyInboundByteBody.empty(), this);
+                requestHandler.accept(ctx, headers, ImmediateNettyByteBody.empty(), this);
             }
         }
 
@@ -198,7 +198,7 @@ abstract class MultiplexedServerHandler {
             }
             requestAccepted = true;
             streamer.dest.setExpectedLengthFrom(request.headers());
-            requestHandler.accept(ctx, request, new StreamingInboundByteBody(streamer.dest), this);
+            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
         /**
@@ -506,7 +506,7 @@ abstract class MultiplexedServerHandler {
          * request case.
          */
         private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
-            final StreamingInboundByteBody.SharedBuffer dest = new StreamingInboundByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            final StreamingNettyByteBody.SharedBuffer dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
             /**
              * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream
              * hasn't consumed ({@link #onBytesConsumed(long)}). May be negative if the downstream

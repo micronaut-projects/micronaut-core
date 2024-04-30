@@ -41,7 +41,7 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -90,7 +90,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                     if (annotation == Body.class) {
                         return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
                             if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
-                                return fullHttpRequest.byteBody().split(InboundByteBody.SplitBackpressureMode.FASTEST).buffer().map(imm -> {
+                                return fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).buffer().map(imm -> {
                                     Argument<T> t = context.getArgument();
                                     if (t.isAssignableFrom(ByteBuffer.class)) {
                                         return () -> Optional.of((T) imm.toByteBuffer());

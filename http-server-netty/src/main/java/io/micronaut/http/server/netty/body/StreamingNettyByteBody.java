@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.body.CloseableImmediateInboundByteBody;
-import io.micronaut.http.body.CloseableInboundByteBody;
+import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.CloseableImmediateByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.EventLoopFlow;
@@ -49,15 +49,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 @Internal
-public final class StreamingInboundByteBody extends NettyInboundByteBody implements CloseableInboundByteBody {
+public final class StreamingNettyByteBody extends NettyByteBody implements CloseableByteBody {
     private final SharedBuffer sharedBuffer;
     private BufferConsumer.Upstream upstream;
 
-    public StreamingInboundByteBody(SharedBuffer sharedBuffer) {
+    public StreamingNettyByteBody(SharedBuffer sharedBuffer) {
         this(sharedBuffer, sharedBuffer.rootUpstream);
     }
 
-    private StreamingInboundByteBody(SharedBuffer sharedBuffer, BufferConsumer.Upstream upstream) {
+    private StreamingNettyByteBody(SharedBuffer sharedBuffer, BufferConsumer.Upstream upstream) {
         this.sharedBuffer = sharedBuffer;
         this.upstream = upstream;
     }
@@ -73,7 +73,7 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
     }
 
     @Override
-    public @NonNull CloseableInboundByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -81,11 +81,11 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
         this.sharedBuffer.reserve();
-        return new StreamingInboundByteBody(sharedBuffer, pair.right());
+        return new StreamingNettyByteBody(sharedBuffer, pair.right());
     }
 
     @Override
-    public @NonNull StreamingInboundByteBody allowDiscard() {
+    public @NonNull StreamingNettyByteBody allowDiscard() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -154,7 +154,7 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffer() {
+    public @NonNull ExecutionFlow<? extends CloseableImmediateByteBody> buffer() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -162,7 +162,7 @@ public final class StreamingInboundByteBody extends NettyInboundByteBody impleme
         this.upstream = null;
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
-        return sharedBuffer.subscribeFull(upstream).map(ImmediateNettyInboundByteBody::new);
+        return sharedBuffer.subscribeFull(upstream).map(ImmediateNettyByteBody::new);
     }
 
     @Override

@@ -29,25 +29,25 @@ import java.util.OptionalLong;
 /**
  * This class represents a stream of bytes from an HTTP connection. These bytes may be streamed or
  * fully in memory, depending on implementation.
- * <p>Each {@link InboundByteBody} may only be used once for a "primary" operation (such as
+ * <p>Each {@link ByteBody} may only be used once for a "primary" operation (such as
  * {@link #toInputStream()}). However, <i>before</i> that primary operation, it may be
- * {@link #split() split} multiple times. Splitting returns a new {@link InboundByteBody} that is
+ * {@link #split() split} multiple times. Splitting returns a new {@link ByteBody} that is
  * independent. That means if you want to do two primary operations on the same
- * {@link InboundByteBody}, you can instead split it once and then do one of the primary operations
+ * {@link ByteBody}, you can instead split it once and then do one of the primary operations
  * on the body returned by {@link #split()}.
- * <p>To ensure resource cleanup, {@link #split()} returns a {@link CloseableInboundByteBody}. This
+ * <p>To ensure resource cleanup, {@link #split()} returns a {@link CloseableByteBody}. This
  * body must be closed if no terminal operation is performed, otherwise there may be a memory leak
  * or stalled connection!
- * <p>An individual {@link InboundByteBody} is <i>not</i> thread-safe: You may not call
+ * <p>An individual {@link ByteBody} is <i>not</i> thread-safe: You may not call
  * {@link #split()} concurrently from multiple threads for example. However, the new
- * {@link InboundByteBody} returned from {@link #split()} is independent, so you may use it on a
+ * {@link ByteBody} returned from {@link #split()} is independent, so you may use it on a
  * different thread as this one.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Experimental
-public interface InboundByteBody {
+public interface ByteBody {
     /**
      * Equivalent to {@code split(SplitBackpressureMode.SLOWEST)}.
      *
@@ -55,12 +55,12 @@ public interface InboundByteBody {
      * performed on it
      */
     @NonNull
-    default CloseableInboundByteBody split() {
+    default CloseableByteBody split() {
         return split(SplitBackpressureMode.SLOWEST);
     }
 
     /**
-     * Create a new, independent {@link InboundByteBody} that contains the same data as this one.
+     * Create a new, independent {@link ByteBody} that contains the same data as this one.
      *
      * @param backpressureMode How to handle backpressure between the old and new body. See
      *                         {@link SplitBackpressureMode} documentation
@@ -68,7 +68,7 @@ public interface InboundByteBody {
      * performed on it
      */
     @NonNull
-    CloseableInboundByteBody split(@NonNull SplitBackpressureMode backpressureMode);
+    CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode);
 
     /**
      * Signal that the upstream may discard any remaining body data. Only if all consumers of the
@@ -81,7 +81,7 @@ public interface InboundByteBody {
      */
     @Contract("-> this")
     @NonNull
-    default InboundByteBody allowDiscard() {
+    default ByteBody allowDiscard() {
         return this;
     };
 
@@ -91,7 +91,7 @@ public interface InboundByteBody {
      * be lower if there is a connection error.
      * <p>This value may go from {@link OptionalLong#empty()} to a known value over the lifetime of
      * this body.
-     * <p>This is <i>not</i> a primary operation and does not modify this {@link InboundByteBody}.
+     * <p>This is <i>not</i> a primary operation and does not modify this {@link ByteBody}.
      *
      * @return The expected length of this body
      */
@@ -137,7 +137,7 @@ public interface InboundByteBody {
      * @return A flow that completes when all bytes are available
      */
     @NonNull
-    ExecutionFlow<? extends CloseableImmediateInboundByteBody> buffer();
+    ExecutionFlow<? extends CloseableImmediateByteBody> buffer();
 
     /**
      * This enum controls how backpressure should be handled if one of the two bodies

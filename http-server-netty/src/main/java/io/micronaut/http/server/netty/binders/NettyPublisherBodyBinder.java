@@ -25,8 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
-import io.micronaut.http.body.InboundByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -69,7 +69,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            InboundByteBody rootBody = nhr.byteBody();
+            ByteBody rootBody = nhr.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }

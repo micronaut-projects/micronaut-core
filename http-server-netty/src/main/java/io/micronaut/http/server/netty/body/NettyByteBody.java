@@ -19,7 +19,7 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -29,17 +29,17 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 @Internal
-public abstract class NettyInboundByteBody implements InboundByteBody {
-    protected static final Logger LOG = LoggerFactory.getLogger(NettyInboundByteBody.class);
+public sealed abstract class NettyByteBody implements ByteBody permits ImmediateNettyByteBody, StreamingNettyByteBody {
+    protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
 
     static void failClaim() {
-        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must InboundByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.server.netty.body.NettyInboundByteBody.");
+        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.server.netty.body.NettyByteBody.");
     }
 
     protected abstract Flux<ByteBuf> toByteBufPublisher();
 
-    public static Flux<ByteBuf> toByteBufs(InboundByteBody body) {
-        if (body instanceof NettyInboundByteBody net) {
+    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
+        if (body instanceof NettyByteBody net) {
             return net.toByteBufPublisher();
         } else {
             return Flux.from(body.toByteArrayPublisher()).map(Unpooled::wrappedBuffer);

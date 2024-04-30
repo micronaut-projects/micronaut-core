@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
 
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
@@ -85,7 +85,7 @@ public final class UpstreamBalancer {
         return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
     }
 
-    static UpstreamPair balancer(BufferConsumer.Upstream upstream, InboundByteBody.SplitBackpressureMode mode) {
+    static UpstreamPair balancer(BufferConsumer.Upstream upstream, ByteBody.SplitBackpressureMode mode) {
         return switch (mode) {
             case SLOWEST -> slowest(upstream);
             case FASTEST -> fastest(upstream);

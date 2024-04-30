@@ -34,7 +34,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.body.CloseableInboundByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -54,7 +54,7 @@ import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -201,7 +201,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableInboundByteBody body, OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
         if (serverConfiguration.isValidateUrl()) {
             try {
@@ -212,7 +212,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 // invalid URI
                 NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                     new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                    ImmediateNettyInboundByteBody.empty(),
+                    ImmediateNettyByteBody.empty(),
                     ctx,
                     conversionService,
                     serverConfiguration

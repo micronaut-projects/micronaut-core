@@ -42,8 +42,8 @@ import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.body.CloseableInboundByteBody;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -57,7 +57,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.body.ImmediateNettyInboundByteBody;
+import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
@@ -172,7 +172,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
-    private final CloseableInboundByteBody body;
+    private final CloseableByteBody body;
     @Nullable
     private FormRouteCompleter formRouteCompleter;
     private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
@@ -190,7 +190,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
-                            CloseableInboundByteBody body,
+                            CloseableByteBody body,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
                             HttpServerConfiguration serverConfiguration) throws IllegalArgumentException {
@@ -205,7 +205,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
-    public final InboundByteBody byteBody() {
+    public final ByteBody byteBody() {
         return body;
     }
 
@@ -658,12 +658,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public boolean isFull() {
-        return byteBody() instanceof ImmediateNettyInboundByteBody;
+        return byteBody() instanceof ImmediateNettyByteBody;
     }
 
     @Override
     public ByteBuffer<?> contents() {
-        if (byteBody() instanceof ImmediateNettyInboundByteBody immediate) {
+        if (byteBody() instanceof ImmediateNettyByteBody immediate) {
             return toByteBuffer(immediate);
         }
         return null;
@@ -671,10 +671,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public ExecutionFlow<ByteBuffer<?>> bufferContents() {
-        return byteBody().buffer().map(c -> toByteBuffer((ImmediateNettyInboundByteBody) c));
+        return byteBody().buffer().map(c -> toByteBuffer((ImmediateNettyByteBody) c));
     }
 
-    private static ByteBuffer<ByteBuf> toByteBuffer(ImmediateNettyInboundByteBody immediateByteBody) {
+    private static ByteBuffer<ByteBuf> toByteBuffer(ImmediateNettyByteBody immediateByteBody) {
         // use delegate because we don't want to implement ReferenceCounted
         return new DelegateByteBuffer<>(NettyByteBufferFactory.DEFAULT.wrap(immediateByteBody.peek()));
     }

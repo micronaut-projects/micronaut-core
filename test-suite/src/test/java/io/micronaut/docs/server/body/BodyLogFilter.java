@@ -1,12 +1,13 @@
 package io.micronaut.docs.server.body;
 
 // tag::imports[]
+
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
-import io.micronaut.http.body.CloseableInboundByteBody;
-import io.micronaut.http.body.InboundByteBody;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -22,12 +23,12 @@ public class BodyLogFilter {
 
     @RequestFilter
     public void logBody(ServerHttpRequest<?> request) { // <2>
-        try (CloseableInboundByteBody ourCopy = // <4>
+        try (CloseableByteBody ourCopy = // <4>
                  request.byteBody()
-                     .split(InboundByteBody.SplitBackpressureMode.SLOWEST) // <3>
+                     .split(ByteBody.SplitBackpressureMode.SLOWEST) // <3>
                      .allowDiscard()) { // <5>
             Flux.from(ourCopy.toByteArrayPublisher()) // <6>
-                .onErrorComplete(InboundByteBody.BodyDiscardedException.class) // <7>
+                .onErrorComplete(ByteBody.BodyDiscardedException.class) // <7>
                 .subscribe(array -> LOG.info("Received body: {}", Base64.getEncoder().encodeToString(array))); // <8>
         }
     }

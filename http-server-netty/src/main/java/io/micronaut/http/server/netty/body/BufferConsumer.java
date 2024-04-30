@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.ByteBody;
 import io.netty.buffer.ByteBuf;
 
 @Internal
@@ -75,7 +76,7 @@ public interface BufferConsumer {
         /**
          * Instruct the upstream to ignore backpressure from this consumer. This is slightly
          * different from {@code onBytesConsumed(Long.MAX_VALUE)}: If there are two consumers
-         * in {@link io.micronaut.http.body.InboundByteBody.SplitBackpressureMode#FASTEST} mode,
+         * in {@link ByteBody.SplitBackpressureMode#FASTEST} mode,
          * a MAX_VALUE requests all data from the common upstream, while a disregardBackpressure
          * removes this downstream from consideration.
          */

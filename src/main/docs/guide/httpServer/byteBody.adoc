@@ -1,6 +1,6 @@
 Micronaut HTTP server version 4.5.0 introduced a new, more advanced API to access the bytes of an incoming request.
 When a api:io.micronaut.http.HttpRequest[] implements api:io.micronaut.http.ServerHttpRequest[], the new `byteBody()`
-method returns an api:io.micronaut.http.body.InboundByteBody[] with buffered, reactive and blocking APIs.
+method returns an api:io.micronaut.http.body.ByteBody[] with buffered, reactive and blocking APIs.
 
 When an HTTP request comes in, it starts out with an unparsed and unclaimed stream of bytes as its `byteBody()`. After
 all request filters have run, typically an argument binder matching the `@Body` parameter of the controller will
@@ -9,10 +9,10 @@ discarding any data if it has not been claimed by the argument binder.
 
 === Primary operations
 
-`InboundByteBody` itself does not offer direct access to the data. To begin processing, there must be a _primary
+`ByteBody` itself does not offer direct access to the data. To begin processing, there must be a _primary
 operation_ that converts the body into another form that can be used in the application programming model.
 
-A normal `InboundByteBody` has two groups of streaming primary operations. `toInputStream()` gives access to the body
+A normal `ByteBody` has two groups of streaming primary operations. `toInputStream()` gives access to the body
 as a regular `InputStream`. The `toByteArrayPublisher()` and `toByteBufferPublisher()` methods return a reactive stream
 of byte arrays or `ByteBuffer`s.
 
@@ -21,24 +21,24 @@ body using an `InputStream`, take care to do so only on another thread, or to an
 `@ExecuteOn(TaskExecutors.BLOCKING)`.
 
 If you need full access to the body, the `buffer()` method returns an `ExecutionFlow` that completes with an
-`ImmediateInboundByteBody` when the full body has been received. `ImmediateInboundByteBody` has a few more convenient
+`ImmediateByteBody` when the full body has been received. `ImmediateByteBody` has a few more convenient
 primary operations: `toByteArray()`, `toByteBuffer()` and `toString(Charset)`.
 
 Buffering is limited to the number of bytes configured in the `micronaut.server.max-request-buffer-size` property.
 
 === Splitting
 
-Because the framework will not buffer the whole body in memory by default, after an InboundByteBody has been claimed (a
-primary operation has been performed), the data is "gone", and the same InboundByteBody cannot be claimed again. That
+Because the framework will not buffer the whole body in memory by default, after an ByteBody has been claimed (a
+primary operation has been performed), the data is "gone", and the same ByteBody cannot be claimed again. That
 means that if a filter were to claim the `ServerHttpRequest.byteBody()` directly (e.g. to print it to a log),
 controllers could not access it anymore. The argument binder for the `@Body` argument would throw an exception.
 
-To resolve this exclusivity problem, an `InboundByteBody` can be _split_ before it is claimed. The split operation
+To resolve this exclusivity problem, an `ByteBody` can be _split_ before it is claimed. The split operation
 essentially duplicates the body stream so that the two consumers (logging and argument binding) can process it
 independently. A body can be `split` any number of times, but only before the primary operation.
 
-While `ServerHttpRequest.byteBody()` returns a normal `InboundByteBody` -- cleanup is done by the HTTP server if the
-body is not consumed--the body returned by `split` is a `CloseableInboundByteBody`. The caller *must* ensure that the
+While `ServerHttpRequest.byteBody()` returns a normal `ByteBody` -- cleanup is done by the HTTP server if the
+body is not consumed--the body returned by `split` is a `CloseableByteBody`. The caller *must* ensure that the
 new instance is closed, otherwise there can be resource and memory leaks, stalled connections, or other issues.
 
 ==== Backpressure
@@ -59,7 +59,7 @@ is the controller, the filter needs to complete before the controller even reads
 guided by the fastest of the two consumers.
 
 These two approaches are already the two most important
-api:io.micronaut.http.body.InboundByteBody.SplitBackpressureMode[]s. The full list of options is as follows:
+api:io.micronaut.http.body.ByteBody.SplitBackpressureMode[]s. The full list of options is as follows:
 
 * `SplitBackpressureMode.SLOWEST` uses the backpressure of the _slowest_ of the two consumers (first example)
 * `SplitBackpressureMode.FASTEST` uses the backpressure of the _fastest_ of the two consumers (second example)
@@ -81,7 +81,7 @@ When there are multiple consumers, discard behavior is dependent on use case. In
 request, when there is a filter that is also subscribed to the body data, it may be appropriate to drop the request in
 some cases (e.g. for logging) but may be necessary to still receive all the data in others.
 
-To signal that the upstream may discard the body, you can call `InboundByteBody.allowDiscard()`. Only if all consumers
+To signal that the upstream may discard the body, you can call `ByteBody.allowDiscard()`. Only if all consumers
 call `allowDiscard()` (or `close()` without a primary operation) may the remaining data actually be discarded. Before
 that, _all_ consumers, even those that called `allowDiscard()`, will still receive all data. For the logging use case,
 you can call `allowDiscard()` and be assured that you will still log the full body if the controller needs it.

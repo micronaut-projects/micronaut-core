@@ -18,25 +18,29 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
+import java.io.Closeable;
+
 /**
- * Combination of {@link CloseableInboundByteBody} and {@link ImmediateInboundByteBody}. See their
- * documentation for details.
+ * A {@link Closeable} version of {@link ByteBody}. {@link #close()} releases any resources
+ * that may still be held. No other operations on this body are valid after {@link #close()}, but
+ * multiple calls to {@link #close()} are allowed (though only the first will do anything). If a
+ * primary operation (see {@link ByteBody}) is performed on this body, you can but do not
+ * need to close it anymore. Closing becomes a no-op in that case.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Experimental
-public interface CloseableImmediateInboundByteBody extends ImmediateInboundByteBody, CloseableInboundByteBody {
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}, it does nothing.
-     */
-    @SuppressWarnings("deprecation")
+public interface CloseableByteBody extends ByteBody, Closeable {
     @Override
     @NonNull
-    @Deprecated
-    default CloseableImmediateInboundByteBody allowDiscard() {
+    default CloseableByteBody allowDiscard() {
         return this;
     }
+
+    /**
+     * Clean up any resources held by this instance. See class documentation.
+     */
+    @Override
+    void close();
 }

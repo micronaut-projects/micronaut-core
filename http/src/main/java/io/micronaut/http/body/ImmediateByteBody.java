@@ -25,48 +25,48 @@ import java.nio.charset.Charset;
 import java.util.OptionalLong;
 
 /**
- * This is an extension of {@link InboundByteBody} when the entire body is immediately available
- * (without waiting). It has the same semantics as {@link InboundByteBody}, but it adds a few other
+ * This is an extension of {@link ByteBody} when the entire body is immediately available
+ * (without waiting). It has the same semantics as {@link ByteBody}, but it adds a few other
  * primary operations for convenience.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Experimental
-public interface ImmediateInboundByteBody extends InboundByteBody {
+public interface ImmediateByteBody extends ByteBody {
     /**
      * For immediate buffers, backpressure is not relevant, so the backpressure modes passed to
      * {@link #split(SplitBackpressureMode)} are ignored. You can use this method always.
      *
-     * @see InboundByteBody#split()
+     * @see ByteBody#split()
      * @return A body with the same content as this one
      */
     @NonNull
-    CloseableImmediateInboundByteBody split();
+    CloseableImmediateByteBody split();
 
     /**
      * This method is equivalent to {@link #split()}, the backpressure parameter is ignored.
      *
      * @param backpressureMode ignored
      * @return A body with the same content as this one
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}. Use
+     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
      * {@link #split()} directly.
      */
     @Override
     @Deprecated
-    default @NonNull CloseableImmediateInboundByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    default @NonNull CloseableImmediateByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
         return split();
     }
 
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}, it does nothing.
+     * @deprecated This method is unnecessary for {@link ImmediateByteBody}, it does nothing.
      */
     @Override
     @NonNull
     @Deprecated
-    default ImmediateInboundByteBody allowDiscard() {
+    default ImmediateByteBody allowDiscard() {
         return this;
     }
 
@@ -74,16 +74,16 @@ public interface ImmediateInboundByteBody extends InboundByteBody {
      * The length in bytes of the body.
      *
      * @return The length
-     * @see InboundByteBody#expectedLength()
+     * @see ByteBody#expectedLength()
      */
     long length();
 
     /**
      * The length in bytes of the body. Never returns {@link OptionalLong#empty()} for
-     * {@link ImmediateInboundByteBody}. Use {@link #length()} directly instead.
+     * {@link ImmediateByteBody}. Use {@link #length()} directly instead.
      *
      * @return The length
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}. Use
+     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
      * {@link #length()} directly.
      */
     @Override
@@ -129,7 +129,7 @@ public interface ImmediateInboundByteBody extends InboundByteBody {
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}. Use
+     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
      * {@link #toByteBuffer()} directly.
      */
     @Override
@@ -142,7 +142,7 @@ public interface ImmediateInboundByteBody extends InboundByteBody {
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateInboundByteBody}. Use
+     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
      * {@link #toByteArray()} directly.
      */
     @Override
