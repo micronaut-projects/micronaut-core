@@ -506,12 +506,22 @@ final class HttpPipelineBuilder implements Closeable {
 
             final Http2FrameCodec frameCodec;
             final Http2ConnectionHandler connectionHandler;
+            Http2MultiplexHandler multiplexHandler;
             if (server.getServerConfiguration().isLegacyMultiplexHandlers()) {
                 frameCodec = createHttp2FrameCodec();
                 connectionHandler = frameCodec;
+                multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
+                    @Override
+                    protected void initChannel(@NonNull Http2StreamChannel ch) {
+                        StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                        streamPipeline.insertHttp2FrameHandlers();
+                        streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                    }
+                });
             } else {
                 connectionHandler = createHttp2ServerHandler(false);
                 frameCodec = null;
+                multiplexHandler = null;
             }
             final String fallbackHandlerName = "http1-fallback-handler";
             HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
@@ -537,14 +547,7 @@ final class HttpPipelineBuilder implements Closeable {
                     if (frameCodec == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
-                        return new Http2ServerUpgradeCodecImpl(frameCodec, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
-                            @Override
-                            protected void initChannel(@NonNull Http2StreamChannel ch) {
-                                StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
-                                streamPipeline.insertHttp2FrameHandlers();
-                                streamPipeline.streamCustomizer.onStreamPipelineBuilt();
-                            }
-                        }));
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, multiplexHandler);
                     }
                 } else {
                     return null;
@@ -557,8 +560,14 @@ final class HttpPipelineBuilder implements Closeable {
                     upgradeCodecFactory,
                     server.getServerConfiguration().getMaxH2cUpgradeRequestSize()
             );
+            ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
+                @Override
+                protected void initChannel(@NonNull Channel ch) {
+                    ch.pipeline().addLast(connectionHandler, multiplexHandler);
+                }
+            };
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
-                    new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
+                    new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, priorKnowledgeHandler);
 
             pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
             pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
