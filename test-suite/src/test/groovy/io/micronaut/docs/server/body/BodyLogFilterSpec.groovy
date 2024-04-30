@@ -24,14 +24,14 @@ class BodyLogFilterSpec extends Specification {
         def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
 
         when:
-        def body = '{"firstName": "foo", "lastName": "bar"}'
+        def body = '{"firstName": "Jonas", "lastName": "Konrad"}'
         def status = client.retrieve(HttpRequest.POST("/person", body), HttpStatus)
         def msgs = [appender.headLog(1), appender.headLog(1)].toSet()
         then:
         status == HttpStatus.OK || status == HttpStatus.NO_CONTENT
         msgs == [
                 "Received body: " + Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8)),
-                "Creating person Person[firstName=foo, lastName=bar]"
+                "Creating person Person[firstName=Jonas, lastName=Konrad]"
         ].toSet()
 
         cleanup:

@@ -605,7 +605,8 @@ abstract class MultiplexedServerHandler {
                 assert ctx.channel().eventLoop().inEventLoop();
 
                 if (unacknowledged < 0) {
-                    notifyDataConsumedLong(Math.min(buf.readableBytes(), -unacknowledged));
+                    // -MIN_VALUE is still MIN_VALUE so we need to special case it
+                    notifyDataConsumedLong(unacknowledged == Long.MIN_VALUE ? buf.readableBytes() : Math.min(buf.readableBytes(), -unacknowledged));
                 }
                 unacknowledged += buf.readableBytes();
                 dest.add(buf);

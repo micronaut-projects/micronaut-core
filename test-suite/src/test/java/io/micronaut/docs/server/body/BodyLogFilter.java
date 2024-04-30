@@ -21,13 +21,14 @@ public class BodyLogFilter {
     private static final Logger LOG = LoggerFactory.getLogger(BodyLogFilter.class);
 
     @RequestFilter
-    public void logBody(ServerHttpRequest<?> request) {
-        try (CloseableInboundByteBody ourCopy =
+    public void logBody(ServerHttpRequest<?> request) { // <2>
+        try (CloseableInboundByteBody ourCopy = // <4>
                  request.byteBody()
-                     .split(InboundByteBody.SplitBackpressureMode.SLOWEST)
-                     .allowDiscard()) {
-            Flux.from(ourCopy.toByteArrayPublisher())
-                .subscribe(array -> LOG.info("Received body: {}", Base64.getEncoder().encodeToString(array)));
+                     .split(InboundByteBody.SplitBackpressureMode.SLOWEST) // <3>
+                     .allowDiscard()) { // <5>
+            Flux.from(ourCopy.toByteArrayPublisher()) // <6>
+                .onErrorComplete(InboundByteBody.BodyDiscardedException.class) // <7>
+                .subscribe(array -> LOG.info("Received body: {}", Base64.getEncoder().encodeToString(array))); // <8>
         }
     }
 }

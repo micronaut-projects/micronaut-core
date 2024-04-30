@@ -17,7 +17,7 @@ public class BodyLogController {
     private static final Logger LOG = LoggerFactory.getLogger(BodyLogController.class);
 
     @Post
-    void create(@Body Person person) {
+    void create(@Body Person person) { // <1>
         LOG.info("Creating person {}", person);
     }
 
