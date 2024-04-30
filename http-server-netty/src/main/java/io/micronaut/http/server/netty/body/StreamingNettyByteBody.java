@@ -124,11 +124,6 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             }
 
             @Override
-            public void discard() {
-
-            }
-
-            @Override
             public void error(Throwable e) {
                 sink.tryEmitError(e);
             }
@@ -522,11 +517,6 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
                     buf.release();
                 }
             }
-        }
-
-        @Override
-        public void discard() {
-            error(BodyDiscardedException.create());
         }
 
         @Override

@@ -19,6 +19,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.ByteBody;
 import io.netty.buffer.ByteBuf;
 
+/**
+ * This is a netty-specific reactor-like API for streaming bytes. It's a bit better than reactor
+ * because it's more explicit about reference counting semantics, has more fine-grained controls
+ * for cancelling, and has more relaxed concurrency semantics.
+ *
+ * @since 4.5.0
+ * @author Jonas Konrad
+ */
 @Internal
 public interface BufferConsumer {
     /**
@@ -36,7 +44,9 @@ public interface BufferConsumer {
     /**
      * Signal that the upstream has discarded the remaining data, as requested by {@link Upstream#allowDiscard()}.
      */
-    void discard();
+    default void discard() {
+        error(ByteBody.BodyDiscardedException.create());
+    }
 
     /**
      * Signal an upstream error.

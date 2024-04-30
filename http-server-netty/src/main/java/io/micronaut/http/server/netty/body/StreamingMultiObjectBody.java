@@ -68,6 +68,6 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
     @Override
     public void handleForm(FormRouteCompleter formRouteCompleter) {
         prepareClaim().subscribe(formRouteCompleter);
-        //next(formRouteCompleter);
+        next(formRouteCompleter);
     }
 }
