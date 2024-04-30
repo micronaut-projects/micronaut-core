@@ -2319,24 +2319,6 @@ class Test(val name:  @TypeUseRuntimeAnn String, val secondName: @TypeUseClassAn
             !secondNameField.hasStereotype(TypeUseClassAnn.name)
     }
 
-    void "test package private field instrospection"() {
-        when:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test
-
-import io.micronaut.core.annotation.Introspected
-import io.micronaut.kotlin.processing.visitor.MySuperclass
-
-@Introspected
-class Test(val name: String) : MySuperclass()
-''')
-        then:
-        introspection.getProperty("name").orElse(null)
-
-        and: 'the package private superclass is not introspected'
-        !introspection.getProperty("field").orElse(null)
-    }
-
     void "test subtypes"() {
         given:
             BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
@@ -2368,6 +2350,30 @@ class Holder<A : Animal>(
             def animal = introspection.getProperty("animal").get().asArgument()
             animal instanceof GenericPlaceholder
             animal.isTypeVariable()
+    }
+
+    void "test package private property introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.visitor.MySuperclass
+
+@Introspected
+class Test(val name: String) : MySuperclass()
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not available'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
     }
 
     void "test list property"() {

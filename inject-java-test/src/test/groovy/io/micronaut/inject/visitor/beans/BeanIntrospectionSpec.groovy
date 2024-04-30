@@ -5183,35 +5183,6 @@ class Test {
         !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
     }
 
-    void "test package private field instrospection"() {
-        when:
-        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.inject.visitor.beans.MySuperclass;
-
-@Introspected
-class Test extends MySuperclass {
-
-    private final String name;
-
-    Test(String name) {
-        this.name = name;
-    }
-
-    String getName() {
-        return name;
-    }
-}
-''')
-        then:
-        introspection.getProperty("name").orElse(null)
-
-        and: 'the package private superclass is not introspected'
-        !introspection.getProperty("field").orElse(null)
-    }
-
     void "test subtypes"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
@@ -5257,6 +5228,41 @@ class Holder<A extends Animal> {
         def animal = introspection.getProperty("animal").get().asArgument()
         animal instanceof GenericPlaceholder
         animal.isTypeVariable()
+    }
+
+    void "test package private property introspection"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.MySuperclass;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not available'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
     }
 
     void "test private property 1"() {

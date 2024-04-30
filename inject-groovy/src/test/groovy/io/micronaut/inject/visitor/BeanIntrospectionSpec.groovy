@@ -2522,7 +2522,7 @@ class Holder<A extends Animal> {
             animal.isTypeVariable()
     }
 
-    void "test package private field instrospection"() {
+    void "test package private property introspection"() {
         when:
         def introspection = buildBeanIntrospection('test.Test', '''
 package test
@@ -2536,10 +2536,16 @@ class Test extends MySuperclass {
     String name
 }
 ''')
-        then:
+        then: 'the property in this class is introspected'
         introspection.getProperty("name").orElse(null)
 
-        and: 'the package private superclass is not introspected'
-        !introspection.getProperty("field").orElse(null)
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not available'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
     }
 }

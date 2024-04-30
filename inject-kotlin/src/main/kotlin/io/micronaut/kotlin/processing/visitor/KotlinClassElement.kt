@@ -23,6 +23,7 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.getKotlinClassByName
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isPrivate
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
@@ -815,7 +816,7 @@ internal open class KotlinClassElement(
                 }
 
                 PropertyElement::class.java -> {
-                    classNode.getDeclaredProperties().toList()
+                    classNode.getDeclaredProperties().filter { !it.isJavaPackagePrivate() }.toList()
                 }
 
                 ConstructorElement::class.java -> {
