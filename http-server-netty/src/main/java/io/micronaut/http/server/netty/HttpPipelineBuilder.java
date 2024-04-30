@@ -17,8 +17,8 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
@@ -32,6 +32,7 @@ import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -442,7 +443,14 @@ final class HttpPipelineBuilder {
                     server.getServerConfiguration().getMaxH2cUpgradeRequestSize()
             );
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
-                    new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
+                    new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, new ChannelInitializer<Channel>() {
+                        @Override
+                        protected void initChannel(@NonNull Channel ch) throws Exception {
+                            ch.pipeline().addLast(connectionHandler);
+                            insertHttp2DownstreamHandlers();
+                            onRequestPipelineBuilt();
+                        }
+                    });
 
             pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
             pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
