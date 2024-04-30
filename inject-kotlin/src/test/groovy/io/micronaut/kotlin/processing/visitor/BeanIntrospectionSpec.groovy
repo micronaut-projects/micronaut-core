@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.fasterxml.jackson.annotation.JsonClassDescription
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.annotation.Executable
@@ -2381,5 +2382,47 @@ data class Cart(
             bean = introspection.getProperty("items").get().withValue(bean, new ArrayList())
         expect:
             bean
+    }
+
+    void "test ignored problem"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.ClassificationAndStats', '''
+package test
+
+import com.fasterxml.jackson.annotation.JsonGetter
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonValue
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class Aggregation(@get:JsonValue val fieldName: String) {
+    FIELD_1("SomeField1"),
+    FIELD_2("SomeField2");
+}
+
+interface StatsEntry {
+    val shouldNotAppearInJson: MutableMap<Aggregation, Int>
+}
+
+@Introspected
+data class ClassificationVars(
+    val regionKode: String
+)
+
+@Introspected
+data class ClassificationAndStats<out T : StatsEntry>(
+    val klassifisering: ClassificationVars,
+    /** Ignore field to avoid double wrapping of values in resulting JSON */
+    @JsonIgnore
+    val stats: T
+) {
+    @JsonGetter("stats")
+    fun getValues(): Map<Aggregation, Int> = stats.shouldNotAppearInJson
+}
+
+        ''')
+            def statsProp = introspection.getProperty("stats").get()
+        expect:
+            statsProp.hasAnnotation(JsonIgnore)
     }
 }

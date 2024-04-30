@@ -406,6 +406,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         BeanDefinition<B> getDeclaringType();
 
         /**
+         * @return The declaring type qualifier
+         * @since 4.5.0
+         */
+        Qualifier<B> getDeclaringTypeQualifier();
+
+        /**
          * @return The inject point
          */
         InjectionPoint<B> getInjectionPoint();
