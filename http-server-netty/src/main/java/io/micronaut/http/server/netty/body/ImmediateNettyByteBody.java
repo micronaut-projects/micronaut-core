@@ -33,6 +33,12 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Objects;
 
+/**
+ * Netty ByteBuf implementation of ImmediateByteBody.
+ *
+ * @since 4.5.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class ImmediateNettyByteBody extends NettyByteBody implements CloseableImmediateByteBody {
     private final long length;

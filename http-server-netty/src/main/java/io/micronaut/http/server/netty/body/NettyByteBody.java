@@ -28,8 +28,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+/**
+ * Common base class for streaming and immediate netty ByteBody implementations.
+ *
+ * @since 4.5.0
+ * @author Jonas Konrad
+ */
 @Internal
-public sealed abstract class NettyByteBody implements ByteBody permits ImmediateNettyByteBody, StreamingNettyByteBody {
+public abstract sealed class NettyByteBody implements ByteBody permits ImmediateNettyByteBody, StreamingNettyByteBody {
     protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
 
     static void failClaim() {

@@ -119,6 +119,7 @@ public interface ImmediateByteBody extends ByteBody {
      * <p>This is a primary operation. After this operation, no other primary operation or
      * {@link #split()} may be done.
      *
+     * @param charset The charset to convert the body
      * @return The body as a string
      */
     @NonNull
@@ -147,6 +148,7 @@ public interface ImmediateByteBody extends ByteBody {
      */
     @Override
     @NonNull
+    @Deprecated
     default Publisher<byte[]> toByteArrayPublisher() {
         return Publishers.just(toByteArray());
     }

@@ -83,7 +83,7 @@ public interface ByteBody {
     @NonNull
     default ByteBody allowDiscard() {
         return this;
-    };
+    }
 
     /**
      * Get the expected length of this body, if known (either from {@code Content-Length} or from

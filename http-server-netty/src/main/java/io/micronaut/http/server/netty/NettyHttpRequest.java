@@ -58,6 +58,7 @@ import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
+import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
@@ -91,7 +92,6 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -610,7 +610,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, Flux.from(byteBody().toByteBufferPublisher()).map(bb -> new DefaultHttpContent(((ByteBuf)bb.asNativeBuffer())))));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBody.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
     }
 
     @Override

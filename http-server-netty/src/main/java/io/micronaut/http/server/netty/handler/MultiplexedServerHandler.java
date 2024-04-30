@@ -61,10 +61,10 @@ abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
 
     ChannelHandlerContext ctx;
+    BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
     @Nullable
     private Compressor compressor;
-    BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;

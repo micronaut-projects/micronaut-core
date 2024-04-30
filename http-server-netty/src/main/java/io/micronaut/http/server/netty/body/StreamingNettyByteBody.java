@@ -48,6 +48,12 @@ import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+/**
+ * Netty implementation for streaming ByteBody.
+ *
+ * @since 4.5.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class StreamingNettyByteBody extends NettyByteBody implements CloseableByteBody {
     private final SharedBuffer sharedBuffer;
@@ -178,6 +184,10 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         sharedBuffer.subscribe(null, upstream);
     }
 
+    /**
+     * This class buffers input data and distributes it to multiple {@link StreamingNettyByteBody}
+     * instances.
+     */
     public static final class SharedBuffer implements BufferConsumer {
         private static final Supplier<ResourceLeakDetector<SharedBuffer>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(SharedBuffer.class));
@@ -438,11 +448,12 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
                 return;
             }
             // calculate the new total length
-            long newLength = (lengthSoFar += buf.readableBytes());
+            long newLength = lengthSoFar + buf.readableBytes();
+            lengthSoFar = newLength;
             if (newLength > limits.maxBodySize()) {
                 // for maxBodySize, all subscribers get the error
                 buf.release();
-                error(new ContentLengthExceededException(limits.maxBodySize(), lengthSoFar));
+                error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
                 rootUpstream.allowDiscard();
                 return;
             }

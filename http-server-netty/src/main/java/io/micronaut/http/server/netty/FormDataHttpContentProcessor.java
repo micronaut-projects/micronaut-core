@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 @Internal
-public class FormDataHttpContentProcessor {
+public final class FormDataHttpContentProcessor {
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final long advertisedLength;
@@ -71,7 +71,7 @@ public class FormDataHttpContentProcessor {
      */
     private boolean destroyed = false;
     /**
-     * Whether we received a LastHttpContent
+     * Whether we received a LastHttpContent.
      */
     private boolean receivedLast = false;
 
