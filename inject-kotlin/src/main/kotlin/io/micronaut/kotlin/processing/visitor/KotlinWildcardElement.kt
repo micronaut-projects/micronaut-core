@@ -50,11 +50,15 @@ internal class KotlinWildcardElement(
     }
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
-        AnnotationMetadataHierarchy(
-            true,
-            upper.annotationMetadata,
-            resolvedGenericTypeAnnotationMetadata
-        )
+        if (presetAnnotationMetadata != null) {
+            presetAnnotationMetadata
+        } else {
+            AnnotationMetadataHierarchy(
+                true,
+                upper.annotationMetadata,
+                resolvedGenericTypeAnnotationMetadata
+            )
+        }
     }
 
     private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
