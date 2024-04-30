@@ -144,6 +144,7 @@ public class ConnectionManager {
     private final HttpClientConfiguration configuration;
     private volatile SslContext sslContext;
     private volatile /* QuicSslContext */ Object http3SslContext;
+    private volatile SslContext websocketSslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
 
@@ -165,6 +166,7 @@ public class ConnectionManager {
         this.configuration = from.configuration;
         this.sslContext = from.sslContext;
         this.http3SslContext = from.http3SslContext;
+        this.websocketSslContext = from.websocketSslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
@@ -209,6 +211,8 @@ public class ConnectionManager {
 
     final void refresh() {
         SslContext oldSslContext = sslContext;
+        SslContext oldWebsocketSslContext = websocketSslContext;
+        websocketSslContext = null;
         if (configuration.getSslConfiguration().isEnabled()) {
             sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
         } else {
@@ -224,6 +228,7 @@ public class ConnectionManager {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
         ReferenceCountUtil.release(oldSslContext);
+        ReferenceCountUtil.release(oldWebsocketSslContext);
     }
 
     /**
@@ -369,7 +374,9 @@ public class ConnectionManager {
             }
         }
         ReferenceCountUtil.release(sslContext);
+        ReferenceCountUtil.release(websocketSslContext);
         sslContext = null;
+        websocketSslContext = null;
     }
 
     /**
@@ -433,6 +440,32 @@ public class ConnectionManager {
     }
 
     /**
+     * Builds an {@link SslContext} for the given WebSocket URI if necessary.
+     *
+     * @return The {@link SslContext} instance
+     */
+    @Nullable
+    private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
+        SslContext sslCtx = websocketSslContext;
+        if (requestKey.isSecure()) {
+            if (configuration.getSslConfiguration().isEnabled()) {
+                if (sslCtx == null) {
+                    synchronized (this) {
+                        sslCtx = websocketSslContext;
+                        if (sslCtx == null) {
+                            sslCtx = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
+                            websocketSslContext = sslCtx;
+                        }
+                    }
+                }
+            } else if (configuration.getProxyAddress().isEmpty()){
+                throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
+            }
+        }
+        return sslCtx;
+    }
+
+    /**
      * Connect to a remote websocket. The given {@link ChannelHandler} is added to the pipeline
      * when the handshakes complete.
      *
@@ -448,7 +481,7 @@ public class ConnectionManager {
             protected void initChannel(@NonNull Channel ch) {
                 addLogHandler(ch);
 
-                SslContext sslContext = buildSslContext(requestKey);
+                SslContext sslContext = buildWebsocketSslContext(requestKey);
                 if (sslContext != null) {
                     ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
                 }
