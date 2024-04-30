@@ -20,7 +20,7 @@ endpoints:
 
 - `details-visible` is one of api:management.endpoint.health.DetailsVisibility[]
 
-The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated.
+The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated. If the details-visible parameter is configured as ANONYMOUS, while the sensitive flag is set to true, the resulting outcome will be 401 Unauthorized.
 
 For example, setting:
 
