@@ -19,10 +19,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
+import io.micronaut.core.util.StringUtils
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
+import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.health.aggregator.DefaultHealthAggregator
@@ -164,6 +166,27 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "2.2.224 (2023-09-17)"
         result.details.service.status == "UP"
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test health endpoint returns 401 for sensitive true and details-visible anonymous"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': StringUtils.TRUE,
+                'endpoints.health.details-visible': DetailsVisibility.ANONYMOUS])
+        URL server = embeddedServer.getURL()
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
+
+        when:
+        client.exchange("/health", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+        HttpStatus.UNAUTHORIZED == ex.status
 
         cleanup:
         embeddedServer.close()
