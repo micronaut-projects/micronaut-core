@@ -2542,10 +2542,36 @@ class Test extends MySuperclass {
         and: 'the public property in the java superclass is introspected'
         introspection.getProperty("publicProperty").orElse(null)
 
-        and: 'the private property in the java superclass is not available'
+        and: 'the private property in the java superclass is not introspected'
         !introspection.getProperty("privateProperty").orElse(null)
 
         and: 'the package private superclass property is not introspected'
         !introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test package private property introspection in same package"() {
+        when:
+        def introspection = buildBeanIntrospection('io.micronaut.inject.visitor.Test', '''
+package io.micronaut.inject.visitor
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test extends MySuperclass {
+
+    String name
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is introspected, as we are in the same package'
+        introspection.getProperty("packagePrivateProperty").orElse(null)
     }
 }
