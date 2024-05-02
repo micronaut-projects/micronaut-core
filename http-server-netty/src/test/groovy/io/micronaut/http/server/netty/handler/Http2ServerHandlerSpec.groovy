@@ -3,7 +3,7 @@ package io.micronaut.http.server.netty.handler
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.ImmediateNettyByteBody
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody
 import io.micronaut.http.server.netty.body.NettyByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
@@ -782,7 +782,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
                 body.buffer().onComplete((imm, t) -> {
-                    def bb = ImmediateNettyByteBody.toByteBuf(imm)
+                    def bb = AvailableNettyByteBody.toByteBuf(imm)
                     outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
                 })
             }

@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.body.CloseableImmediateByteBody;
-import io.micronaut.http.body.ImmediateByteBody;
+import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -40,22 +40,22 @@ import java.util.Objects;
  * @author Jonas Konrad
  */
 @Internal
-public final class ImmediateNettyByteBody extends NettyByteBody implements CloseableImmediateByteBody {
+public final class AvailableNettyByteBody extends NettyByteBody implements CloseableAvailableByteBody {
     private final long length;
     @Nullable
     private ByteBuf buffer;
 
-    public ImmediateNettyByteBody(@NonNull ByteBuf buffer) {
+    public AvailableNettyByteBody(@NonNull ByteBuf buffer) {
         this.buffer = Objects.requireNonNull(buffer, "buffer");
         this.length = buffer.readableBytes();
     }
 
-    public static CloseableImmediateByteBody empty() {
-        return new ImmediateNettyByteBody(Unpooled.EMPTY_BUFFER);
+    public static CloseableAvailableByteBody empty() {
+        return new AvailableNettyByteBody(Unpooled.EMPTY_BUFFER);
     }
 
-    public static ByteBuf toByteBuf(ImmediateByteBody body) {
-        if (body instanceof ImmediateNettyByteBody net) {
+    public static ByteBuf toByteBuf(AvailableByteBody body) {
+        if (body instanceof AvailableNettyByteBody net) {
             return net.claim();
         } else {
             return Unpooled.wrappedBuffer(body.toByteArray());
@@ -94,8 +94,8 @@ public final class ImmediateNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableImmediateByteBody> buffer() {
-        return ExecutionFlow.just(new ImmediateNettyByteBody(claim()));
+    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> buffer() {
+        return ExecutionFlow.just(new AvailableNettyByteBody(claim()));
     }
 
     @Override
@@ -138,7 +138,7 @@ public final class ImmediateNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull CloseableImmediateByteBody split() {
+    public @NonNull CloseableAvailableByteBody split() {
         ByteBuf b = buffer;
         if (b == null) {
             failClaim();
@@ -146,6 +146,6 @@ public final class ImmediateNettyByteBody extends NettyByteBody implements Close
         if (LOG.isTraceEnabled()) {
             LOG.trace("Body split at this location. This is not an error, but may aid in debugging other errors", new Exception());
         }
-        return new ImmediateNettyByteBody(b.retainedSlice());
+        return new AvailableNettyByteBody(b.retainedSlice());
     }
 }

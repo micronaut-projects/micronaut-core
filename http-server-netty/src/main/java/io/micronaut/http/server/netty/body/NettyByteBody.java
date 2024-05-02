@@ -35,7 +35,7 @@ import reactor.core.publisher.Flux;
  * @author Jonas Konrad
  */
 @Internal
-public abstract sealed class NettyByteBody implements ByteBody permits ImmediateNettyByteBody, StreamingNettyByteBody {
+public abstract sealed class NettyByteBody implements ByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
     protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
 
     public static Flux<ByteBuf> toByteBufs(ByteBody body) {

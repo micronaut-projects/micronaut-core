@@ -54,7 +54,7 @@ import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -212,7 +212,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 // invalid URI
                 NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                     new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                    ImmediateNettyByteBody.empty(),
+                    AvailableNettyByteBody.empty(),
                     ctx,
                     conversionService,
                     serverConfiguration

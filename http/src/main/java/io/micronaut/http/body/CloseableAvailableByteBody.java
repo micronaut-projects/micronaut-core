@@ -19,24 +19,24 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
 /**
- * Combination of {@link CloseableByteBody} and {@link ImmediateByteBody}. See their
+ * Combination of {@link CloseableByteBody} and {@link AvailableByteBody}. See their
  * documentation for details.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Experimental
-public interface CloseableImmediateByteBody extends ImmediateByteBody, CloseableByteBody {
+public interface CloseableAvailableByteBody extends AvailableByteBody, CloseableByteBody {
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}, it does nothing.
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}, it does nothing.
      */
     @SuppressWarnings("deprecation")
     @Override
     @NonNull
     @Deprecated
-    default CloseableImmediateByteBody allowDiscard() {
+    default CloseableAvailableByteBody allowDiscard() {
         return this;
     }
 }

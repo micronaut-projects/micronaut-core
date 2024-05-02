@@ -20,9 +20,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
-import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
 import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -130,7 +130,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, ImmediateNettyByteBody.empty(), this);
+                requestHandler.accept(ctx, headers, AvailableNettyByteBody.empty(), this);
             }
         }
 

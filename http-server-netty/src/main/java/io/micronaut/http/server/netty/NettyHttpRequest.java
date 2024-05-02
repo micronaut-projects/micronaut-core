@@ -57,7 +57,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
@@ -658,12 +658,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public boolean isFull() {
-        return byteBody() instanceof ImmediateNettyByteBody;
+        return byteBody() instanceof AvailableNettyByteBody;
     }
 
     @Override
     public ByteBuffer<?> contents() {
-        if (byteBody() instanceof ImmediateNettyByteBody immediate) {
+        if (byteBody() instanceof AvailableNettyByteBody immediate) {
             return toByteBuffer(immediate);
         }
         return null;
@@ -671,10 +671,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public ExecutionFlow<ByteBuffer<?>> bufferContents() {
-        return byteBody().buffer().map(c -> toByteBuffer((ImmediateNettyByteBody) c));
+        return byteBody().buffer().map(c -> toByteBuffer((AvailableNettyByteBody) c));
     }
 
-    private static ByteBuffer<ByteBuf> toByteBuffer(ImmediateNettyByteBody immediateByteBody) {
+    private static ByteBuffer<ByteBuf> toByteBuffer(AvailableNettyByteBody immediateByteBody) {
         // use delegate because we don't want to implement ReferenceCounted
         return new DelegateByteBuffer<>(NettyByteBufferFactory.DEFAULT.wrap(immediateByteBody.peek()));
     }

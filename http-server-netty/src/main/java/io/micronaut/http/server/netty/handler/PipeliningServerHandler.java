@@ -22,9 +22,9 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
-import io.micronaut.http.server.netty.body.ImmediateNettyByteBody;
 import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -313,7 +313,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * This is a wrapper around {@link ImmediateNettyByteBody#ImmediateNettyByteBody(ByteBuf)}
+     * This is a wrapper around {@link AvailableNettyByteBody#AvailableNettyByteBody(ByteBuf)}
      * with an extra body length check.
      */
     static CloseableByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
@@ -326,7 +326,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
             return new StreamingNettyByteBody(mockBuffer);
         } else {
-            return new ImmediateNettyByteBody(buf);
+            return new AvailableNettyByteBody(buf);
         }
     }
 
@@ -409,7 +409,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, request, ImmediateNettyByteBody.empty(), outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {

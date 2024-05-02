@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.CloseableImmediateByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.EventLoopFlow;
@@ -155,7 +155,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableImmediateByteBody> buffer() {
+    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> buffer() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -163,7 +163,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         this.upstream = null;
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
-        return sharedBuffer.subscribeFull(upstream).map(ImmediateNettyByteBody::new);
+        return sharedBuffer.subscribeFull(upstream).map(AvailableNettyByteBody::new);
     }
 
     @Override

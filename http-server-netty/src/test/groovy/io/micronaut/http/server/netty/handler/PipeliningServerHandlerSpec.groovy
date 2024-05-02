@@ -1,9 +1,9 @@
 package io.micronaut.http.server.netty.handler
 
 import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.http.body.AvailableByteBody
+import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
-import io.micronaut.http.body.CloseableImmediateByteBody
-import io.micronaut.http.body.ImmediateByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
@@ -144,7 +144,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-                assert body instanceof ImmediateByteBody
+                assert body instanceof AvailableByteBody
                 assert new String(body.toByteArray(), StandardCharsets.UTF_8) == "foobar"
                 outboundAccess.writeFull(resp)
             }
@@ -367,7 +367,7 @@ class PipeliningServerHandlerSpec extends Specification {
     def 'decompression parts to full'(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
         HttpRequest req = null
-        CloseableImmediateByteBody ibb = null
+        CloseableAvailableByteBody ibb = null
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
@@ -419,7 +419,7 @@ class PipeliningServerHandlerSpec extends Specification {
     def 'decompression full to full'(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
         HttpRequest req = null
-        CloseableImmediateByteBody ibb = null
+        CloseableAvailableByteBody ibb = null
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {

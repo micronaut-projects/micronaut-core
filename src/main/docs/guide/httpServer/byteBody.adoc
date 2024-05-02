@@ -21,7 +21,7 @@ body using an `InputStream`, take care to do so only on another thread, or to an
 `@ExecuteOn(TaskExecutors.BLOCKING)`.
 
 If you need full access to the body, the `buffer()` method returns an `ExecutionFlow` that completes with an
-`ImmediateByteBody` when the full body has been received. `ImmediateByteBody` has a few more convenient
+`AvailableByteBody` when the full body has been received. `AvailableByteBody` has a few more convenient
 primary operations: `toByteArray()`, `toByteBuffer()` and `toString(Charset)`.
 
 Buffering is limited to the number of bytes configured in the `micronaut.server.max-request-buffer-size` property.

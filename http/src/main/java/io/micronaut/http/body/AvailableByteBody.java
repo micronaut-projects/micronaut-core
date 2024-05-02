@@ -33,7 +33,7 @@ import java.util.OptionalLong;
  * @since 4.5.0
  */
 @Experimental
-public interface ImmediateByteBody extends ByteBody {
+public interface AvailableByteBody extends ByteBody {
     /**
      * For immediate buffers, backpressure is not relevant, so the backpressure modes passed to
      * {@link #split(SplitBackpressureMode)} are ignored. You can use this method always.
@@ -42,31 +42,31 @@ public interface ImmediateByteBody extends ByteBody {
      * @return A body with the same content as this one
      */
     @NonNull
-    CloseableImmediateByteBody split();
+    CloseableAvailableByteBody split();
 
     /**
      * This method is equivalent to {@link #split()}, the backpressure parameter is ignored.
      *
      * @param backpressureMode ignored
      * @return A body with the same content as this one
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}. Use
      * {@link #split()} directly.
      */
     @Override
     @Deprecated
-    default @NonNull CloseableImmediateByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    default @NonNull CloseableAvailableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
         return split();
     }
 
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}, it does nothing.
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}, it does nothing.
      */
     @Override
     @NonNull
     @Deprecated
-    default ImmediateByteBody allowDiscard() {
+    default AvailableByteBody allowDiscard() {
         return this;
     }
 
@@ -80,10 +80,10 @@ public interface ImmediateByteBody extends ByteBody {
 
     /**
      * The length in bytes of the body. Never returns {@link OptionalLong#empty()} for
-     * {@link ImmediateByteBody}. Use {@link #length()} directly instead.
+     * {@link AvailableByteBody}. Use {@link #length()} directly instead.
      *
      * @return The length
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}. Use
      * {@link #length()} directly.
      */
     @Override
@@ -130,7 +130,7 @@ public interface ImmediateByteBody extends ByteBody {
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}. Use
      * {@link #toByteBuffer()} directly.
      */
     @Override
@@ -143,7 +143,7 @@ public interface ImmediateByteBody extends ByteBody {
     /**
      * {@inheritDoc}
      *
-     * @deprecated This method is unnecessary for {@link ImmediateByteBody}. Use
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}. Use
      * {@link #toByteArray()} directly.
      */
     @Override
