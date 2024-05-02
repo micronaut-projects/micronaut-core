@@ -1,6 +1,6 @@
 Micronaut HTTP server version 4.5.0 introduced a new, more advanced API to access the bytes of an incoming request.
-When a api:io.micronaut.http.HttpRequest[] implements api:io.micronaut.http.ServerHttpRequest[], the new `byteBody()`
-method returns an api:io.micronaut.http.body.ByteBody[] with buffered, reactive and blocking APIs.
+When an api:io.micronaut.http.HttpRequest[] implements api:io.micronaut.http.ServerHttpRequest[], the new `byteBody()`
+method returns a api:io.micronaut.http.body.ByteBody[] with buffered, reactive and blocking APIs.
 
 When an HTTP request comes in, it starts out with an unparsed and unclaimed stream of bytes as its `byteBody()`. After
 all request filters have run, typically an argument binder matching the `@Body` parameter of the controller will
