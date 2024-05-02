@@ -33,6 +33,10 @@ The ann:websocket.annotation.OnMessage[] method can define a parameter for the m
 
 A method annotated with ann:websocket.annotation.OnError[] can be added to implement custom error handling. The `@OnError` method can define a parameter that receives the exception type to be handled. If no `@OnError` handling is present and an unrecoverable exception occurs, the WebSocket is automatically closed.
 
+=== Using @ExecuteOn For Blocking Methods
+
+The callback methods of a ann:websocket.annotation.ServerWebSocket[] are invoked on the main Netty server event loop by default. If you do any blocking I/O operations in your WebSocket handler methods, then you must offload those tasks to a separate thread pool in the same manner as with HTTP. As with a ann:http.annotation.Controller[] or ann:http.annotation.Filter[], the ann:scheduling.annotation.ExecuteOn[] annotation can be applied to a ann:websocket.annotation.ServerWebSocket[] handler at either the type or method level.
+
 === Non-Blocking Message Handling
 
 The previous example uses the `broadcastSync` method of the api:websocket.WebSocketBroadcaster[] interface which blocks until the broadcast is complete. A similar `sendSync` method exists in api:websocket.WebSocketSession[] to send a message to a single receiver in a blocking manner. You can however implement non-blocking WebSocket servers by instead returning a rs:Publisher[] or a link:{jdkapi}/java.base/java/util/concurrent/Future.html[Future] from each WebSocket handler method. For example:
