@@ -68,6 +68,7 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -360,19 +361,21 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             .map(
                 executorService -> {
                     ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
+                    Mono<?> result;
                     if (returnType.isReactive()) {
-                        return Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
-                            .subscribeOn(Schedulers.fromExecutor(executorService))
-                            .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
+                        result = Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
+                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));;
+                    } else if (returnType.isAsync()) {
+                        result = Mono.fromFuture((Supplier<CompletableFuture<?>>) invokeWithContext(boundExecutable, messageHandler));
                     } else {
-                        return executorService.submit(() -> ServerRequestContext.with(originatingRequest,
-                            (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget())));
+                        result = Mono.fromSupplier(invokeWithContext(boundExecutable, messageHandler));
                     }
+                    return (Object) result.subscribeOn(Schedulers.fromExecutor(executorService));
                 }
             ).orElseGet(invokeWithContext(boundExecutable, messageHandler));
     }
 
-    private Supplier<Object> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+    private Supplier<?> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         return () -> ServerRequestContext.with(originatingRequest,
             (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
     }

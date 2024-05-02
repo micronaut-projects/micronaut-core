@@ -220,7 +220,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 Object target = errorMethod.getTarget();
                 Object result;
                 try {
-                    result = boundExecutable.invoke(target);
+                    result = invokeExecutable(boundExecutable, errorMethod);
                 } catch (Exception e) {
 
                     if (LOG.isErrorEnabled()) {
@@ -230,8 +230,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
-                    Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                    flowable.collectList().subscribe(objects -> fallback.accept(cause), throwable -> {
+                    Mono<?> unhandled = Mono.from(instrumentPublisher(ctx, result));
+                    unhandled.subscribe(unhandledResult -> fallback.accept(cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler {}.{}: {}", target.getClass().getSimpleName(), errorMethod.getExecutableMethod(), throwable.getMessage(), throwable);
                         }

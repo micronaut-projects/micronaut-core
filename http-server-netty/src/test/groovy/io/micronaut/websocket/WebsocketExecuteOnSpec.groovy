@@ -2,6 +2,7 @@ package io.micronaut.websocket
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
@@ -18,6 +19,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 import spock.util.concurrent.PollingConditions
 
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.function.Predicate
 import java.util.function.Supplier
@@ -28,6 +30,12 @@ import java.util.stream.Collectors
 class WebsocketExecuteOnSpec extends Specification {
 
     static final Logger LOG = LoggerFactory.getLogger(WebsocketExecuteOnSpec.class)
+
+    static final String ERROR_MESSAGE = "error"
+    static final String JOINED = "joined on thread %s"
+    static final String DISCONNECTED = "disconnected on thread %s"
+    static final String ECHO = " from thread %s"
+    static final String ERROR_RESPONSE = "error handled on thread %s"
 
     @Inject
     EmbeddedServer embeddedServer
@@ -70,13 +78,57 @@ class WebsocketExecuteOnSpec extends Specification {
         "async"     | _
     }
 
+    @Unroll
+    void "#type websocket server handler can handle errors with ExecuteOn"() {
+        given:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient.class, embeddedServer.getURL())
+        String threadName = (LoomSupport.isSupported() ? "virtual" : TaskExecutors.IO) + "-executor"
+        String expectedJoined = "joined on thread " + threadName
+        String expectedError = "error handled on thread " + threadName
+        String expectedEcho = "Hello from thread " + threadName
+
+        expect:
+        wsClient
+
+        when:
+        EchoClientWebSocket echoClientWebSocket = Flux.from(wsClient.connect(EchoClientWebSocket, "/echo/${type}")).blockFirst()
+
+        then:
+        noExceptionThrown()
+        new PollingConditions().eventually {
+            echoClientWebSocket.receivedMessages() == [expectedJoined]
+        }
+
+        when:
+        echoClientWebSocket.send(ERROR_MESSAGE)
+
+        then:
+        new PollingConditions().eventually {
+            echoClientWebSocket.receivedMessages() == [expectedJoined, expectedError]
+        }
+
+        when:
+        echoClientWebSocket.send('Hello')
+
+        then:
+        new PollingConditions().eventually {
+            echoClientWebSocket.receivedMessages() == [expectedJoined, expectedError, expectedEcho]
+        }
+
+        cleanup:
+        echoClientWebSocket.close()
+
+        where:
+        type        | _
+        "sync"      | _
+        "reactive"  | _
+        "async"     | _
+    }
+
     @Requires(property = "spec.name", value = "WebsocketExecuteOnSpec")
     @ServerWebSocket("/echo/sync")
     @ExecuteOn(TaskExecutors.BLOCKING)
     static class SynchronousEchoServerWebSocket {
-        public static final String JOINED = "joined on thread %s"
-        public static final String DISCONNECTED = "disconnected on thread %s"
-        public static final String ECHO = "%s from thread %s"
 
         @Inject
         WebSocketBroadcaster broadcaster
@@ -88,12 +140,21 @@ class WebsocketExecuteOnSpec extends Specification {
 
         @OnMessage
         void onMessage(String message, WebSocketSession session) {
-            broadcaster.broadcastSync(ECHO.formatted(message, Thread.currentThread().getName()), isValid(session))
+            if (message == ERROR_MESSAGE) {
+                throw new IllegalStateException("this should be handled")
+            }
+            broadcaster.broadcastSync((message + ECHO).formatted(Thread.currentThread().getName()), isValid(session))
         }
 
         @OnClose
         void onClose(WebSocketSession session) {
             broadcaster.broadcastSync(DISCONNECTED.formatted(Thread.currentThread().getName()), isValid(session))
+        }
+
+        @OnError
+        void handleError(IllegalStateException ex) {
+            LOG.info("Handling error from error handler")
+            broadcaster.broadcastSync(ERROR_RESPONSE.formatted(Thread.currentThread().getName()))
         }
 
         private static Predicate<WebSocketSession> isValid(WebSocketSession session) {
@@ -105,9 +166,6 @@ class WebsocketExecuteOnSpec extends Specification {
     @ServerWebSocket("/echo/reactive")
     @ExecuteOn(TaskExecutors.BLOCKING)
     static class ReactiveEchoServerWebSocket {
-        public static final String JOINED = "joined on thread %s"
-        public static final String DISCONNECTED = "disconnected on thread %s"
-        public static final String ECHO = " from thread %s"
 
         @Inject
         WebSocketBroadcaster broadcaster
@@ -124,6 +182,9 @@ class WebsocketExecuteOnSpec extends Specification {
 
         @OnMessage
         Publisher<String> onMessage(String message, WebSocketSession session) {
+            if (message == ERROR_MESSAGE) {
+                return Mono.error(new IllegalStateException("this should be handled"))
+            }
             Mono.fromSupplier(formatMessage(message + ECHO))
                     .flatMap(m -> Mono.from(broadcaster.broadcast(m)))
         }
@@ -131,10 +192,17 @@ class WebsocketExecuteOnSpec extends Specification {
         @OnClose
         Publisher<String> onClose(WebSocketSession session) {
             Mono.just(session)
-                .flatMap(s -> {
-                    LOG.info(DISCONNECTED.formatted(Thread.currentThread().getName()))
-                    return Mono.just("closed")
-                })
+                    .flatMap(s -> {
+                        LOG.info(DISCONNECTED.formatted(Thread.currentThread().getName()))
+                        return Mono.just("closed")
+                    })
+        }
+
+        @OnError
+        Publisher<?> handleError(IllegalStateException ex) {
+            LOG.info("Handling error from error handler")
+            Mono.fromSupplier(() -> ERROR_RESPONSE.formatted(Thread.currentThread().getName()))
+                    .flatMap(m -> Mono.from(broadcaster.broadcast(m))).then(Mono.empty())
         }
     }
 
@@ -142,9 +210,6 @@ class WebsocketExecuteOnSpec extends Specification {
     @ServerWebSocket("/echo/async")
     @ExecuteOn(TaskExecutors.BLOCKING)
     static class AsyncEchoServerWebSocket {
-        public static final String JOINED = "joined on thread %s"
-        public static final String DISCONNECTED = "disconnected on thread %s"
-        public static final String ECHO = " from thread %s"
 
         @Inject
         WebSocketBroadcaster broadcaster
@@ -154,25 +219,36 @@ class WebsocketExecuteOnSpec extends Specification {
         }
 
         @OnOpen
-        Future<String> onOpen(WebSocketSession session) {
+        CompletableFuture<String> onOpen(WebSocketSession session) {
             Mono.fromSupplier(formatMessage(JOINED))
                     .flatMap(message -> Mono.from(broadcaster.broadcast(message))).toFuture();
         }
 
         @OnMessage
-        Future<String> onMessage(String message, WebSocketSession session) {
+        CompletableFuture<String> onMessage(String message, WebSocketSession session) {
+            if (message == ERROR_MESSAGE) {
+                return Mono.error(new IllegalStateException("this should be handled")).toFuture()
+            }
             Mono.fromSupplier(formatMessage(message + ECHO))
                     .flatMap(m -> Mono.from(broadcaster.broadcast(m))).toFuture()
         }
 
         @OnClose
-        Future<String> onClose(WebSocketSession session) {
+        CompletableFuture<String> onClose(WebSocketSession session) {
             Mono.just(session)
                     .flatMap(s -> {
                         LOG.info(DISCONNECTED.formatted(Thread.currentThread().getName()))
                         return Mono.just("closed")
                     }).toFuture()
         }
+
+        @OnError
+        CompletableFuture<?> handleError(IllegalStateException ex) {
+            LOG.info("Handling error from error handler")
+            Mono.fromSupplier(() -> ERROR_RESPONSE.formatted(Thread.currentThread().getName()))
+                    .flatMap(m -> Mono.from(broadcaster.broadcast(m))).then(Mono.empty()).toFuture()
+        }
+
     }
 
     @Requires(property = "spec.name", value = "WebsocketExecuteOnSpec")
@@ -207,7 +283,7 @@ class WebsocketExecuteOnSpec extends Specification {
             replies.stream()
                     .filter(str -> str.contains(type))
                     .map(str -> str.replaceAll(type, ""))
-                    .map(str -> str.substring(0, str.length()-(1)).replace("-thread-", ""))
+                    .map(str -> str.replaceAll("\\d", "").replace("-thread-", ""))
                     .collect(Collectors.toList())
         }
     }
