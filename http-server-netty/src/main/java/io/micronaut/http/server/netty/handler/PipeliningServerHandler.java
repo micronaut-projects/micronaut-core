@@ -317,11 +317,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * with an extra body length check.
      */
     static CloseableByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
+        // ImmediateNettyByteBody does not support exceptions, so if we hit one of the configured
+        // limits, we return a StreamingNettyByteBody instead.
         if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
             BufferConsumer.Upstream upstream = bytesConsumed -> {
             };
             StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
-            mockBuffer.add(buf); // this will trigger the exception
+            mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
             return new StreamingNettyByteBody(mockBuffer);
         } else {
             return new ImmediateNettyByteBody(buf);
@@ -539,7 +541,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
         final StreamingNettyByteBody.SharedBuffer dest;
         final OutboundAccessImpl outboundAccess;
-        long requested = 65536;
+        long requested = 65535; // This is the number of bytes we initially accept before any downstream demand. 65535 matches the INITIAL_WINDOW_SIZE of HTTP/2.
         boolean sendContinue;
 
         private StreamingInboundHandler(OutboundAccessImpl outboundAccess, boolean sendContinue) {

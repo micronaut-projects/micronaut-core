@@ -38,12 +38,6 @@ import reactor.core.publisher.Flux;
 public abstract sealed class NettyByteBody implements ByteBody permits ImmediateNettyByteBody, StreamingNettyByteBody {
     protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
 
-    static void failClaim() {
-        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.server.netty.body.NettyByteBody.");
-    }
-
-    protected abstract Flux<ByteBuf> toByteBufPublisher();
-
     public static Flux<ByteBuf> toByteBufs(ByteBody body) {
         if (body instanceof NettyByteBody net) {
             return net.toByteBufPublisher();
@@ -66,5 +60,11 @@ public abstract sealed class NettyByteBody implements ByteBody permits Immediate
     @Override
     public @NonNull Publisher<ByteBuffer<?>> toByteBufferPublisher() {
         return toByteBufPublisher().map(NettyByteBufferFactory.DEFAULT::wrap);
+    }
+
+    abstract Flux<ByteBuf> toByteBufPublisher();
+
+    static void failClaim() {
+        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.server.netty.body.NettyByteBody.");
     }
 }

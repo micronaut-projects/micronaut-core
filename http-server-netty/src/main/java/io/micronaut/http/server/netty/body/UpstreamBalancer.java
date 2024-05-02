@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
  * only need to test for the first case.
  */
 @Internal
-public final class UpstreamBalancer {
+final class UpstreamBalancer {
     private static final AtomicLongFieldUpdater<UpstreamBalancer> DELTA = AtomicLongFieldUpdater.newUpdater(UpstreamBalancer.class, "delta");
     private static final AtomicIntegerFieldUpdater<UpstreamBalancer> FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "flags");
 
@@ -70,21 +70,36 @@ public final class UpstreamBalancer {
         this.upstream = upstream;
     }
 
-    public static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
+    /**
+     * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#SLOWEST}.
+     */
+    static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new SlowestUpstreamImpl(false), balancer.new SlowestUpstreamImpl(true));
     }
 
+    /**
+     * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#FASTEST}.
+     */
     static UpstreamPair fastest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new FastestUpstreamImpl(false), balancer.new FastestUpstreamImpl(true));
     }
 
+    /**
+     * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#ORIGINAL} and
+     * {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#NEW}.
+     */
     static UpstreamPair first(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
     }
 
+    /**
+     * Create a pair of {@link io.micronaut.http.server.netty.body.BufferConsumer.Upstream}
+     * instances that delegates to the given {@code upstream} according to the semantics of the
+     * given {@code mode}.
+     */
     static UpstreamPair balancer(BufferConsumer.Upstream upstream, ByteBody.SplitBackpressureMode mode) {
         return switch (mode) {
             case SLOWEST -> slowest(upstream);

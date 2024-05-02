@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
@@ -42,7 +41,6 @@ public class BufferLengthExceededHandler implements ExceptionHandler<BufferLengt
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public BufferLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
     }

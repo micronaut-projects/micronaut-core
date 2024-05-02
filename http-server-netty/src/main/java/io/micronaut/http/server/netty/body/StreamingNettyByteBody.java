@@ -182,6 +182,9 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     /**
      * This class buffers input data and distributes it to multiple {@link StreamingNettyByteBody}
      * instances.
+     * <p>Thread safety: The {@link BufferConsumer} methods <i>must</i> only be called from one
+     * thread, the {@link #eventLoopFlow} thread. The other methods (subscribe, reserve) can be
+     * called from any thread.
      */
     public static final class SharedBuffer implements BufferConsumer {
         private static final Supplier<ResourceLeakDetector<SharedBuffer>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
@@ -379,8 +382,8 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         private ExecutionFlow<ByteBuf> subscribeFull0(DelayedExecutionFlow<ByteBuf> targetFlow, Upstream specificUpstream, boolean canReturnImmediate) {
             assert !working;
 
-            if (reserved == 0) {
-                throw new IllegalStateException("Need to reserve a spot first");
+            if (reserved <= 0) {
+                throw new IllegalStateException("Need to reserve a spot first. This should not happen, StreamingNettyByteBody should guard against it");
             }
 
             ExecutionFlow<ByteBuf> ret = targetFlow;
