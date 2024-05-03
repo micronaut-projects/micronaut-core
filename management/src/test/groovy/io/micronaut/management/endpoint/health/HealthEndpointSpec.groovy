@@ -172,6 +172,27 @@ class HealthEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test health endpoint returns 401 for sensitive true and details-visible anonymous"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': StringUtils.TRUE,
+                'endpoints.health.details-visible': DetailsVisibility.ANONYMOUS])
+        URL server = embeddedServer.getURL()
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
+
+        when:
+        client.exchange("/health", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+        HttpStatus.UNAUTHORIZED == ex.status
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     void "test health endpoint with a high diskspace threshold"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [

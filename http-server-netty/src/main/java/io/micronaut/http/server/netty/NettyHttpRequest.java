@@ -295,7 +295,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (pipeline != null) {
             return pipeline.httpVersion;
         }
-        return HttpVersion.HTTP_1_1;
+        // Http2ServerHandler case
+        return findConnectionHandler() == null ? HttpVersion.HTTP_1_1 : HttpVersion.HTTP_2_0;
     }
 
     @Override

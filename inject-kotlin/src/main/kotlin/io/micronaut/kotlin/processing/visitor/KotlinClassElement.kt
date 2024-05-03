@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.getKotlinClassByName
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isPrivate
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
@@ -64,7 +65,7 @@ import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.kotlin.processing.getBinaryName
-import java.util.*
+import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
 
@@ -815,7 +816,7 @@ internal open class KotlinClassElement(
                 }
 
                 PropertyElement::class.java -> {
-                    classNode.getDeclaredProperties().toList()
+                    classNode.getDeclaredProperties().filter { !it.isJavaPackagePrivate() }.toList()
                 }
 
                 ConstructorElement::class.java -> {
