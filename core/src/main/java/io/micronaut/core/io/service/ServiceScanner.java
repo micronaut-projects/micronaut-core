@@ -239,7 +239,7 @@ final class ServiceScanner<S> {
 
         @Override
         public void collect(Collection<S> values, boolean allowFork) {
-            if (allowFork) {
+            if (allowFork && ForkJoinPool.getCommonPoolParallelism() > 1) {
                 ForkJoinPool.commonPool().invoke(this);
                 for (RecursiveActionValuesCollector<S> task : tasks) {
                     task.join();
