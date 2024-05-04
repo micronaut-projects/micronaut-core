@@ -2,6 +2,18 @@ At times, you may want a bean to load conditionally based on various potential f
 
 The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
 
+If you declare an injection point, for example, `Bean a`, but no bean of type `Bean` can be instantiated, the framework throws a `NoSuchBeanException`.
+The framework cannot inject a bean into an injection point if the bean requirements specified by `@Requires` are not fulfilled.
+
+If you want to declare an injection point as Optional, you have several options:
+
+* Mark the injection point as `@Nullable`. In Kotlin, nullable type names have `?` at the end; you don't need to specify the `@Nullable` annotation.
+* Declare it as `BeanProvider<Bean>`. Learn about <<types, Injectable Container Types>>.
+
+You can also inject a collection of beans. For example, you can inject `List<Bean>`. The collection is empty if no bean of type `Bean` fulfills the injection point.
+
+=== @Requires Example
+
 Consider the following example:
 
 snippet::io.micronaut.docs.requires.JdbcBookService[tags="requires",indent=0, title="Using @Requires"]
