@@ -35,7 +35,7 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
+@Target(ElementType.PARAMETER)
 @Bindable
 @Inherited
 public @interface Part {
@@ -45,4 +45,9 @@ public @interface Part {
      */
     @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
+
+    /**
+     * @return The {@link io.micronaut.http.MediaType} value that this part is present
+     */
+    String contentType() default "";
 }
