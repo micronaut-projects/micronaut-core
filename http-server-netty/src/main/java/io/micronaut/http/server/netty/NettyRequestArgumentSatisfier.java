@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -43,9 +44,10 @@ public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
      * Constructor.
      *
      * @param requestBinderRegistry The request argument binder
+     * @param beanContext The bean context
      */
-    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
-        super(requestBinderRegistry);
+    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, BeanContext beanContext) {
+        super(requestBinderRegistry, beanContext);
     }
 
     @Override

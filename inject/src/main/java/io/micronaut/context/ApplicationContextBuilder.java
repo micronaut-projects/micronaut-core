@@ -225,6 +225,16 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
 
     /**
+     * Enable strict conversion error checking.
+     * @param strict Whether to enable strict conversion error checking
+     * @return This application
+     * @since 3.9.0
+     */
+    @NonNull default ApplicationContextBuilder strictConversionChecking(boolean strict) {
+        return this;
+    }
+
+    /**
      * Set the command line arguments.
      *
      * @param args The arguments

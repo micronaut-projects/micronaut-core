@@ -41,6 +41,16 @@ public interface BeanContextConfiguration {
     }
 
     /**
+     * Enable strict conversion error checking.
+     *
+     * @return Whether to perform strict error checking for conversions
+     * @since 3.9.0
+     */
+    default boolean isStrictConversionChecking() {
+        return false;
+    }
+
+    /**
      * The class loader to use.
      * @return The class loader.
      */

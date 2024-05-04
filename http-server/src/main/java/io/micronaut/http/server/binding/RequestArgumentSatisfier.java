@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.binding;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -49,12 +51,15 @@ import java.util.Optional;
 public class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;
+    private final BeanContextConfiguration beanContextConfiguration;
 
     /**
      * @param requestBinderRegistry The Request binder registry
+     * @param beanContext The bean context
      */
-    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
+    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, BeanContext beanContext) {
         this.binderRegistry = requestBinderRegistry;
+        this.beanContextConfiguration = beanContext.getContextConfiguration();
     }
 
     /**
@@ -117,7 +122,7 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
-                    } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                    } else if (bindingResult.isSatisfied() && argument.isNullable() && (!beanContextConfiguration.isStrictConversionChecking() || !conversionContext.hasErrors())) {
                         value = NullArgument.INSTANCE;
                     }
                 } else {
@@ -128,6 +133,7 @@ public class RequestArgumentSatisfier {
                 value = (UnresolvedArgument<?>) () -> argumentBinder.bind(conversionContext, request);
             } else {
                 ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
+                boolean strictFailure = beanContextConfiguration.isStrictConversionChecking() && conversionContext.hasErrors();
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
@@ -138,9 +144,9 @@ public class RequestArgumentSatisfier {
                             value = optionalValue;
                         }
                     }
-                } else if (bindingResult.isPresentAndSatisfied()) {
+                } else if (bindingResult.isPresentAndSatisfied() && !strictFailure) {
                     value = bindingResult.get();
-                } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                } else if (bindingResult.isSatisfied() && argument.isNullable() && !strictFailure) {
                     value = NullArgument.INSTANCE;
                 } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isNullable() || conversionContext.hasErrors()) {
                     value = (UnresolvedArgument) () -> {
