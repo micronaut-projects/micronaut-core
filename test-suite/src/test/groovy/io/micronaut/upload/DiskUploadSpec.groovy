@@ -25,7 +25,9 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Retry
 
+import java.nio.file.Files
 import java.security.MessageDigest
+import java.util.concurrent.ThreadLocalRandom
 
 /**
  * Any changes or additions to this test should also be done
@@ -419,9 +421,51 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
+    void "test very big file upload"() {
+        given:
+        def tmp = Files.createTempFile("DiskUploadSpec-data", ".bin")
+
+        def length = 1500 * 1024 * 1024 // 1500MiB
+        try (OutputStream os = Files.newOutputStream(tmp)) {
+            int remaining = length
+            byte[] arr = new byte[4096];
+            while (remaining > 0) {
+                ThreadLocalRandom.current().nextBytes(arr)
+                os.write(arr, 0, Math.min(arr.length, remaining))
+                remaining -= arr.length
+            }
+        }
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.bin", MediaType.APPLICATION_OCTET_STREAM_TYPE, tmp.toFile())
+                .build()
+
+        when:
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/receive-completed-file-upload-huge", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+
+        HttpResponse<String> response = flowable.blockFirst()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == "data.bin: " + length
+
+        cleanup:
+        Files.deleteIfExists(tmp)
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300, 'micronaut.server.multipart.disk': true]
+        super.getConfiguration() << [
+                'micronaut.http.client.read-timeout': 300,
+                'micronaut.server.multipart.disk': true,
+                'micronaut.server.max-request-size': '2GB',
+                'micronaut.server.multipart.max-file-size': '2GB'
+        ]
     }
 
     private byte[] calculateMd5(byte[] bytes) {

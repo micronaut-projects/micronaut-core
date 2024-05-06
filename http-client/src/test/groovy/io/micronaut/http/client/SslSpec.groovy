@@ -32,6 +32,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.ssl.SslHandshakeTimeoutException
 import reactor.core.publisher.Flux
 import spock.lang.Ignore
+import spock.lang.Retry
 import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
@@ -111,6 +112,7 @@ class SslSpec extends Specification {
         }
     }
 
+    @Retry(count = 5) // sometimes badssl.com times out
     void 'bad server ssl cert'() {
         given:
         def cfg = new DefaultHttpClientConfiguration()
