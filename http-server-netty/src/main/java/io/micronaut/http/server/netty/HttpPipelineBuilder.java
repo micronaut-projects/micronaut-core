@@ -78,14 +78,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
-import java.security.cert.Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -106,8 +105,8 @@ import java.util.function.Supplier;
 final class HttpPipelineBuilder implements Closeable {
     static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
         SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
-    static final Supplier<AttributeKey<Supplier<Certificate>>> CERTIFICATE_SUPPLIER_ATTRIBUTE =
-        SupplierUtil.memoized(() -> AttributeKey.newInstance("certificate-supplier"));
+    static final Supplier<AttributeKey<Supplier<SSLSession>>> SSL_SESSION_ATTRIBUTE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("ssl-session"));
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
@@ -194,19 +193,8 @@ final class HttpPipelineBuilder implements Closeable {
             return sslHandler;
         }
 
-        /**
-         * Create a supplier that looks up the peer cert of this connection ({@link #CERTIFICATE_SUPPLIER_ATTRIBUTE}).
-         *
-         * @return The supplier
-         */
-        Supplier<Certificate> findPeerCert() {
-            return SupplierUtil.memoized(() -> {
-                try {
-                    return (quicSslEngine == null ? sslHandler.engine() : quicSslEngine).getSession().getPeerCertificates()[0];
-                } catch (SSLPeerUnverifiedException ex) {
-                    return null;
-                }
-            });
+        Supplier<SSLSession> findSslSession() {
+            return SupplierUtil.memoized(() -> (quicSslEngine == null ? sslHandler.engine() : quicSslEngine).getSession());
         }
 
         HttpPipelineBuilder pipelineBuilder() {
@@ -673,7 +661,7 @@ final class HttpPipelineBuilder implements Closeable {
         private void insertMicronautHandlers() {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
-                channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(sslHandler.findPeerCert());
+                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
             }
 
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
@@ -699,7 +687,7 @@ final class HttpPipelineBuilder implements Closeable {
             httpVersion = HttpVersion.HTTP_2_0;
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
-                channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(sslHandler.findPeerCert());
+                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
             }
         }
 

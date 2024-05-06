@@ -91,11 +91,11 @@ import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.security.cert.Certificate;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -397,8 +397,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
-    public Optional<Certificate> getCertificate() {
-        Supplier<Certificate> sup = channelHandlerContext.channel().attr(HttpPipelineBuilder.CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).get();
+    public Optional<SSLSession> getSslSession() {
+        Supplier<SSLSession> sup = channelHandlerContext.channel().attr(HttpPipelineBuilder.SSL_SESSION_ATTRIBUTE.get()).get();
         return sup == null ? Optional.empty() : Optional.ofNullable(sup.get());
     }
 
