@@ -49,6 +49,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  */
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private final List<Object> singletons = new ArrayList<>();
+    private final List<RuntimeBeanDefinition<?>> beanDefinitions = new ArrayList<>();
     private final List<String> environments = new ArrayList<>();
     private final List<String> defaultEnvironments = new ArrayList<>();
     private final List<String> packages = new ArrayList<>();
@@ -149,6 +150,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public @NonNull ApplicationContextBuilder singletons(Object... beans) {
         if (beans != null) {
             singletons.addAll(Arrays.asList(beans));
+        }
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        if (definitions != null) {
+            beanDefinitions.addAll(Arrays.asList(definitions));
         }
         return this;
     }
@@ -343,6 +352,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!singletons.isEmpty()) {
             for (Object singleton : singletons) {
                 applicationContext.registerSingleton(singleton);
+            }
+        }
+
+        if (!beanDefinitions.isEmpty()) {
+            for (RuntimeBeanDefinition<?> beanDefinition : beanDefinitions) {
+                applicationContext.registerBeanDefinition(beanDefinition);
             }
         }
 
