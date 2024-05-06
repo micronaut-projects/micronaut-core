@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class VehicleSpec {
 
@@ -56,4 +57,36 @@ class VehicleSpec {
         assertEquals("Starting V6 Engine", vehicle.start());
     }
 
+    @Test
+    void testStartVehicleWithNonEmptyPlaceholder() {
+        // tag::start[]
+        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        LinkedHashMap<String, Object> map = new LinkedHashMap(1);
+        map.put("my.engine.description", "${DESCRIPTION}");
+        map.put("DESCRIPTION", "V8 Engine");
+        applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));
+        applicationContext.start();
+
+        Vehicle vehicle = applicationContext.getBean(Vehicle.class);
+        DefaultGroovyMethods.println(this, vehicle.start());
+        // end::start[]
+
+        assertEquals("V8 Engine", vehicle.getEngine().getDescription());
+    }
+
+    @Test
+    void testStartVehicleWithEmptyPlaceholder() {
+        // tag::start[]
+        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        LinkedHashMap<String, Object> map = new LinkedHashMap(1);
+        map.put("my.engine.description", "${DESCRIPTION}");
+        applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));
+        applicationContext.start();
+
+        Vehicle vehicle = applicationContext.getBean(Vehicle.class);
+        DefaultGroovyMethods.println(this, vehicle.start());
+        // end::start[]
+
+        assertNull(vehicle.getEngine().getDescription());
+    }
 }
