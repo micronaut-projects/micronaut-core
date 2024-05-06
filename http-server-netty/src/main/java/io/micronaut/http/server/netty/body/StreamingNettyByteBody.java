@@ -155,7 +155,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> buffer() {
+    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

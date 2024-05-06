@@ -20,7 +20,7 @@ WARNING: `InputStream` is blocking API, and the netty event loop must never be b
 body using an `InputStream`, take care to do so only on another thread, or to annotate your filter with
 `@ExecuteOn(TaskExecutors.BLOCKING)`.
 
-If you need full access to the body, the `buffer()` method returns an `ExecutionFlow` that completes with an
+If you need full access to the body, the `buffer()` method returns a `CompletableFuture` that completes with an
 `AvailableByteBody` when the full body has been received. `AvailableByteBody` has a few more convenient
 primary operations: `toByteArray()`, `toByteBuffer()` and `toString(Charset)`.
 

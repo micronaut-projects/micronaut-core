@@ -18,8 +18,10 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -27,6 +29,8 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Common base class for streaming and immediate netty ByteBody implementations.
@@ -60,6 +64,14 @@ public abstract sealed class NettyByteBody implements ByteBody permits Available
     @Override
     public @NonNull Publisher<ByteBuffer<?>> toByteBufferPublisher() {
         return toByteBufPublisher().map(NettyByteBufferFactory.DEFAULT::wrap);
+    }
+
+    @Override
+    public abstract @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
+
+    @Override
+    public CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
+        return bufferFlow().toCompletableFuture();
     }
 
     abstract Flux<ByteBuf> toByteBufPublisher();

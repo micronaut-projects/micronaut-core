@@ -90,7 +90,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                     if (annotation == Body.class) {
                         return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
                             if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
-                                return fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).buffer().map(imm -> {
+                                return fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).bufferFlow().map(imm -> {
                                     Argument<T> t = context.getArgument();
                                     if (t.isAssignableFrom(ByteBuffer.class)) {
                                         return () -> Optional.of((T) imm.toByteBuffer());

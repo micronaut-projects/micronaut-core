@@ -671,7 +671,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public ExecutionFlow<ByteBuffer<?>> bufferContents() {
-        return byteBody().buffer().map(c -> toByteBuffer((AvailableNettyByteBody) c));
+        return byteBody().bufferFlow().map(c -> toByteBuffer((AvailableNettyByteBody) c));
     }
 
     private static ByteBuffer<ByteBuf> toByteBuffer(AvailableNettyByteBody immediateByteBody) {

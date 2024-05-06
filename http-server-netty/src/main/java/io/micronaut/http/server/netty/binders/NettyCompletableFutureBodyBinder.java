@@ -74,7 +74,7 @@ final class NettyCompletableFutureBodyBinder
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
             CompletableFuture<Object> future = rootBody
-                .buffer()
+                .bufferFlow()
                 .map(bytes -> {
                     Optional<Object> value;
                     try {

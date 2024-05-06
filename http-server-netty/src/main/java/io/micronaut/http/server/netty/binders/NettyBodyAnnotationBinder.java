@@ -107,7 +107,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
         // If there's an error during conversion, the body must stay available, so we split here.
         // This costs us nothing because we need to buffer anyway.
-        ExecutionFlow<? extends CloseableAvailableByteBody> buffered = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).buffer();
+        ExecutionFlow<? extends CloseableAvailableByteBody> buffered = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).bufferFlow();
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")

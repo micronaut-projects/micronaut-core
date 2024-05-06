@@ -85,7 +85,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             }
             // bind a single result
             ExecutionFlow<Object> flow = rootBody
-                .buffer()
+                .bufferFlow()
                 .map(bytes -> {
                     Optional<Object> value;
                     try {

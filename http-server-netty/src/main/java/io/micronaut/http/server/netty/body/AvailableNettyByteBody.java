@@ -94,7 +94,7 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> buffer() {
+    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         return ExecutionFlow.just(new AvailableNettyByteBody(claim()));
     }
 

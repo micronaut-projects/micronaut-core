@@ -781,7 +781,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
-                body.buffer().onComplete((imm, t) -> {
+                body.bufferFlow().onComplete((imm, t) -> {
                     def bb = AvailableNettyByteBody.toByteBuf(imm)
                     outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
                 })
