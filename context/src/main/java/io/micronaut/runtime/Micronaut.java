@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
@@ -218,6 +219,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public @NonNull Micronaut singletons(Object... beans) {
         return (Micronaut) super.singletons(beans);
+    }
+
+    @Override
+    public Micronaut beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        return (Micronaut) super.beanDefinitions(definitions);
     }
 
     @Override
