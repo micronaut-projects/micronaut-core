@@ -68,7 +68,6 @@ class VehicleSpec {
         applicationContext.start();
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
-        DefaultGroovyMethods.println(this, vehicle.start());
         // end::start[]
 
         assertEquals("V8 Engine", vehicle.getEngine().getDescription());
@@ -84,7 +83,6 @@ class VehicleSpec {
         applicationContext.start();
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
-        DefaultGroovyMethods.println(this, vehicle.start());
         // end::start[]
 
         assertNull(vehicle.getEngine().getDescription());
