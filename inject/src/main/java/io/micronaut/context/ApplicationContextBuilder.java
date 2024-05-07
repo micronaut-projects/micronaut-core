@@ -97,6 +97,16 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder singletons(@Nullable Object... beans);
 
     /**
+     * Register additional runtime bean definitions prior to startup.
+     * @param definitions The definitions.
+     * @return The context builder
+     * @since 4.5.0
+     */
+    default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        return this;
+    };
+
+    /**
      * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
      * it is running in using environment variables and/or stack trace inspection.
      *
