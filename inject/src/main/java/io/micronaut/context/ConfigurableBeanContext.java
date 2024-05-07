@@ -22,5 +22,17 @@ package io.micronaut.context;
  */
 public interface ConfigurableBeanContext
     extends BeanContext {
+
+    /**
+     * Configures the bean context loading all bean definitions
+     * required to perform successful startup without starting the context itself.
+     *
+     * <p>Once called the methods of the {@link BeanDefinitionRegistry} interface will
+     * return results allowing inspection of the context without needing to run the context.</p>
+     *
+     * @see io.micronaut.inject.BeanDefinition
+     * @see #getBeanDefinition(Class)
+     * @see #start()
+     */
     void configure();
 }
