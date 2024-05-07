@@ -115,6 +115,7 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import jakarta.inject.Singleton;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +157,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @since 1.0
  */
 @SuppressWarnings("MagicNumber")
-public class DefaultBeanContext implements InitializableBeanContext {
+public class DefaultBeanContext implements InitializableBeanContext, ConfigurableBeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -171,6 +172,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
+    protected final AtomicBoolean configured = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
@@ -231,6 +233,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private BeanDefinitionValidator beanValidator;
     private List<BeanDefinitionReference> beanDefinitionReferences;
     private List<BeanConfiguration> beanConfigurationsList;
+
+    private StartupBeans startupBeans;
 
     List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners;
     private List<Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>>> beanCreationEventListeners;
@@ -470,8 +474,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
             beanPreDestroyEventListeners = null;
             beanDestroyedEventListeners = null;
             conversionService = null;
+            startupBeans = null;
             terminating.set(false);
             running.set(false);
+            configured.set(false);
         }
         return this;
     }
@@ -2739,6 +2745,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return registration;
     }
 
+    private void assertContextState() {
+        if (!this.running.get() && !this.initializing.get()) {
+            throw new BeanContextException("Cannot resolve beans until the context is running");
+        }
+    }
+
     private <T> Optional<BeanDefinition<T>> findBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
         BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
         if (beanDefinition != null) {
@@ -2948,6 +2960,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull BeanDefinition<T> definition,
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
+        assertContextState();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
 
         if (qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())) {
@@ -3251,9 +3264,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private void readAllBeanConfigurations() {
-        Iterable<BeanConfiguration> beanConfigurations = resolveBeanConfigurations();
-        for (BeanConfiguration beanConfiguration : beanConfigurations) {
-            registerConfiguration(beanConfiguration);
+        if (beanConfigurations.isEmpty()) {
+            Iterable<BeanConfiguration> beanConfigurations = resolveBeanConfigurations();
+            for (BeanConfiguration beanConfiguration : beanConfigurations) {
+                registerConfiguration(beanConfiguration);
+            }
         }
     }
 
@@ -3268,85 +3283,98 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private void readAllBeanDefinitionClasses() {
-        List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
-        List<BeanDefinitionProducer> processedBeans = new ArrayList<>(10);
-        List<BeanDefinitionProducer> parallelBeans = new ArrayList<>(10);
+        this.startupBeans = configureBeanDefinitionReferences();
+        initializeEventListeners();
+        initializeContext(
+            startupBeans.eagerInitBeans,
+            startupBeans.processedBeans,
+            startupBeans.parallelBeans
+        );
+    }
 
-        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
+    @NonNull
+    private StartupBeans configureBeanDefinitionReferences() {
+        if (startupBeans == null) {
 
-        List<BeanDefinitionProducer> producers = new ArrayList<>(beanDefinitionReferences.size());
-        List<BeanDefinitionProducer> proxyTargetBeans = new ArrayList<>(beanDefinitionReferences.size());
-        for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
-            producers.add(new BeanDefinitionProducer(beanDefinitionReference));
-        }
-        beanDefinitionsClasses.addAll(producers);
+            List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
+            List<BeanDefinitionProducer> processedBeans = new ArrayList<>(10);
+            List<BeanDefinitionProducer> parallelBeans = new ArrayList<>(10);
 
-        Collection<BeanConfiguration> allConfigurations = beanConfigurations.values();
-        List<BeanConfiguration> configurationsDisabled = new ArrayList<>(allConfigurations.size());
-        for (BeanConfiguration bc : allConfigurations) {
-            if (!bc.isEnabled(this)) {
-                configurationsDisabled.add(bc);
+            List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
+
+            List<BeanDefinitionProducer> producers = new ArrayList<>(beanDefinitionReferences.size());
+            List<BeanDefinitionProducer> proxyTargetBeans = new ArrayList<>(beanDefinitionReferences.size());
+            for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+                producers.add(new BeanDefinitionProducer(beanDefinitionReference));
             }
-        }
+            beanDefinitionsClasses.addAll(producers);
 
-        reference:
-        for (BeanDefinitionProducer beanDefinitionProducer : producers) {
-            if (beanDefinitionProducer.isDisabled()) {
-                continue;
-            }
-            BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
-            for (BeanConfiguration disableConfiguration : configurationsDisabled) {
-                if (disableConfiguration.isWithin(beanDefinitionReference)) {
-                    beanDefinitionProducer.referenceEnabled = false;
-                    continue reference;
+            Collection<BeanConfiguration> allConfigurations = beanConfigurations.values();
+            List<BeanConfiguration> configurationsDisabled = new ArrayList<>(allConfigurations.size());
+            for (BeanConfiguration bc : allConfigurations) {
+                if (!bc.isEnabled(this)) {
+                    configurationsDisabled.add(bc);
                 }
             }
 
-            if (beanDefinitionReference.isProxiedBean()) {
-                beanDefinitionProducer.referenceEnabled = false;
-                BeanDefinitionProducer proxyBeanProducer = new BeanDefinitionProducer(beanDefinitionReference);
-                // retain only if proxy target otherwise the target is never used
-                if (beanDefinitionReference.isProxyTarget()) {
-                    proxyTargetBeans.add(proxyBeanProducer);
+            reference:
+            for (BeanDefinitionProducer beanDefinitionProducer : producers) {
+                if (beanDefinitionProducer.isDisabled()) {
+                    continue;
                 }
-                continue;
-            }
-
-            final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
-            Class<?>[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
-            if (indexes.length > 0) {
-                //noinspection ForLoopReplaceableByForEach
-                for (int i = 0; i < indexes.length; i++) {
-                    Class<?> indexedType = indexes[i];
-                    resolveTypeIndex(indexedType).add(beanDefinitionProducer);
-                }
-            } else {
-                if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
-                    final Class<?> aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
-                    if (indexedTypes.contains(aClass)) {
-                        resolveTypeIndex(aClass).add(beanDefinitionProducer);
+                BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
+                for (BeanConfiguration disableConfiguration : configurationsDisabled) {
+                    if (disableConfiguration.isWithin(beanDefinitionReference)) {
+                        beanDefinitionProducer.referenceEnabled = false;
+                        continue reference;
                     }
                 }
-            }
-            if (isEagerInit(beanDefinitionReference)) {
-                eagerInitBeans.add(beanDefinitionProducer);
-            } else if (annotationMetadata.hasDeclaredStereotype(PARALLEL_TYPE)) {
-                parallelBeans.add(beanDefinitionProducer);
+
+                if (beanDefinitionReference.isProxiedBean()) {
+                    beanDefinitionProducer.referenceEnabled = false;
+                    BeanDefinitionProducer proxyBeanProducer = new BeanDefinitionProducer(beanDefinitionReference);
+                    // retain only if proxy target otherwise the target is never used
+                    if (beanDefinitionReference.isProxyTarget()) {
+                        proxyTargetBeans.add(proxyBeanProducer);
+                    }
+                    continue;
+                }
+
+                final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
+                Class<?>[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
+                if (indexes.length > 0) {
+                    //noinspection ForLoopReplaceableByForEach
+                    for (int i = 0; i < indexes.length; i++) {
+                        Class<?> indexedType = indexes[i];
+                        resolveTypeIndex(indexedType).add(beanDefinitionProducer);
+                    }
+                } else {
+                    if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
+                        final Class<?> aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
+                        if (indexedTypes.contains(aClass)) {
+                            resolveTypeIndex(aClass).add(beanDefinitionProducer);
+                        }
+                    }
+                }
+                if (isEagerInit(beanDefinitionReference)) {
+                    eagerInitBeans.add(beanDefinitionProducer);
+                } else if (annotationMetadata.hasDeclaredStereotype(PARALLEL_TYPE)) {
+                    parallelBeans.add(beanDefinitionProducer);
+                }
+
+                if (beanDefinitionReference.requiresMethodProcessing()) {
+                    processedBeans.add(beanDefinitionProducer);
+                }
+
             }
 
-            if (beanDefinitionReference.requiresMethodProcessing()) {
-                processedBeans.add(beanDefinitionProducer);
-            }
+            this.beanDefinitionReferences = null;
+            this.beanConfigurationsList = null;
 
+            this.proxyTargetBeans.addAll(proxyTargetBeans);
+            startupBeans = new StartupBeans(eagerInitBeans, processedBeans, parallelBeans);
         }
-
-        this.beanDefinitionReferences = null;
-        this.beanConfigurationsList = null;
-
-        this.proxyTargetBeans.addAll(proxyTargetBeans);
-
-        initializeEventListeners();
-        initializeContext(eagerInitBeans, processedBeans, parallelBeans);
+        return startupBeans;
     }
 
     private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {
@@ -3404,6 +3432,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                     @NonNull Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier) {
+        assertContextState();
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
             if (hasQualifier) {
@@ -3696,6 +3725,31 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @Override
     public MutableConversionService getConversionService() {
         return conversionService;
+    }
+
+    @Override
+    public synchronized final void configure() {
+        if (this.running.get()) {
+            configurationFailure("already running");
+        }
+        if (this.terminating.get()) {
+            configurationFailure("currently terminating");
+        }
+        if (this.initializing.get()) {
+            configurationFailure("currently initializing");
+        }
+        configureContextInternal();
+    }
+
+    private void configureContextInternal() {
+        if (configured.compareAndSet(false, true)) {
+            readAllBeanConfigurations();
+            configureBeanDefinitionReferences();
+        }
+    }
+
+    private static void configurationFailure(String message) {
+        throw new ConfigurationException("Bean context is " + message + ". The configure() method can only be called prior to startup");
     }
 
     /**
@@ -4093,6 +4147,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final class CollectionHolder<T> {
         Collection<BeanRegistration<T>> registrations;
     }
+
+    /**
+     * Holds references to the startup beans.
+     * @param eagerInitBeans Eager init beans
+     * @param processedBeans Processed beans
+     * @param parallelBeans Parallel startup beans
+     */
+    private record StartupBeans(
+        List<BeanDefinitionProducer> eagerInitBeans,
+        List<BeanDefinitionProducer> processedBeans,
+        List<BeanDefinitionProducer> parallelBeans) {
+    }
+
 
     /**
      * The class adds the caching of the enabled decision + the definition instance.

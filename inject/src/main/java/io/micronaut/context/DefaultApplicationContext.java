@@ -68,7 +68,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
+public class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext {
 
     private final ClassPathResourceLoader resourceLoader;
     private final ApplicationContextConfiguration configuration;
