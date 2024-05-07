@@ -115,7 +115,6 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -343,7 +342,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     LOG.debug("Starting BeanContext");
                 }
                 registerConversionService();
-                finalizeConfiguration();
+                readAllBeanConfigurations();
+                configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
                             .values()
@@ -3282,8 +3282,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         return list;
     }
 
-    private void readAllBeanDefinitionClasses() {
-        this.startupBeans = configureBeanDefinitionReferences();
+    private void configureAndStartContext() {
+        this.startupBeans = readBeanDefinitionReferences();
         initializeEventListeners();
         initializeContext(
             startupBeans.eagerInitBeans,
@@ -3293,7 +3293,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     @NonNull
-    private StartupBeans configureBeanDefinitionReferences() {
+    private StartupBeans readBeanDefinitionReferences() {
         if (startupBeans == null) {
 
             List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
@@ -3719,7 +3719,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @Override
     public void finalizeConfiguration() {
         readAllBeanConfigurations();
-        readAllBeanDefinitionClasses();
+        configureAndStartContext();
     }
 
     @Override
@@ -3728,7 +3728,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     @Override
-    public synchronized final void configure() {
+    public final synchronized void configure() {
         if (this.running.get()) {
             configurationFailure("already running");
         }
@@ -3744,7 +3744,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private void configureContextInternal() {
         if (configured.compareAndSet(false, true)) {
             readAllBeanConfigurations();
-            configureBeanDefinitionReferences();
+            readBeanDefinitionReferences();
         }
     }
 
