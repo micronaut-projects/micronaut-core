@@ -19,4 +19,6 @@ public interface Engine {
     int getCylinders();
 
     String start();
+
+    String getDescription();
 }
