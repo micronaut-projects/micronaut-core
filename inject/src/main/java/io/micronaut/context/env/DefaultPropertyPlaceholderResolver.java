@@ -394,14 +394,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         @Override
         public <T> Optional<T> findValue(Class<T> type) {
-            for (String expression: expressions) {
-                Optional<T> optionalValue = resolveOptionalExpression(expression, type);
-                if (optionalValue.isPresent()) {
-                    return optionalValue;
+            try {
+                for (String expression: expressions) {
+                    Optional<T> optionalValue = resolveOptionalExpression(expression, type);
+                    if (optionalValue.isPresent()) {
+                        return optionalValue;
+                    }
                 }
-            }
-            if (defaultValue != null) {
-                return conversionService.convert(defaultValue, type);
+                if (defaultValue != null) {
+                    return conversionService.convert(defaultValue, type);
+                }
+            } catch (ConfigurationException e) {
+                // Swallow exception.
             }
             return Optional.empty();
         }
