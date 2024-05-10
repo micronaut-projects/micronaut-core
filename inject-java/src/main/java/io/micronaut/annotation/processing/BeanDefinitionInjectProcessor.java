@@ -170,7 +170,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // process remaining
             int count = beanDefinitions.size();
             if (count > 0) {
-                note("Creating bean classes for %s type elements", count);
                 ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
                 for (String className : beanDefinitions) {
                     if (processed.add(className)) {
