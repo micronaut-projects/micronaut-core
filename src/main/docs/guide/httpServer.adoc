@@ -6,9 +6,7 @@ If you create your project using the Micronaut CLI `create-app` command, the `ht
 
 Micronaut framework includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty].
 
-The design of the HTTP server in the Micronaut framework is optimized for interchanging messages between Microservices, typically in JSON, and is not intended as a full server-side MVC framework. For example, there is currently no support for server-side views or features typical of a traditional server-side MVC framework.
-
-The goal of the HTTP server is to make it as easy as possible to expose APIs to be consumed by HTTP clients, regardless of the language they are written in. To use the HTTP server you need the `http-server-netty` dependency in your build:
+The goal of the HTTP server is to make it as easy as possible to expose services to be consumed by HTTP clients and web pages, regardless of the language they are written in. There is support for rendering HTML from a variety of templating frameworks in the https://micronaut-projects.github.io/micronaut-views/5.2.2/guide/[Micronaut Views] module. To use the HTTP server you need the `http-server-netty` dependency in your build:
 
 dependency:micronaut-http-server-netty[]
 
