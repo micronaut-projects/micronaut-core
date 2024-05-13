@@ -3240,6 +3240,20 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return bean;
         }
 
+        // try resolve @DefaultImplementation
+        for (BeanDefinition<T> candidate : candidates) {
+            if (candidate.hasStereotype(DefaultImplementation.class)) {
+                String n = candidate.stringValue(DefaultImplementation.class, "name").orElse(null);
+                if (n != null) {
+                    for (BeanDefinition<T> bd : candidates) {
+                        if (bd.getBeanType().getName().equals(n)) {
+                            return candidate;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
             return exactMatches.iterator().next();
