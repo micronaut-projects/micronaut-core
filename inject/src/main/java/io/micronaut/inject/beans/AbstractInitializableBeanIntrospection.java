@@ -933,7 +933,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             ArgumentUtils.requireNonNull("bean", bean);
 
             if (!beanType.isInstance(bean)) {
-                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + bean);
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (isReadOnly()) {
                 throw new UnsupportedOperationException("Cannot write a read-only property: " + getName());
