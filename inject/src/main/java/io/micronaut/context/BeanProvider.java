@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
+import jakarta.inject.Provider;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Objects;
@@ -54,6 +55,15 @@ public interface BeanProvider<T> extends Iterable<T> {
      */
     @NonNull
     T get();
+
+    /**
+     * Convert this provider into a jakarta provider.
+     * @return The jakarta provider.
+     * @since 4.5.0
+     */
+    default @NonNull Provider<T> asJakartaProvider() {
+        return this::get;
+    }
 
     /**
      * Finds a bean for the optionally specified qualifier. Return empty if non-exists.

@@ -172,12 +172,14 @@ class Bar {}
 ''')
         when:
         def bean = getBean(context, 'test.Test')
+        def fooProvider = context.getProvider(context.classLoader.loadClass('test.Foo'))
 
         then:
         bean.provider.isPresent()
         !bean.barProvider.isPresent()
         bean.provider.find(null).isPresent()
         !bean.barProvider.find(null).isPresent()
+        bean.provider.get().is(fooProvider.get())
 
         when:
         bean.barProvider.get()
