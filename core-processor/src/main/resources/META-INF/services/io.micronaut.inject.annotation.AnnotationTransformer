@@ -1,3 +1,4 @@
+io.micronaut.inject.annotation.internal.AutowiredTransformer
 io.micronaut.inject.annotation.internal.CoreNullableTransformer
 io.micronaut.inject.annotation.internal.CoreNonNullTransformer
 io.micronaut.inject.annotation.internal.KotlinNullableMapper

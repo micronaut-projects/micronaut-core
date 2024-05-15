@@ -53,6 +53,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectableBeanDefinition;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ValidatedBeanDefinition;
@@ -1151,6 +1152,27 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
     }
 
+    @Internal
+    @UsedByGeneratedCode
+    protected final boolean isMethodResolved(int methodIndex, Object[] parameters) {
+        MethodReference methodRef = methodInjection[methodIndex];
+        Argument<?>[] arguments = methodRef.arguments;
+        if (arguments.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            Object value = parameters[i];
+            if (value == null) {
+                Argument<?> argument = arguments[i];
+                if (!argument.isDeclaredNullable()
+                    && !InjectionPoint.isInjectionRequired(methodRef.annotationMetadata)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /**
      * Obtains all bean definitions for a method argument at the given index.
      *
@@ -2142,7 +2164,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
     }
 
-    private <K> K resolveBean(
+    private <K> @Nullable K resolveBean(
             BeanResolutionContext resolutionContext,
             Argument<K> argument,
             @Nullable Qualifier<K> qualifier) {
@@ -2155,7 +2177,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
-                if (argument.isDeclaredNullable()) {
+                if (argument.isDeclaredNullable() || !InjectionPoint.isInjectionRequired(argument.getAnnotationMetadata())) {
                     return resolutionContext.findBean(argument, qualifier).orElse(null);
                 }
                 return resolutionContext.getBean(argument, qualifier);

@@ -27,6 +27,7 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
+import io.micronaut.context.annotation.Autowired;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -76,6 +77,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.InitializingBeanDefinition;
 import io.micronaut.inject.InjectableBeanDefinition;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
@@ -1813,8 +1815,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 declaringType,
                 fieldElement,
                 fieldElement.getAnnotationMetadata(),
-                requiresReflection,
-                visitorContext
+                requiresReflection
         );
     }
 
@@ -1822,9 +1823,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             TypedElement declaringType,
             FieldElement fieldElement,
             AnnotationMetadata annotationMetadata,
-            boolean requiresReflection,
-            VisitorContext visitorContext) {
+            boolean requiresReflection) {
 
+        boolean isRequired = fieldElement
+            .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
+            .orElse(true);
         boolean requiresGenericType = false;
         Method methodToInvoke;
         final ClassElement genericType = fieldElement.getGenericType();
@@ -1866,7 +1869,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 requiresReflection,
                 methodToInvoke,
                 isArray,
-                requiresGenericType
+                requiresGenericType,
+                isRequired
         );
     }
 
@@ -1936,13 +1940,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitFieldValue(TypedElement declaringType,
                                 FieldElement fieldElement,
-                                boolean requiresReflection, boolean isOptional) {
+                                boolean requiresReflection,
+                                boolean isOptional) {
         AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
         Label falseCondition = isOptional ? pushPropertyContainsCheck(injectMethodVisitor, fieldElement.getType(), fieldElement.getName(), annotationMetadata) : null;
 
         if (isInnerType(fieldElement.getGenericType())) {
-            visitFieldInjectionPointInternal(declaringType, fieldElement, annotationMetadata, requiresReflection, visitorContext);
+            visitFieldInjectionPointInternal(declaringType, fieldElement, annotationMetadata, requiresReflection);
         } else if (!isConfigurationProperties || requiresReflection) {
+            boolean isRequired = fieldElement
+                .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
+                .orElse(true);
             visitFieldInjectionPointInternal(
                     declaringType,
                     fieldElement,
@@ -1950,7 +1958,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     requiresReflection,
                     GET_VALUE_FOR_FIELD,
                     isOptional,
-                    false);
+                    false,
+                    isRequired
+            );
         } else {
             injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
 
@@ -2224,14 +2234,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             boolean requiresReflection,
             Method methodToInvoke,
             boolean isArray,
-            boolean requiresGenericType) {
+            boolean requiresGenericType,
+            boolean isRequired) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
 
         autoApplyNamedIfPresent(fieldElement, annotationMetadata);
 
         GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
-        injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
+        if (isRequired) {
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
+        }
 
         if (!pushValueBypassingBeanContext(injectMethodVisitor, fieldElement.getGenericField())) {
             // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
@@ -2256,7 +2269,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // cast the return value to the correct type
             pushCastToType(injectMethodVisitor, fieldElement.getType());
         }
-        putField(injectMethodVisitor, fieldElement, requiresReflection, declaringType);
+
+        Label falseCondition = null;
+        Type fieldType = JavaModelUtils.getTypeReference(fieldElement.getType());
+        if (!isRequired) {
+            int i = injectMethodVisitor.newLocal(fieldType);
+            injectMethodVisitor.storeLocal(i, fieldType);
+            injectMethodVisitor.loadLocal(i, fieldType);
+            falseCondition = injectMethodVisitor.newLabel();
+            injectMethodVisitor.ifNull(falseCondition);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
+            injectMethodVisitor.loadLocal(i, fieldType);
+        }
+        putField(
+            injectMethodVisitor,
+            fieldElement,
+            requiresReflection,
+            declaringType
+        );
+        if (falseCondition != null) {
+            injectMethodVisitor.visitLabel(falseCondition);
+        }
         currentFieldIndex++;
         fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, requiresReflection));
     }
@@ -2477,6 +2510,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
         }
 
+        boolean isRequiredInjection = InjectionPoint.isInjectionRequired(methodElement);
         if (!requiresReflection) {
             // if the method doesn't require reflection then invoke it directly
 
@@ -2506,14 +2540,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.loadArg(INJECT_METHOD_BEAN_CONTEXT_PARAM);
             injectMethodVisitor.push(currentMethodIndex);
             injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
-            pushNewArrayIndexed(injectMethodVisitor, Object.class, argumentTypes, (index, entry) -> {
-                pushMethodParameterValue(injectMethodVisitor, index, entry);
-                pushBoxPrimitiveIfNecessary(entry.getType(), injectMethodVisitor);
-            });
+            newArrayOfMethodParameters(injectMethodVisitor, argumentTypes);
             injectMethodVisitor.invokeVirtual(superType, INVOKE_WITH_REFLECTION_METHOD);
         }
 
         destroyInjectScopeBeansIfNecessary(injectMethodVisitor, hasInjectScope);
+    }
+
+    private void newArrayOfMethodParameters(GeneratorAdapter injectMethodVisitor, List<ParameterElement> argumentTypes) {
+        pushNewArrayIndexed(injectMethodVisitor, Object.class, argumentTypes, (index, entry) -> {
+            pushMethodParameterValue(injectMethodVisitor, index, entry);
+            pushBoxPrimitiveIfNecessary(entry.getType(), injectMethodVisitor);
+        });
     }
 
     private void destroyInjectScopeBeansIfNecessary(GeneratorAdapter injectMethodVisitor, boolean hasInjectScope) {
@@ -2547,9 +2585,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         pushInvokeGetEvaluatedExpressionValueForMethodArgument(injectMethodVisitor, i, entry);
                     } else {
                         Optional<String> valueValue = entry.getAnnotationMetadata().stringValue(Value.class);
-                        if (valueValue.isPresent()) {
-                            pushInvokeGetPropertyPlaceholderValueForMethod(injectMethodVisitor, i, entry, valueValue.get());
-                        }
+                        valueValue.ifPresent(s -> pushInvokeGetPropertyPlaceholderValueForMethod(injectMethodVisitor, i, entry, s));
                     }
                 }
                 return;
