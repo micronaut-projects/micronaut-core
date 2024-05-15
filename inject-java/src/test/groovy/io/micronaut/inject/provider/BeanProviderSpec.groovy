@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
@@ -172,7 +173,10 @@ class Bar {}
 ''')
         when:
         def bean = getBean(context, 'test.Test')
-        def fooProvider = context.getProvider(context.classLoader.loadClass('test.Foo'))
+
+        def type = context.classLoader.loadClass('test.Foo')
+        def fooProvider = context.getProvider(type)
+        def fooProvider2 = context.getProvider(Argument.of(type))
 
         then:
         bean.provider.isPresent()
@@ -180,6 +184,8 @@ class Bar {}
         bean.provider.find(null).isPresent()
         !bean.barProvider.find(null).isPresent()
         bean.provider.get().is(fooProvider.get())
+        fooProvider.get().is(fooProvider2.get())
+        fooProvider.asJakartaProvider().get().is(fooProvider.get())
 
         when:
         bean.barProvider.get()
