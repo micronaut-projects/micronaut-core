@@ -320,7 +320,8 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
-                         boolean requiresReflection, boolean isOptional);
+                         boolean requiresReflection,
+                         boolean isOptional);
 
     /**
      * @return The package name of the bean
