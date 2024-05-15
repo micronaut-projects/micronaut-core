@@ -31,6 +31,8 @@ import java.util.Map;
  *
  * @author graemerocher
  * @since 1.0
+ * @see ApplicationContextConfigurer
+ * @see ApplicationContext#builder()
  */
 public interface ApplicationContextBuilder {
 
@@ -53,6 +55,7 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 2.0
      */
+    @SuppressWarnings("unchecked")
     default @NonNull ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
         if (eagerInitSingletons) {
             return eagerInitAnnotated(Singleton.class);
@@ -77,6 +80,7 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 2.0
      */
+    @SuppressWarnings("unchecked")
     @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**

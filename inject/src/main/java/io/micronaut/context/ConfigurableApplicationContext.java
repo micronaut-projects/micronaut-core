@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,13 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-
 /**
- * An interface for classes that provide an {@link ApplicationContext}.
+ * Extended version of the {@link ApplicationContext} that
+ * allows loading the context configuration without starting the context.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @see ConfigurableBeanContext#configure()
+ * @since 4.5.0
  */
-public interface ApplicationContextProvider {
-
-    /**
-     * Resolves the {@link ApplicationContext} for this class.
-     *
-     * @return The {@link ApplicationContext}
-     */
-    @NonNull ApplicationContext getApplicationContext();
+public interface ConfigurableApplicationContext
+    extends ApplicationContext, ConfigurableBeanContext {
 }
