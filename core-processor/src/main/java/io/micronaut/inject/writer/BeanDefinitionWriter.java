@@ -106,6 +106,7 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
+import java.util.function.BiConsumer;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -412,6 +413,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final org.objectweb.asm.commons.Method INVOKE_WITH_REFLECTION_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "invokeMethodWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object[].class)
+    );
+
+    private static final org.objectweb.asm.commons.Method IS_METHOD_RESOLVED = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "isMethodResolved", int.class, Object[].class)
     );
 
     private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
@@ -2493,7 +2498,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
 
         MethodElement methodElement = methodVisitData.getMethodElement();
-        final List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getParameters());
+        @NonNull ParameterElement[] methodParameters = methodElement.getParameters();
+        final List<ParameterElement> argumentTypes = Arrays.asList(methodParameters);
         applyDefaultNamedToParameters(argumentTypes);
         final TypedElement declaringType = methodVisitData.beanType;
         final String methodName = methodElement.getName();
@@ -2511,7 +2517,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         boolean isRequiredInjection = InjectionPoint.isInjectionRequired(methodElement);
-        if (!requiresReflection) {
+        if (!isRequiredInjection && hasArguments) {
+            // store parameter values in local object[]
+            final int parametersIndex = createParameterArray(argumentTypes, injectMethodVisitor, (index, parameter) ->
+                pushMethodParameterValue(injectMethodVisitor, index, parameter)
+            );
+
+            // invoke isMethodResolved with method paremeters
+            injectMethodVisitor.loadThis();
+            injectMethodVisitor.push(currentMethodIndex);
+            injectMethodVisitor.loadLocal(parametersIndex, Type.getType(Object[].class));
+            injectMethodVisitor.invokeVirtual(superType, IS_METHOD_RESOLVED);
+            injectMethodVisitor.push(false);
+
+            // check method resolved
+            Label falseCondition = injectMethodVisitor.newLabel();
+            injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
+            String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
+            injectMethodVisitor.loadLocal(injectInstanceIndex, beanType);
+
+            // load parameters from Object[]
+            for (int i = 0; i < methodParameters.length; i++) {
+                ParameterElement methodParameter = methodParameters[i];
+                injectMethodVisitor.loadLocal(parametersIndex);
+                injectMethodVisitor.push(i);
+                Type t = getTypeReference(methodParameter.getType());
+                injectMethodVisitor.arrayLoad(t);
+                pushCastToType(injectMethodVisitor, t);
+            }
+            // invoke the bean method
+            invokeBeanMethodDirectly(injectMethodVisitor, declaringTypeRef, methodName, methodDescriptor, returnType);
+            injectMethodVisitor.visitLabel(falseCondition);
+        } else if (!requiresReflection) {
             // if the method doesn't require reflection then invoke it directly
 
             // invoke the method on this injected instance
@@ -2528,12 +2565,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
             }
-            injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                    declaringTypeRef.getInternalName(), methodName,
-                    methodDescriptor, isInterface);
-            if (isConfigurationProperties && !returnType.isVoid()) {
-                injectMethodVisitor.pop();
-            }
+            invokeBeanMethodDirectly(injectMethodVisitor, declaringTypeRef, methodName, methodDescriptor, returnType);
         } else {
             injectMethodVisitor.loadThis();
             injectMethodVisitor.loadArg(INJECT_METHOD_BEAN_RESOLUTION_CONTEXT_PARAM);
@@ -2545,6 +2577,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         destroyInjectScopeBeansIfNecessary(injectMethodVisitor, hasInjectScope);
+    }
+
+    private void invokeBeanMethodDirectly(GeneratorAdapter injectMethodVisitor, Type declaringTypeRef, String methodName, String methodDescriptor, ClassElement returnType) {
+        injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                declaringTypeRef.getInternalName(), methodName,
+            methodDescriptor, isInterface);
+        if (isConfigurationProperties && !returnType.isVoid()) {
+            injectMethodVisitor.pop();
+        }
     }
 
     private void newArrayOfMethodParameters(GeneratorAdapter injectMethodVisitor, List<ParameterElement> argumentTypes) {
@@ -3240,7 +3281,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         new FactoryMethodDef(factoryType, factoryElement, methodDescriptor, factoryVar)
                 );
                 // populate an Object[] of all constructor arguments
-                final int parametersIndex = createParameterArray(parameterList, buildMethodVisitor);
+                final int parametersIndex = createConstructorParameterArray(parameterList, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameterList);
             } else {
                 if (factoryElement instanceof MethodElement methodElement) {
@@ -3362,7 +3403,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (isIntercepted) {
                 final int constructorIndex = initInterceptedConstructorWriter(buildMethodVisitor, parameters, null);
                 // populate an Object[] of all constructor arguments
-                final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
+                final int parametersIndex = createConstructorParameterArray(parameters, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
             } else {
                 boolean isKotlin = constructor.getClass().getSimpleName().startsWith("Kotlin");
@@ -3660,15 +3701,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return this.beanDefinitionName + "$" + ++innerClassIndex;
     }
 
-    private int createParameterArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor) {
-        pushNewArrayIndexed(buildMethodVisitor, Object.class, parameters, (index, parameter) -> {
+    private int createConstructorParameterArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor) {
+        return createParameterArray(parameters, buildMethodVisitor, (index, parameter) ->
             pushConstructorArgument(
                 buildMethodVisitor,
                 parameter,
                 index,
                 true
-            );
-        });
+            )
+        );
+    }
+
+    private static int createParameterArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor, BiConsumer<Integer, ParameterElement> parameterHandler) {
+        pushNewArrayIndexed(buildMethodVisitor, Object.class, parameters, parameterHandler);
         int local = buildMethodVisitor.newLocal(Type.getType(Object[].class));
         buildMethodVisitor.storeLocal(local);
         return local;

@@ -5,8 +5,13 @@ import jakarta.inject.Singleton;
 
 @Singleton
 public class Test {
+
+    private Foo foo = new Foo("test");
+
     @Autowired(required = false)
-    Foo foo = new Foo("test");
+    public void setFoo(Foo foo) {
+        this.foo = foo;
+    }
 }
 
 record Foo(String name) {}
