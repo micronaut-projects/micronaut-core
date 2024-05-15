@@ -342,7 +342,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     LOG.debug("Starting BeanContext");
                 }
                 registerConversionService();
-                readAllBeanConfigurations();
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -3283,7 +3282,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void configureAndStartContext() {
-        this.startupBeans = readBeanDefinitionReferences();
+        configureContextInternal();
         initializeEventListeners();
         initializeContext(
             startupBeans.eagerInitBeans,
@@ -3718,7 +3717,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
     @Override
     public void finalizeConfiguration() {
-        readAllBeanConfigurations();
         configureAndStartContext();
     }
 
@@ -3741,7 +3739,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         configureContextInternal();
     }
 
-    private void configureContextInternal() {
+    /**
+     * Configures the context reading all bean definitions.
+     */
+    @Internal
+    void configureContextInternal() {
         if (configured.compareAndSet(false, true)) {
             readAllBeanConfigurations();
             readBeanDefinitionReferences();

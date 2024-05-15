@@ -132,6 +132,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
     }
 
     @Override
+    @Internal
+    final void configureContextInternal() {
+        super.configureContextInternal();
+        configuration.getContextConfigurer().ifPresent(configurer ->
+            configurer.configure(this)
+        );
+    }
+
+    @Override
     public @NonNull
     <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
         return (ApplicationContext) super.registerSingleton(type, singleton, qualifier, inject);
