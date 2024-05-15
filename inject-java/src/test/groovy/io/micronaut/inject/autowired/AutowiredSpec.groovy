@@ -138,4 +138,43 @@ record Foo(String name) {
         expect:
         bean.value.name == 'unchanged'
     }
+
+    void "test autowired required=false on method (optional injection) - multiple arguments"() {
+        given:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.Autowired;
+import io.micronaut.context.annotation.Value;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test {
+
+    private Foo value = new Foo("unchanged");
+
+    @Autowired(required = false)
+    public void setValues(Bar bar, Foo value) {
+        this.value = value;
+    }
+
+    public test.Foo getValue() {
+        return value;
+    }
+}
+
+record Foo(String name) {
+
+}
+
+@Singleton
+class Bar {
+
+}
+''')
+        def bean = getBean(context, 'test.Test')
+
+        expect:"If any of the arguments don't resolve then don't invoke"
+        bean.value.name == 'unchanged'
+    }
 }
