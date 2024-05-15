@@ -3241,16 +3241,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         // try resolve @DefaultImplementation
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate.hasStereotype(DefaultImplementation.class)) {
-                String n = candidate.stringValue(DefaultImplementation.class, "name").orElse(null);
-                if (n != null) {
-                    for (BeanDefinition<T> bd : candidates) {
-                        if (bd.getBeanType().getName().equals(n)) {
-                            return candidate;
-                        }
+        BeanDefinition<T> first = candidates.iterator().next();
+        if (first.hasStereotype(DefaultImplementation.class)) {
+            String n = first.stringValue(DefaultImplementation.class, "name").orElse(null);
+            if (n != null) {
+                for (BeanDefinition<T> bd : candidates) {
+                    if (bd.getBeanType().getName().equals(n)) {
+                        return bd;
                     }
-                    break;
                 }
             }
         }
