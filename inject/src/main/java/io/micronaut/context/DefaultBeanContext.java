@@ -339,7 +339,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     LOG.debug("Starting BeanContext");
                 }
                 registerConversionService();
+<<<<<<< Updated upstream
                 finalizeConfiguration();
+=======
+                configureAndStartContext();
+>>>>>>> Stashed changes
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
                             .values()
@@ -3267,10 +3271,22 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return list;
     }
 
+<<<<<<< Updated upstream
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
         List<BeanDefinitionProducer> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionProducer> parallelBeans = new ArrayList<>(10);
+=======
+    private void configureAndStartContext() {
+        configureContextInternal();
+        initializeEventListeners();
+        initializeContext(
+            startupBeans.eagerInitBeans,
+            startupBeans.processedBeans,
+            startupBeans.parallelBeans
+        );
+    }
+>>>>>>> Stashed changes
 
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
 
@@ -3689,8 +3705,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @Override
     public void finalizeConfiguration() {
+<<<<<<< Updated upstream
         readAllBeanConfigurations();
         readAllBeanDefinitionClasses();
+=======
+        configureAndStartContext();
+>>>>>>> Stashed changes
     }
 
     @Override
@@ -3698,6 +3718,38 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return conversionService;
     }
 
+<<<<<<< Updated upstream
+=======
+    @Override
+    public final synchronized void configure() {
+        if (this.running.get()) {
+            configurationFailure("already running");
+        }
+        if (this.terminating.get()) {
+            configurationFailure("currently terminating");
+        }
+        if (this.initializing.get()) {
+            configurationFailure("currently initializing");
+        }
+        configureContextInternal();
+    }
+
+    /**
+     * Configures the context reading all bean definitions.
+     */
+    @Internal
+    void configureContextInternal() {
+        if (configured.compareAndSet(false, true)) {
+            readAllBeanConfigurations();
+            readBeanDefinitionReferences();
+        }
+    }
+
+    private static void configurationFailure(String message) {
+        throw new ConfigurationException("Bean context is " + message + ". The configure() method can only be called prior to startup");
+    }
+
+>>>>>>> Stashed changes
     /**
      * @param <T> The type
      * @param <R> The return type
