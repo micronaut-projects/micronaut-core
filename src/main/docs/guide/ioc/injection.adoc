@@ -46,7 +46,7 @@ snippet::io.micronaut.docs.ioc.injection.field.Vehicle[indent="0"]
 <1> The field is annotated with `jakarta.inject.Inject`.
 <2> Note that for Kotlin instead of an optional type (a type ending with `?`) you can use `lateinit var`
 
-Trying to inject a field that is declared `final` will result in a compilation error. Field injection should be seen as inferior to constructor inject as explained in the previous sections since it can result in the code being less-structured, harder to read and harder to test.
+Trying to inject a field that is declared `final` will result in a compilation error. Field injection should be seen as inferior to constructor injection as explained in the previous sections since it can result in the code being less-structured, harder to read and harder to test.
 
 WARNING: If the field is `private` scope or inaccessible then the field will be injected using the Java reflection API which is not recommended.
 
@@ -67,7 +67,7 @@ Method injection can be useful if you need post construction initializers, howev
 
 Occasionally it is desirable for injection to be optional (ie. not fail with a api:context.exceptions.NoSuchBeanException[] if there is no candidate bean available).
 
-For example if you are trying to build an extensible system where a default implementation is provided but consumers of your API can provide a bean and that if available will be injected then you are likely interested in making the injection optional.
+For example if you are trying to build an extensible system where a default implementation is provided by the type but consumers of your API can provide a bean that, if available, will be injected.
 
 One way to make injection optional is to annotate the injected type with ann:core.annotation.Nullable[] which will result in `null` being injected by the framework if the bean is unavailable:
 

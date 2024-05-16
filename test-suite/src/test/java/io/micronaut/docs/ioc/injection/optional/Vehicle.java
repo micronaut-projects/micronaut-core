@@ -7,16 +7,19 @@ import jakarta.inject.Singleton;
 @Singleton
 class Vehicle {
     @Autowired(required = false) // <1>
-    Engine engine = new Engine();
+    Engine engine = new Engine(6);
 
     void start() {
         engine.start();
     }
+
+    public Engine getEngine() {
+        return engine;
+    }
 }
 
-@Singleton
-class Engine {
+record Engine(int cylinders) {
     void start() {
-        System.out.println("Vrooom!" );
+        System.out.println("Vrooom! " + cylinders);
     }
 }
