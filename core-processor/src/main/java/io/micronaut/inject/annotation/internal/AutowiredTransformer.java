@@ -25,7 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 
 /**
- * Transforms {@link Autowired} to {@link jakarta.inject.Inject}
+ * Transforms {@link Autowired} to {@link jakarta.inject.Inject}.
  */
 public class AutowiredTransformer
     implements TypedAnnotationTransformer<Autowired> {
