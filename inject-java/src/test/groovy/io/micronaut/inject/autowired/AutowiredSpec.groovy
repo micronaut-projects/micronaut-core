@@ -105,6 +105,41 @@ class Foo {
         bean.value == "unchanged"
     }
 
+    void "test autowired required=true on method (default behaviour)"() {
+        given:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.Autowired;
+import io.micronaut.context.annotation.Value;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test {
+
+    private Foo value = new Foo("unchanged");
+
+    @Autowired
+    public void setValue(Foo value) {
+        this.value = value;
+    }
+
+    public test.Foo getValue() {
+        return value;
+    }
+}
+
+@Singleton
+record Foo(@Value("injected") String name) {
+
+}
+''')
+        def bean = getBean(context, 'test.Test')
+
+        expect:
+        bean.value.name == 'injected'
+    }
+
     void "test autowired required=false on method (optional injection)"() {
         given:
         def context = buildContext('''
