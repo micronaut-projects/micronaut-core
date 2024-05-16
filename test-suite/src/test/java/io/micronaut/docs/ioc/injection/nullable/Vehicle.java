@@ -14,6 +14,10 @@ class Vehicle {
     void start() {
         engine.start();
     }
+
+    public Engine getEngine() {
+        return engine;
+    }
 }
 
 record Engine(int cylinders) {
