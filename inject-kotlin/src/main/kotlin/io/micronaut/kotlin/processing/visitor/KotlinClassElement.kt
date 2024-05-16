@@ -433,10 +433,13 @@ internal open class KotlinClassElement(
                     }
                 }
         }
-        val propertyNames = allProperties.map { it.name }.toSet()
-
+        val propertyNames = allProperties.map { it.name }.toMutableSet()
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
         val methods = ArrayList(getEnclosedElements(ElementQuery.ALL_METHODS))
+        if (isJavaRecord(nativeType.declaration)) {
+            propertyElementQuery.readPrefixes("")
+            propertyElementQuery.writePrefixes(emptyArray())
+        }
         allProperties.forEach { prop ->
             methods.removeIf { m ->
                 prop.name == NameUtils.getPropertyNameForGetter(
@@ -456,7 +459,8 @@ internal open class KotlinClassElement(
             {
                 emptyList()
             },
-            false, propertyNames,
+            false,
+            propertyNames,
             customReaderPropertyNameResolver,
             customWriterPropertyNameResolver,
             { value: AstBeanPropertiesUtils.BeanPropertyData ->
@@ -792,16 +796,23 @@ internal open class KotlinClassElement(
                 }
 
                 MethodElement::class.java -> {
-                    classNode.getDeclaredFunctions()
+                    val functions = if (isJavaRecord(classNode)) {
+                        classNode.getAllFunctions().filter {
+                            !listOf(
+                                "hashCode",
+                                "toString",
+                                "equals"
+                            ).contains(it.simpleName.asString())
+                        }
+                    } else {
+                        classNode.getDeclaredFunctions()
+                    }
+
+                    functions
                         .filter { func: KSFunctionDeclaration ->
                             !func.isConstructor() &&
                                     func.origin != Origin.SYNTHETIC &&
-                                    // this is a hack but no other way it seems
-                                    !listOf(
-                                        "hashCode",
-                                        "toString",
-                                        "equals"
-                                    ).contains(func.simpleName.asString()) && (includeAbstract || !func.isAbstract || !classNode.isAbstract())
+                                    (includeAbstract || !func.isAbstract || !classNode.isAbstract())
                         }
                         .toList()
                 }
@@ -841,7 +852,10 @@ internal open class KotlinClassElement(
             return t == builtIns.anyType ||
                     t == builtIns.nothingType ||
                     t == builtIns.unitType ||
-                    classNode.qualifiedName.toString() == Enum::class.java.name
+                    (classNode.qualifiedName != null && (
+                            classNode.qualifiedName!!.asString() == Enum::class.java.name ||
+                                    classNode.qualifiedName!!.asString() == Record::class.java.name
+                            ))
         }
 
         override fun isAbstractClass(classNode: KSClassDeclaration) = classNode.isAbstract()
@@ -906,5 +920,8 @@ internal open class KotlinClassElement(
         }
     }
 
+    private fun isJavaRecord(classNode: KSClassDeclaration) =
+        classNode.origin == Origin.JAVA && classNode.superTypes.filter { Record::class.java.name == it.resolve().declaration.qualifiedName?.asString() }
+            .any()
 
 }

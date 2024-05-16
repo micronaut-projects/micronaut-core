@@ -30,6 +30,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Nullability
 import com.google.devtools.ksp.symbol.Variance
 import com.google.devtools.ksp.symbol.Visibility
 import io.micronaut.aop.Around
@@ -538,7 +539,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             }
             val canBePrimitive =
                 type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
-            if (allowPrimitive && canBePrimitive) {
+            if (allowPrimitive && canBePrimitive && type?.nullability != Nullability.PLATFORM) {
                 val element = primitives[qualifiedNameString]
                 if (element != null) {
                     return element
