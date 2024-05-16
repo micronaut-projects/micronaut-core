@@ -19,6 +19,7 @@ ioc:
   beans: Defining Beans
   how: How Does it Work?
   beanContext: The BeanContext
+  injection: Dependency Injection Types
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   typed: Limiting Injectable Types
