@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
@@ -1353,6 +1354,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @EachProperty("listeners")
     public static final class NettyListenerConfiguration {
+        private final String name;
         private Family family = Family.TCP;
         private boolean ssl;
         @Nullable
@@ -1360,6 +1362,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private int port;
         private String path;
         private boolean exposeDefaultRoutes = true;
+        private boolean supportGracefulShutdown = true;
         private Integer fd = null;
         private Integer acceptedFd = null;
         private boolean bind = true;
@@ -1375,12 +1378,41 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Internal
         public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
-            NettyListenerConfiguration configuration = new NettyListenerConfiguration();
+            NettyListenerConfiguration configuration = new NettyListenerConfiguration(host + ":" + port);
             configuration.setFamily(Family.TCP);
             configuration.setHost(host);
             configuration.setPort(port);
             configuration.setSsl(ssl);
             return configuration;
+        }
+
+        /**
+         * Constructor.
+         *
+         * @param name The name of this listener
+         */
+        @Inject
+        public NettyListenerConfiguration(@Parameter String name) {
+            this.name = name;
+        }
+
+        /**
+         * Constructor.
+         *
+         * @deprecated Please pass the listener name to {@link #NettyListenerConfiguration(String)}
+         */
+        @Deprecated
+        public NettyListenerConfiguration() {
+            this("unknown");
+        }
+
+        /**
+         * Name of the listener.
+         *
+         * @return Name of the listener
+         */
+        public String getName() {
+            return name;
         }
 
         /**
@@ -1483,6 +1515,30 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Internal
         public void setExposeDefaultRoutes(boolean exposeDefaultRoutes) {
             this.exposeDefaultRoutes = exposeDefaultRoutes;
+        }
+
+        /**
+         * If {@code true} (the default), this listener will stop accepting new connections and
+         * terminate any existing ones when a graceful shutdown is initiated. By setting this to
+         * {@code false} you can ignore the graceful shutdown, e.g. to keep a management port up
+         * while the shutdown of other listeners is in progress.
+         *
+         * @return Whether to support shutting down gracefully
+         */
+        public boolean isSupportGracefulShutdown() {
+            return supportGracefulShutdown;
+        }
+
+        /**
+         * If {@code true} (the default), this listener will stop accepting new connections and
+         * terminate any existing ones when a graceful shutdown is initiated. By setting this to
+         * {@code false} you can ignore the graceful shutdown, e.g. to keep a management port up
+         * while the shutdown of other listeners is in progress.
+         *
+         * @param supportGracefulShutdown Whether to support shutting down gracefully
+         */
+        public void setSupportGracefulShutdown(boolean supportGracefulShutdown) {
+            this.supportGracefulShutdown = supportGracefulShutdown;
         }
 
         /**

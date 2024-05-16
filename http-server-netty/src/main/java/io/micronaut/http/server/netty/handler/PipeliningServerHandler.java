@@ -22,7 +22,9 @@ import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -68,9 +70,12 @@ import reactor.util.concurrent.Queues;
 import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -81,7 +86,7 @@ import java.util.concurrent.ExecutorService;
  * @since 4.0.0
  */
 @Internal
-public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
+public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
     private final RequestHandler requestHandler;
@@ -101,7 +106,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Queue of outbound messages that can't be written yet.
      */
-    private final Queue<OutboundAccessImpl> outboundQueue = new ArrayDeque<>(1);
+    private final Deque<OutboundAccessImpl> outboundQueue = new ArrayDeque<>(1);
     /**
      * Current outbound message, or {@code null} if no outbound message is waiting.
      */
@@ -129,6 +134,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
+    private boolean shuttingDown = false;
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
@@ -303,6 +309,39 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         } finally {
             writing = false;
+        }
+    }
+
+    @Override
+    public @NonNull Optional<ShutdownState> reportShutdownState() {
+        return Optional.of(new SingleShutdownState("Waiting to write response"));
+    }
+
+    @Override
+    public CompletionStage<?> shutdownGracefully() {
+        if (ctx.executor().inEventLoop()) {
+            shutdownGracefully0();
+        } else {
+            ctx.executor().execute(this::shutdownGracefully0);
+        }
+
+        return NettyHttpServer.toCompletionStage(ctx.channel().closeFuture());
+    }
+
+    private void shutdownGracefully0() {
+        /*
+         * - if there is no in-flight request, close immediately.
+         * - if there is one or more request where the response headers have not been sent yet, send `connection: close` for the last of them
+         * - if there is one or more request, close the connection after the last response
+         */
+        shuttingDown = true;
+        if (inboundHandler == baseInboundHandler && outboundHandler == null && outboundQueue.isEmpty()) {
+            ctx.close();
+        } else {
+            OutboundAccessImpl lastResponse = outboundQueue.peekLast();
+            if (lastResponse != null) {
+                lastResponse.closeAfterWrite = true;
+            }
         }
     }
 
@@ -896,19 +935,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.outboundAccess = outboundAccess;
         }
 
-        protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean close) {
+        private boolean shouldCloseAfterContent(boolean last) {
+            return last && (outboundAccess.closeAfterWrite || (shuttingDown && outboundQueue.isEmpty()));
+        }
+
+        protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean last) {
             if (this.compressionSession == null) {
-                write(content, flush, close);
+                write(content, flush, shouldCloseAfterContent(last));
             } else {
                 // slow path
-                writeCompressing0(content, flush, close);
+                writeCompressing0(content, flush, last);
             }
         }
 
-        private void writeCompressing0(HttpContent content, boolean flush, boolean close) {
+        private void writeCompressing0(HttpContent content, boolean flush, boolean last) {
             Compressor.Session compressionSession = this.compressionSession;
             compressionSession.push(content.content());
-            boolean last = content instanceof LastHttpContent;
             if (last) {
                 compressionSession.finish();
             }
@@ -920,6 +962,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // this can happen in FullHttpResponse, just send the full body.
                 write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
             }
+            boolean close = shouldCloseAfterContent(last);
             ByteBuf toSend = compressionSession.poll();
             // send the compressed buffer with the flags.
             if (toSend == null) {
@@ -1005,7 +1048,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            writeCompressing(message, true, outboundAccess.closeAfterWrite);
+            writeCompressing(message, true, true);
             outboundHandler = null;
             requestHandler.responseWritten(outboundAccess.attachment);
             PipeliningServerHandler.this.writeSome();
@@ -1085,7 +1128,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (last) {
                     writtenLast = true;
                 }
-                writeCompressing(httpContent, true, last && outboundAccess.closeAfterWrite);
+                writeCompressing(httpContent, true, last);
                 if (ctx.channel().isWritable()) {
                     subscription.request(1);
                 }
@@ -1134,7 +1177,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
 
                 if (!writtenLast) {
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, true);
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();
@@ -1178,7 +1221,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
                 @Override
                 protected void writeLast() {
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, true);
                     outboundHandler = null;
                     requestHandler.responseWritten(outboundAccess.attachment);
                     PipeliningServerHandler.this.writeSome();

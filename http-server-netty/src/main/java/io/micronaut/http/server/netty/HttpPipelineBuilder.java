@@ -30,8 +30,12 @@ import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
+import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -47,6 +51,7 @@ import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketSe
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
@@ -64,6 +69,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.incubator.codec.http3.DefaultHttp3GoAwayFrame;
 import io.netty.incubator.codec.http3.Http3;
 import io.netty.incubator.codec.http3.Http3FrameToHttpObjectCodec;
 import io.netty.incubator.codec.http3.Http3ServerConnectionHandler;
@@ -87,8 +93,14 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -174,6 +186,14 @@ final class HttpPipelineBuilder implements Closeable {
         return requestHandler;
     }
 
+    static String toString(@Nullable SocketAddress address) {
+        if (address instanceof InetSocketAddress inet) {
+            return inet.getHostString() + ":" + inet.getPort();
+        } else {
+            return "unknown";
+        }
+    }
+
     /**
      * Holder class for normal or QUIC ssl handler.
      */
@@ -222,14 +242,16 @@ final class HttpPipelineBuilder implements Closeable {
         }
     }
 
-    final class ConnectionPipeline {
-        private final Channel channel;
+    final class ConnectionPipeline implements GracefulShutdownCapable {
+        final Channel channel;
         private final ChannelPipeline pipeline;
 
         @Nullable
         private final SslHandlerHolder sslHandler;
 
         private final NettyServerCustomizer connectionCustomizer;
+
+        private volatile GracefulShutdownCapable specificGracefulShutdown;
 
         /**
          * @param channel The channel of this connection
@@ -320,6 +342,8 @@ final class HttpPipelineBuilder implements Closeable {
         void initHttp3Channel() {
             insertPcapLoggingHandler(channel, "udp-encapsulated");
 
+            Set<Http3GracefulShutdown> activeChannels = ConcurrentHashMap.newKeySet();
+            AtomicBoolean shuttingDown = new AtomicBoolean(false);
             pipeline.addLast(Http3.newQuicServerCodecBuilder()
                 .sslEngineProvider(QuicFactory.quicEngineFactory(sslHandler))
                     //.sslEngineProvider(q -> quicSslContext.newEngine(q.alloc()))
@@ -331,18 +355,51 @@ final class HttpPipelineBuilder implements Closeable {
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(@NonNull Channel ch) throws Exception {
+                        if (shuttingDown.get()) {
+                            ch.close();
+                            return;
+                        }
+
+                        AtomicLong maxStreamId = new AtomicLong();
                         insertPcapLoggingHandler(ch, "quic-decapsulated");
-                        ch.pipeline().addLast(new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
+                        Http3ServerConnectionHandler connectionHandler = new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
                             @Override
                             protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                                while (true) {
+                                    long m = maxStreamId.get();
+                                    if (m >= ch.streamId() || maxStreamId.compareAndSet(m, ch.streamId())) {
+                                        break;
+                                    }
+                                }
                                 StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                                 streamPipeline.insertHttp3FrameHandlers();
                                 streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                             }
-                        }));
+                        }, new ChannelInitializer<QuicStreamChannel>() {
+                            @Override
+                            protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                            }
+                        }, null, null, true);
+
+                        ch.pipeline().addLast(connectionHandler);
+                        Http3GracefulShutdown gracefulShutdown = new Http3GracefulShutdown(ch.pipeline().lastContext(), maxStreamId);
+                        activeChannels.add(gracefulShutdown);
+                        ch.closeFuture().addListener((ChannelFutureListener) future -> activeChannels.remove(gracefulShutdown));
                     }
                 })
                 .build());
+            specificGracefulShutdown = new GracefulShutdownCapable() {
+                @Override
+                public @NonNull CompletionStage<?> shutdownGracefully() {
+                    shuttingDown.set(true);
+                    return GracefulShutdownCapable.shutdownAll(activeChannels.stream());
+                }
+
+                @Override
+                public @NonNull Optional<ShutdownState> reportShutdownState() {
+                    return CombinedShutdownState.combineShutdownState(activeChannels, Http3GracefulShutdown::key, n -> Map.entry("other", new SingleShutdownState("And " + n + " other connections")));
+                }
+            };
         }
 
         /**
@@ -388,7 +445,7 @@ final class HttpPipelineBuilder implements Closeable {
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, createServerCodec());
 
-            new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
+            specificGracefulShutdown = new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
 
             connectionCustomizer.onInitialPipelineBuilt();
             connectionCustomizer.onStreamPipelineBuilt();
@@ -403,10 +460,14 @@ final class HttpPipelineBuilder implements Closeable {
 
             boolean legacyMultiplexHandlers = routingInBoundHandler.serverConfiguration.isLegacyMultiplexHandlers();
             if (legacyMultiplexHandlers) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, createHttp2FrameCodec());
+                Http2FrameCodec http2FrameCodec = createHttp2FrameCodec();
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2FrameCodec);
+                specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2FrameCodec);
                 pipeline.addLast(makeHttp2Handler());
             } else {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, createHttp2ServerHandler(true));
+                Http2ConnectionHandler http2ServerHandler = createHttp2ServerHandler(true);
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2ServerHandler);
+                specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2ServerHandler);
             }
 
             connectionCustomizer.onInitialPipelineBuilt();
@@ -528,6 +589,7 @@ final class HttpPipelineBuilder implements Closeable {
                             super.upgradeTo(ctx, upgradeRequest);
                             pipeline.remove(fallbackHandlerName);
                             new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
+                            specificGracefulShutdown = new Http2GracefulShutdown(ctx.pipeline().context(connectionHandler), connectionHandler);
                             onRequestPipelineBuilt();
                         }
                     }
@@ -570,7 +632,7 @@ final class HttpPipelineBuilder implements Closeable {
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
-                    new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
+                    specificGracefulShutdown = new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     cp.fireChannelRead(ReferenceCountUtil.retain(msg));
@@ -600,6 +662,23 @@ final class HttpPipelineBuilder implements Closeable {
                     server.getServerConfiguration().isValidateHeaders(),
                     server.getServerConfiguration().getInitialBufferSize()
             );
+        }
+
+        @Override
+        public CompletionStage<?> shutdownGracefully() {
+            GracefulShutdownCapable specificGracefulShutdown = this.specificGracefulShutdown;
+            if (specificGracefulShutdown == null) {
+                return NettyHttpServer.toCompletionStage(channel.close());
+            } else {
+                return specificGracefulShutdown.shutdownGracefully();
+            }
+        }
+
+        @Override
+        public Optional<ShutdownState> reportShutdownState() {
+            return Optional.of(Optional.ofNullable(this.specificGracefulShutdown)
+                .flatMap(GracefulShutdownCapable::reportShutdownState)
+                .orElse(new SingleShutdownState("Waiting for connection channel to close")));
         }
     }
 
@@ -658,7 +737,7 @@ final class HttpPipelineBuilder implements Closeable {
          * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
          * and netty requests, and routing.
          */
-        private void insertMicronautHandlers() {
+        private GracefulShutdownCapable insertMicronautHandlers() {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
                 channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
@@ -681,6 +760,7 @@ final class HttpPipelineBuilder implements Closeable {
             PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
             pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
+            return pipeliningServerHandler;
         }
 
         void afterHttp2ServerHandlerSetUp() {
@@ -696,14 +776,14 @@ final class HttpPipelineBuilder implements Closeable {
          * {@value ChannelPipelineCustomizer#HANDLER_HTTP_SERVER_CODEC}. Used both for normal HTTP 1 connections, and
          * after a H2C negotiation failure.
          */
-        private void insertHttp1DownstreamHandlers() {
+        private GracefulShutdownCapable insertHttp1DownstreamHandlers() {
             httpVersion = HttpVersion.HTTP_1_1;
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
             registerMicronautChannelHandlers();
 
-            insertMicronautHandlers();
+            return insertMicronautHandlers();
         }
 
         /**
@@ -720,6 +800,91 @@ final class HttpPipelineBuilder implements Closeable {
                 }
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
+        }
+    }
+
+    private static abstract class Http23GracefulShutdownBase implements GracefulShutdownCapable {
+        final ChannelHandlerContext ctx;
+
+        Http23GracefulShutdownBase(ChannelHandlerContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public @NonNull Optional<ShutdownState> reportShutdownState() {
+            return Optional.of(new SingleShutdownState("Waiting for client to terminate the HTTP/2 connection. Still active streams: " + numberOfActiveStreams()));
+        }
+
+        @Override
+        public CompletionStage<?> shutdownGracefully() {
+            if (ctx.executor().inEventLoop()) {
+                shutdownGracefully0();
+            } else {
+                ctx.executor().execute(this::shutdownGracefully0);
+            }
+
+            return NettyHttpServer.toCompletionStage(ctx.channel().closeFuture());
+        }
+
+        private void shutdownGracefully0() {
+            goAway()
+                .addListener((ChannelFutureListener) future -> {
+                    if (!future.isSuccess()) {
+                        ctx.close();
+                    }
+                });
+            ctx.flush();
+        }
+
+        protected abstract int numberOfActiveStreams();
+
+        protected abstract ChannelFuture goAway();
+    }
+
+    private static final class Http2GracefulShutdown extends Http23GracefulShutdownBase {
+        private final Http2ConnectionHandler connectionHandler;
+
+        public Http2GracefulShutdown(ChannelHandlerContext ctx, Http2ConnectionHandler connectionHandler) {
+            super(ctx);
+            this.connectionHandler = connectionHandler;
+        }
+
+        @Override
+        protected int numberOfActiveStreams() {
+            return connectionHandler.connection().numActiveStreams();
+        }
+
+        @Override
+        protected ChannelFuture goAway() {
+            return connectionHandler.goAway(ctx, connectionHandler.connection().remote().lastStreamCreated(), Http2Error.NO_ERROR.code(), Unpooled.EMPTY_BUFFER, ctx.newPromise());
+        }
+    }
+
+    private static final class Http3GracefulShutdown extends Http23GracefulShutdownBase {
+        private final AtomicLong maxStreamId;
+
+        public Http3GracefulShutdown(ChannelHandlerContext ctx, AtomicLong maxStreamId) {
+            super(ctx);
+            this.maxStreamId = maxStreamId;
+        }
+
+        String key() {
+            QuicChannel quicChannel = (QuicChannel) ctx.channel();
+            return "c:" + HttpPipelineBuilder.toString(quicChannel.remoteSocketAddress()) + " s:" + HttpPipelineBuilder.toString(quicChannel.localSocketAddress()) + " cid:" + quicChannel.id().asLongText();
+        }
+
+        @Override
+        protected int numberOfActiveStreams() {
+            return -1; // not sure how to count these
+        }
+
+        @Override
+        protected ChannelFuture goAway() {
+            QuicStreamChannel controlStream = Http3.getLocalControlStream(ctx.channel());
+            if (controlStream == null) {
+                return ctx.close();
+            }
+            return controlStream.writeAndFlush(new DefaultHttp3GoAwayFrame(maxStreamId.get() + 4));
         }
     }
 }
