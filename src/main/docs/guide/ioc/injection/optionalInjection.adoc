@@ -1,0 +1,28 @@
+Occasionally it is desirable for injection to be optional (ie. not fail with a api:context.exceptions.NoSuchBeanException[] if there is no candidate bean available).
+
+For example if you are trying to build an extensible system where a default implementation is provided by the type but consumers of your API can provide a bean that, if available, will be injected.
+
+One way to make injection optional is to annotate the injected type with ann:core.annotation.Nullable[] which will result in `null` being injected by the framework if the bean is unavailable:
+
+.Example of Injecting `null`
+snippet::io.micronaut.docs.ioc.injection.nullable.Vehicle[indent="0"]
+
+<1> Here the constructor argument is annotated with ann:core.annotation.Nullable[]
+<2> Since there is no bean available `null` is injected and the code has to handle the possibility that the argument could be `null.
+
+Using ann:core.annotation.Nullable[] has the following considerations:
+
+* Can be used with any of the injection types (constructor, method or field injection)
+* Somewhere the code has to handle what happens if `null` is injected, for constructors this is easy since the constructor can handle the `null`, but for fields and methods a `@PostConstruct` method would need to be implemented to handle `null` if `null` is not desirable.
+* Finally, `@Nullable` cannot be used on primitive types like `int`, `long` etc. when using <<valueAnnotation, configuration injection>>. To handle primitives you need to specify `@Bindable(defaultValue="..")` and provide a default value.
+
+An alternative to ann:core.annotation.Nullable[], is to make the injection optional (not to be confused with `java.util.Optional`). This can be done with the ann:context.annotation.Autowired[] annotation by setting the `required` member to `false`:
+
+.Example of Optional Injection with `@Autowired`
+snippet::io.micronaut.docs.ioc.injection.optional.Vehicle[indent="0"]
+
+<1> `@Autowired(required=false)` is declared making the injection optional.
+
+This approach differs to using ann:core.annotation.Nullable[] since in this case if the bean is not available the injection point will not be invoked and `null` won't be injected.
+
+However, it important to note that ann:context.annotation.Autowired[] can only be applied for method and field injection. Optional injection cannot be applied to constructor injection, because there is no way to make a constructor argument optional.
