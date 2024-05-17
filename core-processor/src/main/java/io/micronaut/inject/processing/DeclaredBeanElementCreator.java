@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -496,8 +497,14 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             return false;
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
+        boolean isRequired = InjectionPoint.isInjectionRequired(fieldElement);
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
-            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, fieldElement.isReflectionRequired(classElement), false);
+            visitor.visitFieldValue(
+                fieldElement.getDeclaringType(),
+                fieldElement,
+                fieldElement.isReflectionRequired(classElement),
+                !isRequired
+            );
             return true;
         }
         if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)

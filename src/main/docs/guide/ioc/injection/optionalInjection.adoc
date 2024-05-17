@@ -1,0 +1,11 @@
+// THIS SECTION IS DISABLED. See https://github.com/micronaut-projects/micronaut-core/pull/10830
+An alternative to ann:core.annotation.Nullable[], is to make the injection optional (not to be confused with `java.util.Optional`). This can be done with the ann:context.annotation.Autowired[] annotation by setting the `required` member to `false`:
+
+.Example of Optional Injection with `@Autowired`
+snippet::io.micronaut.docs.ioc.injection.optional.Vehicle[indent="0"]
+
+<1> `@Autowired(required=false)` is declared making the injection optional.
+
+This approach differs to using ann:core.annotation.Nullable[] since in this case if the bean is not available the injection point will not be invoked and `null` won't be injected.
+
+However, it important to note that ann:context.annotation.Autowired[] can only be applied for method and field injection. Optional injection cannot be applied to constructor injection, because there is no way to make a constructor argument optional.

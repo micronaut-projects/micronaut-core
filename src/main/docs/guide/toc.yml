@@ -19,6 +19,12 @@ ioc:
   beans: Defining Beans
   how: How Does it Work?
   beanContext: The BeanContext
+  injection:
+    title: Dependency Injection Types
+    constructorInjection: Constructor Injection
+    fieldInjection: Field Injection
+    methodInjection: Method Injection
+    nullableInjection: Nullable Injection
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   typed: Limiting Injectable Types
