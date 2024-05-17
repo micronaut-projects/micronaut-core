@@ -7,7 +7,7 @@ Constructor injection is the preferred and recommended injection type because Co
 * Is less likely to result in a `NullPointerException`
 * More clearly expresses the dependencies of a particular type in one place.
 
-The example in the previous section used constructor injection. Note that if you have multiple constructors you can disambiguate which constructor to invoke with the `jakarta.inject.Inject` annotation or the ann:core.annotation.Creator[] annotation:
+The example in the next section uses constructor injection. Note that if you have multiple constructors you can disambiguate which constructor to invoke with the `jakarta.inject.Inject` annotation or the ann:core.annotation.Creator[] annotation:
 
 .Example of Constructor Injection
 snippet::io.micronaut.docs.ioc.injection.ctor.Vehicle[indent="0"]
