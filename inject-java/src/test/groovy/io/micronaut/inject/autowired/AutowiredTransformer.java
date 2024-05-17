@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.annotation.internal;
+package io.micronaut.inject.autowired;
 
-import io.micronaut.context.annotation.Autowired;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -32,8 +31,8 @@ public class AutowiredTransformer
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Autowired> annotation, VisitorContext visitorContext) {
         AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.INJECT);
-        annotation.booleanValue(Autowired.MEMBER_REQUIRED)
-            .ifPresent(b -> builder.member(Autowired.MEMBER_REQUIRED, b));
+        annotation.booleanValue(AnnotationUtil.MEMBER_REQUIRED)
+            .ifPresent(b -> builder.member(AnnotationUtil.MEMBER_REQUIRED, b));
 
         return List.of(
             builder

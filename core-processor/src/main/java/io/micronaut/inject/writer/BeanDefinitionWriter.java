@@ -27,7 +27,6 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
-import io.micronaut.context.annotation.Autowired;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -1831,7 +1830,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             boolean requiresReflection) {
 
         boolean isRequired = fieldElement
-            .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
+            .booleanValue(AnnotationUtil.INJECT, AnnotationUtil.MEMBER_REQUIRED)
             .orElse(true);
         boolean requiresGenericType = false;
         Method methodToInvoke;
@@ -1954,7 +1953,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             visitFieldInjectionPointInternal(declaringType, fieldElement, annotationMetadata, requiresReflection);
         } else if (!isConfigurationProperties || requiresReflection) {
             boolean isRequired = fieldElement
-                .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
+                .booleanValue(AnnotationUtil.INJECT, AnnotationUtil.MEMBER_REQUIRED)
                 .orElse(true);
             visitFieldInjectionPointInternal(
                     declaringType,

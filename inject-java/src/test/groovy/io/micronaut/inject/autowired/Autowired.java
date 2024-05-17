@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.annotation;
+package io.micronaut.inject.autowired;
 
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.AnnotationUtil;
 import jakarta.inject.Inject;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -36,10 +38,6 @@ import java.lang.annotation.Target;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD})
 @Documented
 public @interface Autowired {
-    /**
-     * The name of the required member.
-     */
-    String MEMBER_REQUIRED = "required";
 
     /**
      * Specify whether the injection point is required.
@@ -56,7 +54,7 @@ public @interface Autowired {
      */
     @AliasFor(
         annotation = Inject.class,
-        member = MEMBER_REQUIRED
+        member = AnnotationUtil.MEMBER_REQUIRED
     )
     boolean required() default true;
 }

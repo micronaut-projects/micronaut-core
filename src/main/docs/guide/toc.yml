@@ -24,7 +24,7 @@ ioc:
     constructorInjection: Constructor Injection
     fieldInjection: Field Injection
     methodInjection: Method Injection
-    optionalInjection: Optional Injection
+    nullableInjection: Nullable Injection
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   typed: Limiting Injectable Types

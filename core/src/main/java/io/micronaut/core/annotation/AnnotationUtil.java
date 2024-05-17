@@ -194,6 +194,10 @@ public class AnnotationUtil {
      * The inherited annotation.
      */
     public static final String ANN_INHERITED = Inherited.class.getName();
+    /**
+     * The name of the required member.
+     */
+    public static final String MEMBER_REQUIRED = "required";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

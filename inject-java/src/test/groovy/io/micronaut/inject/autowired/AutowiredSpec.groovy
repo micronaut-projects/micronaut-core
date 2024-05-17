@@ -12,7 +12,7 @@ class AutowiredSpec extends AbstractTypeElementSpec {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import jakarta.inject.Singleton;
 
 @Singleton
@@ -37,7 +37,7 @@ class Foo {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import jakarta.inject.Singleton;
 
 @Singleton
@@ -61,7 +61,7 @@ class Foo {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import jakarta.inject.Singleton;
 
 @Singleton
@@ -84,7 +84,7 @@ record Foo(String name) {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
@@ -110,7 +110,7 @@ class Foo {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
@@ -145,7 +145,7 @@ record Foo(@Value("injected") String name) {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
@@ -179,7 +179,7 @@ record Foo(String name) {
         def context = buildContext('''
 package test;
 
-import io.micronaut.context.annotation.Autowired;
+import io.micronaut.inject.autowired.Autowired;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 

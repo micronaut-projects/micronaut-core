@@ -16,7 +16,6 @@
 package io.micronaut.inject;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Autowired;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
@@ -55,7 +54,7 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
      */
     static boolean isInjectionRequired(AnnotationMetadata annotationMetadata) {
         return annotationMetadata != null && annotationMetadata
-            .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
+            .booleanValue(AnnotationUtil.INJECT, AnnotationUtil.MEMBER_REQUIRED)
             .orElse(true);
     }
 
