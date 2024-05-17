@@ -1,6 +1,6 @@
 The Micronaut framework supports the following types of dependency injection:
 
-* Constructor injection (must be one public constructor or a single constructor annotated with `@Inject`)
+* Constructor injection (with an access level of public, protected, or default - and in case of multiple constructors, you can specify the one to be chosen, annotating it with `@Inject`)
 * Field injection
 * JavaBean property injection
 * Method parameter injection
