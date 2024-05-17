@@ -15,15 +15,8 @@
  */
 package io.micronaut.inject;
 
-<<<<<<< HEAD
-=======
-import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Autowired;
-import io.micronaut.core.annotation.AnnotationMetadata;
->>>>>>> 605ceac06f (initial implementation, method injection not yet working)
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -40,28 +33,4 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
      */
     @NonNull BeanDefinition<T> getDeclaringBean();
 
-<<<<<<< HEAD
-=======
-    /**
-     * @return The qualifier of the bean that declares this injection point
-     * @since 4.5.0
-     */
-    @Nullable
-    default Qualifier<T> getDeclaringBeanQualifier() {
-        return getDeclaringBean().getDeclaredQualifier();
-    }
-
-    /**
-     * Check whether injection is required for the given metadata.
-     * @param annotationMetadata The annotation metadata.
-     * @return True if injection is required.
-     * @since 4.5.0
-     */
-    static boolean isInjectionRequired(AnnotationMetadata annotationMetadata) {
-        return annotationMetadata != null && annotationMetadata
-            .booleanValue(AnnotationUtil.INJECT, Autowired.MEMBER_REQUIRED)
-            .orElse(true);
-    }
-
->>>>>>> 605ceac06f (initial implementation, method injection not yet working)
 }
