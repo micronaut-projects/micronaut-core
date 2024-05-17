@@ -3252,6 +3252,18 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return bean;
         }
 
+        // try resolve @DefaultImplementation
+        BeanDefinition<T> first = candidates.iterator().next();
+        if (first.hasStereotype(DefaultImplementation.class)) {
+            String n = first.stringValue(DefaultImplementation.class, "name").orElse(null);
+            if (n != null) {
+                for (BeanDefinition<T> bd : candidates) {
+                    if (bd.getBeanType().getName().equals(n)) {
+                        return bd;
+                    }
+                }
+            }
+        }
         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
             return exactMatches.iterator().next();
