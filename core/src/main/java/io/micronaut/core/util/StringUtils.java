@@ -16,6 +16,7 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -441,7 +442,7 @@ public final class StringUtils {
      */
     public static Iterable<String> splitOmitEmptyStrings(final CharSequence sequence, final char splitCharacter) {
         Objects.requireNonNull(sequence);
-        return () -> new SplitOmitEmptyIterator(sequence, splitCharacter);
+        return new SplitOmitEmptyIterator(sequence, splitCharacter);
     }
 
     /**
@@ -489,7 +490,7 @@ public final class StringUtils {
      * @author Denis Stepanov
      * @since 2.5.0
      */
-    private static final class SplitOmitEmptyIterator implements Iterator<String> {
+    private static final class SplitOmitEmptyIterator implements Iterator<String>, Iterable<String> {
 
         private final CharSequence sequence;
         private final char splitCharacter;
@@ -557,5 +558,13 @@ public final class StringUtils {
             end = true;
         }
 
+        @NotNull
+        @Override
+        public Iterator<String> iterator() {
+            if (index == 0) {
+                return this;
+            }
+            return new SplitOmitEmptyIterator(sequence, splitCharacter);
+        }
     };
 }

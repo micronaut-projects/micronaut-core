@@ -103,7 +103,8 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public PropagatedContextImpl plus(PropagatedContextElement element) {
-        PropagatedContextElement[] newElements = Arrays.copyOf(elements, elements.length + 1);
+        PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length + 1];
+        System.arraycopy(elements, 0, newElements, 0, elements.length);
         newElements[newElements.length - 1] = element;
         return new PropagatedContextImpl(newElements, containsThreadElements || isThreadElement(element));
     }
@@ -187,7 +188,12 @@ final class PropagatedContextImpl implements PropagatedContext {
         } else if (prevCtx == null) {
             restore = CLEANUP;
         } else { // elements.length == 0
-            restore = () -> ThreadContext.set(prevCtx);
+            restore = new Scope() { // Keep the anonymous class to avoid lambda in hot path
+                @Override
+                public void close() {
+                    ThreadContext.set(prevCtx);
+                }
+            };
             if (elements.length == 0) {
                 ThreadContext.remove();
                 return restore;
@@ -198,12 +204,15 @@ final class PropagatedContextImpl implements PropagatedContext {
         ThreadContext.set(ctx);
         if (containsThreadElements) {
             Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = ctx.updateThreadState();
-            return () -> {
-                ctx.restoreState(threadState);
-                if (prevCtx == null) {
-                    ThreadContext.remove();
-                } else {
-                    ThreadContext.set(prevCtx);
+            return new Scope() { // Keep the anonymous class to avoid lambda in hot path
+                @Override
+                public void close() {
+                    ctx.restoreState(threadState);
+                    if (prevCtx == null) {
+                        ThreadContext.remove();
+                    } else {
+                        ThreadContext.set(prevCtx);
+                    }
                 }
             };
         }

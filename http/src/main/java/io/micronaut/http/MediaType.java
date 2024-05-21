@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -523,7 +524,7 @@ public class MediaType implements CharSequence {
      *
      * @param name The name of the media type. For example application/json
      */
-    public MediaType(String name) {
+    public MediaType(@NonNull String name) {
         this(name, null, Collections.emptyMap());
     }
 
@@ -533,7 +534,7 @@ public class MediaType implements CharSequence {
      * @param name   The name of the media type. For example application/json
      * @param params The parameters
      */
-    public MediaType(String name, Map<String, String> params) {
+    public MediaType(@NonNull String name, @Nullable Map<String, String> params) {
         this(name, null, params);
     }
 
@@ -543,7 +544,7 @@ public class MediaType implements CharSequence {
      * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
-    public MediaType(String name, String extension) {
+    public MediaType(@NonNull String name, @Nullable String extension) {
         this(name, extension, Collections.emptyMap());
     }
 
@@ -554,7 +555,7 @@ public class MediaType implements CharSequence {
      * @param extension The extension of the file using this media type if it differs from the subtype
      * @param params    The parameters
      */
-    public MediaType(String name, String extension, Map<String, String> params) {
+    public MediaType(@NonNull String name, @Nullable String extension, @Nullable Map<String, String> params) {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
@@ -617,7 +618,11 @@ public class MediaType implements CharSequence {
                 this.extension = subtype;
             }
         }
-        this.strRepr = toString0();
+        if (params == null || params.isEmpty()) {
+            this.strRepr = name;
+        } else {
+            this.strRepr = toString0();
+        }
     }
 
     /**
@@ -627,78 +632,43 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType of(String mediaType) {
-        switch (mediaType) {
-            case ALL:
-                return ALL_TYPE;
-            case APPLICATION_FORM_URLENCODED:
-                return APPLICATION_FORM_URLENCODED_TYPE;
-            case MULTIPART_FORM_DATA:
-                return MULTIPART_FORM_DATA_TYPE;
-            case TEXT_HTML:
-                return TEXT_HTML_TYPE;
-            case TEXT_CSV:
-                return TEXT_CSV_TYPE;
-            case APPLICATION_XHTML:
-                return APPLICATION_XHTML_TYPE;
-            case APPLICATION_XML:
-                return APPLICATION_XML_TYPE;
-            case APPLICATION_JSON:
-                return APPLICATION_JSON_TYPE;
-            case APPLICATION_JSON_FEED:
-                return APPLICATION_JSON_FEED_TYPE;
-            case APPLICATION_JSON_GITHUB:
-                return APPLICATION_JSON_GITHUB_TYPE;
-            case APPLICATION_JSON_PATCH:
-                return APPLICATION_JSON_PATCH_TYPE;
-            case APPLICATION_JSON_MERGE_PATCH:
-                return APPLICATION_JSON_MERGE_PATCH_TYPE;
-            case APPLICATION_JSON_PROBLEM:
-                return APPLICATION_JSON_PROBLEM_TYPE;
-            case APPLICATION_JSON_SCHEMA:
-                return APPLICATION_JSON_SCHEMA_TYPE;
-            case APPLICATION_YAML:
-                return APPLICATION_YAML_TYPE;
-            case TEXT_XML:
-                return TEXT_XML_TYPE;
-            case TEXT_JSON:
-                return TEXT_JSON_TYPE;
-            case TEXT_PLAIN:
-                return TEXT_PLAIN_TYPE;
-            case APPLICATION_HAL_JSON:
-                return APPLICATION_HAL_JSON_TYPE;
-            case APPLICATION_HAL_XML:
-                return APPLICATION_HAL_XML_TYPE;
-            case APPLICATION_ATOM_XML:
-                return APPLICATION_ATOM_XML_TYPE;
-            case APPLICATION_VND_ERROR:
-                return APPLICATION_VND_ERROR_TYPE;
-            case TEXT_EVENT_STREAM:
-                return TEXT_EVENT_STREAM_TYPE;
-            case APPLICATION_JSON_STREAM:
-                return APPLICATION_JSON_STREAM_TYPE;
-            case APPLICATION_OCTET_STREAM:
-                return APPLICATION_OCTET_STREAM_TYPE;
-            case APPLICATION_GRAPHQL:
-                return APPLICATION_GRAPHQL_TYPE;
-            case APPLICATION_PDF:
-                return APPLICATION_PDF_TYPE;
-            case IMAGE_PNG:
-                return IMAGE_PNG_TYPE;
-            case IMAGE_JPEG:
-                return IMAGE_JPEG_TYPE;
-            case IMAGE_GIF:
-                return IMAGE_GIF_TYPE;
-            case IMAGE_WEBP:
-                return IMAGE_WEBP_TYPE;
-            case APPLICATION_GPX_XML:
-                return GPX_XML_TYPE;
-            case APPLICATION_GZIP:
-                return GZIP_TYPE;
-            case APPLICATION_ZIP:
-                return ZIP_TYPE;
-            default:
-                return new MediaType(mediaType);
-        }
+        return switch (mediaType) {
+            case ALL -> ALL_TYPE;
+            case APPLICATION_FORM_URLENCODED -> APPLICATION_FORM_URLENCODED_TYPE;
+            case MULTIPART_FORM_DATA -> MULTIPART_FORM_DATA_TYPE;
+            case TEXT_HTML -> TEXT_HTML_TYPE;
+            case TEXT_CSV -> TEXT_CSV_TYPE;
+            case APPLICATION_XHTML -> APPLICATION_XHTML_TYPE;
+            case APPLICATION_XML -> APPLICATION_XML_TYPE;
+            case APPLICATION_JSON -> APPLICATION_JSON_TYPE;
+            case APPLICATION_JSON_FEED -> APPLICATION_JSON_FEED_TYPE;
+            case APPLICATION_JSON_GITHUB -> APPLICATION_JSON_GITHUB_TYPE;
+            case APPLICATION_JSON_PATCH -> APPLICATION_JSON_PATCH_TYPE;
+            case APPLICATION_JSON_MERGE_PATCH -> APPLICATION_JSON_MERGE_PATCH_TYPE;
+            case APPLICATION_JSON_PROBLEM -> APPLICATION_JSON_PROBLEM_TYPE;
+            case APPLICATION_JSON_SCHEMA -> APPLICATION_JSON_SCHEMA_TYPE;
+            case APPLICATION_YAML -> APPLICATION_YAML_TYPE;
+            case TEXT_XML -> TEXT_XML_TYPE;
+            case TEXT_JSON -> TEXT_JSON_TYPE;
+            case TEXT_PLAIN -> TEXT_PLAIN_TYPE;
+            case APPLICATION_HAL_JSON -> APPLICATION_HAL_JSON_TYPE;
+            case APPLICATION_HAL_XML -> APPLICATION_HAL_XML_TYPE;
+            case APPLICATION_ATOM_XML -> APPLICATION_ATOM_XML_TYPE;
+            case APPLICATION_VND_ERROR -> APPLICATION_VND_ERROR_TYPE;
+            case TEXT_EVENT_STREAM -> TEXT_EVENT_STREAM_TYPE;
+            case APPLICATION_JSON_STREAM -> APPLICATION_JSON_STREAM_TYPE;
+            case APPLICATION_OCTET_STREAM -> APPLICATION_OCTET_STREAM_TYPE;
+            case APPLICATION_GRAPHQL -> APPLICATION_GRAPHQL_TYPE;
+            case APPLICATION_PDF -> APPLICATION_PDF_TYPE;
+            case IMAGE_PNG -> IMAGE_PNG_TYPE;
+            case IMAGE_JPEG -> IMAGE_JPEG_TYPE;
+            case IMAGE_GIF -> IMAGE_GIF_TYPE;
+            case IMAGE_WEBP -> IMAGE_WEBP_TYPE;
+            case APPLICATION_GPX_XML -> GPX_XML_TYPE;
+            case APPLICATION_GZIP -> GZIP_TYPE;
+            case APPLICATION_ZIP -> ZIP_TYPE;
+            default -> new MediaType(mediaType);
+        };
     }
 
     /**
@@ -920,7 +890,7 @@ public class MediaType implements CharSequence {
             }
         }
 
-        List<MediaType> mediaTypes = new ArrayList<>();
+        List<MediaType> mediaTypes = new ArrayList<>(values.size());
         for (CharSequence value : values) {
             for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
                 try {
