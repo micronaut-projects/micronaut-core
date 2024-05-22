@@ -16,7 +16,6 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -558,7 +557,6 @@ public final class StringUtils {
             end = true;
         }
 
-        @NotNull
         @Override
         public Iterator<String> iterator() {
             if (index == 0) {
