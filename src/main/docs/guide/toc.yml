@@ -143,9 +143,9 @@ httpServer:
       httpServerFilterErrorStates: HttpServerFilter Error States
   byteBody:
     title: Advanced body access
-    primary: Primary operations
-    splitting: Splitting
-    example: Example
+    byteBodyPrimary: Primary operations
+    byteBodySplitting: Splitting
+    byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
