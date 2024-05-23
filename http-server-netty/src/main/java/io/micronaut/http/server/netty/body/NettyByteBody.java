@@ -22,6 +22,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -39,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Jonas Konrad
  */
 @Internal
-public abstract sealed class NettyByteBody implements ByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
+public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
     protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
 
     public static Flux<ByteBuf> toByteBufs(ByteBody body) {
@@ -66,7 +67,6 @@ public abstract sealed class NettyByteBody implements ByteBody permits Available
         return toByteBufPublisher().map(NettyByteBufferFactory.DEFAULT::wrap);
     }
 
-    @Override
     public abstract @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
 
     @Override

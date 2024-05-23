@@ -16,10 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
@@ -142,18 +139,6 @@ public interface ByteBody {
      * @return A future that completes when all bytes are available
      */
     CompletableFuture<? extends CloseableAvailableByteBody> buffer();
-
-    /**
-     * <b>Internal</b> variant of {@link #buffer()} that uses the {@link ExecutionFlow} API for
-     * extra efficiency.
-     *
-     * @return A flow that completes when all bytes are available
-     */
-    @NonNull
-    @Internal
-    default ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        return CompletableFutureExecutionFlow.just(buffer());
-    }
 
     /**
      * This enum controls how backpressure should be handled if one of the two bodies

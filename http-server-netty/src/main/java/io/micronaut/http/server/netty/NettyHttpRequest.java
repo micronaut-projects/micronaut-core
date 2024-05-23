@@ -44,6 +44,7 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -671,7 +672,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public ExecutionFlow<ByteBuffer<?>> bufferContents() {
-        return byteBody().bufferFlow().map(c -> toByteBuffer((AvailableNettyByteBody) c));
+        return InternalByteBody.bufferFlow(byteBody()).map(c -> toByteBuffer((AvailableNettyByteBody) c));
     }
 
     private static ByteBuffer<ByteBuf> toByteBuffer(AvailableNettyByteBody immediateByteBody) {

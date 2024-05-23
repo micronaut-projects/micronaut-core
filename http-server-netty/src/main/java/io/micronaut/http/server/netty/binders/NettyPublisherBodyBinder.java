@@ -27,6 +27,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -84,8 +85,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 }
             }
             // bind a single result
-            ExecutionFlow<Object> flow = rootBody
-                .bufferFlow()
+            ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
                     Optional<Object> value;
                     try {

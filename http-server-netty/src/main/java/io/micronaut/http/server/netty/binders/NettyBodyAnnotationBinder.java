@@ -33,6 +33,7 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
@@ -107,7 +108,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
         // If there's an error during conversion, the body must stay available, so we split here.
         // This costs us nothing because we need to buffer anyway.
-        ExecutionFlow<? extends CloseableAvailableByteBody> buffered = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST).bufferFlow();
+        ByteBody body = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
+        ExecutionFlow<? extends CloseableAvailableByteBody> buffered = InternalByteBody.bufferFlow(body);
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")

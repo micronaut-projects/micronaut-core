@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 
 import java.util.Arrays;
@@ -73,8 +74,7 @@ final class NettyCompletableFutureBodyBinder
 
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
-            CompletableFuture<Object> future = rootBody
-                .bufferFlow()
+            CompletableFuture<Object> future = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
                     Optional<Object> value;
                     try {
