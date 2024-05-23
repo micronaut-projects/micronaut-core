@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.nativetransport
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.NettyChannelType
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.netty.channel.epoll.EpollServerSocketChannel
 import spock.lang.Requires
@@ -19,7 +20,7 @@ class LinuxNativeTransportSpec extends AbstractMicronautSpec {
         body == "works"
 
         expect:
-        applicationContext.getBean(EventLoopGroupFactory).serverSocketChannelClass() == EpollServerSocketChannel.class
+        applicationContext.getBean(EventLoopGroupFactory).channelClass(NettyChannelType.SERVER_SOCKET) == EpollServerSocketChannel.class
     }
 
     @Override
