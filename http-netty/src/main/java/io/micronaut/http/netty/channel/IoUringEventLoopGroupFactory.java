@@ -18,13 +18,10 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.incubator.channel.uring.IOUring;
 import io.netty.incubator.channel.uring.IOUringDatagramChannel;
 import io.netty.incubator.channel.uring.IOUringEventLoopGroup;
@@ -75,33 +72,6 @@ public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return new IOUringEventLoopGroup(threads, executor);
-    }
-
-    /**
-     * Returns the server channel class.
-     *
-     * @return IOUringServerSocketChannel.
-     */
-    @Override
-    public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
-        return IOUringServerSocketChannel.class;
-    }
-
-    @NonNull
-    @Override
-    public IOUringServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        return new IOUringServerSocketChannel();
-    }
-
-    @NonNull
-    @Override
-    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return IOUringSocketChannel.class;
-    }
-
-    @Override
-    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
-        return new IOUringSocketChannel();
     }
 
     @Override

@@ -18,12 +18,10 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollDomainSocketChannel;
@@ -31,9 +29,6 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerDomainSocketChannel;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -80,51 +75,6 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return new EpollEventLoopGroup(threads, executor);
-    }
-
-    /**
-     * Returns the server channel class.
-     *
-     * @return EpollServerSocketChannel.
-     */
-    @Override
-    public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
-        return EpollServerSocketChannel.class;
-    }
-
-    @Override
-    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
-        try {
-            return EpollServerDomainSocketChannel.class;
-        } catch (NoClassDefFoundError e) {
-            throw new UnsupportedOperationException(e);
-        }
-    }
-
-    @NonNull
-    @Override
-    public EpollServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        return new EpollServerSocketChannel();
-    }
-
-    @Override
-    public ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        try {
-            return new EpollServerDomainSocketChannel();
-        } catch (NoClassDefFoundError e) {
-            throw new UnsupportedOperationException(e);
-        }
-    }
-
-    @NonNull
-    @Override
-    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return EpollSocketChannel.class;
-    }
-
-    @Override
-    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
-        return new EpollSocketChannel();
     }
 
     @Override

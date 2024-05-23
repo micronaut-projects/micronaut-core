@@ -16,6 +16,8 @@ import io.netty.channel.epoll.Epoll
 import io.netty.channel.epoll.EpollDomainSocketChannel
 import io.netty.channel.epoll.EpollEventLoopGroup
 import io.netty.channel.epoll.EpollServerSocketChannel
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioDomainSocketChannel
 import io.netty.channel.unix.DomainSocketAddress
 import io.netty.channel.unix.Socket
 import io.netty.handler.codec.http.DefaultFullHttpRequest
@@ -159,7 +161,7 @@ class ListenerConfigurationSpec extends Specification {
     }
 
     @IgnoreIf({ !Epoll.isAvailable() })
-    def 'unix domain socket'(boolean abstract_) {
+    def 'unix domain socket epoll'(boolean abstract_) {
         given:
         def tmpDir = Files.createTempDirectory(null)
         def path = tmpDir.resolve('test')
@@ -216,6 +218,69 @@ class ListenerConfigurationSpec extends Specification {
 
         where:
         abstract_ << [true, false]
+    }
+
+    @IgnoreIf({ !os.linux })
+    def 'unix domain socket nio'(boolean abstract_) {
+        given:
+        def tmpDir = Files.createTempDirectory(null)
+        def path = tmpDir.resolve('test')
+        def bindPath = (abstract_ ? '\0' : '') + path.toString()
+        def server = (NettyEmbeddedServer) ApplicationContext.run(
+                EmbeddedServer,
+                [
+                        'micronaut.netty.event-loops.default.prefer-native-transport': false,
+                        'micronaut.netty.event-loops.parent.prefer-native-transport': false,
+                        'micronaut.server.netty.listeners.a.family': 'UNIX',
+                        'micronaut.server.netty.listeners.a.path': bindPath,
+                ])
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup()
+        Bootstrap bootstrap = new Bootstrap()
+                .group(group)
+                .channel(NioDomainSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpClientCodec())
+                                .addLast(new HttpObjectAggregator(1024))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                                        responses.add(msg)
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(UnixDomainSocketAddress.of(bindPath))
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        channel.writeAndFlush(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/'))
+        channel.read()
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
+        }
+        responses[0].status() == HttpResponseStatus.NOT_FOUND
+
+        cleanup:
+        responses.forEach(r -> r.release())
+        channel.close()
+        group.shutdownGracefully()
+        server.close()
+        if (!abstract_) {
+            Files.deleteIfExists(path)
+        }
+        Files.deleteIfExists(tmpDir)
+
+        where:
+        abstract_ << [
+                // true, unsupported by nio
+                false
+        ]
     }
 
     @IgnoreIf({ !Epoll.isAvailable() })
