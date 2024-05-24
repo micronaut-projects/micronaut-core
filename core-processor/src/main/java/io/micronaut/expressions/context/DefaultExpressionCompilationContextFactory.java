@@ -25,7 +25,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -49,7 +48,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         this.visitorContext = visitorContext;
     }
 
-    @NotNull
+    @NonNull
     private DefaultExpressionEvaluationContext recreateContext() {
         return new DefaultExpressionEvaluationContext(CONTEXT_TYPES.toArray(ClassElement[]::new));
     }
@@ -68,8 +67,9 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         return buildForExpression(expression, thisElement);
     }
 
+    @NonNull
     @Override
-    public ExpressionCompilationContextFactory registerContextClass(ClassElement contextClass) {
+    public ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass) {
         CONTEXT_TYPES.add(contextClass);
         this.sharedContext = recreateContext();
         return this;

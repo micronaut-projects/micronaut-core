@@ -37,7 +37,6 @@ import io.micronaut.http.filter.ConditionalFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.HttpHostResolver;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -400,7 +399,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         );
     }
 
-    @NotNull
+    @NonNull
     private static MutableHttpResponse<Object> forbidden() {
         return HttpResponse.status(HttpStatus.FORBIDDEN);
     }
