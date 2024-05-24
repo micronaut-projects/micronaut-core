@@ -74,6 +74,7 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         return Optional.of(upperType);
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -87,21 +88,25 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         return getGenericTypeAnnotationMetadata();
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
+    @NonNull
     @Override
     public Object getGenericNativeType() {
         return wildcardNativeElement;
     }
 
+    @NonNull
     @Override
     protected GroovyClassElement copyConstructor() {
         return new GroovyWildcardElement(wildcardNativeElement, upperBounds, lowerBounds, elementAnnotationMetadataFactory, upperType);

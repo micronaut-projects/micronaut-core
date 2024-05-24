@@ -30,12 +30,62 @@ class MediaTypeSpec extends Specification {
 
     void "test MediaType::of"() {
         expect:
+        MediaType.of('multipart/form-data') == MediaType.MULTIPART_FORM_DATA_TYPE
+
         MediaType.of('application/vnd.github+json') == MediaType.APPLICATION_JSON_GITHUB_TYPE
         MediaType.of('application/feed+json') == MediaType.APPLICATION_JSON_FEED_TYPE
         MediaType.of('application/problem+json') == MediaType.APPLICATION_JSON_PROBLEM_TYPE
         MediaType.of('application/json-patch+json') == MediaType.APPLICATION_JSON_PATCH_TYPE
         MediaType.of('application/merge-patch+json') == MediaType.APPLICATION_JSON_MERGE_PATCH_TYPE
         MediaType.of('application/schema+json') == MediaType.APPLICATION_JSON_SCHEMA_TYPE
+        MediaType.of('application/x-www-form-urlencoded') == MediaType.APPLICATION_FORM_URLENCODED_TYPE
+        MediaType.of('application/xhtml+xml') == MediaType.APPLICATION_XHTML_TYPE
+        MediaType.of('application/xml') == MediaType.APPLICATION_XML_TYPE
+        MediaType.of('application/json') == MediaType.APPLICATION_JSON_TYPE
+        MediaType.of('application/x-yaml') == MediaType.APPLICATION_YAML_TYPE
+        MediaType.of('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') == MediaType.MICROSOFT_EXCEL_OPEN_XML_TYPE
+        MediaType.of('application/vnd.ms-excel') == MediaType.MICROSOFT_EXCEL_TYPE
+        MediaType.of('application/hal+json') == MediaType.APPLICATION_HAL_JSON_TYPE
+        MediaType.of('application/hal+xml') == MediaType.APPLICATION_HAL_XML_TYPE
+        MediaType.of('application/atom+xml') == MediaType.APPLICATION_ATOM_XML_TYPE
+        MediaType.of('application/vnd.error+json') == MediaType.APPLICATION_VND_ERROR_TYPE
+        MediaType.of('application/x-json-stream') == MediaType.APPLICATION_JSON_STREAM_TYPE
+        MediaType.of('application/octet-stream') == MediaType.APPLICATION_OCTET_STREAM_TYPE
+        MediaType.of('application/graphql') == MediaType.APPLICATION_GRAPHQL_TYPE
+        MediaType.of('application/gpx+xml') == MediaType.GPX_XML_TYPE
+        MediaType.of('application/zip') == MediaType.ZIP_TYPE
+        MediaType.of('application/gzip') == MediaType.GZIP_TYPE
+        MediaType.of('application/yang') == MediaType.YANG_TYPE
+        MediaType.of('application/rtf') == MediaType.RTF_TYPE
+        MediaType.of('application/zlib') == MediaType.ZLIB_TYPE
+        MediaType.of('application/zstd') == MediaType.ZSTD_TYPE
+        MediaType.of('application/pdf') == MediaType.APPLICATION_PDF_TYPE
+        MediaType.of('application/toml') == MediaType.TOML_TYPE
+        MediaType.of('application/x-cue') == MediaType.CUE_TYPE
+
+        MediaType.of('text/html') == MediaType.TEXT_HTML_TYPE
+        MediaType.of('text/csv') == MediaType.TEXT_CSV_TYPE
+        MediaType.of('text/css') == MediaType.TEXT_CSS_TYPE
+        MediaType.of('text/xml') == MediaType.TEXT_XML_TYPE
+        MediaType.of('text/json') == MediaType.TEXT_JSON_TYPE
+        MediaType.of('text/plain') == MediaType.TEXT_PLAIN_TYPE
+        MediaType.of('text/markdown') == MediaType.TEXT_MARKDOWN_TYPE
+        MediaType.of('text/event-stream') == MediaType.TEXT_EVENT_STREAM_TYPE
+        MediaType.of('text/javascript') == MediaType.TEXT_JAVASCRIPT_TYPE
+        MediaType.of('text/ecmascript') == MediaType.TEXT_ECMASCRIPT_TYPE
+
+        MediaType.of('image/apng') == MediaType.IMAGE_APNG_TYPE
+        MediaType.of('image/bmp') == MediaType.IMAGE_BMP_TYPE
+        MediaType.of('image/x-icon') == MediaType.IMAGE_X_ICON_TYPE
+        MediaType.of('image/tiff') == MediaType.IMAGE_TIFF_TYPE
+        MediaType.of('image/avif') == MediaType.IMAGE_AVIF_TYPE
+        MediaType.of('image/svg+xml') == MediaType.IMAGE_SVG_TYPE
+        MediaType.of('image/xbm') == MediaType.IMAGE_XBM_TYPE
+        MediaType.of('image/png') == MediaType.IMAGE_PNG_TYPE
+        MediaType.of('image/jpeg') == MediaType.IMAGE_JPEG_TYPE
+        MediaType.of('image/gif') == MediaType.IMAGE_GIF_TYPE
+        MediaType.of('image/webp') == MediaType.IMAGE_WEBP_TYPE
+        MediaType.of('image/wmf') == MediaType.IMAGE_WMF_TYPE
     }
 
     void "test media type"() {
@@ -91,8 +141,12 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | true
         "application/hal+xml"       | true
         "application/json"          | true
-        "application/x-yaml"         | true
+        "application/x-yaml"        | true
+        "application/x-cue"         | true
         "application/xml"           | true
+        "application/graphql"       | true
+        "application/toml"          | true
+        "application/yang"          | true
         "text/html;charset=utf-8"   | true
         "text/foo"                  | true
         "application/hal+text"      | true

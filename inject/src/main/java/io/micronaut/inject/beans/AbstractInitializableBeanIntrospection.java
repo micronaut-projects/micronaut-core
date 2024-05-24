@@ -804,7 +804,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 if (constructorLength == params.length) {
                     return introspection.instantiateInternal(params);
                 } else {
-                    Object[] constructorParams = Arrays.copyOfRange(params, 0, constructorLength);
+                    Object[] constructorParams = new Object[constructorLength];
+                    System.arraycopy(params, 0, constructorParams, 0, constructorLength);
                     B bean = introspection.instantiateInternal(constructorParams);
                     UnsafeBeanProperty<Object, Object>[] writeableProperties = builderData.writeableProperties;
                     if (writeableProperties != null) {

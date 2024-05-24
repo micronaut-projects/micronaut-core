@@ -74,6 +74,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return Optional.of(upperBound);
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -92,11 +93,13 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return typeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
+    @NonNull
     @Override
     public Object getGenericNativeType() {
         return wildcardType;

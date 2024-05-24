@@ -108,7 +108,7 @@ public interface ApplicationContextBuilder {
      */
     default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
         return this;
-    };
+    }
 
     /**
      * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment

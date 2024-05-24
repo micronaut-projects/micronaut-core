@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -113,6 +114,16 @@ public class MediaType implements CharSequence {
     public static final MediaType ALL_TYPE = new MediaType(ALL, "all");
 
     /**
+     * Multi part form data: multipart/form-data.
+     */
+    public static final String MULTIPART_FORM_DATA = "multipart/form-data";
+
+    /**
+     * Multi part form data: multipart/form-data.
+     */
+    public static final MediaType MULTIPART_FORM_DATA_TYPE = new MediaType(MULTIPART_FORM_DATA);
+
+    /**
      * Form encoded data: application/x-www-form-urlencoded.
      */
     public static final String APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded";
@@ -126,36 +137,6 @@ public class MediaType implements CharSequence {
      * Shortcut for {@link #APPLICATION_FORM_URLENCODED_TYPE}.
      */
     public static final MediaType FORM = APPLICATION_FORM_URLENCODED_TYPE;
-
-    /**
-     * Multi part form data: multipart/form-data.
-     */
-    public static final String MULTIPART_FORM_DATA = "multipart/form-data";
-
-    /**
-     * Multi part form data: multipart/form-data.
-     */
-    public static final MediaType MULTIPART_FORM_DATA_TYPE = new MediaType(MULTIPART_FORM_DATA);
-
-    /**
-     * HTML: text/html.
-     */
-    public static final String TEXT_HTML = "text/html";
-
-    /**
-     * HTML: text/html.
-     */
-    public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
-
-    /**
-     * CSV: text/csv.
-     */
-    public static final String TEXT_CSV = "text/csv";
-
-    /**
-     * CSV: text/csv.
-     */
-    public static final MediaType TEXT_CSV_TYPE = new MediaType(TEXT_CSV);
 
     /**
      * XHTML: application/xhtml+xml.
@@ -280,36 +261,6 @@ public class MediaType implements CharSequence {
     public static final MediaType MICROSOFT_EXCEL_TYPE = new MediaType(MICROSOFT_EXCEL, EXTENSION_XLS);
 
     /**
-     * XML: text/xml.
-     */
-    public static final String TEXT_XML = "text/xml";
-
-    /**
-     * XML: text/xml.
-     */
-    public static final MediaType TEXT_XML_TYPE = new MediaType(TEXT_XML);
-
-    /**
-     * JSON: text/json.
-     */
-    public static final String TEXT_JSON = "text/json";
-
-    /**
-     * JSON: text/json.
-     */
-    public static final MediaType TEXT_JSON_TYPE = new MediaType(TEXT_JSON);
-
-    /**
-     * Plain Text: text/plain.
-     */
-    public static final String TEXT_PLAIN = "text/plain";
-
-    /**
-     * Plain Text: text/plain.
-     */
-    public static final MediaType TEXT_PLAIN_TYPE = new MediaType(TEXT_PLAIN);
-
-    /**
      * HAL JSON: application/hal+json.
      */
     public static final String APPLICATION_HAL_JSON = "application/hal+json";
@@ -350,16 +301,6 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_VND_ERROR_TYPE = new MediaType(APPLICATION_VND_ERROR);
 
     /**
-     * Server Sent Event: text/event-stream.
-     */
-    public static final String TEXT_EVENT_STREAM = "text/event-stream";
-
-    /**
-     * Server Sent Event: text/event-stream.
-     */
-    public static final MediaType TEXT_EVENT_STREAM_TYPE = new MediaType(TEXT_EVENT_STREAM);
-
-    /**
      * JSON Stream: application/x-json-stream.
      */
     public static final String APPLICATION_JSON_STREAM = "application/x-json-stream";
@@ -390,6 +331,96 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
 
     /**
+     * GPS Exchange Format: application/gpx+xml.
+     */
+    public static final String APPLICATION_GPX_XML = "application/gpx+xml";
+
+    /**
+     * GPS Exchange Format: application/gpx+xml.
+     */
+    public static final MediaType GPX_XML_TYPE = new MediaType(APPLICATION_GPX_XML, EXTENSION_GPX);
+
+    /**
+     * ZIP archive format: application/zip.
+     */
+    public static final String APPLICATION_ZIP = "application/zip";
+
+    /**
+     * ZIP archive format: application/zip.
+     */
+    public static final MediaType ZIP_TYPE = new MediaType(APPLICATION_ZIP);
+
+    /**
+     * GZip compressed data: application/gzip.
+     */
+    public static final String APPLICATION_GZIP = "application/gzip";
+
+    /**
+     * GZip compressed data: application/gzip.
+     */
+    public static final MediaType GZIP_TYPE = new MediaType(APPLICATION_GZIP);
+
+    /**
+     * YANG format data: application/yang.
+     */
+    public static final String APPLICATION_YANG = "application/yang";
+
+    /**
+     * YANG format data: application/yang.
+     */
+    public static final MediaType YANG_TYPE = new MediaType(APPLICATION_YANG);
+
+    /**
+     * CUE format data: application/x-cue.
+     */
+    public static final String APPLICATION_CUE = "application/x-cue";
+
+    /**
+     * CUE format data: application/x-cue.
+     */
+    public static final MediaType CUE_TYPE = new MediaType(APPLICATION_CUE);
+
+    /**
+     * TOML format data: application/toml.
+     */
+    public static final String APPLICATION_TOML = "application/toml";
+
+    /**
+     * TOML format data: application/toml.
+     */
+    public static final MediaType TOML_TYPE = new MediaType(APPLICATION_TOML);
+
+    /**
+     * RTF format data: application/rtf.
+     */
+    public static final String APPLICATION_RTF = "application/rtf";
+
+    /**
+     * RTF format data: application/rtf.
+     */
+    public static final MediaType RTF_TYPE = new MediaType(APPLICATION_RTF);
+
+    /**
+     * Zlib compressed data: application/zlib.
+     */
+    public static final String APPLICATION_ZLIB = "application/zlib";
+
+    /**
+     * Zlib compressed data: application/zlib.
+     */
+    public static final MediaType ZLIB_TYPE = new MediaType(APPLICATION_ZLIB);
+
+    /**
+     * Zstd compressed data: application/zstd.
+     */
+    public static final String APPLICATION_ZSTD = "application/zstd";
+
+    /**
+     * Zstd compressed data: application/zstd.
+     */
+    public static final MediaType ZSTD_TYPE = new MediaType(APPLICATION_ZSTD);
+
+    /**
      * PDF: application/pdf.
      */
     public static final String APPLICATION_PDF = "application/pdf";
@@ -398,6 +429,176 @@ public class MediaType implements CharSequence {
      * PDF: application/pdf.
      */
     public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
+
+    /**
+     * HTML: text/html.
+     */
+    public static final String TEXT_HTML = "text/html";
+
+    /**
+     * HTML: text/html.
+     */
+    public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final String TEXT_CSV = "text/csv";
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final MediaType TEXT_CSV_TYPE = new MediaType(TEXT_CSV);
+
+    /**
+     * CSS: text/css.
+     */
+    public static final String TEXT_CSS = "text/css";
+
+    /**
+     * CSS: text/css.
+     */
+    public static final MediaType TEXT_CSS_TYPE = new MediaType(TEXT_CSS);
+
+    /**
+     * XML: text/xml.
+     */
+    public static final String TEXT_XML = "text/xml";
+
+    /**
+     * XML: text/xml.
+     */
+    public static final MediaType TEXT_XML_TYPE = new MediaType(TEXT_XML);
+
+    /**
+     * JSON: text/json.
+     */
+    public static final String TEXT_JSON = "text/json";
+
+    /**
+     * JSON: text/json.
+     */
+    public static final MediaType TEXT_JSON_TYPE = new MediaType(TEXT_JSON);
+
+    /**
+     * Text javascript: text/javascript.
+     */
+    public static final String TEXT_JAVASCRIPT = "text/javascript";
+
+    /**
+     * Text javascript: text/javascript.
+     */
+    public static final MediaType TEXT_JAVASCRIPT_TYPE = new MediaType(TEXT_JAVASCRIPT);
+
+    /**
+     * Text ecmascript: text/ecmascript.
+     */
+    public static final String TEXT_ECMASCRIPT = "text/ecmascript";
+
+    /**
+     * Text ecmascript: text/ecmascript.
+     */
+    public static final MediaType TEXT_ECMASCRIPT_TYPE = new MediaType(TEXT_ECMASCRIPT);
+
+    /**
+     * Plain Text: text/plain.
+     */
+    public static final String TEXT_PLAIN = "text/plain";
+
+    /**
+     * Plain Text: text/plain.
+     */
+    public static final MediaType TEXT_PLAIN_TYPE = new MediaType(TEXT_PLAIN);
+
+    /**
+     * Markdown: text/markdown.
+     */
+    public static final String TEXT_MARKDOWN = "text/markdown";
+
+    /**
+     * Markdown: text/markdown.
+     */
+    public static final MediaType TEXT_MARKDOWN_TYPE = new MediaType(TEXT_MARKDOWN);
+
+    /**
+     * Server Sent Event: text/event-stream.
+     */
+    public static final String TEXT_EVENT_STREAM = "text/event-stream";
+
+    /**
+     * Server Sent Event: text/event-stream.
+     */
+    public static final MediaType TEXT_EVENT_STREAM_TYPE = new MediaType(TEXT_EVENT_STREAM);
+
+    /**
+     * Animated Portable Network Graphics (APNG): image/apng.
+     */
+    public static final String IMAGE_APNG = "image/apng";
+
+    /**
+     * Animated Portable Network Graphics (APNG): image/apng.
+     */
+    public static final MediaType IMAGE_APNG_TYPE = new MediaType(IMAGE_APNG);
+
+    /**
+     * Bitmap file: image/bmp.
+     */
+    public static final String IMAGE_BMP = "image/bmp";
+
+    /**
+     * Bitmap file: image/bmp.
+     */
+    public static final MediaType IMAGE_BMP_TYPE = new MediaType(IMAGE_BMP);
+
+    /**
+     * Microsoft Icon: image/x-icon.
+     */
+    public static final String IMAGE_X_ICON = "image/x-icon";
+
+    /**
+     * Microsoft Icon: image/x-icon.
+     */
+    public static final MediaType IMAGE_X_ICON_TYPE = new MediaType(IMAGE_X_ICON);
+
+    /**
+     * Tagged Image File Format: image/tiff.
+     */
+    public static final String IMAGE_TIFF = "image/tiff";
+
+    /**
+     * Tagged Image File Format: image/tiff.
+     */
+    public static final MediaType IMAGE_TIFF_TYPE = new MediaType(IMAGE_TIFF);
+
+    /**
+     * AV1 Image File Format (AVIF): image/avif.
+     */
+    public static final String IMAGE_AVIF = "image/avif";
+
+    /**
+     * AV1 Image File Format (AVIF): image/avif.
+     */
+    public static final MediaType IMAGE_AVIF_TYPE = new MediaType(IMAGE_AVIF);
+
+    /**
+     * Scalable Vector Graphics (SVG): image/svg+xml.
+     */
+    public static final String IMAGE_SVG = "image/svg+xml";
+
+    /**
+     * Scalable Vector Graphics (SVG): image/svg+xml.
+     */
+    public static final MediaType IMAGE_SVG_TYPE = new MediaType(IMAGE_SVG);
+
+    /**
+     * X Window System Bitmap file (XBM): image/xbm.
+     */
+    public static final String IMAGE_XBM = "image/xbm";
+
+    /**
+     * X Window System Bitmap file (XBM): image/xbm.
+     */
+    public static final MediaType IMAGE_XBM_TYPE = new MediaType(IMAGE_XBM);
 
     /**
      * Png Image: image/png.
@@ -440,34 +641,14 @@ public class MediaType implements CharSequence {
     public static final MediaType IMAGE_WEBP_TYPE = new MediaType(IMAGE_WEBP);
 
     /**
-     * GPS Exchange Format: application/gpx+xml.
+     * WMF Image: image/wmf.
      */
-    public static final String APPLICATION_GPX_XML = "application/gpx+xml";
+    public static final String IMAGE_WMF = "image/wmf";
 
     /**
-     * GPS Exchange Format: application/gpx+xml.
+     * WMF Image: image/wmf.
      */
-    public static final MediaType GPX_XML_TYPE = new MediaType(APPLICATION_GPX_XML, EXTENSION_GPX);
-
-    /**
-     * ZIP archive format: application/zip.
-     */
-    public static final String APPLICATION_ZIP = "application/zip";
-
-    /**
-     * ZIP archive format: application/zip.
-     */
-    public static final MediaType ZIP_TYPE = new MediaType(APPLICATION_ZIP);
-
-    /**
-     * GZip compressed data: application/gzip.
-     */
-    public static final String APPLICATION_GZIP = "application/gzip";
-
-    /**
-     * GZip compressed data: application/gzip.
-     */
-    public static final MediaType GZIP_TYPE = new MediaType(APPLICATION_GZIP);
+    public static final MediaType IMAGE_WMF_TYPE = new MediaType(IMAGE_WMF);
 
     /**
      * Parameter {@code "charset"}.
@@ -491,6 +672,7 @@ public class MediaType implements CharSequence {
     static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ImmutableArgumentConversionContext.of(ARGUMENT);
 
     private static final char SEMICOLON = ';';
+    private static final String WILDCARD = "*";
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
@@ -523,7 +705,7 @@ public class MediaType implements CharSequence {
      *
      * @param name The name of the media type. For example application/json
      */
-    public MediaType(String name) {
+    public MediaType(@NonNull String name) {
         this(name, null, Collections.emptyMap());
     }
 
@@ -533,7 +715,7 @@ public class MediaType implements CharSequence {
      * @param name   The name of the media type. For example application/json
      * @param params The parameters
      */
-    public MediaType(String name, Map<String, String> params) {
+    public MediaType(@NonNull String name, @Nullable Map<String, String> params) {
         this(name, null, params);
     }
 
@@ -543,7 +725,7 @@ public class MediaType implements CharSequence {
      * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
-    public MediaType(String name, String extension) {
+    public MediaType(@NonNull String name, @Nullable String extension) {
         this(name, extension, Collections.emptyMap());
     }
 
@@ -554,7 +736,7 @@ public class MediaType implements CharSequence {
      * @param extension The extension of the file using this media type if it differs from the subtype
      * @param params    The parameters
      */
-    public MediaType(String name, String extension, Map<String, String> params) {
+    public MediaType(@NonNull String name, @Nullable String extension, @Nullable Map<String, String> params) {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
@@ -617,7 +799,11 @@ public class MediaType implements CharSequence {
                 this.extension = subtype;
             }
         }
-        this.strRepr = toString0();
+        if (params == null || params.isEmpty()) {
+            this.strRepr = name;
+        } else {
+            this.strRepr = toString0();
+        }
     }
 
     /**
@@ -627,78 +813,63 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType of(String mediaType) {
-        switch (mediaType) {
-            case ALL:
-                return ALL_TYPE;
-            case APPLICATION_FORM_URLENCODED:
-                return APPLICATION_FORM_URLENCODED_TYPE;
-            case MULTIPART_FORM_DATA:
-                return MULTIPART_FORM_DATA_TYPE;
-            case TEXT_HTML:
-                return TEXT_HTML_TYPE;
-            case TEXT_CSV:
-                return TEXT_CSV_TYPE;
-            case APPLICATION_XHTML:
-                return APPLICATION_XHTML_TYPE;
-            case APPLICATION_XML:
-                return APPLICATION_XML_TYPE;
-            case APPLICATION_JSON:
-                return APPLICATION_JSON_TYPE;
-            case APPLICATION_JSON_FEED:
-                return APPLICATION_JSON_FEED_TYPE;
-            case APPLICATION_JSON_GITHUB:
-                return APPLICATION_JSON_GITHUB_TYPE;
-            case APPLICATION_JSON_PATCH:
-                return APPLICATION_JSON_PATCH_TYPE;
-            case APPLICATION_JSON_MERGE_PATCH:
-                return APPLICATION_JSON_MERGE_PATCH_TYPE;
-            case APPLICATION_JSON_PROBLEM:
-                return APPLICATION_JSON_PROBLEM_TYPE;
-            case APPLICATION_JSON_SCHEMA:
-                return APPLICATION_JSON_SCHEMA_TYPE;
-            case APPLICATION_YAML:
-                return APPLICATION_YAML_TYPE;
-            case TEXT_XML:
-                return TEXT_XML_TYPE;
-            case TEXT_JSON:
-                return TEXT_JSON_TYPE;
-            case TEXT_PLAIN:
-                return TEXT_PLAIN_TYPE;
-            case APPLICATION_HAL_JSON:
-                return APPLICATION_HAL_JSON_TYPE;
-            case APPLICATION_HAL_XML:
-                return APPLICATION_HAL_XML_TYPE;
-            case APPLICATION_ATOM_XML:
-                return APPLICATION_ATOM_XML_TYPE;
-            case APPLICATION_VND_ERROR:
-                return APPLICATION_VND_ERROR_TYPE;
-            case TEXT_EVENT_STREAM:
-                return TEXT_EVENT_STREAM_TYPE;
-            case APPLICATION_JSON_STREAM:
-                return APPLICATION_JSON_STREAM_TYPE;
-            case APPLICATION_OCTET_STREAM:
-                return APPLICATION_OCTET_STREAM_TYPE;
-            case APPLICATION_GRAPHQL:
-                return APPLICATION_GRAPHQL_TYPE;
-            case APPLICATION_PDF:
-                return APPLICATION_PDF_TYPE;
-            case IMAGE_PNG:
-                return IMAGE_PNG_TYPE;
-            case IMAGE_JPEG:
-                return IMAGE_JPEG_TYPE;
-            case IMAGE_GIF:
-                return IMAGE_GIF_TYPE;
-            case IMAGE_WEBP:
-                return IMAGE_WEBP_TYPE;
-            case APPLICATION_GPX_XML:
-                return GPX_XML_TYPE;
-            case APPLICATION_GZIP:
-                return GZIP_TYPE;
-            case APPLICATION_ZIP:
-                return ZIP_TYPE;
-            default:
-                return new MediaType(mediaType);
-        }
+        return switch (mediaType) {
+            case ALL -> ALL_TYPE;
+            case APPLICATION_FORM_URLENCODED -> APPLICATION_FORM_URLENCODED_TYPE;
+            case APPLICATION_XHTML -> APPLICATION_XHTML_TYPE;
+            case APPLICATION_XML -> APPLICATION_XML_TYPE;
+            case APPLICATION_JSON -> APPLICATION_JSON_TYPE;
+            case APPLICATION_JSON_FEED -> APPLICATION_JSON_FEED_TYPE;
+            case APPLICATION_JSON_GITHUB -> APPLICATION_JSON_GITHUB_TYPE;
+            case APPLICATION_JSON_PATCH -> APPLICATION_JSON_PATCH_TYPE;
+            case APPLICATION_JSON_MERGE_PATCH -> APPLICATION_JSON_MERGE_PATCH_TYPE;
+            case APPLICATION_JSON_PROBLEM -> APPLICATION_JSON_PROBLEM_TYPE;
+            case APPLICATION_JSON_SCHEMA -> APPLICATION_JSON_SCHEMA_TYPE;
+            case APPLICATION_YAML -> APPLICATION_YAML_TYPE;
+            case APPLICATION_HAL_JSON -> APPLICATION_HAL_JSON_TYPE;
+            case APPLICATION_HAL_XML -> APPLICATION_HAL_XML_TYPE;
+            case APPLICATION_ATOM_XML -> APPLICATION_ATOM_XML_TYPE;
+            case APPLICATION_VND_ERROR -> APPLICATION_VND_ERROR_TYPE;
+            case APPLICATION_JSON_STREAM -> APPLICATION_JSON_STREAM_TYPE;
+            case APPLICATION_OCTET_STREAM -> APPLICATION_OCTET_STREAM_TYPE;
+            case APPLICATION_GRAPHQL -> APPLICATION_GRAPHQL_TYPE;
+            case APPLICATION_PDF -> APPLICATION_PDF_TYPE;
+            case APPLICATION_GPX_XML -> GPX_XML_TYPE;
+            case APPLICATION_GZIP -> GZIP_TYPE;
+            case APPLICATION_ZIP -> ZIP_TYPE;
+            case MICROSOFT_EXCEL_OPEN_XML -> MICROSOFT_EXCEL_OPEN_XML_TYPE;
+            case MICROSOFT_EXCEL -> MICROSOFT_EXCEL_TYPE;
+            case APPLICATION_YANG -> YANG_TYPE;
+            case APPLICATION_CUE -> CUE_TYPE;
+            case APPLICATION_TOML -> TOML_TYPE;
+            case APPLICATION_RTF -> RTF_TYPE;
+            case APPLICATION_ZLIB -> ZLIB_TYPE;
+            case APPLICATION_ZSTD -> ZSTD_TYPE;
+            case MULTIPART_FORM_DATA -> MULTIPART_FORM_DATA_TYPE;
+            case TEXT_HTML -> TEXT_HTML_TYPE;
+            case TEXT_CSV -> TEXT_CSV_TYPE;
+            case TEXT_XML -> TEXT_XML_TYPE;
+            case TEXT_JSON -> TEXT_JSON_TYPE;
+            case TEXT_PLAIN -> TEXT_PLAIN_TYPE;
+            case TEXT_EVENT_STREAM -> TEXT_EVENT_STREAM_TYPE;
+            case TEXT_MARKDOWN -> TEXT_MARKDOWN_TYPE;
+            case TEXT_CSS -> TEXT_CSS_TYPE;
+            case TEXT_JAVASCRIPT -> TEXT_JAVASCRIPT_TYPE;
+            case TEXT_ECMASCRIPT -> TEXT_ECMASCRIPT_TYPE;
+            case IMAGE_APNG -> IMAGE_APNG_TYPE;
+            case IMAGE_BMP -> IMAGE_BMP_TYPE;
+            case IMAGE_X_ICON -> IMAGE_X_ICON_TYPE;
+            case IMAGE_TIFF -> IMAGE_TIFF_TYPE;
+            case IMAGE_AVIF -> IMAGE_AVIF_TYPE;
+            case IMAGE_SVG -> IMAGE_SVG_TYPE;
+            case IMAGE_XBM -> IMAGE_XBM_TYPE;
+            case IMAGE_PNG -> IMAGE_PNG_TYPE;
+            case IMAGE_JPEG -> IMAGE_JPEG_TYPE;
+            case IMAGE_GIF -> IMAGE_GIF_TYPE;
+            case IMAGE_WEBP -> IMAGE_WEBP_TYPE;
+            case IMAGE_WMF -> IMAGE_WMF_TYPE;
+            default -> new MediaType(mediaType);
+        };
     }
 
     /**
@@ -717,8 +888,8 @@ public class MediaType implements CharSequence {
         }
         String expectedType = expectedContentType.getType();
         String expectedSubtype = expectedContentType.getSubtype();
-        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedType);
-        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedSubtype);
+        boolean typeMatch = type.equals(WILDCARD) || type.equalsIgnoreCase(expectedType);
+        boolean subtypeMatch = subtype.equals(WILDCARD) || subtype.equalsIgnoreCase(expectedSubtype);
         return typeMatch && subtypeMatch;
     }
 
@@ -806,7 +977,14 @@ public class MediaType implements CharSequence {
     public boolean isTextBased() {
         boolean matches = textTypePatterns.stream().anyMatch(p -> p.matcher(name).matches());
         if (!matches) {
-            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml") || subtype.equalsIgnoreCase("x-yaml");
+            matches = subtype.equalsIgnoreCase("json")
+                    || subtype.equalsIgnoreCase("xml")
+                    || subtype.equalsIgnoreCase("x-yaml")
+                    || subtype.equalsIgnoreCase("graphql")
+                    || subtype.equalsIgnoreCase("yang")
+                    || subtype.equalsIgnoreCase("toml")
+                    || subtype.equalsIgnoreCase("x-cue")
+            ;
         }
         return matches;
     }
@@ -852,9 +1030,9 @@ public class MediaType implements CharSequence {
         } else {
             StringBuilder sb = new StringBuilder(name);
             parameters.forEach((name, value) -> {
-                sb.append(";");
+                sb.append(';');
                 sb.append(name);
-                sb.append("=");
+                sb.append('=');
                 sb.append(value);
             });
             return sb.toString();
@@ -920,7 +1098,7 @@ public class MediaType implements CharSequence {
             }
         }
 
-        List<MediaType> mediaTypes = new ArrayList<>();
+        var mediaTypes = new ArrayList<MediaType>(values.size());
         for (CharSequence value : values) {
             for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
                 try {
@@ -932,8 +1110,8 @@ public class MediaType implements CharSequence {
         }
         mediaTypes.sort((o1, o2) -> {
             //The */* type is always last
-            boolean fullWildcard1 = o1.type.equals("*");
-            boolean fullWildcard2 = o2.type.equals("*");
+            boolean fullWildcard1 = o1.type.equals(WILDCARD);
+            boolean fullWildcard2 = o2.type.equals(WILDCARD);
             if (fullWildcard1 && fullWildcard2) {
                 return 0;
             } else if (fullWildcard1) {
@@ -941,9 +1119,9 @@ public class MediaType implements CharSequence {
             } else if (fullWildcard2) {
                 return -1;
             }
-            if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+            if (o2.subtype.equals(WILDCARD) && !o1.subtype.equals(WILDCARD)) {
                 return -1;
-            } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+            } else if (o1.subtype.equals(WILDCARD) && !o2.subtype.equals(WILDCARD)) {
                 return 1;
             }
             return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
@@ -968,7 +1146,7 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType[] of(CharSequence... mediaType) {
-        MediaType[] types = new MediaType[mediaType.length];
+        var types = new MediaType[mediaType.length];
         for (int i = 0; i < mediaType.length; i++) {
             types[i] = MediaType.of(mediaType[i].toString());
         }
@@ -1047,8 +1225,8 @@ public class MediaType implements CharSequence {
     @SuppressWarnings("MagicNumber")
     private static Map<String, String> loadMimeTypes() {
         try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
-            Map<String, String> result = new LinkedHashMap<>(100);
+            var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
+            var result = new LinkedHashMap<String, String>(100);
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty() || line.charAt(0) == '#') {
