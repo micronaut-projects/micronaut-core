@@ -32,7 +32,7 @@ public interface UriBuilder {
     /**
      * Sets the URI fragment.
      *
-     * @param fragment The fragument
+     * @param fragment The fragment
      * @return This builder
      */
     @NonNull UriBuilder fragment(@Nullable String fragment);
