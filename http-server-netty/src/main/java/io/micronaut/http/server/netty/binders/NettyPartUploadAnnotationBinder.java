@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -27,7 +28,6 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.converters.NettyConverters;
-import org.jetbrains.annotations.NotNull;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -73,7 +73,7 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         return bindPart(conversionService, context, nettyRequest, inputName, false);
     }
 
-    @NotNull
+    @NonNull
     static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, NettyHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
         if (skipClaimed && nettyRequest.formRouteCompleter().isClaimed(inputName)) {
             return BindingResult.unsatisfied();

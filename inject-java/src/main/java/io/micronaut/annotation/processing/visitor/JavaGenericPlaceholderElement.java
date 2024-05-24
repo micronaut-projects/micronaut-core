@@ -113,6 +113,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return getGenericTypeAnnotationMetadata();
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -121,16 +122,19 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return genericTypeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
+    @NonNull
     @Override
     public JavaNativeElement.Placeholder getGenericNativeType() {
         return genericNativeType;

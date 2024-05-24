@@ -17,8 +17,8 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
@@ -39,7 +39,7 @@ public interface GenericElement extends ClassElement {
      *
      * @return The generic native type
      */
-    @NotNull
+    @NonNull
     default Object getGenericNativeType() {
         return getNativeType();
     }
@@ -52,7 +52,7 @@ public interface GenericElement extends ClassElement {
      * @return the type annotations
      */
     @Experimental
-    @NotNull
+    @NonNull
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
     }
