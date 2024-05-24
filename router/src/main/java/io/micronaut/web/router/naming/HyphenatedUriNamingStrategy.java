@@ -38,10 +38,18 @@ import jakarta.inject.Singleton;
 public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrategy {
     private final String contextPath;
 
+    /**
+     * Constructor without context path.
+     */
     public HyphenatedUriNamingStrategy() {
         this(null);
     }
 
+    /**
+     * Constructor with optional context path.
+     *
+     * @param contextPath The context path to prefix to all URIs
+     */
     @Inject
     public HyphenatedUriNamingStrategy(@Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         if (contextPath == null) {
