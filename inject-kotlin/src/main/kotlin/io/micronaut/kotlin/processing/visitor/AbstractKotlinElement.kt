@@ -284,7 +284,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = type.declaration.typeParameters
-        if (type.arguments.isEmpty()) {
+        if (type.arguments.isEmpty() || type.arguments.size != typeParameters.size) {
             typeParameters.forEach {
                 typeArguments[it.name.asString()] =
                     resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
