@@ -39,7 +39,7 @@ class SslSpec extends Specification {
                 'https://wrong.host.badssl.com/',
                 'https://self-signed.badssl.com/',
                 'https://untrusted-root.badssl.com/',
-                'https://revoked.badssl.com/',
+                //'https://revoked.badssl.com/', needs jvm option
                 //'https://pinning-test.badssl.com/', // not implemented
                 'https://no-subject.badssl.com/',
                 'https://reversed-chain.badssl.com/',
