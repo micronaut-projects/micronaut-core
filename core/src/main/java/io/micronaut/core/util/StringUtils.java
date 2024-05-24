@@ -564,5 +564,5 @@ public final class StringUtils {
             }
             return new SplitOmitEmptyIterator(sequence, splitCharacter);
         }
-    };
+    }
 }
