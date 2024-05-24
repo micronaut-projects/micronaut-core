@@ -15,15 +15,10 @@
  */
 package io.micronaut.web.router.naming;
 
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.conventions.PropertyConvention;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
-import jakarta.inject.Singleton;
 
 /**
  * The configurable {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}
@@ -31,11 +26,9 @@ import jakarta.inject.Singleton;
  *
  * @author Andrey Tsarenko
  * @since 1.2.0
+ * @deprecated Behavior moved up into {@link HyphenatedUriNamingStrategy}
  */
-@Primary
-@Singleton
-@Replaces(HyphenatedUriNamingStrategy.class)
-@Requires(property = "micronaut.server.context-path")
+@Deprecated(since = "4.5.0", forRemoval = true)
 public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
 
     private final String contextPath;
@@ -67,18 +60,6 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
     @Override
     public @NonNull String resolveUri(Class type, PropertyConvention id) {
         return contextPath + super.resolveUri(type, id);
-    }
-
-    private String normalizeContextPath(String contextPath) {
-        if (StringUtils.isNotEmpty(contextPath)) {
-            if (contextPath.charAt(0) != '/') {
-                contextPath = '/' + contextPath;
-            }
-            if (contextPath.charAt(contextPath.length() - 1) == '/') {
-                contextPath = contextPath.substring(0, contextPath.length() - 1);
-            }
-        }
-        return contextPath;
     }
 }
 
