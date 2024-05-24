@@ -364,7 +364,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                     Mono<?> result;
                     if (returnType.isReactive()) {
                         result = Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
-                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));;
+                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
                     } else if (returnType.isAsync()) {
                         result = Mono.fromFuture((Supplier<CompletableFuture<?>>) invokeWithContext(boundExecutable, messageHandler));
                     } else {
