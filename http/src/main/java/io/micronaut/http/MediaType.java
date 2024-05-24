@@ -250,12 +250,12 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_JSON_TYPE = new MediaType(MediaType.APPLICATION_JSON);
 
     /**
-     * YAML: application/x-yaml.
+     * YAML: application/yaml.
      */
-    public static final String APPLICATION_YAML = "application/x-yaml";
+    public static final String APPLICATION_YAML = "application/yaml";
 
     /**
-     * YAML: application/x-yaml.
+     * YAML: application/yaml.
      */
     public static final MediaType APPLICATION_YAML_TYPE = new MediaType(MediaType.APPLICATION_YAML);
 
@@ -806,7 +806,7 @@ public class MediaType implements CharSequence {
     public boolean isTextBased() {
         boolean matches = textTypePatterns.stream().anyMatch(p -> p.matcher(name).matches());
         if (!matches) {
-            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml") || subtype.equalsIgnoreCase("x-yaml");
+            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml") || subtype.equalsIgnoreCase("yaml");
         }
         return matches;
     }
