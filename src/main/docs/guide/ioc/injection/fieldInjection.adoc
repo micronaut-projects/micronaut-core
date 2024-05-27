@@ -1,0 +1,11 @@
+You can inject non-final Java fields by annotating the field with `jakarta.inject.Inject`, for example:
+
+.Example of Field Injection
+snippet::io.micronaut.docs.ioc.injection.field.Vehicle[indent="0"]
+
+<1> The field is annotated with `jakarta.inject.Inject`.
+<2> Note that for Kotlin instead of an optional type (a type ending with `?`) you can use `lateinit var`
+
+Trying to inject a field that is declared `final` will result in a compilation error. Field injection should be seen as inferior to constructor injection as explained in the previous sections since it can result in the code being less-structured, harder to read and harder to test.
+
+WARNING: If the field is `private` scope or inaccessible then the field will be injected using the Java reflection API which is not recommended.

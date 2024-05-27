@@ -4,6 +4,7 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.ssl.ClientSslConfiguration
 import spock.lang.PendingFeature
+import spock.lang.Retry
 import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
@@ -13,6 +14,7 @@ import java.time.Duration
 // See http-client/src/test/groovy/io/micronaut/http/client/SslSpec.groovy
 class SslSpec extends Specification {
 
+    @Retry(count = 5) // sometimes badssl.com times out
     void 'bad server ssl cert'() {
         given:
         def cfg = new DefaultHttpClientConfiguration()
@@ -37,7 +39,7 @@ class SslSpec extends Specification {
                 'https://wrong.host.badssl.com/',
                 'https://self-signed.badssl.com/',
                 'https://untrusted-root.badssl.com/',
-                'https://revoked.badssl.com/',
+                //'https://revoked.badssl.com/', needs jvm option
                 //'https://pinning-test.badssl.com/', // not implemented
                 'https://no-subject.badssl.com/',
                 'https://reversed-chain.badssl.com/',

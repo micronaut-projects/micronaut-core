@@ -199,6 +199,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     msg,
                     routeMatch,
                     ctx,
+                    serverConfiguration.getThreadSelection(),
+                    routeExecutor.getExecutorSelector(),
                     routeExecutor.getCoroutineHelper().orElse(null));
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 

@@ -49,8 +49,6 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.ServerChannel;
-import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -285,16 +283,6 @@ public class DefaultNettyEmbeddedServerFactory
                 config,
                 this.nettyThreadFactory
         );
-    }
-
-    @Override
-    public ServerSocketChannel getServerSocketChannelInstance(EventLoopGroupConfiguration workerConfig) {
-        return eventLoopGroupFactory.serverSocketChannelInstance(workerConfig);
-    }
-
-    @Override
-    public ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
-        return eventLoopGroupFactory.domainServerSocketChannelInstance(workerConfig);
     }
 
     @Override

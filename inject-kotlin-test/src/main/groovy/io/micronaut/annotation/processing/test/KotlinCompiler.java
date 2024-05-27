@@ -78,7 +78,6 @@ public class KotlinCompiler {
         KOTLIN_COMPILATION.setJvmDefault("all");
         KOTLIN_COMPILATION.setInheritClassPath(true);
 
-        KSP_COMPILATION.setJavacArguments(Collections.singletonList("-Xopt-in=kotlin.RequiresOptIn"));
         KSP_COMPILATION.setInheritClassPath(true);
         KSP_COMPILATION.setClasspaths(Arrays.asList(
             new File(KSP_COMPILATION.getWorkingDir(), "ksp/classes"),
@@ -134,6 +133,29 @@ public class KotlinCompiler {
             // ignore
         }
         KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
+        KotlinCompilation.Result result = KOTLIN_COMPILATION.compile();
+        if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
+            throw new RuntimeException(result.getMessages());
+        }
+
+        KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
+        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
+        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
+        KotlinCompilation.Result kspResult = KSP_COMPILATION.compile();
+        if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
+            throw new RuntimeException(kspResult.getMessages());
+        }
+
+        return new Pair<>(new Pair<>(KOTLIN_COMPILATION, result), new Pair<>(KSP_COMPILATION, kspResult));
+    }
+
+    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
+        try {
+            Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
+        } catch (IOException e) {
+            // ignore
+        }
+        KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)));
         KotlinCompilation.Result result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
@@ -238,14 +260,12 @@ public class KotlinCompiler {
         return buildContext(clazz, false);
     }
 
-    public static ApplicationContext
-    buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
+    public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
         return buildContext(clazz, includeAllBeans, Collections.emptyMap());
     }
 
     @SuppressWarnings("java:S2095")
-    public static ApplicationContext
-    buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
+    public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
         Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, classElement -> {
         });
         ClassLoader classLoader = toClassLoader(pair);
