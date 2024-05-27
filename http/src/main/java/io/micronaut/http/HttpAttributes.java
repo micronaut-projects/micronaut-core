@@ -89,7 +89,12 @@ public enum HttpAttributes implements CharSequence {
     /**
      * The message body writer.
      */
-    MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter");
+    MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter"),
+
+    /**
+     * Body that was discarded because this is a HEAD response.
+     */
+    HEAD_BODY(Constants.PREFIX + ".headBody");
 
     private final String name;
 
