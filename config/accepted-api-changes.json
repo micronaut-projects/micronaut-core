@@ -1083,6 +1083,18 @@
     "type": "io.micronaut.http.client.tck.tests.$Person$IntrospectionRef",
     "member": "Implemented interface io.micronaut.core.beans.BeanIntrospectionReference",
     "reason": "Introspection changes"
+  },
+  {
+    "type": "io.micronaut.http.filter.BaseFilterProcessor$RequiresRequestBodyBinder",
+    "member": "Implemented interface io.micronaut.core.bind.ArgumentBinder",
+    "reason": "Internal class"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.$DefaultHttpContentProcessorResolver$Definition",
+    "reason": "Internal class removed"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.jackson.$JsonHttpContentSubscriberFactory$Definition",
+    "reason": "Internal class removed"
   }
-
 ]

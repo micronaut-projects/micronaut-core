@@ -147,6 +147,11 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+  byteBody:
+    title: Advanced body access
+    byteBodyPrimary: Primary operations
+    byteBodySplitting: Splitting
+    byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:

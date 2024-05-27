@@ -1,9 +1,9 @@
 package io.micronaut.http.server.netty.handler
 
-import io.micronaut.http.server.HttpServerConfiguration
-import io.micronaut.http.server.netty.body.ByteBody
-import io.micronaut.http.server.netty.body.ImmediateByteBody
-import io.micronaut.http.server.netty.body.StreamingByteBody
+import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.http.body.AvailableByteBody
+import io.micronaut.http.body.CloseableAvailableByteBody
+import io.micronaut.http.body.CloseableByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
@@ -48,7 +48,8 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeFull(resp)
             }
 
@@ -93,7 +94,8 @@ class PipeliningServerHandlerSpec extends Specification {
         def sink = Sinks.many().unicast().<HttpContent>onBackpressureBuffer()
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(resp, sink.asFlux())
             }
 
@@ -141,10 +143,9 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                assert body instanceof ImmediateByteBody
-                assert body.contentUnclaimed().toString(StandardCharsets.UTF_8) == "foobar"
-                body.release()
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                assert body instanceof AvailableByteBody
+                assert new String(body.toByteArray(), StandardCharsets.UTF_8) == "foobar"
                 outboundAccess.writeFull(resp)
             }
 
@@ -180,8 +181,8 @@ class PipeliningServerHandlerSpec extends Specification {
         def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).collectList().subscribe { outboundAccess.writeFull(resp) }
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).collectList().subscribe { outboundAccess.writeFull(resp) }
             }
 
             @Override
@@ -224,9 +225,8 @@ class PipeliningServerHandlerSpec extends Specification {
             }
         }, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                assert request instanceof FullHttpRequest
-                request.release()
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeFull(resp)
             }
 
@@ -261,9 +261,9 @@ class PipeliningServerHandlerSpec extends Specification {
         def cleaned = 0
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 assert request instanceof FullHttpRequest
-                request.release()
+                body.close()
                 outboundAccess.writeStreamed(resp, sink.asFlux().doOnCancel {
                     // optional extra weirdness: onComplete *after* cancel. Could lead to double call to responseWritten, if I was an idiot.
                     if (completeOnCancel) sink.tryEmitComplete()
@@ -309,16 +309,15 @@ class PipeliningServerHandlerSpec extends Specification {
         Subscription subscription = null
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                ((StreamingByteBody) body).rawContent(new HttpServerConfiguration()).asPublisher().subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.toByteArrayPublisher().subscribe(new Subscriber<byte[]>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         subscription = s
                     }
 
                     @Override
-                    void onNext(ByteBuf httpContent) {
-                        httpContent.release()
+                    void onNext(byte[] httpContent) {
                     }
 
                     @Override
@@ -349,7 +348,8 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.writeInbound(req)
         then:
         // no read call until request
-        mon.read == 1
+        // ok i reconsidered this. similar to http/2, PipeliningServerHandler now accepts 64K before downstream demand happens.
+        mon.read == 2
 
         when:
         subscription.request(1)
@@ -367,10 +367,10 @@ class PipeliningServerHandlerSpec extends Specification {
     def 'decompression parts to full'(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
         HttpRequest req = null
-        ImmediateByteBody ibb = null
+        CloseableAvailableByteBody ibb = null
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 ibb = body
                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
@@ -402,10 +402,10 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.flushInbound()
         then:
         !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
-        ibb.contentUnclaimed().equals(Unpooled.wrappedBuffer(uncompressed))
+        Arrays.equals(ibb.toByteArray(), uncompressed)
 
         cleanup:
-        ibb.release()
+        ibb.close()
 
         where:
         contentEncoding            | compressor
@@ -419,10 +419,10 @@ class PipeliningServerHandlerSpec extends Specification {
     def 'decompression full to full'(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
         HttpRequest req = null
-        ImmediateByteBody ibb = null
+        CloseableAvailableByteBody ibb = null
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 ibb = body
                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
@@ -453,10 +453,10 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.writeInbound(r)
         then:
         !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
-        ibb.contentUnclaimed().equals(Unpooled.wrappedBuffer(uncompressed))
+        Arrays.equals(ibb.toByteArray(), uncompressed)
 
         cleanup:
-        ibb.release()
+        ibb.close()
 
         where:
         contentEncoding            | compressor
@@ -470,10 +470,10 @@ class PipeliningServerHandlerSpec extends Specification {
     def 'decompression parts to stream'(ChannelHandler compressor, CharSequence contentEncoding) {
         given:
         HttpRequest req = null
-        StreamingByteBody sbb = null
+        CloseableByteBody sbb = null
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 sbb = body
                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
@@ -508,8 +508,8 @@ class PipeliningServerHandlerSpec extends Specification {
         then:
         !req.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
         CompositeByteBuf decompressed = Unpooled.compositeBuffer()
-        for (ByteBuf c : Flux.from(sbb.rawContent(new HttpServerConfiguration()).asPublisher()).toIterable()) {
-            decompressed.addComponent(true, c)
+        for (ByteBuffer<?> c : Flux.from(sbb.toByteBufferPublisher()).toIterable()) {
+            decompressed.addComponent(true, c.asNativeBuffer())
         }
         decompressed.equals(Unpooled.wrappedBuffer(uncompressed))
 
@@ -534,8 +534,8 @@ class PipeliningServerHandlerSpec extends Specification {
             int i = 0
 
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                body.release()
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 if (i++ == 0) {
                     outboundAccess.writeStreamed(resp, sink.asFlux())
                 } else {
@@ -570,9 +570,9 @@ class PipeliningServerHandlerSpec extends Specification {
         int unwritten = 0
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 unwritten++
-                body.release()
+                body.close()
                 outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
             }
 

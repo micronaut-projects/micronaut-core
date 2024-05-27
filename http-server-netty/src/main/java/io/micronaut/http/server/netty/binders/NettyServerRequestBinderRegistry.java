@@ -71,8 +71,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
             beanLocator,
             httpServerConfiguration
         ));
-        internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder(
-            httpServerConfiguration.get()));
+        internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder());
         NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(
             httpServerConfiguration.get().getMultipart(),
             executorService.get()

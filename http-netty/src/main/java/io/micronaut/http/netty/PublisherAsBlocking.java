@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.scheduler.NonBlocking;
 
 import java.io.Closeable;
 import java.util.concurrent.locks.Condition;
@@ -153,6 +154,9 @@ public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
                     return null;
                 }
                 if (demanded) {
+                    if (Thread.currentThread() instanceof NonBlocking) {
+                        throw new IllegalStateException("Attempted to do blocking operation on a thread marked as NonBlocking. (Maybe the netty event loop?) Please only run blocking operations on IO or virtual threads, for example by marking your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+                    }
                     newDataCondition.await();
                 }
                 subscription = this.subscription;

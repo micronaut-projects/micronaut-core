@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,9 @@
  */
 package io.micronaut.http.server.netty.body;
 
-import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.core.annotation.Internal;
 
-/**
- * Special {@link HttpBody} that is inserted on calling {@link ByteBody#claimForReuse}. This allows
- * {@link NettyHttpRequest#getBody()} to still be called (though it will return nothing).
- */
-final class HttpBodyReused implements HttpBody {
-    @Override
-    public void release() {
-        // nothing to do
-    }
-
-    @Override
-    public HttpBody next() {
-        return null;
-    }
+@Internal
+public record BodySizeLimits(long maxBodySize, long maxBufferSize) {
+    public static final BodySizeLimits UNLIMITED = new BodySizeLimits(Long.MAX_VALUE, Integer.MAX_VALUE);
 }

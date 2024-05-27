@@ -21,6 +21,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
@@ -172,6 +173,10 @@ final class HttpPipelineBuilder implements Closeable {
             requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
         }
         return requestHandler;
+    }
+
+    private BodySizeLimits bodySizeLimits() {
+        return new BodySizeLimits(server.getServerConfiguration().getMaxRequestSize(), server.getServerConfiguration().getMaxRequestBufferSize());
     }
 
     /**
@@ -429,6 +434,7 @@ final class HttpPipelineBuilder implements Closeable {
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .compressor(embeddedServices.getHttpCompressionStrategy())
+                .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
                 .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
@@ -680,6 +686,7 @@ final class HttpPipelineBuilder implements Closeable {
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
             PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
             pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
+            pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
         }
 

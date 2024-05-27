@@ -21,7 +21,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
@@ -37,7 +37,7 @@ public class HttpRequestTest extends TestCase {
         nettyRequest.headers().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
-                ByteBody.empty(),
+                AvailableNettyByteBody.empty(),
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
                 ConversionService.SHARED,
                 new HttpServerConfiguration()
@@ -59,7 +59,7 @@ public class HttpRequestTest extends TestCase {
         nettyRequest.headers().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML);
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
-                ByteBody.empty(),
+                AvailableNettyByteBody.empty(),
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
                 ConversionService.SHARED,
                 new HttpServerConfiguration()

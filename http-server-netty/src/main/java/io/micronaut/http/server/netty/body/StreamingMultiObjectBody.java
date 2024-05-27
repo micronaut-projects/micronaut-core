@@ -36,7 +36,7 @@ import java.util.function.Function;
  */
 @Internal
 public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implements MultiObjectBody {
-    StreamingMultiObjectBody(Publisher<?> publisher) {
+    public StreamingMultiObjectBody(Publisher<?> publisher) {
         super(publisher);
     }
 

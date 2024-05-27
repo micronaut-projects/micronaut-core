@@ -34,6 +34,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -53,7 +54,7 @@ import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -112,9 +113,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+
     final StaticResourceResolver staticResourceResolver;
     final NettyHttpServerConfiguration serverConfiguration;
-    final HttpContentProcessorResolver httpContentProcessorResolver;
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final Supplier<ExecutorService> ioExecutorSupplier;
     final boolean multipartEnabled;
@@ -133,7 +134,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * @param serverConfiguration          The Netty HTTP server configuration
      * @param embeddedServerContext        The embedded server context
      * @param ioExecutor                   The IO executor
-     * @param httpContentProcessorResolver The http content processor resolver
      * @param terminateEventPublisher      The terminate event publisher
      * @param conversionService            The conversion service
      */
@@ -141,7 +141,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         NettyHttpServerConfiguration serverConfiguration,
         NettyEmbeddedServices embeddedServerContext,
         Supplier<ExecutorService> ioExecutor,
-        HttpContentProcessorResolver httpContentProcessorResolver,
         ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher,
         ConversionService conversionService) {
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
@@ -149,7 +148,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.ioExecutorSupplier = ioExecutor;
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
-        this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
@@ -203,18 +201,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
-    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
         if (serverConfiguration.isValidateUrl()) {
             try {
                 mnRequest.getUri();
             } catch (IllegalArgumentException e) {
-                body.release();
+                body.close();
 
                 // invalid URI
                 NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                     new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                    ByteBody.empty(),
+                    AvailableNettyByteBody.empty(),
                     ctx,
                     conversionService,
                     serverConfiguration

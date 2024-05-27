@@ -20,7 +20,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.server.netty.body.BodySizeLimits;
+import io.micronaut.http.server.netty.body.BufferConsumer;
+import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -29,27 +32,22 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
-import reactor.util.concurrent.Queues;
 
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -63,6 +61,7 @@ abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
 
     ChannelHandlerContext ctx;
+    BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
     @Nullable
     private Compressor compressor;
@@ -131,7 +130,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, ByteBody.empty(), this);
+                requestHandler.accept(ctx, headers, AvailableNettyByteBody.empty(), this);
             }
         }
 
@@ -144,7 +143,6 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            data.retain();
             if (streamer == null) {
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
@@ -167,7 +165,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, ByteBody.of(fullBody), this);
+                    requestHandler.accept(ctx, request, PipeliningServerHandler.createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -175,12 +173,9 @@ abstract class MultiplexedServerHandler {
                     bufferedContent.add(data);
                 }
             } else {
-                DefaultHttpContent c = endOfStream ? new DefaultLastHttpContent(data) : new DefaultHttpContent(data);
-                if (streamer.sink.tryEmitNext(c) != Sinks.EmitResult.OK) {
-                    c.release();
-                }
+                streamer.add(data);
                 if (endOfStream) {
-                    streamer.sink.tryEmitComplete();
+                    streamer.complete();
                 }
             }
             return 0;
@@ -194,17 +189,16 @@ abstract class MultiplexedServerHandler {
             if (requestAccepted || streamer != null || request == null) {
                 return;
             }
-            streamer = new InputStreamer();
+            streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
-                    if (streamer.sink.tryEmitNext(new DefaultHttpContent(buf)) != Sinks.EmitResult.OK) {
-                        buf.release();
-                    }
+                    streamer.add(buf);
                 }
                 bufferedContent = null;
             }
             requestAccepted = true;
-            requestHandler.accept(ctx, request, ByteBody.of(streamer, request.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, -1)), this);
+            streamer.dest.setExpectedLengthFrom(request.headers());
+            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
         /**
@@ -223,7 +217,7 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             if (streamer != null) {
-                streamer.sink.tryEmitError(e);
+                streamer.error(e);
             }
             finish();
         }
@@ -511,62 +505,128 @@ abstract class MultiplexedServerHandler {
          * This is the {@link HotObservable} that represents the request body in the streaming
          * request case.
          */
-        private class InputStreamer implements HotObservable<HttpContent> {
-            final Queue<HttpContent> queue = Queues.<HttpContent>unbounded().get();
-            final Sinks.Many<HttpContent> sink = Sinks.many().unicast().onBackpressureBuffer(queue);
-            final Flux<HttpContent> flux = sink.asFlux()
-                .doOnNext(this::onNext);
+        private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
+            final StreamingNettyByteBody.SharedBuffer dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            /**
+             * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream
+             * hasn't consumed ({@link #onBytesConsumed(long)}). May be negative if the downstream
+             * has signaled more consumption.
+             */
+            long unacknowledged = 0;
+            boolean sendContinue;
 
-            private void onNext(HttpContent c) {
-                onNext(c.content().readableBytes());
+            InputStreamer(boolean sendContinue) {
+                this.sendContinue = sendContinue;
             }
 
-            private void onNext(int n) {
+            @Override
+            public void start() {
                 EventLoop eventLoop = ctx.channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
-                    eventLoop.execute(() -> onNext(n));
+                    eventLoop.execute(this::start);
                     return;
                 }
 
-                notifyDataConsumed(n);
-                if (queue.isEmpty()) {
-                    // flush any window updates
-                    flush();
+                if (sendContinue) {
+                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, ctx.voidPromise());
+                    sendContinue = false;
                 }
             }
 
             @Override
-            public void closeIfNoSubscriber() {
+            public void onBytesConsumed(long bytesConsumed) {
+                if (bytesConsumed < 0) {
+                    throw new IllegalArgumentException("Negative bytes consumed");
+                }
+
                 EventLoop eventLoop = ctx.channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
-                    eventLoop.execute(this::closeIfNoSubscriber);
+                    eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                     return;
                 }
 
-                if (sink.currentSubscriberCount() == 0) {
-                    // this prevents further onData calls from leaking items
-                    sink.tryEmitError(SubscribedTooLateException.INSTANCE);
-                    closeInput();
+                long oldUnacknowledged = unacknowledged;
+                if (oldUnacknowledged > 0) {
+                    notifyDataConsumedLong(Math.min(bytesConsumed, oldUnacknowledged));
                 }
+                long newUnacknowledged = oldUnacknowledged - bytesConsumed;
+                if (newUnacknowledged > oldUnacknowledged) {
+                    // overflow, clamp
+                    newUnacknowledged = Long.MIN_VALUE;
+                }
+                unacknowledged = newUnacknowledged;
+            }
+
+            private void notifyDataConsumedLong(long bytesConsumed) {
+                if (bytesConsumed == 0) {
+                    return;
+                }
+                assert bytesConsumed > 0;
+
+                for (int i = 0; bytesConsumed > Integer.MAX_VALUE && i < 100; i++) {
+                    notifyDataConsumed(Integer.MAX_VALUE);
+                    bytesConsumed -= Integer.MAX_VALUE;
+                }
+                if (bytesConsumed > Integer.MAX_VALUE) {
+                    LOG.debug("Clamping onBytesConsumed({})", bytesConsumed);
+                    // so many bytes consumed at once, weird! just clamp.
+                    bytesConsumed = Integer.MAX_VALUE;
+                }
+                notifyDataConsumed(Math.toIntExact(bytesConsumed));
+                // flush any window updates
+                flush();
             }
 
             @Override
-            public void subscribe(Subscriber<? super HttpContent> s) {
-                flux.subscribe(s);
+            public void allowDiscard() {
+                EventLoop eventLoop = ctx.channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    eventLoop.execute(this::allowDiscard);
+                    return;
+                }
+
+                closeInput();
+                dest.discard(); // signal discard
             }
-        }
-    }
 
-    private static final class SubscribedTooLateException extends RuntimeException {
-        static final SubscribedTooLateException INSTANCE = new SubscribedTooLateException();
+            @Override
+            public void disregardBackpressure() {
+                EventLoop eventLoop = ctx.channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    eventLoop.execute(this::disregardBackpressure);
+                    return;
+                }
 
-        SubscribedTooLateException() {
-            super("Subscribed too late to message body (after closeIfNoSubscriber)");
-        }
+                unacknowledged = Long.MIN_VALUE;
+            }
 
-        @Override
-        public Throwable fillInStackTrace() {
-            return this;
+            @Override
+            public void add(ByteBuf buf) {
+                assert ctx.channel().eventLoop().inEventLoop();
+
+                if (unacknowledged < 0) {
+                    // -MIN_VALUE is still MIN_VALUE so we need to special case it
+                    notifyDataConsumedLong(unacknowledged == Long.MIN_VALUE ? buf.readableBytes() : Math.min(buf.readableBytes(), -unacknowledged));
+                }
+                unacknowledged += buf.readableBytes();
+                dest.add(buf);
+            }
+
+            @Override
+            public void complete() {
+                dest.complete();
+            }
+
+            @Override
+            public void discard() {
+                // this is implemented in allowDiscard to reduce confusion about method names
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void error(Throwable e) {
+                dest.error(e);
+            }
         }
     }
 }

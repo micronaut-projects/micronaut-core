@@ -48,7 +48,7 @@ import java.util.function.Function;
  */
 @Internal
 public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> implements MultiObjectBody {
-    ImmediateMultiObjectBody(List<?> objects) {
+    public ImmediateMultiObjectBody(List<?> objects) {
         super(objects);
     }
 

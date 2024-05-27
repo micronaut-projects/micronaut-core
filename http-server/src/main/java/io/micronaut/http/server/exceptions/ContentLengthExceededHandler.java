@@ -27,7 +27,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
- * Default handle for {@link ContentLengthExceededException} errors.
+ * Default handler for {@link ContentLengthExceededException} errors.
  *
  * @author Graeme Rocher
  * @since 1.0
