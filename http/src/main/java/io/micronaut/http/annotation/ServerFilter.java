@@ -74,6 +74,7 @@ public @interface ServerFilter {
 
     /**
      * @return Whether the contextPath should be concatenated into the filter pattern
+     * @since 4.5.1
      */
     boolean appendContextPath() default true;
 }
