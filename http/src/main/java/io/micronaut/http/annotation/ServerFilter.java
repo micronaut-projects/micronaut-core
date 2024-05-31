@@ -71,4 +71,10 @@ public @interface ServerFilter {
      * @return The methods to match. Defaults to all
      */
     HttpMethod[] methods() default {};
+
+    /**
+     * @return Whether the contextPath should be concatenated into the filter pattern
+     * @since 4.5.1
+     */
+    boolean appendContextPath() default true;
 }
