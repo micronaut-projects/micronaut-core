@@ -1204,12 +1204,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 }
             }
         }
-        if (beanToDestroy instanceof LifeCycle cycle) {
-            try {
-                cycle.stop();
-            } catch (Exception e) {
-                throw new BeanDestructionException(definition, e);
-            }
+        if (beanToDestroy instanceof LifeCycle<?> cycle) {
+            destroyLifeCycleBean(cycle, definition);
         }
         if (registration instanceof BeanDisposingRegistration) {
             List<BeanRegistration<?>> dependents = ((BeanDisposingRegistration<T>) registration).getDependents();
@@ -1228,6 +1224,21 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
 
         triggerBeanDestroyedListeners(definition, beanToDestroy);
+    }
+
+    /**
+     * Destroy a lifecycle bean.
+     * @param cycle The cycle
+     * @param definition The definition
+     * @param <T> The bean type
+     */
+    @Internal
+    protected <T> void destroyLifeCycleBean(LifeCycle<?> cycle, BeanDefinition<T> definition) {
+        try {
+            cycle.stop();
+        } catch (Exception e) {
+            throw new BeanDestructionException(definition, e);
+        }
     }
 
     @NonNull

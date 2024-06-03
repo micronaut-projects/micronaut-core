@@ -20,6 +20,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
+import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -31,6 +32,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
@@ -39,6 +41,7 @@ import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +76,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private final BeanContext beanContext;
     private final ConversionService conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
+    private final List<ScheduledDefinition> scheduledMethods = new ArrayList<>();
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
     /**
@@ -87,104 +91,119 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         this.taskExceptionHandler = taskExceptionHandler;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        if (!(beanContext instanceof ApplicationContext)) {
-            return;
-        }
-        List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
-        for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
-            String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
-
-            String initialDelayStr = scheduledAnnotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null);
-            Duration initialDelay = null;
-            if (StringUtils.hasText(initialDelayStr)) {
-                initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
-                );
+        if (beanContext instanceof ApplicationContext) {
+            ScheduledDefinition scheduledDefinition = new ScheduledDefinition(beanDefinition, method);
+            if (!scheduledMethods.contains(scheduledDefinition)) {
+                this.scheduledMethods.add(scheduledDefinition);
             }
+        }
+    }
 
-            String scheduler = scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
-            Optional<TaskScheduler> optionalTaskScheduler = beanContext
+    /**
+     * On startup event listener that schedules the active tasks.
+     * @param startupEvent The startup event.
+     */
+    @EventListener
+    @SuppressWarnings("unchecked")
+    void scheduleTasks(@SuppressWarnings("unused") StartupEvent startupEvent) {
+        for (ScheduledDefinition scheduledDefinition : scheduledMethods) {
+            ExecutableMethod<?, ?> method = scheduledDefinition.method();
+            BeanDefinition<?> beanDefinition = scheduledDefinition.definition();
+            List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
+            for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
+                String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
+
+                String initialDelayStr = scheduledAnnotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null);
+                Duration initialDelay = null;
+                if (StringUtils.hasText(initialDelayStr)) {
+                    initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
+                        new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
+                    );
+                }
+
+                String scheduler = scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
+                Optional<TaskScheduler> optionalTaskScheduler = beanContext
                     .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
 
-            if (optionalTaskScheduler.isEmpty()) {
-                optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
+                if (optionalTaskScheduler.isEmpty()) {
+                    optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
                         .filter(ScheduledExecutorService.class::isInstance)
                         .map(ScheduledExecutorTaskScheduler::new);
-            }
+                }
 
-            TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
-            Runnable task = () -> {
-                try {
-                    ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
-                    BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
-                    Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
-                    AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
-                    if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
-                        finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
-                    }
-                    boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
-                    if (shouldRun) {
-                        try {
-                            ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
-                        } catch (Throwable e) {
-                            handleException((Class<Object>) beanDefinition.getBeanType(), bean, e);
+                TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
+                Runnable task = () -> {
+                    try {
+                        ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
+                        BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
+                        Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
+                        AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
+                        if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
+                            finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
                         }
+                        boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
+                        if (shouldRun) {
+                            try {
+                                ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
+                            } catch (Throwable e) {
+                                handleException((Class<Object>) beanDefinition.getBeanType(), bean, e);
+                            }
+                        }
+                    } catch (NoSuchBeanException noSuchBeanException) {
+                        // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
+                        // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
+                        LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
+                    } catch (Exception e) {
+                        TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
+                        finalHandler.handleCreationFailure(beanDefinition, e);
                     }
-                } catch (NoSuchBeanException noSuchBeanException) {
-                   // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
-                   // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
-                   LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
-                } catch (Exception e) {
-                    TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
-                    finalHandler.handleCreationFailure(beanDefinition, e);
+                };
+
+                String cronExpr = scheduledAnnotation.stringValue(MEMBER_CRON).orElse(null);
+                String zoneIdStr = scheduledAnnotation.stringValue(MEMBER_ZONE_ID).orElse(null);
+                String fixedDelay = scheduledAnnotation.stringValue(MEMBER_FIXED_DELAY).orElse(null);
+
+                if (StringUtils.isNotEmpty(cronExpr)) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
+                    }
+
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
+                    scheduledTasks.add(scheduledFuture);
+                } else if (StringUtils.isNotEmpty(fixedRate)) {
+                    Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
+                    Duration duration = converted.orElseThrow(() ->
+                        new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
+                    );
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Scheduling fixed rate task [{}] for method: {}", duration, method);
+                    }
+
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
+                    scheduledTasks.add(scheduledFuture);
+                } else if (StringUtils.isNotEmpty(fixedDelay)) {
+                    Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
+                    Duration duration = converted.orElseThrow(() ->
+                        new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
+                    );
+
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
+                    }
+
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
+                    scheduledTasks.add(scheduledFuture);
+                } else if (initialDelay != null) {
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
+
+                    scheduledTasks.add(scheduledFuture);
+                } else {
+                    throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
                 }
-            };
-
-            String cronExpr = scheduledAnnotation.stringValue(MEMBER_CRON).orElse(null);
-            String zoneIdStr = scheduledAnnotation.stringValue(MEMBER_ZONE_ID).orElse(null);
-            String fixedDelay = scheduledAnnotation.stringValue(MEMBER_FIXED_DELAY).orElse(null);
-
-            if (StringUtils.isNotEmpty(cronExpr)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
-                }
-
-                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
-                scheduledTasks.add(scheduledFuture);
-            } else if (StringUtils.isNotEmpty(fixedRate)) {
-                Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
-                Duration duration = converted.orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
-                );
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Scheduling fixed rate task [{}] for method: {}", duration, method);
-                }
-
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
-                scheduledTasks.add(scheduledFuture);
-            } else if (StringUtils.isNotEmpty(fixedDelay)) {
-                Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
-                Duration duration = converted.orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
-                );
-
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
-                }
-
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
-                scheduledTasks.add(scheduledFuture);
-            } else if (initialDelay != null) {
-                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
-
-                scheduledTasks.add(scheduledFuture);
-            } else {
-                throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
     }
@@ -203,10 +222,19 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     @PreDestroy
     public void close() {
-        for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
-            if (!scheduledTask.isCancelled()) {
-                scheduledTask.cancel(false);
+        try {
+            for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
+                if (!scheduledTask.isCancelled()) {
+                    scheduledTask.cancel(false);
+                }
             }
+        } finally {
+            this.scheduledTasks.clear();
+            this.scheduledMethods.clear();
         }
     }
+
+    private record ScheduledDefinition(
+        BeanDefinition<?> definition,
+        ExecutableMethod<?, ?> method) { }
 }
