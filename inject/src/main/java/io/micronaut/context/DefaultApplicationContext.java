@@ -663,6 +663,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
     }
 
+    @Override
+    protected <T> void destroyLifeCycleBean(LifeCycle<?> cycle, BeanDefinition<T> definition) {
+        if (cycle != environment) { // handle environment separately, see stop() method
+            super.destroyLifeCycleBean(cycle, definition);
+        }
+    }
+
     /**
      * @param beanContext The bean context
      */
