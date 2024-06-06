@@ -210,7 +210,6 @@ public class ConnectionManager {
 
 
         refresh();
-        running.set(true);
     }
 
     final void refresh() {
@@ -228,6 +227,7 @@ public class ConnectionManager {
             http3SslContext = null;
         }
         initBootstrap();
+        running.set(true);
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
