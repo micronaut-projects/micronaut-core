@@ -1204,7 +1204,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 }
             }
         }
-        if (beanToDestroy instanceof LifeCycle<?> cycle) {
+        if (beanToDestroy instanceof LifeCycle<?> cycle && !dependent) {
             destroyLifeCycleBean(cycle, definition);
         }
         if (registration instanceof BeanDisposingRegistration) {
