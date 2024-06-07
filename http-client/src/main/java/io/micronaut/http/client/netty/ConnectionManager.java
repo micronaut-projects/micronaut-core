@@ -136,6 +136,8 @@ public class ConnectionManager {
     private final ClientSslBuilder nettyClientSslBuilder;
     private EventLoopGroup group;
     private final boolean shutdownGroup;
+
+    private final AtomicBoolean running = new AtomicBoolean(false);
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -206,6 +208,7 @@ public class ConnectionManager {
             shutdownGroup = true;
         }
 
+
         refresh();
     }
 
@@ -224,6 +227,7 @@ public class ConnectionManager {
             http3SslContext = null;
         }
         initBootstrap();
+        running.set(true);
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
@@ -315,10 +319,12 @@ public class ConnectionManager {
      * @see DefaultHttpClient#start()
      */
     public final void start() {
-        // only need to start new group if it's managed by us
-        if (shutdownGroup) {
-            group = createEventLoopGroup(configuration, threadFactory);
-            initBootstrap(); // rebuild bootstrap with new group
+        if (running.compareAndSet(false, true)) {
+            // only need to start new group if it's managed by us
+            if (shutdownGroup) {
+                group = createEventLoopGroup(configuration, threadFactory);
+                initBootstrap(); // rebuild bootstrap with new group
+            }
         }
     }
 
@@ -352,31 +358,34 @@ public class ConnectionManager {
      * @see DefaultHttpClient#stop()
      */
     public final void shutdown() {
-        for (Pool pool : pools.values()) {
-            pool.shutdown();
-        }
-        if (shutdownGroup) {
-            Duration shutdownTimeout = configuration.getShutdownTimeout()
-                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
-            Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
-                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+        if (running.compareAndSet(true, false)) {
 
-            Future<?> future = group.shutdownGracefully(
-                shutdownQuietPeriod.toMillis(),
-                shutdownTimeout.toMillis(),
-                TimeUnit.MILLISECONDS
-            );
-            try {
-                future.await(shutdownTimeout.toMillis());
-            } catch (InterruptedException e) {
-                // ignore
-                Thread.currentThread().interrupt();
+            for (Pool pool : pools.values()) {
+                pool.shutdown();
             }
+            if (shutdownGroup) {
+                Duration shutdownTimeout = configuration.getShutdownTimeout()
+                    .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                    .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+
+                Future<?> future = group.shutdownGracefully(
+                    shutdownQuietPeriod.toMillis(),
+                    shutdownTimeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+                );
+                try {
+                    future.await(shutdownTimeout.toMillis());
+                } catch (InterruptedException e) {
+                    // ignore
+                    Thread.currentThread().interrupt();
+                }
+            }
+            ReferenceCountUtil.release(sslContext);
+            ReferenceCountUtil.release(websocketSslContext);
+            sslContext = null;
+            websocketSslContext = null;
         }
-        ReferenceCountUtil.release(sslContext);
-        ReferenceCountUtil.release(websocketSslContext);
-        sslContext = null;
-        websocketSslContext = null;
     }
 
     /**
@@ -385,7 +394,7 @@ public class ConnectionManager {
      * @return Whether this connection manager is still running and can serve requests
      */
     public final boolean isRunning() {
-        return !group.isShutdown();
+        return running.get() && !group.isShutdown();
     }
 
     /**
