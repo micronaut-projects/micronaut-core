@@ -58,6 +58,7 @@ import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
@@ -299,7 +300,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Object body) {
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
-            @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+            Object routeInfoO = response.getAttribute(HttpAttributes.ROUTE_INFO).orElse(null);
+            // usually this is a UriRouteInfo, avoid scalability issues here
+            @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
 
             if (Publishers.isConvertibleToPublisher(body)) {
                 response.body(null);
@@ -320,7 +323,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 responseBodyType = Argument.of((Class<Object>) body.getClass());
             }
             if (responseMediaType == null) {
-                if (body instanceof MediaTypeProvider mediaTypeProvider) {
+                // perf: check for common body types
+                //noinspection ConditionCoveredByFurtherCondition
+                if (!(body instanceof String) && !(body instanceof byte[]) && body instanceof MediaTypeProvider mediaTypeProvider) {
                     responseMediaType = mediaTypeProvider.getMediaType();
                 } else if (routeInfo != null) {
                     responseMediaType = routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo);

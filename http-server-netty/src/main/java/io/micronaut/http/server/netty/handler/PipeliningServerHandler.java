@@ -43,6 +43,7 @@ import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -398,12 +399,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
 
-            boolean full = request instanceof FullHttpRequest;
+            // getClass for performance
+            boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
                 requestHandler.accept(ctx, request, createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
-                if (message instanceof HttpContent) {
+                if (full) {
                     inboundHandler.read(message);
                 }
                 if (decompressionChannel != null) {
@@ -709,9 +711,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class DroppingInboundHandler extends InboundHandler {
         @Override
         void read(Object message) {
-            ((HttpContent) message).release();
-            if (message instanceof LastHttpContent) {
+            if (message instanceof LastHttpContent lhc) {
+                lhc.release();
                 inboundHandler = baseInboundHandler;
+            } else {
+                ((HttpContent) message).release();
             }
         }
 

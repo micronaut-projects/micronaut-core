@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.attr.AttributeHolder;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -62,6 +63,7 @@ import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
+import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -384,7 +386,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        RouteMatch<?> routeMatch = (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+        Object routeMatchO = ((AttributeHolder) this).getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+        // usually this is a DefaultUriRouteMatch, avoid scalability issues here
+        RouteMatch<?> routeMatch = routeMatchO instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) routeMatchO;
         if (routeMatch != null) {
             // discard parameters that have already been bound
             for (Object toDiscard : routeMatch.getVariableValues().values()) {
@@ -404,7 +408,14 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             formRouteCompleter.release();
         }
         if (attributes != null) {
-            attributes.values().forEach(this::releaseIfNecessary);
+            attributes.forEach((k, v) -> {
+                //noinspection StringEquality
+                if (k == HttpAttributes.ROUTE_MATCH.toString() || k == HttpAttributes.ROUTE_INFO.toString() || v instanceof String) {
+                    // perf: avoid an instanceof in releaseIfNecessary
+                    return;
+                }
+                releaseIfNecessary(v);
+            });
         }
     }
 

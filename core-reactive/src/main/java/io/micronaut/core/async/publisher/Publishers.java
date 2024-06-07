@@ -424,12 +424,16 @@ public class Publishers {
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Class<?> type) {
+        // first, check for some common types without instanceof
+        if (type == Publisher.class) {
+            return true;
+        }
+        if (type.isPrimitive() || type.getName().startsWith("java.") || type.isArray()) {
+            return false;
+        }
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
-            if (type.isPrimitive() || type.getName().startsWith("java.")) {
-                return false;
-            }
             for (Class<?> reactiveType : REACTIVE_TYPES) {
                 if (reactiveType.isAssignableFrom(type)) {
                     return true;
@@ -454,7 +458,10 @@ public class Publishers {
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Object object) {
-        if (object == null) {
+        if (object == null ||
+            // check some common types for performance
+            object instanceof String || object instanceof byte[]) {
+
             return false;
         }
         if (object instanceof Publisher) {
