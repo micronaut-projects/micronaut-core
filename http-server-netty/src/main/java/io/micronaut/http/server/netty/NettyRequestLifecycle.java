@@ -25,6 +25,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.body.StreamingMultiObjectBody;
@@ -92,7 +93,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
             ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
             if (imperativeFlow != null) {
-                rib.writeResponse(outboundAccess, request, imperativeFlow.getValue(), imperativeFlow.getError());
+                Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
+                // usually this is a MutableHttpResponse, avoid scalability issues here
+                HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
+                rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
             } else {
                 result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
             }

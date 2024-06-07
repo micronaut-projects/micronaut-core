@@ -37,7 +37,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
+public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;

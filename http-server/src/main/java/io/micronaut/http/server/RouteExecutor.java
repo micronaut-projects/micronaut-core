@@ -434,7 +434,9 @@ public final class RouteExecutor {
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext, HttpRequest<?> request, RouteInfo<?> routeInfo, Object body) {
-        if (body instanceof HttpResponse<?> httpResponse) {
+        // performance optimization: check for common body types
+        //noinspection ConditionCoveredByFurtherCondition
+        if (!(body instanceof String) && !(body instanceof byte[]) && body instanceof HttpResponse<?> httpResponse) {
             MutableHttpResponse<?> outgoingResponse = httpResponse.toMutableResponse();
             final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (bodyArgument.isAsyncOrReactive()) {

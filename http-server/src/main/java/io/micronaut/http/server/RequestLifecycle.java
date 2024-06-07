@@ -41,6 +41,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
@@ -196,7 +197,9 @@ public class RequestLifecycle {
     private ExecutionFlow<HttpResponse<?>> callRoute(ExecutionFlow<RouteMatch<?>> flux,
                                                      HttpRequest<?> filteredRequest,
                                                      PropagatedContext propagatedContext) {
-        RouteMatch<?> routeMatch = flux.tryCompleteValue();
+        Object o = ((ExecutionFlow<?>) flux).tryCompleteValue();
+        // usually this is a DefaultUriRouteMatch, avoid scalability issues here
+        RouteMatch<?> routeMatch = o instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) o;
         if (routeMatch != null) {
             return routeExecutor.callRoute(propagatedContext, routeMatch, filteredRequest);
         }
@@ -207,7 +210,9 @@ public class RequestLifecycle {
                                                                  HttpRequest<?> request,
                                                                  RouteMatch<?> routeMatch,
                                                                  PropagatedContext propagatedContext) {
-        HttpResponse<?> response = flux.tryCompleteValue();
+        Object o = ((ExecutionFlow<?>) flux).tryCompleteValue();
+        // usually this is a MutableHttpResponse, avoid scalability issues here
+        HttpResponse<?> response = o instanceof MutableHttpResponse<?> mut ? mut : (HttpResponse<?>) o;
         if (response != null) {
             return handleStatusException(request, response, routeMatch, propagatedContext);
         }
