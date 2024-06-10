@@ -41,7 +41,8 @@ import java.util.concurrent.CompletableFuture;
  */
 @Internal
 public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
-    protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBody.class);
+    // don't change this, isolate body buffering to separate logging name space
+    protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBufferFactory.class);
 
     public static Flux<ByteBuf> toByteBufs(ByteBody body) {
         if (body instanceof NettyByteBody net) {
