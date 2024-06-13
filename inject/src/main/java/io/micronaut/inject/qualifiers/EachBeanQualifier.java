@@ -27,11 +27,11 @@ import io.micronaut.inject.BeanType;
  * @since 4.6
  */
 @Internal
-final class EachBeanQualifier<T> extends FilteringQualifier<T> {
+public final class EachBeanQualifier<T> extends FilteringQualifier<T> {
 
     private final BeanDefinition<?> beanDefinition;
 
-    EachBeanQualifier(BeanDefinition<?> beanDefinition) {
+    public EachBeanQualifier(BeanDefinition<?> beanDefinition) {
         this.beanDefinition = beanDefinition;
     }
 

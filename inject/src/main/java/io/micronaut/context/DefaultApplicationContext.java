@@ -45,8 +45,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.qualifiers.EachBeanQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -567,7 +567,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
                             qualifier = PrimaryQualifier.INSTANCE;
                         } else {
                             // @EachBean needs to have something of qualifier to find its origin
-                            qualifier = Qualifiers.eachBeanOf(dependentCandidate);
+                            qualifier = new EachBeanQualifier<>(dependentCandidate);
                         }
                     }
                     BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
