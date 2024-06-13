@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import jakarta.inject.Named;
 
@@ -429,6 +430,18 @@ public class Qualifiers {
             }
         }
         return null;
+    }
+
+    /**
+     * Qualifies the origin bean definition that was used to create an each bean.
+     *
+     * @param beanDefinition The beanDefinition
+     * @param <T>            The component type
+     * @return The qualifier
+     * @since 4.6
+     */
+    public static <T> Qualifier<T> eachBeanOf(BeanDefinition<?> beanDefinition) {
+        return new EachBeanQualifier<>(beanDefinition);
     }
 
     private record PrefixQualifier<T>(String prefix) implements Qualifier<T> {
