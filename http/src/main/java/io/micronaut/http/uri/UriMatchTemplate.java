@@ -409,11 +409,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                         (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen - 2) == '+'))) {
                         operatorQuantifier = "?";
                     }
+                    String s = (firstChar == '^') ? modifierStr.substring(1) : modifierStr;
                     if (operator == '/' || operator == '.') {
-                        variablePattern = "(" + ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = "(" + s + ")";
                     } else {
                         operatorPrefix = "(";
-                        variablePattern = ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = s + ")";
                     }
                     variableQuantifier = "";
                 }
@@ -427,7 +428,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                     pattern.append("(")
                         .append(operatorPrefix)
                         .append("\\")
-                        .append(String.valueOf(operator))
+                        .append(operator)
                         .append(operatorQuantifier);
                     operatorAppended = true;
                     // fall through
