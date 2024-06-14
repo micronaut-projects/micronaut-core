@@ -581,18 +581,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * An URI template parser.
      */
     protected static class UriTemplateParser {
-        private static final int STATE_TEXT = 0; // raw text
-        private static final int STATE_VAR_START = 1; // the start of a URI variable i.e. {
-        private static final int STATE_VAR_CONTENT = 2; // within a URI variable. i.e. {var}
-        private static final int STATE_VAR_NEXT = 11; // within the next variable in a URI variable declaration i.e. {var, var2}
-        private static final int STATE_VAR_MODIFIER = 12; // within a variable modifier i.e. {var:1}
-        private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable i.e. {var, var2:1}
         String templateText;
-        private int state = STATE_TEXT;
-        private char operator = OPERATOR_NONE; // zero means no operator
-        private char modifier = OPERATOR_NONE; // zero means no modifier
-        private String varDelimiter;
-        private boolean isQuerySegment = false;
 
         /**
          * @param templateText The template
@@ -607,20 +596,33 @@ public class UriTemplate implements Comparable<UriTemplate> {
          * @param segments The list of segments
          */
         protected void parse(List<PathSegment> segments) {
+            enum State {
+                TEXT, // raw text
+                VAR_START, // the start of a URI variable i.e. {
+                VAR_CONTENT, // within a URI variable. i.e. {var}
+                VAR_NEXT, // within the next variable in a URI variable declaration i.e. {var, var2}
+                VAR_MODIFIER, // within a variable modifier i.e. {var:1}
+                VAR_NEXT_MODIFIER  // within a variable modifier of a next variable i.e. {var, var2:1}
+            }
+            State state = State.TEXT;
+            char operator = OPERATOR_NONE; // zero means no operator
+            char modifier = OPERATOR_NONE; // zero means no modifier
+            String varDelimiter = null;
+            boolean isQuerySegment = false;
             char[] chars = templateText.toCharArray();
             StringBuilder buff = new StringBuilder();
             StringBuilder modBuff = new StringBuilder();
             int varCount = 0;
             for (char c : chars) {
                 switch (state) {
-                    case STATE_TEXT:
+                    case TEXT:
                         if (c == VAR_START) {
                             if (!buff.isEmpty()) {
                                 String val = buff.toString();
                                 addRawContentSegment(segments, val, isQuerySegment);
                             }
                             buff.delete(0, buff.length());
-                            state = STATE_VAR_START;
+                            state = State.VAR_START;
                         } else {
                             if (c == QUERY_OPERATOR || c == HASH_OPERATOR) {
                                 isQuerySegment = true;
@@ -628,26 +630,26 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             buff.append(c);
                         }
                         continue;
-                    case STATE_VAR_MODIFIER:
-                    case STATE_VAR_NEXT_MODIFIER:
+                    case VAR_MODIFIER:
+                    case VAR_NEXT_MODIFIER:
                         if (c == ' ') {
                             continue;
                         }
                         // fall through
-                    case STATE_VAR_NEXT:
-                    case STATE_VAR_CONTENT:
+                    case VAR_NEXT:
+                    case VAR_CONTENT:
                         switch (c) {
                             case ':':
                             case EXPAND_MODIFIER: // arrived to expansion modifier
-                                if (state == STATE_VAR_MODIFIER || state == STATE_VAR_NEXT_MODIFIER) {
+                                if (state == State.VAR_MODIFIER || state == State.VAR_NEXT_MODIFIER) {
                                     modBuff.append(c);
                                     continue;
                                 }
                                 modifier = c;
-                                state = state == STATE_VAR_NEXT ? STATE_VAR_NEXT_MODIFIER : STATE_VAR_MODIFIER;
+                                state = state == State.VAR_NEXT ? State.VAR_NEXT_MODIFIER : State.VAR_MODIFIER;
                                 continue;
                             case ',': // arrived to new variable
-                                state = STATE_VAR_NEXT;
+                                state = State.VAR_NEXT;
                                 // fall through
                             case VAR_END: // arrived to variable end
                                 if (!buff.isEmpty()) {
@@ -696,11 +698,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                             delimiter = ",";
                                     }
                                     String modifierStr = modBuff.toString();
-                                    char modifierChar = modifier;
-                                    String previous = state == STATE_VAR_NEXT || state == STATE_VAR_NEXT_MODIFIER ? this.varDelimiter : null;
-                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previous, isQuerySegment);
+                                    String previous = state == State.VAR_NEXT || state == State.VAR_NEXT_MODIFIER ? varDelimiter : null;
+                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifier, operator, previous, isQuerySegment);
                                 }
-                                boolean hasAnotherVar = state == STATE_VAR_NEXT && c != VAR_END;
+                                boolean hasAnotherVar = state == State.VAR_NEXT && c != VAR_END;
                                 if (hasAnotherVar) {
                                     varDelimiter = switch (operator) {
                                         case ';' -> null;
@@ -713,7 +714,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 } else {
                                     varCount = 0;
                                 }
-                                state = hasAnotherVar ? STATE_VAR_NEXT : STATE_TEXT;
+                                state = hasAnotherVar ? State.VAR_NEXT : State.TEXT;
                                 modBuff.delete(0, modBuff.length());
                                 buff.delete(0, buff.length());
                                 modifier = OPERATOR_NONE;
@@ -734,7 +735,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 }
 
                         }
-                    case STATE_VAR_START:
+                    case VAR_START:
                         switch (c) {
                             case ' ':
                                 continue;
@@ -748,10 +749,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             case DOT_OPERATOR:
                             case SLASH_OPERATOR:
                                 operator = c;
-                                state = STATE_VAR_CONTENT;
+                                state = State.VAR_CONTENT;
                                 continue;
                             default:
-                                state = STATE_VAR_CONTENT;
+                                state = State.VAR_CONTENT;
                                 buff.append(c);
                                 continue;
                         }
@@ -760,7 +761,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 }
             }
 
-            if (state == STATE_TEXT && !buff.isEmpty()) {
+            if (state == State.TEXT && !buff.isEmpty()) {
                 String val = buff.toString();
                 addRawContentSegment(segments, val, isQuerySegment);
             }
@@ -805,9 +806,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
             segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
         }
 
-        /**
-         * Raw path segment implementation.
-         */
         private record RawPathSegment(boolean isQuerySegment, String value) implements PathSegment {
 
             @Override
@@ -858,9 +856,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
-        /**
-         * Variable path segment implementation.
-         */
         private record VariablePathSegment(boolean isQuerySegment, String variable, String prefix,
                                            String delimiter, boolean encode, char modifierChar,
                                            char operator, String modifierStr,
