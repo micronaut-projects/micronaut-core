@@ -70,7 +70,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
-        if (variables.isEmpty() && Pattern.quote(templateString.toString()).equals(pattern.toString())) {
+        if (variables.isEmpty() && Pattern.quote(templateString.toString()).contentEquals(pattern)) {
             // if there are no variables and a match pattern matches template we can assume it matches exactly
             this.matchPattern = null;
             this.exactMatch = true;
