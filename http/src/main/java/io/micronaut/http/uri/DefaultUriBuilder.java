@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.core.util.ArrayUtils;
@@ -22,14 +24,14 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,7 +59,7 @@ class DefaultUriBuilder implements UriBuilder {
     private static final Pattern PATTERN_FULL_URI = Pattern.compile(
         "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
             ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
-    
+
     private String authority;
     private final MutableConvertibleMultiValues<String> queryParams;
     private String scheme;
@@ -120,7 +122,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.host = host;
                 }
                 if (port != null) {
-                    this.port = Integer.valueOf(port);
+                    this.port = Integer.parseInt(port);
                 }
                 if (path != null) {
 
@@ -345,7 +347,7 @@ class DefaultUriBuilder implements UriBuilder {
 
         StringBuilder path = this.path;
         if (StringUtils.isNotEmpty(path)) {
-            if (builder.length() > 0 && path.charAt(0) != '/') {
+            if (!builder.isEmpty() && path.charAt(0) != '/') {
                 builder.append('/');
             }
             String pathStr = path.toString();
@@ -413,10 +415,6 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String encode(String userInfo) {
-        try {
-            return URLEncoder.encode(userInfo, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException("No available charset: " + e.getMessage());
-        }
+        return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
     }
 }
