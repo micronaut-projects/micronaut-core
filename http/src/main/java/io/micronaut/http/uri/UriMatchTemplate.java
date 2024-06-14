@@ -70,7 +70,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
-        if (variables.isEmpty() && Pattern.quote(templateString.toString()).equals(pattern.toString())) {
+        if (variables.isEmpty() && Pattern.quote(templateString.toString()).contentEquals(pattern)) {
             // if there are no variables and a match pattern matches template we can assume it matches exactly
             this.matchPattern = null;
             this.exactMatch = true;
@@ -389,13 +389,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
             matchTemplate.variables.add(new UriMatchVariable(variable, modifierChar, operator));
-            StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
             boolean hasModifier = modifierChar == ':' && modLen > 0;
             String operatorPrefix = "";
             String operatorQuantifier = "";
             String variableQuantifier = "+?)";
-            String variablePattern = getVariablePattern(variable, operator);
+            String variablePattern = null;
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
@@ -409,25 +408,26 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                         (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen - 2) == '+'))) {
                         operatorQuantifier = "?";
                     }
+                    String s = (firstChar == '^') ? modifierStr.substring(1) : modifierStr;
                     if (operator == '/' || operator == '.') {
-                        variablePattern = "(" + ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = "(" + s + ")";
                     } else {
                         operatorPrefix = "(";
-                        variablePattern = ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = s + ")";
                     }
                     variableQuantifier = "";
                 }
             }
 
             boolean operatorAppended = false;
-
+            StringBuilder pattern = matchTemplate.pattern;
             switch (operator) {
                 case '.':
                 case '/':
                     pattern.append("(")
                         .append(operatorPrefix)
                         .append("\\")
-                        .append(String.valueOf(operator))
+                        .append(operator)
                         .append(operatorQuantifier);
                     operatorAppended = true;
                     // fall through
@@ -435,6 +435,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 case '0': // no active operator
                     if (!operatorAppended) {
                         pattern.append("(").append(operatorPrefix);
+                    }
+                    if (variablePattern == null) {
+                        variablePattern = getVariablePattern(variable, operator);
                     }
                     pattern.append(variablePattern)
                         .append(variableQuantifier)
