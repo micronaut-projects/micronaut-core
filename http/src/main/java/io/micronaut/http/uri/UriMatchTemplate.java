@@ -389,13 +389,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
             matchTemplate.variables.add(new UriMatchVariable(variable, modifierChar, operator));
-            StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
             boolean hasModifier = modifierChar == ':' && modLen > 0;
             String operatorPrefix = "";
             String operatorQuantifier = "";
             String variableQuantifier = "+?)";
-            String variablePattern = getVariablePattern(variable, operator);
+            String variablePattern = null;
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
@@ -421,7 +420,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             }
 
             boolean operatorAppended = false;
-
+            StringBuilder pattern = matchTemplate.pattern;
             switch (operator) {
                 case '.':
                 case '/':
@@ -436,6 +435,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 case '0': // no active operator
                     if (!operatorAppended) {
                         pattern.append("(").append(operatorPrefix);
+                    }
+                    if (variablePattern == null) {
+                        variablePattern = getVariablePattern(variable, operator);
                     }
                     pattern.append(variablePattern)
                         .append(variableQuantifier)
