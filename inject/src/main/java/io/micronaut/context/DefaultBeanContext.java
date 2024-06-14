@@ -927,28 +927,25 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         BeanDefinition<Map<String, V>> existingBean = findBeanDefinitionInternal(mapType, mapQualifier).orElse(null);
         if (existingBean != null) {
             return getBean(existingBean);
-        } else {
-            Collection<BeanRegistration<V>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
-            if (beanRegistrations.isEmpty()) {
-                return Collections.emptyMap();
-            } else {
-                try {
-                    return beanRegistrations.stream().collect(Collectors.toUnmodifiableMap(
-                        DefaultBeanContext::resolveKey,
-                        reg -> reg.bean
-                    ));
-                } catch (IllegalStateException e) { // occurs for duplicate keys
-                    List<BeanDefinition<V>> beanDefinitions = beanRegistrations.stream().map(reg -> reg.beanDefinition).toList();
-                    throw new DependencyInjectionException(
-                        resolutionContext,
-                        "Injecting a map of beans requires each bean to define a qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
-                        new NonUniqueBeanException(
-                            beanType.getType(),
-                            beanDefinitions.iterator()
-                        )
-                    );
-                }
-            }
+        }
+        Collection<BeanRegistration<V>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
+        if (beanRegistrations.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return beanRegistrations.stream().collect(Collectors.toUnmodifiableMap(
+                DefaultBeanContext::resolveKey,
+                reg -> reg.bean
+            ));
+        } catch (IllegalStateException e) { // occurs for duplicate keys
+            throw new DependencyInjectionException(
+                resolutionContext,
+                "Injecting a map of beans requires `@Named` qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
+                new NonUniqueBeanException(
+                    beanType.getType(),
+                    beanRegistrations.stream().map(reg -> reg.beanDefinition).iterator()
+                )
+            );
         }
     }
 
@@ -957,17 +954,18 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         BeanDefinition<?> definition = reg.beanDefinition;
         BeanIdentifier identifier = reg.identifier;
         if (definition instanceof NameResolver resolver) {
-            return resolver.resolveName().orElse(identifier.getName());
-        } else {
-            String name = identifier.getName();
-            if (name.equals(Primary.SIMPLE_NAME)) {
-                Class<?> candidateType = reg.beanDefinition.getBeanType();
-                String candidateSimpleName = candidateType.getSimpleName();
-                return NameUtils.decapitalize(candidateSimpleName);
-            } else {
+            String name = resolver.resolveName().orElse(null);
+            if (name != null) {
                 return name;
             }
         }
+        String name = identifier.getName();
+        if (name.equals(Primary.SIMPLE_NAME)) {
+            Class<?> candidateType = reg.beanDefinition.getBeanType();
+            String candidateSimpleName = candidateType.getSimpleName();
+            return NameUtils.decapitalize(candidateSimpleName);
+        }
+        return name;
     }
 
     /**

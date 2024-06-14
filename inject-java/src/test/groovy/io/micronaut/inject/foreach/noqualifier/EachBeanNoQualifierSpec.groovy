@@ -5,14 +5,30 @@ import spock.lang.Specification
 
 class EachBeanNoQualifierSpec extends Specification {
 
+    void "test returning a map of beans"() {
+        given:
+            ApplicationContext context = ApplicationContext.run([
+                    'spec': 'EachBeanNoQualifierSpec'
+            ])
+        when:
+            context.getBean(MyMapEachUser)
+        then:
+            def e = thrown(Exception)
+            e.message.contains "Injecting a map of beans requires `@Named` qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: Duplicate key myEach1"
+        cleanup:
+            context.close()
+    }
+
     void "test mapping each bean without qualifier"() {
         given:
-            ApplicationContext context = ApplicationContext.run()
-
+            ApplicationContext context = ApplicationContext.run([
+                    'spec': 'EachBeanNoQualifierSpec'
+            ])
         when:
             def myEach1Users = context.getBean(MyEach1User)
         then:
             myEach1Users.getAll().size() == 2
+            myEach1Users.getAll().collect { it.myService.name }.containsAll("foo", "bar")
             myEach1Users.getAll().collect { it.myService.name }.containsAll("foo", "bar")
         when:
             def myEach1s = context.getBeansOfType(MyEach1)

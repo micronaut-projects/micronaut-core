@@ -3,7 +3,9 @@ package io.micronaut.inject.foreach.qualifier;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec", value = "EachBeanQualifierSpec")
 @EachBean(MyService.class)
 public class MyEach3 {
 

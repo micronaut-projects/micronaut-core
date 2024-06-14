@@ -1,9 +1,11 @@
 package io.micronaut.inject.foreach.noqualifier;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
 import java.util.List;
 
+@Requires(property = "spec", value = "EachBeanNoQualifierSpec")
 @Singleton
 public class MyEach1User {
 

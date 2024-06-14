@@ -5,10 +5,24 @@ import spock.lang.Specification
 
 class EachBeanQualifierSpec extends Specification {
 
+    void "test returning a map of beans"() {
+        given:
+            ApplicationContext context = ApplicationContext.run([
+                    'spec': 'EachBeanQualifierSpec'
+            ])
+        when:
+            def bean = context.getBean(MyMapEachUser)
+        then:
+            bean.getAllMap().keySet().containsAll(["Foo", "Bar"])
+        cleanup:
+            context.close()
+    }
+
     void "test mapping each bean with qualifier"() {
         given:
-            ApplicationContext context = ApplicationContext.run()
-
+            ApplicationContext context = ApplicationContext.run([
+                    'spec': 'EachBeanQualifierSpec'
+            ])
         when:
             def myEach1Users = context.getBean(MyEach1User)
         then:
