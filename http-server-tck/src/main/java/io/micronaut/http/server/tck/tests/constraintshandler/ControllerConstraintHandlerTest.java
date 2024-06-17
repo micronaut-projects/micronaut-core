@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -191,6 +192,10 @@ public class ControllerConstraintHandlerTest {
                 password = credentials.getPassword();
             } else if (obj instanceof CredentialsWithNonNull credentials) {
                 password = credentials.getPassword();
+            } else if (obj instanceof Map<?, ?> map) {
+                password = map.get("password") == null ? null : map.get("password").toString();
+            } else if (obj instanceof ConvertibleValues<?> values) {
+                password = values.get("password", String.class).orElse(null);
             }
             return password != null ? Optional.of(Map.of("password", password)) : Optional.empty();
         }
