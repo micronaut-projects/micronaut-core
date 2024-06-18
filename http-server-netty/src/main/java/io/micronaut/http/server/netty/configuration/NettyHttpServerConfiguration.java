@@ -130,6 +130,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_JSON_BUFFER_MAX_COMPONENTS = 4096;
+
+    public static final int DEFAULT_BLOCK_SIZE = 1 << 16; // 64 KB;
+
+    public static final int DEFAULT_MAX_BLOCK_SIZE = 1 << (DEFAULT_COMPRESSIONLEVEL + 7) + 0x0F; // 32 M;
+
     /**
      * Default value for {@link Http3Settings#getInitialMaxData()}.
      *
@@ -196,6 +201,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
+    private int blockSize = DEFAULT_BLOCK_SIZE;
+    private int maxBlockSize = DEFAULT_MAX_BLOCK_SIZE;
     private boolean legacyMultiplexHandlers = false;
 
     /**
@@ -729,6 +736,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    public int getBlockSize() {
+        return blockSize;
+    }
+
+    public void setBlockSize(int blockSize) {
+        this.blockSize = blockSize;
+    }
+
+    public int getMaxBlockSize() {
+        return maxBlockSize;
+    }
+
+    public void setMaxBlockSize(int maxBlockSize) {
+        this.maxBlockSize = maxBlockSize;
     }
 
     /**

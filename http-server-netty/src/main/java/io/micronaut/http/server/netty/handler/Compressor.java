@@ -66,7 +66,7 @@ final class Compressor {
         this.gzipOptions = StandardCompressionOptions.gzip(strategy.getCompressionLevel(), stdGzip.windowBits(), stdGzip.memLevel());
         DeflateOptions stdDeflate = StandardCompressionOptions.deflate();
         this.deflateOptions = StandardCompressionOptions.deflate(strategy.getCompressionLevel(), stdDeflate.windowBits(), stdDeflate.memLevel());
-        this.zstdOptions = Zstd.isAvailable() ? StandardCompressionOptions.zstd() : null;
+        this.zstdOptions = Zstd.isAvailable() ? StandardCompressionOptions.zstd(strategy.getCompressionLevel(), strategy.getBlockSize(), strategy.getMaxBlockSize()) : null;
         this.snappyOptions = StandardCompressionOptions.snappy();
     }
 

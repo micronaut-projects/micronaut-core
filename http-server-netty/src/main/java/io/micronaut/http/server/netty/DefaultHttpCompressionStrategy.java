@@ -36,6 +36,8 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
     private final int compressionLevel;
+    private final int blockSize;
+    private final int maxBlockSize;
 
     /**
      * @param serverConfiguration The netty server configuration
@@ -44,15 +46,19 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
         this.compressionLevel = serverConfiguration.getCompressionLevel();
+        this.blockSize = serverConfiguration.getBlockSize();
+        this.maxBlockSize = serverConfiguration.getMaxBlockSize();
     }
 
     /**
      * @param compressionThreshold The compression threshold
      * @param compressionLevel The compression level (0-9)
      */
-    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel) {
+    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel, int blockSize, int maxBlockSize) {
         this.compressionThreshold = compressionThreshold;
         this.compressionLevel = compressionLevel;
+        this.blockSize = blockSize;
+        this.maxBlockSize = maxBlockSize;
     }
 
     @Override
@@ -78,5 +84,15 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     @Override
     public int getCompressionLevel() {
         return compressionLevel;
+    }
+
+    @Override
+    public int getBlockSize() {
+        return blockSize;
+    }
+
+    @Override
+    public int getMaxBlockSize() {
+        return maxBlockSize;
     }
 }

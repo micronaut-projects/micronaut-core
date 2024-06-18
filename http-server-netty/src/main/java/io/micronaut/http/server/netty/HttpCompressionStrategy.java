@@ -39,4 +39,12 @@ public interface HttpCompressionStrategy extends Toggleable {
     default int getCompressionLevel() {
         return StandardCompressionOptions.gzip().compressionLevel();
     }
+
+    default int getBlockSize() {
+        return StandardCompressionOptions.zstd().blockSize();
+    }
+
+    default int getMaxBlockSize() {
+        return StandardCompressionOptions.zstd().maxEncodeSize();
+    }
 }
