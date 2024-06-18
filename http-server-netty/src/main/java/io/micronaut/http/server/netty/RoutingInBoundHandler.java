@@ -48,6 +48,7 @@ import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
+import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -314,7 +315,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 return;
             }
 
-            MessageBodyWriter<Object> messageBodyWriter = (MessageBodyWriter<Object>) response.getBodyWriter().orElse(null);
+            // avoid checkcast for MessageBodyWriter interface here
+            Object o = response.getBodyWriter().orElse(null);
+            MessageBodyWriter<Object> messageBodyWriter = o instanceof NettyJsonHandler njh ? njh : (MessageBodyWriter<Object>) o;
             MediaType responseMediaType = response.getContentType().orElse(null);
             Argument<Object> responseBodyType;
             if (routeInfo != null) {
@@ -552,7 +555,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     <T> NettyBodyWriter<T> wrap(MessageBodyWriter<T> closure) {
-        if (closure instanceof NettyBodyWriter<T> nettyClosure) {
+        if (closure instanceof NettyJsonHandler<T> nettyClosure) {
+            // also covered by the next if, but this is slightly faster than an interface check
+            return nettyClosure;
+        } else if (closure instanceof NettyBodyWriter<T> nettyClosure) {
             return nettyClosure;
         } else {
             return new CompatNettyWriteClosure<>(closure);

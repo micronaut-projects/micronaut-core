@@ -3,6 +3,17 @@ plugins {
     id "me.champeau.jmh" version "0.7.2"
 }
 
+sourceSets {
+    create("typeCheckTest") {
+        compileClasspath += sourceSets.jmh.output
+        runtimeClasspath += sourceSets.jmh.output
+    }
+}
+
+configurations {
+    typePollutionAgent
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     jmhAnnotationProcessor project(":inject-java")
@@ -33,7 +44,18 @@ dependencies {
     }
 
     jmh libs.jmh.core
+
+    typeCheckTestImplementation libs.junit.jupiter
+    typeCheckTestImplementation 'org.moditect.jfrunit:jfrunit-core:1.0.0.Alpha2'
+    typePollutionAgent 'io.forked.franz:type-pollution-agent:0.1-SNAPSHOT'
+    typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
+
+configurations {
+    typeCheckTestImplementation.extendsFrom(jmhImplementation, implementation)
+    typeCheckTestRuntimeOnly.extendsFrom(jmhRuntimeOnly, runtimeOnly)
+}
+
 jmh {
     includes = ['io.micronaut.http.server.StartupBenchmark']
     duplicateClassesStrategy = DuplicatesStrategy.WARN
@@ -42,6 +64,21 @@ jmh {
 tasks.named("processJmhResources") {
     duplicatesStrategy = DuplicatesStrategy.WARN
 }
+
+tasks.register('typeCheckTest', Test) {
+    description = "Runs type check tests."
+    group = "verification"
+
+    testClassesDirs = sourceSets.typeCheckTest.output.classesDirs
+    classpath = sourceSets.typeCheckTest.runtimeClasspath
+
+    useJUnitPlatform()
+    systemProperty("io.type.pollution.file", project.layout.buildDirectory.get().file("type-pollution.log").asFile.toString())
+    jvmArgs("-javaagent:${configurations.typePollutionAgent.singleFile}")
+}
+
+check.dependsOn typeCheckTest
+
 ['spotlessJavaCheck', 'checkstyleMain', 'checkstyleJmh'].each {
     tasks.named(it) {
         enabled = false

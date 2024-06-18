@@ -84,6 +84,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
 import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
@@ -456,7 +457,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
 
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final BeanIntrospection<Object> introspection = findIntrospection(beanClass);
+            final UnsafeBeanInstantiationIntrospection<Object> introspection = (UnsafeBeanInstantiationIntrospection<Object>) findIntrospection(beanClass);
             if (introspection == null) {
                 return builder;
             } else {
@@ -707,7 +708,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, args);
                         }
-                        return introspection.instantiate(false, args);
+                        return ((UnsafeBeanInstantiationIntrospection<?>) introspection).instantiateUnsafe(args);
                     }
 
                     @Override
@@ -715,14 +716,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, delegate);
                         }
-                        return introspection.instantiate(false, new Object[] { delegate });                    }
+                        return introspection.instantiateUnsafe(new Object[] { delegate });                    }
 
                     @Override
                     public Object createFromString(DeserializationContext ctxt, String value) {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, value);
                         }
-                        return introspection.instantiate(false, new Object[]{ value });
+                        return introspection.instantiateUnsafe(new Object[]{ value });
                     }
 
                     @Override
@@ -748,7 +749,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, value);
                         }
-                        return introspection.instantiate(false, new Object[]{ value });
+                        return introspection.instantiateUnsafe(new Object[]{ value });
                     }
 
                     @Override
@@ -756,7 +757,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, value);
                         }
-                        return introspection.instantiate(false, new Object[]{ value });
+                        return introspection.instantiateUnsafe(new Object[]{ value });
                     }
 
                     @Override
@@ -764,7 +765,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (preInstantiateCallback != null) {
                             preInstantiateCallback.preInstantiate(introspection, value);
                         }
-                        return introspection.instantiate(false, new Object[]{ value });
+                        return introspection.instantiateUnsafe(new Object[]{ value });
                     }
 
                 });
