@@ -276,7 +276,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         if (variables.isEmpty()) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {
-                    exactMatchInfo = new UriMatchTemplate.DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
+                    exactMatchInfo = new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
                 }
                 return exactMatchInfo;
             }
