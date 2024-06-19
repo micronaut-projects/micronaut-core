@@ -328,7 +328,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
         }
-        return true;
+        return uri.isEmpty();
     }
 
     private static int readText(String input, boolean requiresSlash) {
