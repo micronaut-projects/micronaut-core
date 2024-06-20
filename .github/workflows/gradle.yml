@@ -45,14 +45,14 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@v1.2.1
+        uses: graalvm/setup-graalvm@v1.2.2
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/gradle-build-action@v3.3.2
+        uses: gradle/gradle-build-action@v3.4.2
 
       - name: "❓ Optional setup step"
         run: |
