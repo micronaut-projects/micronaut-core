@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2014 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,15 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 /**
- * @author Graeme Rocher
- * @since 1.0
+ * @author Denis Stepanov
  */
-class UriMatchTemplateSpec extends Specification {
+class UriTemplateMatcherSpec extends Specification {
 
     @Unroll
     void "test compareTo for #left and #right"() {
         given:
-        UriMatchTemplate leftTemplate = new UriMatchTemplate(left)
-        UriMatchTemplate rightTemplate = new UriMatchTemplate(right)
+        UriTemplateMatcher leftTemplate = new UriTemplateMatcher(left)
+        UriTemplateMatcher rightTemplate = new UriTemplateMatcher(right)
 
         expect:
         leftTemplate.compareTo(rightTemplate) == result
@@ -49,7 +48,7 @@ class UriMatchTemplateSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri when nested with #nested"() {
         given:
-        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
         Optional<UriMatchInfo> info = matchTemplate.nest(nested).match(uri)
 
         expect:
@@ -71,7 +70,7 @@ class UriMatchTemplateSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri"() {
         given:
-        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:
@@ -81,6 +80,9 @@ class UriMatchTemplateSpec extends Specification {
         where:
         template                         | uri                        | matches | variables
         // raw unencoded paths
+        "/books{/id:.*}{/chapter:.*}"    | '/books/1/ch22'            | true    | [id: '1/ch22', chapter:'']
+        "/books{/id:\\d+}{/chapter:.*}"  | '/books/1/ch22'            | true    | [id: '1', chapter:'ch22']
+    "/books{/id:\\d+}{/chapter:.*}/file{.ext:?}" | '/books/1/ch22/file.xml' | true    | [id: '1', chapter:'ch22', ext: 'xml']
         "/id/{id}.csv"                   |'/id/{id}'                  | false   | null
         "https://www.domain.com/{+path}" |'https://www.domain.com/abc'| true    | [path:'abc']
         "https://www.domain.com/       " |'https://www.domain.com    '| false   | null
@@ -90,9 +92,6 @@ class UriMatchTemplateSpec extends Specification {
         "/books/{+path}/test"            | '/books/foo/bar/test'      | true    | [path: 'foo/bar']
         "/books{/id}{.ext:?}"            | '/books/1.xml'             | true    | [id: '1', ext: 'xml']
         "/books{/id}{.ext:?}"            | '/books/1'                 | true    | [id: '1', ext: null]
-        "/books{/id:.*}{/chapter:.*}"    | '/books/1/ch22'            | true    | [id: '1/ch22', chapter:'']
-        "/books{/id:\\d+}{/chapter:.*}"  | '/books/1/ch22'            | true    | [id: '1', chapter:'ch22']
-"/books{/id:\\d+}{/chapter:.*}/file{.ext:?}" | '/books/1/ch22/file.xml' | true    | [id: '1', chapter:'ch22', ext: 'xml']
         "/books{/path:.*?}{.ext:?}"      | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']
         ""                               | ""                         | true    | [:]
         "/"                              | "/"                        | true    | [:]
@@ -108,7 +107,7 @@ class UriMatchTemplateSpec extends Specification {
         "/books{/path:.*}"               | '/books/foo/bar'           | true    | [path: 'foo/bar']
         "/books{/path:.*}{.ext}"         | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']
         "/books{/path:.*}{.ext:?}"       | '/books/foo/bar'           | true    | [path: 'foo/bar', ext: null]
-        "/books/{id}"                    | '/books'                   | false   | null
+        "/books/{id}/{chapter}"          | '/books/123/ch1'           | true    | [id: '123', chapter: 'ch1']
         "/books/{id}"                    | '/books/1'                 | true    | [id: '1']
         "/books/{id}"                    | '/books/test'              | true    | [id: 'test']
         "/books/{id:2}"                  | '/books/1'                 | true    | [id: '1']
@@ -146,7 +145,7 @@ class UriMatchTemplateSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri with trailing slash"() {
         given:
-        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:
@@ -194,7 +193,7 @@ class UriMatchTemplateSpec extends Specification {
     @Unroll
     void "Test URI template #template matches uri with encoded characters: #uri"() {
         given:
-        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:

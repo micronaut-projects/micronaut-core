@@ -162,6 +162,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * @return The template string
+     */
+    public String getTemplateString() {
+        return templateString;
+    }
+
+    /**
      * @return The number of segments that are variable
      */
     public long getVariableSegmentCount() {
