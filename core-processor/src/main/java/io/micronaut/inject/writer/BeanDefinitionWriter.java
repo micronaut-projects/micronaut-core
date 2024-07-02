@@ -447,20 +447,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
 
-    private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
-            Class.class, // beanType
-            AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
-            AnnotationMetadata.class, // annotationMetadata
-            AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
-            AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
-            AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
-            ExecutableMethodsDefinition.class, // executableMethodsDefinition
-            Map.class, // typeArgumentsMap
-            AbstractInitializableBeanDefinition.PrecalculatedInfo.class, // precalculated info
-            Condition[].class, // pre conditions
-            Condition[].class, // post conditions
-            Throwable.class // failed initialization
-    ));
+    private static final Optional<Constructor<AbstractInitializableBeanDefinitionAndReference>> BEAN_DEFINITION_CLASS_CONSTRUCTOR1 = ReflectionUtils.findConstructor(
+        AbstractInitializableBeanDefinitionAndReference.class,
+        Class.class, // beanType
+        AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
+        AnnotationMetadata.class, // annotationMetadata
+        AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
+        AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
+        AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
+        ExecutableMethodsDefinition.class, // executableMethodsDefinition
+        Map.class, // typeArgumentsMap
+        AbstractInitializableBeanDefinition.PrecalculatedInfo.class // precalculated info
+    );
+
+    private static final Optional<Constructor<AbstractInitializableBeanDefinitionAndReference>> BEAN_DEFINITION_CLASS_CONSTRUCTOR2 = ReflectionUtils.findConstructor(
+        AbstractInitializableBeanDefinitionAndReference.class,
+        Class.class, // beanType
+        AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
+        AnnotationMetadata.class, // annotationMetadata
+        AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
+        AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
+        AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
+        ExecutableMethodsDefinition.class, // executableMethodsDefinition
+        Map.class, // typeArgumentsMap
+        AbstractInitializableBeanDefinition.PrecalculatedInfo.class, // precalculated info
+        Condition[].class, // pre conditions
+        Condition[].class, // post conditions
+        Throwable.class // failed initialization
+    );
 
     private static final Type PRECALCULATED_INFO = Type.getType(AbstractInitializableBeanDefinition.PrecalculatedInfo.class);
     private static final org.objectweb.asm.commons.Method PRECALCULATED_INFO_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(
@@ -4485,22 +4499,26 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // 9: `PrecalculatedInfo`
             protectedConstructor.getStatic(beanDefinitionType, FIELD_PRECALCULATED_INFO, PRECALCULATED_INFO);
 
-            List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
-            if (requirements.isEmpty()) {
-                // 10: Pre conditions
-                pushNewArray(protectedConstructor, Condition.class, 0);
-                // 11: Post conditions
-                pushNewArray(protectedConstructor, Condition.class, 0);
-            } else {
-                // 10: Pre conditions
-                protectedConstructor.getStatic(beanDefinitionType, FIELD_PRE_START_CONDITIONS, Type.getType(Condition[].class));
-                // 11: Post conditions
-                protectedConstructor.getStatic(beanDefinitionType, FIELD_POST_START_CONDITIONS, Type.getType(Condition[].class));
-            }
-            // 12: Exception
-            protectedConstructor.getStatic(beanDefinitionType, FIELD_FAILED_INITIALIZATION, Type.getType(Throwable.class));
+            if (BEAN_DEFINITION_CLASS_CONSTRUCTOR2.isPresent()) {
+                List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
+                if (requirements.isEmpty()) {
+                    // 10: Pre conditions
+                    pushNewArray(protectedConstructor, Condition.class, 0);
+                    // 11: Post conditions
+                    pushNewArray(protectedConstructor, Condition.class, 0);
+                } else {
+                    // 10: Pre conditions
+                    protectedConstructor.getStatic(beanDefinitionType, FIELD_PRE_START_CONDITIONS, Type.getType(Condition[].class));
+                    // 11: Post conditions
+                    protectedConstructor.getStatic(beanDefinitionType, FIELD_POST_START_CONDITIONS, Type.getType(Condition[].class));
+                }
+                // 12: Exception
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_FAILED_INITIALIZATION, Type.getType(Throwable.class));
 
-            protectedConstructor.invokeConstructor(getSuperType(), BEAN_DEFINITION_CLASS_CONSTRUCTOR);
+                protectedConstructor.invokeConstructor(getSuperType(), org.objectweb.asm.commons.Method.getMethod(BEAN_DEFINITION_CLASS_CONSTRUCTOR2.get()));
+            } else {
+                protectedConstructor.invokeConstructor(getSuperType(), org.objectweb.asm.commons.Method.getMethod(BEAN_DEFINITION_CLASS_CONSTRUCTOR1.get()));
+            }
 
             protectedConstructor.returnValue();
             protectedConstructor.visitMaxs(20, 1);

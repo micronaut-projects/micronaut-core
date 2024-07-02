@@ -27,7 +27,7 @@ class MissingBeanSpec extends Specification {
             ApplicationContext.run(EmbeddedServer, ['spec.name': "MissingConstructorBeanController"])
         then:
             def e = thrown(BeanInstantiationException)
-            e.message == "Failed to initialize the bean: io/micronaut/inject/test/external/ExternalBean"
+            e.message == "Failed to initialize the bean [class io.micronaut.http.missing.classnotfound.MissingConstructorBeanController]: io/micronaut/inject/test/external/ExternalBean"
     }
 
     void "test a controller with a missing bean 2"() {
@@ -35,7 +35,7 @@ class MissingBeanSpec extends Specification {
             ApplicationContext.run(EmbeddedServer, ['spec.name': "MissingFieldBeanController"])
         then:
             def e = thrown(BeanInstantiationException)
-            e.message == "Failed to initialize the bean: io/micronaut/inject/test/external/ExternalBean"
+            e.message == "Failed to initialize the bean [class io.micronaut.http.missing.classnotfound.MissingFieldBeanController]: io/micronaut/inject/test/external/ExternalBean"
     }
 
     void "test a controller with a missing bean 3"() {
@@ -43,7 +43,7 @@ class MissingBeanSpec extends Specification {
             ApplicationContext.run(EmbeddedServer, ['spec.name': "MissingMethodInjectBeanController"])
         then:
             def e = thrown(BeanInstantiationException)
-            e.message == "Failed to initialize the bean: io/micronaut/inject/test/external/ExternalBean"
+            e.message == "Failed to initialize the bean [class io.micronaut.http.missing.classnotfound.MissingMethodInjectBeanController]: io/micronaut/inject/test/external/ExternalBean"
     }
 
     void "test a controller with a missing bean 4"() {
@@ -51,7 +51,7 @@ class MissingBeanSpec extends Specification {
             ApplicationContext.run(EmbeddedServer, ['spec.name': "MissingExecutableMethodBeanController"])
         then:
             def e = thrown(BeanInstantiationException)
-            e.message == "Failed to initialize the bean: io/micronaut/inject/test/external/ExternalBean"
+            e.message == "Failed to initialize the bean [class io.micronaut.http.missing.classnotfound.MissingExecutableMethodBeanController]: io/micronaut/inject/test/external/ExternalBean"
     }
 
 }

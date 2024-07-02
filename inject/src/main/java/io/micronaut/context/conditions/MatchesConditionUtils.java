@@ -105,7 +105,7 @@ public class MatchesConditionUtils {
             }
         }
         if (requirement.contains(RequiresCondition.MEMBER_MISSING_PROPERTY)) {
-            String property = requirement.stringValue(RequiresCondition.MEMBER_PROPERTY).orElse(null);
+            String property = requirement.stringValue(RequiresCondition.MEMBER_MISSING_PROPERTY).orElse(null);
             if (StringUtils.isNotEmpty(property)) {
                 preConditions.add(new MatchesMissingPropertyCondition(property));
             }
