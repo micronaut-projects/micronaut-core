@@ -73,6 +73,14 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
         this.postLoadConditions = postLoadConditions;
     }
 
+    /**
+     * Is enabled bean definition.
+     *
+     * @param context           The bean context
+     * @param resolutionContext The resolution context
+     * @param preCheck          if it's a pre-load / post-load
+     * @return true if enabled
+     */
     public final boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext, boolean preCheck) {
         if (preLoadConditions != null && postLoadConditions != null) {
             DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
@@ -120,7 +128,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
     @Override
     public final BeanDefinition<T> load(BeanContext context) {
         if (failedInitialization != null) {
-            throw new BeanInstantiationException("Failed to initialize the bean: " + failedInitialization.getMessage(), failedInitialization);
+            throw new BeanInstantiationException("Failed to initialize the bean [" + getBeanType() + "]: " + failedInitialization.getMessage(), failedInitialization);
         }
         BeanDefinition<T> definition = load();
         if (definition instanceof EnvironmentConfigurable environmentConfigurable) {

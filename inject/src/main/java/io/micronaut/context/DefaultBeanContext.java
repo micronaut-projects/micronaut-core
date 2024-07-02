@@ -4220,7 +4220,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 return false;
             }
             if (referenceEnabled == null) {
-                if (isReferenceAndDefinitionEnabled(ref, context, resolutionContext)) {
+                if (isReferenceEnabled(ref, context, resolutionContext)) {
                     referenceEnabled = true;
                 } else {
                     referenceEnabled = false;
@@ -4230,7 +4230,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return referenceEnabled;
         }
 
-        private boolean isReferenceAndDefinitionEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
+        private boolean isReferenceEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
             if (ref instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> referenceAndDefinition) {
                 return referenceAndDefinition.isEnabled(context, resolutionContext, true);
             }
@@ -4259,7 +4259,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             if (definitionEnabled == null) {
                 if (isReferenceEnabled(context, resolutionContext)) {
                     BeanDefinition <?> def = getDefinition(context);
-                    if (isDefenitionEnabled(context, resolutionContext, def)) {
+                    if (isDefinitionEnabled(context, resolutionContext, def)) {
                         definition = def;
                         definitionEnabled = true;
                     } else {
@@ -4272,7 +4272,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return definitionEnabled;
         }
 
-        private boolean isDefenitionEnabled(DefaultBeanContext context, BeanResolutionContext resolutionContext, BeanDefinition<?> def) {
+        private boolean isDefinitionEnabled(DefaultBeanContext context, BeanResolutionContext resolutionContext, BeanDefinition<?> def) {
             if (def instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> definitionAndReference) {
                 return definitionAndReference.isEnabled(context, resolutionContext, false);
             }
