@@ -184,7 +184,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
 
     /**
      *
-     * @param routeMatch
+     * @param routeMatch the route match
      * @param <T> The target type
      * @param <R> The return type
      * @return Returns the value of the annotation {@link Version} in the route method wrapped in an {@link Optional}.

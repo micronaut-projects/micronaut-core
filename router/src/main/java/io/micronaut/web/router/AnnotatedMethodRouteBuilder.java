@@ -25,15 +25,32 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.CustomHttpMethod;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Error;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Head;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Options;
+import io.micronaut.http.annotation.Patch;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.Trace;
+import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -309,10 +326,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                     }
 
                     if (isGlobal) {
-                        //noinspection unchecked
                         error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                     } else {
-                        //noinspection unchecked
                         error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                     }
                 }
@@ -348,7 +363,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             }
         );
 
-        if (!actionAnn.isPresent() && method.isDeclaredAnnotationPresent(UriMapping.class)) {
+        if (actionAnn.isEmpty() && method.isDeclaredAnnotationPresent(UriMapping.class)) {
             Set<String> uris = CollectionUtils.setOf(method.stringValues(UriMapping.class, "uris"));
             uris.add(method.stringValue(UriMapping.class).orElse(UriMapping.DEFAULT_URI));
             for (String uri: uris) {
@@ -379,7 +394,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     /**
      * state class for defining routes.
      */
-    private final class RouteDefinition {
+    private static final class RouteDefinition {
         private final BeanDefinition beanDefinition;
         private final ExecutableMethod executableMethod;
         private final int port;

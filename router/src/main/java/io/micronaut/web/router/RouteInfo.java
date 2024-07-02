@@ -194,7 +194,6 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
 
-
     /**
      * Whether the route does produce any of the given types.
      *
