@@ -106,6 +106,12 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
+    /**
+     * The default value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final DnsResolutionMode DEFAULT_DNS_RESOLUTION_MODE = DnsResolutionMode.DEFAULT;
+
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -167,6 +173,8 @@ public abstract class HttpClientConfiguration {
     private LogLevel logLevel;
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
+
+    private DnsResolutionMode dnsResolutionMode = DEFAULT_DNS_RESOLUTION_MODE;
 
     /**
      * Default constructor.
@@ -778,6 +786,25 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Configure how DNS records are resolved. This option is specific to the netty client.
+     *
+     * @return The DNS resolution mode
+     */
+    @NonNull
+    public DnsResolutionMode getDnsResolutionMode() {
+        return dnsResolutionMode;
+    }
+
+    /**
+     * Configure how DNS records are resolved. This option is specific to the netty client.
+     *
+     * @param dnsResolutionMode The DNS resolution mode
+     */
+    public void setDnsResolutionMode(@NonNull DnsResolutionMode dnsResolutionMode) {
+        this.dnsResolutionMode = dnsResolutionMode;
+    }
+
+    /**
      * Configuration for the HTTP client connnection pool.
      */
     public static class ConnectionPoolConfiguration implements Toggleable {
@@ -981,5 +1008,24 @@ public abstract class HttpClientConfiguration {
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
         }
+    }
+
+    /**
+     * The DNS resolution mode.
+     */
+    public enum DnsResolutionMode {
+        /**
+         * Default netty resolution implementation. Addresses are resolved before connecting.
+         */
+        DEFAULT,
+        /**
+         * No-op resolution implementation. Addresses are resolved internally by the JDK during
+         * connection.
+         */
+        NOOP,
+        /**
+         * Pick a random resolved record for each connection.
+         */
+        ROUND_ROBIN,
     }
 }
