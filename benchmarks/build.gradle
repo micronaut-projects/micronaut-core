@@ -3,15 +3,16 @@ plugins {
     id "me.champeau.jmh" version "0.7.2"
 }
 
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
 sourceSets {
     create("typeCheckTest") {
         compileClasspath += sourceSets.jmh.output
         runtimeClasspath += sourceSets.jmh.output
     }
-}
-
-configurations {
-    typePollutionAgent
 }
 
 dependencies {
@@ -46,8 +47,9 @@ dependencies {
     jmh libs.jmh.core
 
     typeCheckTestImplementation libs.junit.jupiter
-    typeCheckTestImplementation 'org.moditect.jfrunit:jfrunit-core:1.0.0.Alpha2'
-    typePollutionAgent 'io.forked.franz:type-pollution-agent:0.1-SNAPSHOT'
+    typeCheckTestImplementation 'io.micronaut.test:micronaut-test-type-pollution:4.4.0-SNAPSHOT'
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.14.17")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.14.17")
     typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
 
@@ -73,8 +75,6 @@ tasks.register('typeCheckTest', Test) {
     classpath = sourceSets.typeCheckTest.runtimeClasspath
 
     useJUnitPlatform()
-    systemProperty("io.type.pollution.file", project.layout.buildDirectory.get().file("type-pollution.log").asFile.toString())
-    jvmArgs("-javaagent:${configurations.typePollutionAgent.singleFile}")
 }
 
 check.dependsOn typeCheckTest
