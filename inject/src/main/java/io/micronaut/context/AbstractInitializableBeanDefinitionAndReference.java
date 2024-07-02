@@ -15,6 +15,10 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.context.conditions.MatchesDynamicCondition;
+import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -22,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.ExecutableMethodsDefinition;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.util.Map;
 
@@ -34,6 +39,10 @@ import java.util.Map;
  */
 public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends AbstractInitializableBeanDefinition<T> implements BeanDefinitionReference<T> {
 
+    private final Throwable failedInitialization;
+    private final Condition[] preLoadConditions;
+    private final Condition[] postLoadConditions;
+
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
@@ -43,9 +52,60 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
                                                               @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
                                                               @NonNull PrecalculatedInfo precalculatedInfo) {
-        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo);
+        this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo, null, null, null);
     }
 
+    protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
+                                                              @Nullable MethodOrFieldReference constructor,
+                                                              @Nullable AnnotationMetadata annotationMetadata,
+                                                              @Nullable MethodReference[] methodInjection,
+                                                              @Nullable FieldReference[] fieldInjection,
+                                                              @Nullable AnnotationReference[] annotationInjection,
+                                                              @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
+                                                              @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+                                                              @NonNull PrecalculatedInfo precalculatedInfo,
+                                                              @Nullable Condition[] preLoadConditions,
+                                                              @Nullable Condition[] postLoadConditions,
+                                                              @Nullable Throwable failedInitialization) {
+        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo);
+        this.failedInitialization = failedInitialization;
+        this.preLoadConditions = preLoadConditions;
+        this.postLoadConditions = postLoadConditions;
+    }
+
+    public final boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext, boolean preCheck) {
+        if (preLoadConditions != null && postLoadConditions != null) {
+            DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
+            DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
+                defaultBeanContext,
+                this, resolutionContext);
+            boolean matches;
+            if (preCheck) {
+                matches = matches(conditionContext, preLoadConditions);
+            } else {
+                matches = matches(conditionContext, postLoadConditions);
+            }
+            if (matches) {
+                return true;
+            }
+            onFail(conditionContext, defaultBeanContext);
+            return false;
+        }
+        if (preCheck) {
+            // new implementation of definition and reference always did all checks in post checks
+            return true;
+        }
+        return isEnabled(context, resolutionContext);
+    }
+
+    private static boolean matches(ConditionContext<?> conditionContext, Condition[] conditions) {
+        for (Condition condition : conditions) {
+            if (!condition.matches(conditionContext)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /**
      * Represents {@link BeanDefinitionReference#getBeanDefinitionName()} when the class implements {@link BeanDefinitionReference}.
@@ -59,6 +119,9 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
 
     @Override
     public final BeanDefinition<T> load(BeanContext context) {
+        if (failedInitialization != null) {
+            throw new BeanInstantiationException("Failed to initialize the bean: " + failedInitialization.getMessage(), failedInitialization);
+        }
         BeanDefinition<T> definition = load();
         if (definition instanceof EnvironmentConfigurable environmentConfigurable) {
             if (context instanceof DefaultApplicationContext applicationContext) {
@@ -70,6 +133,22 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
         }
         if (definition instanceof BeanContextConfigurable ctxConfigurable) {
             ctxConfigurable.configure(context);
+        }
+        if (postLoadConditions != null) {
+            for (int i = 0; i < postLoadConditions.length; i++) {
+                Condition postStartCondition = postLoadConditions[i];
+                if (postStartCondition instanceof MatchesDynamicCondition matchesDynamicCondition) {
+                    AnnotationMetadata annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(matchesDynamicCondition.annotationMetadata());
+                    if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+                        eam.configure(context);
+                        eam.setBeanDefinition(this);
+                    }
+                    postLoadConditions[i] = new MatchesDynamicCondition(
+                        annotationMetadata
+                    );
+                }
+            }
+
         }
         return definition;
     }

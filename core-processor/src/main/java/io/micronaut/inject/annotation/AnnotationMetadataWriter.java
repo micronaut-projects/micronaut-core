@@ -752,7 +752,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         methodVisitor.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
     }
 
-    private static void invokeLoadClassValueMethod(
+    public static void invokeLoadClassValueMethod(
             Type declaringType,
             ClassVisitor declaringClassWriter,
             GeneratorAdapter methodVisitor,

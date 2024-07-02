@@ -2087,7 +2087,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * @return The candidates
      */
     @NonNull
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
+    @Internal
+    public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                    @NonNull Argument<T> beanType,
                                                                    @Nullable BeanDefinition<?> filter) {
         Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
@@ -4206,9 +4207,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
         BeanDefinitionProducer(@NonNull BeanDefinitionReference reference) {
             this.reference = reference;
-            if (reference instanceof AbstractInitializableBeanDefinitionAndReference<?>) {
-                referenceEnabled  = true; // Postpone validation check
-            }
         }
 
         public boolean isReferenceEnabled(DefaultBeanContext context) {
@@ -4222,7 +4220,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 return false;
             }
             if (referenceEnabled == null) {
-                if (ref.isEnabled(context, resolutionContext)) {
+                if (isReferenceAndDefinitionEnabled(ref, context, resolutionContext)) {
                     referenceEnabled = true;
                 } else {
                     referenceEnabled = false;
@@ -4230,6 +4228,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 }
             }
             return referenceEnabled;
+        }
+
+        private boolean isReferenceAndDefinitionEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
+            if (ref instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> referenceAndDefinition) {
+                return referenceAndDefinition.isEnabled(context, resolutionContext, true);
+            }
+            return reference.isEnabled(context);
         }
 
         public boolean isDisabled() {
@@ -4254,7 +4259,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             if (definitionEnabled == null) {
                 if (isReferenceEnabled(context, resolutionContext)) {
                     BeanDefinition <?> def = getDefinition(context);
-                    if (def.isEnabled(context, resolutionContext)) {
+                    if (isDefenitionEnabled(context, resolutionContext, def)) {
                         definition = def;
                         definitionEnabled = true;
                     } else {
@@ -4265,6 +4270,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 }
             }
             return definitionEnabled;
+        }
+
+        private boolean isDefenitionEnabled(DefaultBeanContext context, BeanResolutionContext resolutionContext, BeanDefinition<?> def) {
+            if (def instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> definitionAndReference) {
+                return definitionAndReference.isEnabled(context, resolutionContext, false);
+            }
+            return def.isEnabled(context, resolutionContext);
         }
 
         public <T> BeanDefinitionReference<T> getReference() {

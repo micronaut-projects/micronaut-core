@@ -40,10 +40,31 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.PropertySource;
+import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.conditions.MatchesAbsenseOfBeansCondition;
+import io.micronaut.context.conditions.MatchesAbsenseOfClassNamesCondition;
+import io.micronaut.context.conditions.MatchesAbsenseOfClassesCondition;
+import io.micronaut.context.conditions.MatchesConditionUtils;
+import io.micronaut.context.conditions.MatchesConfigurationCondition;
+import io.micronaut.context.conditions.MatchesCurrentNotOsCondition;
+import io.micronaut.context.conditions.MatchesCurrentOsCondition;
+import io.micronaut.context.conditions.MatchesCustomCondition;
+import io.micronaut.context.conditions.MatchesDynamicCondition;
+import io.micronaut.context.conditions.MatchesEnvironmentCondition;
+import io.micronaut.context.conditions.MatchesMissingPropertyCondition;
+import io.micronaut.context.conditions.MatchesNotEnvironmentCondition;
+import io.micronaut.context.conditions.MatchesPresenceOfBeansCondition;
+import io.micronaut.context.conditions.MatchesPresenceOfClassesCondition;
+import io.micronaut.context.conditions.MatchesPresenceOfEntitiesCondition;
+import io.micronaut.context.conditions.MatchesPresenseOfResourcesCondition;
+import io.micronaut.context.conditions.MatchesPropertyCondition;
+import io.micronaut.context.conditions.MatchesSdkCondition;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -105,7 +126,6 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
-import java.util.function.BiConsumer;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -137,6 +157,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -435,7 +456,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
             ExecutableMethodsDefinition.class, // executableMethodsDefinition
             Map.class, // typeArgumentsMap
-            AbstractInitializableBeanDefinition.PrecalculatedInfo.class // precalculated info
+            AbstractInitializableBeanDefinition.PrecalculatedInfo.class, // precalculated info
+            Condition[].class, // pre conditions
+            Condition[].class, // post conditions
+            Throwable.class // failed initialization
     ));
 
     private static final Type PRECALCULATED_INFO = Type.getType(AbstractInitializableBeanDefinition.PrecalculatedInfo.class);
@@ -453,12 +477,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ));
 
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
+    private static final String FIELD_EXECUTABLE_METHODS = "$EXEC";
     private static final String FIELD_INJECTION_METHODS = "$INJECTION_METHODS";
     private static final String FIELD_INJECTION_FIELDS = "$INJECTION_FIELDS";
     private static final String FIELD_ANNOTATION_INJECTIONS = "$ANNOTATION_INJECTIONS";
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
     private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
     private static final String FIELD_EXPOSED_TYPES = "$EXPOSED_TYPES";
+    private static final String FIELD_FAILED_INITIALIZATION = "$FAILURE";
+    private static final String FIELD_PRECALCULATED_INFO = "$INFO";
+    private static final String FIELD_PRE_START_CONDITIONS = "$PRE_CONDITIONS";
+    private static final String FIELD_POST_START_CONDITIONS = "$POST_CONDITIONS";
 
     private static final org.objectweb.asm.commons.Method METHOD_REFERENCE_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // declaringType,
@@ -1067,90 +1096,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         if (buildMethodVisitor == null) {
             throw new IllegalStateException("At least one call to visitBeanDefinitionConstructor() is required");
-        }
-
-        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-
-        classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR,
-                Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class).getDescriptor(), null, null);
-
-        if (!superBeanDefinition && !allMethodVisits.isEmpty()) {
-            Type methodsFieldType = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_METHODS, methodsFieldType.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, allMethodVisits, methodVisitData -> {
-                pushNewMethodReference(
-                    staticInit,
-                    JavaModelUtils.getTypeReference(methodVisitData.beanType),
-                    methodVisitData.methodElement,
-                    methodVisitData.getAnnotationMetadata(),
-                    methodVisitData.isPostConstruct(),
-                    methodVisitData.isPreDestroy()
-                );
-            });
-            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_METHODS, methodsFieldType);
-        }
-
-        if (!fieldInjectionPoints.isEmpty()) {
-            Type fieldsFieldType = Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class);
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_FIELDS, fieldsFieldType.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.FieldReference.class, fieldInjectionPoints, fieldVisitData -> {
-                pushNewFieldReference(
-                    staticInit,
-                    JavaModelUtils.getTypeReference(fieldVisitData.beanType),
-                    fieldVisitData.fieldElement,
-                    fieldVisitData.annotationMetadata
-                );
-            });
-            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
-        }
-
-        if (!annotationInjectionPoints.isEmpty()) {
-            Type annotationInjectionsFieldType = Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class);
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_INJECTIONS,
-                    annotationInjectionsFieldType.getDescriptor(), null, null);
-
-            List<Type> injectedTypes = new ArrayList<>(annotationInjectionPoints.keySet());
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, injectedTypes, annotationVisitData -> {
-                pushNewAnnotationReference(staticInit, annotationVisitData);
-            });
-            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, annotationInjectionsFieldType);
-        }
-
-        if (!superBeanDefinition && hasTypeArguments()) {
-            Type typeArgumentsFieldType = Type.getType(Map.class);
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType.getDescriptor(), null, null);
-            pushStringMapOf(staticInit, typeArguments, true, null, new Consumer<Map<String, ClassElement>>() {
-                @Override
-                public void accept(Map<String, ClassElement> stringClassElementMap) {
-                    pushTypeArgumentElements(
-                            annotationMetadata,
-                            beanDefinitionType,
-                            classWriter,
-                            staticInit,
-                            beanDefinitionName,
-                            stringClassElementMap,
-                            defaultsStorage,
-                            loadTypeMethods
-                    );
-                }
-            });
-            staticInit.putStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType);
-        }
-
-        // first build the constructor
-        visitBeanDefinitionConstructorInternal(
-                staticInit,
-                constructor
-        );
-
-        addInnerConfigurationMethod(staticInit);
-        addGetExposedTypes(staticInit);
-
-        staticInit.returnValue();
-        staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
-        staticInit.visitEnd();
-
-        if (buildMethodVisitor != null) {
+        } else {
             if (isPrimitiveBean) {
                 pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
             }
@@ -1186,6 +1132,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
             checkIfShouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
+
+        addStaticInitializer();
+
+        addConstructor();
         addGetOrder();
 
         getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
@@ -1234,6 +1184,313 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void addStaticInitializer() {
+        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
+
+        AbstractAnnotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
+
+        classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_FAILED_INITIALIZATION, Type.getType(Throwable.class).getDescriptor(), null, null);
+
+        Label tryStart = new Label();
+        Label tryEnd = new Label();
+        Label exceptionHandler = new Label();
+        staticInit.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(Throwable.class));
+
+        staticInit.visitLabel(tryStart);
+
+        classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR,
+            Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class).getDescriptor(), null, null);
+
+        if (constructor instanceof MethodElement methodElement) {
+            ParameterElement[] parameters = methodElement.getParameters();
+            List<ParameterElement> parameterList = Arrays.asList(parameters);
+            applyDefaultNamedToParameters(parameterList);
+
+            pushNewMethodReference(staticInit, JavaModelUtils.getTypeReference(methodElement.getDeclaringType()), methodElement, methodElement.getAnnotationMetadata(), false, false);
+        } else if (constructor instanceof FieldElement fieldConstructor) {
+            pushNewFieldReference(staticInit, JavaModelUtils.getTypeReference(fieldConstructor.getDeclaringType()), fieldConstructor, fieldConstructor.getAnnotationMetadata());
+        } else {
+            throw new IllegalArgumentException("Unexpected constructor: " + constructor);
+        }
+        staticInit.putStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
+
+        boolean hasMethodInjection = !superBeanDefinition && !allMethodVisits.isEmpty();
+        if (hasMethodInjection) {
+            Type methodsFieldType = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_METHODS, methodsFieldType.getDescriptor(), null, null);
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, allMethodVisits, methodVisitData -> {
+                pushNewMethodReference(
+                    staticInit,
+                    JavaModelUtils.getTypeReference(methodVisitData.beanType),
+                    methodVisitData.methodElement,
+                    methodVisitData.getAnnotationMetadata(),
+                    methodVisitData.isPostConstruct(),
+                    methodVisitData.isPreDestroy()
+                );
+            });
+            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_METHODS, methodsFieldType);
+        }
+
+        boolean hasFieldInjection = !fieldInjectionPoints.isEmpty();
+        if (hasFieldInjection) {
+            Type fieldsFieldType = Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_FIELDS, fieldsFieldType.getDescriptor(), null, null);
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.FieldReference.class, fieldInjectionPoints, fieldVisitData -> {
+                pushNewFieldReference(
+                    staticInit,
+                    JavaModelUtils.getTypeReference(fieldVisitData.beanType),
+                    fieldVisitData.fieldElement,
+                    fieldVisitData.annotationMetadata
+                );
+            });
+            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
+        }
+
+        boolean hasAnnotationInjection = !annotationInjectionPoints.isEmpty();
+        if (hasAnnotationInjection) {
+            Type annotationInjectionsFieldType = Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_INJECTIONS,
+                annotationInjectionsFieldType.getDescriptor(), null, null);
+
+            List<Type> injectedTypes = new ArrayList<>(annotationInjectionPoints.keySet());
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, injectedTypes, annotationVisitData -> {
+                pushNewAnnotationReference(staticInit, annotationVisitData);
+            });
+            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, annotationInjectionsFieldType);
+        }
+
+        boolean hasTypeArguments = !superBeanDefinition && hasTypeArguments();
+        if (hasTypeArguments) {
+            Type typeArgumentsFieldType = Type.getType(Map.class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType.getDescriptor(), null, null);
+            pushStringMapOf(staticInit, typeArguments, true, null, new Consumer<Map<String, ClassElement>>() {
+                @Override
+                public void accept(Map<String, ClassElement> stringClassElementMap) {
+                    pushTypeArgumentElements(
+                        annotationMetadata,
+                        beanDefinitionType,
+                        classWriter,
+                        staticInit,
+                        beanDefinitionName,
+                        stringClassElementMap,
+                        defaultsStorage,
+                        loadTypeMethods
+                    );
+                }
+            });
+            staticInit.putStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType);
+        }
+
+        boolean hasExecutableMethods = executableMethodsDefinitionWriter != null;
+        if (hasExecutableMethods) {
+            Type execType = executableMethodsDefinitionWriter.getClassType();
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_EXECUTABLE_METHODS, execType.getDescriptor(), null, null);
+            staticInit.newInstance(execType);
+            staticInit.dup();
+            staticInit.invokeConstructor(execType, METHOD_DEFAULT_CONSTRUCTOR);
+            staticInit.putStatic(beanDefinitionType, FIELD_EXECUTABLE_METHODS, executableMethodsDefinitionWriter.getClassType());
+        }
+
+        staticInit.goTo(tryEnd);
+
+        staticInit.visitLabel(exceptionHandler);
+        staticInit.putStatic(beanDefinitionType, FIELD_FAILED_INITIALIZATION, Type.getType(Throwable.class));
+        staticInit.push((String) null);
+        staticInit.putStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
+        if (hasExecutableMethods) {
+            staticInit.push((String) null);
+            staticInit.putStatic(beanDefinitionType, FIELD_EXECUTABLE_METHODS, executableMethodsDefinitionWriter.getClassType());
+        }
+        if (hasMethodInjection) {
+            staticInit.push((String) null);
+            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_METHODS, Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class));
+        }
+        if (hasFieldInjection) {
+            staticInit.push((String) null);
+            staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
+        }
+        if (hasAnnotationInjection) {
+            staticInit.push((String) null);
+            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class));
+        }
+        if (hasTypeArguments) {
+            staticInit.push((String) null);
+            staticInit.putStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, Type.getType(Map.class));
+        }
+        staticInit.goTo(tryEnd);
+
+        staticInit.visitLabel(tryEnd);
+
+        pushPrecalculatedInfo(staticInit, annotationMetadata);
+
+        addInnerConfigurationMethod(staticInit);
+        addGetExposedTypes(staticInit);
+        addConditions(staticInit);
+
+        // Defaults can be contributed by other static initializers, it should be at the end
+        AbstractAnnotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
+
+        staticInit.returnValue();
+        staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
+        staticInit.visitEnd();
+    }
+
+    private void addConditions(GeneratorAdapter staticInit) {
+        List<Condition> preConditions = new ArrayList<>();
+        List<Condition> postConditions = new ArrayList<>();
+        List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
+        if (requirements.isEmpty()) {
+            return;
+        }
+        List<AnnotationValue<Requires>> dynamicRequirements = new ArrayList<>();
+        for (AnnotationValue<Requires> requirement : requirements) {
+            if (requirement.getValues().values().stream().anyMatch(value -> value instanceof EvaluatedExpressionReference)) {
+                dynamicRequirements.add(requirement);
+                continue;
+            }
+            MatchesConditionUtils.createConditions(requirement, preConditions, postConditions);
+        }
+        if (!dynamicRequirements.isEmpty()) {
+            MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+            for (AnnotationValue<Requires> requirement : requirements) {
+                annotationMetadata.addRepeatable(Requirements.class.getName(), requirement);
+            }
+            postConditions.add(new MatchesDynamicCondition(annotationMetadata));
+        }
+
+        classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_PRE_START_CONDITIONS, Type.getType(Condition[].class).getDescriptor(), null, null);
+        classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_POST_START_CONDITIONS, Type.getType(Condition[].class).getDescriptor(), null, null);
+
+        Consumer<Condition> writer = new Consumer<>() {
+            @Override
+            public void accept(Condition condition) {
+                if (condition instanceof MatchesPropertyCondition matchesPropertyCondition) {
+                    pushRecord(matchesPropertyCondition.getClass(), () -> {
+                        staticInit.push(matchesPropertyCondition.property());
+                        staticInit.push(matchesPropertyCondition.value());
+                        staticInit.push(matchesPropertyCondition.defaultValue());
+                        pushEnumValue(matchesPropertyCondition.condition());
+                    });
+                } else if (condition instanceof MatchesAbsenseOfBeansCondition matchesAbsenseOfBeansCondition) {
+                    pushRecord(matchesAbsenseOfBeansCondition.getClass(), () -> {
+                        pushAnnotationClassValues(matchesAbsenseOfBeansCondition.missingBeans());
+                    });
+                } else if (condition instanceof MatchesPresenceOfBeansCondition matchesPresenceOfBeansCondition) {
+                    pushRecord(matchesPresenceOfBeansCondition.getClass(), () -> {
+                        pushAnnotationClassValues(matchesPresenceOfBeansCondition.beans());
+                    });
+                } else if (condition instanceof MatchesAbsenseOfClassesCondition matchesAbsenseOfClassesCondition) {
+                    pushRecord(matchesAbsenseOfClassesCondition.getClass(), () -> {
+                        pushAnnotationClassValues(matchesAbsenseOfClassesCondition.classes());
+                    });
+                } else if (condition instanceof MatchesPresenceOfClassesCondition matchesPresenceOfClassesCondition) {
+                    pushRecord(matchesPresenceOfClassesCondition.getClass(), () -> {
+                        pushAnnotationClassValues(matchesPresenceOfClassesCondition.classes());
+                    });
+                } else if (condition instanceof MatchesPresenceOfEntitiesCondition matchesPresenceOfEntitiesCondition) {
+                    pushRecord(matchesPresenceOfEntitiesCondition.getClass(), () -> {
+                        pushAnnotationClassValues(matchesPresenceOfEntitiesCondition.classes());
+                    });
+                } else if (condition instanceof MatchesAbsenseOfClassNamesCondition matchesAbsenseOfClassNamesCondition) {
+                    pushRecord(matchesAbsenseOfClassNamesCondition.getClass(), () -> {
+                        pushNewArray(staticInit, String.class, matchesAbsenseOfClassNamesCondition.classes(), staticInit::push);
+                    });
+                } else if (condition instanceof MatchesConfigurationCondition matchesConfigurationCondition) {
+                    pushRecord(matchesConfigurationCondition.getClass(), () -> {
+                        staticInit.push(matchesConfigurationCondition.configurationName());
+                        staticInit.push(matchesConfigurationCondition.minimumVersion());
+                    });
+                } else if (condition instanceof MatchesCurrentNotOsCondition matchesCurrentNotOsCondition) {
+                    pushRecord(matchesCurrentNotOsCondition.getClass(), () -> {
+                        pushNewArray(staticInit, Requires.Family.class, matchesCurrentNotOsCondition.notOs(), this::pushEnumValue);
+                        try {
+                            staticInit.invokeStatic(
+                                Type.getType(CollectionUtils.class),
+                                org.objectweb.asm.commons.Method.getMethod(
+                                    CollectionUtils.class.getMethod("enumSet", Enum[].class)
+                                )
+                            );
+                        } catch (NoSuchMethodException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } else if (condition instanceof MatchesCurrentOsCondition currentOsCondition) {
+                    pushRecord(currentOsCondition.getClass(), () -> {
+                        pushNewArray(staticInit, Requires.Family.class, currentOsCondition.os(), this::pushEnumValue);
+                        try {
+                            staticInit.invokeStatic(
+                                Type.getType(CollectionUtils.class),
+                                org.objectweb.asm.commons.Method.getMethod(
+                                    CollectionUtils.class.getMethod("enumSet", Enum[].class)
+                                )
+                            );
+                        } catch (NoSuchMethodException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } else if (condition instanceof MatchesCustomCondition matchesCustomCondition) {
+                    pushRecord(matchesCustomCondition.getClass(), () -> {
+                        pushAnnotationClassValue(matchesCustomCondition.customConditionClass());
+                    });
+                } else if (condition instanceof MatchesEnvironmentCondition matchesEnvironmentCondition) {
+                    pushRecord(matchesEnvironmentCondition.getClass(), () -> {
+                        pushNewArray(staticInit, String.class, matchesEnvironmentCondition.env(), staticInit::push);
+                    });
+                } else if (condition instanceof MatchesMissingPropertyCondition matchesMissingPropertyCondition) {
+                    pushRecord(matchesMissingPropertyCondition.getClass(), () -> {
+                        staticInit.push(matchesMissingPropertyCondition.property());
+                    });
+                } else if (condition instanceof MatchesNotEnvironmentCondition matchesNotEnvironmentCondition) {
+                    pushRecord(matchesNotEnvironmentCondition.getClass(), () -> {
+                        pushNewArray(staticInit, String.class, matchesNotEnvironmentCondition.env(), staticInit::push);
+                    });
+                } else if (condition instanceof MatchesPresenseOfResourcesCondition matchesPresenseOfResourcesCondition) {
+                    pushRecord(matchesPresenseOfResourcesCondition.getClass(), () -> {
+                        pushNewArray(staticInit, String.class, matchesPresenseOfResourcesCondition.resourcePaths(), staticInit::push);
+                    });
+                } else if (condition instanceof MatchesSdkCondition matchesSdkCondition) {
+                    pushRecord(matchesSdkCondition.getClass(), () -> {
+                        pushEnumValue(matchesSdkCondition.sdk());
+                        staticInit.push(matchesSdkCondition.version());
+                    });
+                } else if (condition instanceof MatchesDynamicCondition matchesDynamicCondition) {
+                    pushRecord(matchesDynamicCondition.getClass(), () -> {
+                        pushAnnotationMetadata(staticInit, matchesDynamicCondition.annotationMetadata());
+                    });
+                } else {
+                    throw new IllegalStateException("Unsupported condition type: " + condition.getClass().getName());
+                }
+            }
+
+            private void pushEnumValue(Enum anEnum) {
+                Type type = Type.getType(anEnum.getClass());
+                staticInit.getStatic(type, anEnum.name(), type);
+            }
+
+            private void pushAnnotationClassValues(AnnotationClassValue<?>[] classValues) {
+                pushNewArray(staticInit, AnnotationClassValue.class, classValues, this::pushAnnotationClassValue);
+            }
+
+            private void pushAnnotationClassValue(AnnotationClassValue<?> annotationClassValue) {
+                AnnotationMetadataWriter.invokeLoadClassValueMethod(beanDefinitionType, classWriter, staticInit, loadTypeMethods, annotationClassValue);
+            }
+
+            private void pushRecord(Class<?> classType, Runnable setValues) {
+                Type type = Type.getType(classType);
+                staticInit.newInstance(type);
+                staticInit.dup();
+                setValues.run();
+                staticInit.invokeConstructor(type, org.objectweb.asm.commons.Method.getMethod(
+                    classType.getConstructors()[0]
+                ));
+            }
+        };
+        pushNewArray(staticInit, Condition.class, preConditions, writer);
+        staticInit.putStatic(beanDefinitionType, FIELD_PRE_START_CONDITIONS, Type.getType(Condition[].class));
+        pushNewArray(staticInit, Condition.class, postConditions, writer);
+        staticInit.putStatic(beanDefinitionType, FIELD_POST_START_CONDITIONS, Type.getType(Condition[].class));
     }
 
     private String getSuperTypeInternalType() {
@@ -1330,24 +1587,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void addInnerConfigurationMethod(GeneratorAdapter staticInit) {
-        if (isConfigurationProperties) {
+        if (isConfigurationProperties && !beanTypeInnerClasses.isEmpty()) {
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Set.class).getDescriptor(), null, null);
+            pushStoreClassesAsSet(staticInit, beanTypeInnerClasses.toArray(EMPTY_STRING_ARRAY));
+            staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
 
-
-            if (beanTypeInnerClasses.size() > 0) {
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Set.class).getDescriptor(), null, null);
-                pushStoreClassesAsSet(staticInit, beanTypeInnerClasses.toArray(EMPTY_STRING_ARRAY));
-                staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
-
-                GeneratorAdapter isInnerConfigurationMethod = startProtectedMethod(classWriter, "isInnerConfiguration", boolean.class.getName(), Class.class.getName());
-                isInnerConfigurationMethod.getStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
-                isInnerConfigurationMethod.loadArg(0);
-                isInnerConfigurationMethod.invokeInterface(Type.getType(Collection.class), org.objectweb.asm.commons.Method.getMethod(
-                        ReflectionUtils.getRequiredMethod(Collection.class, "contains", Object.class)
-                ));
-                isInnerConfigurationMethod.returnValue();
-                isInnerConfigurationMethod.visitMaxs(1, 1);
-                isInnerConfigurationMethod.visitEnd();
-            }
+            GeneratorAdapter isInnerConfigurationMethod = startProtectedMethod(classWriter, "isInnerConfiguration", boolean.class.getName(), Class.class.getName());
+            isInnerConfigurationMethod.getStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
+            isInnerConfigurationMethod.loadArg(0);
+            isInnerConfigurationMethod.invokeInterface(Type.getType(Collection.class), org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(Collection.class, "contains", Object.class)
+            ));
+            isInnerConfigurationMethod.returnValue();
+            isInnerConfigurationMethod.visitMaxs(1, 1);
+            isInnerConfigurationMethod.visitEnd();
         }
     }
 
@@ -4150,21 +4403,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
-    private void visitBeanDefinitionConstructorInternal(GeneratorAdapter staticInit, Object constructor) {
-
-        if (constructor instanceof MethodElement methodElement) {
-            ParameterElement[] parameters = methodElement.getParameters();
-            List<ParameterElement> parameterList = Arrays.asList(parameters);
-            applyDefaultNamedToParameters(parameterList);
-
-            pushNewMethodReference(staticInit, JavaModelUtils.getTypeReference(methodElement.getDeclaringType()), methodElement, methodElement.getAnnotationMetadata(), false, false);
-        } else if (constructor instanceof FieldElement fieldConstructor) {
-            pushNewFieldReference(staticInit, JavaModelUtils.getTypeReference(fieldConstructor.getDeclaringType()), fieldConstructor, fieldConstructor.getAnnotationMetadata());
-        } else {
-            throw new IllegalArgumentException("Unexpected constructor: " + constructor);
-        }
-
-        staticInit.putStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
+    private void addConstructor() {
 
         GeneratorAdapter publicConstructor = new GeneratorAdapter(
                 classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null),
@@ -4176,7 +4415,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         publicConstructor.push(beanType);
         publicConstructor.getStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
         publicConstructor.invokeConstructor(superBeanDefinition ? superType : beanDefinitionType, PROTECTED_ABSTRACT_BEAN_DEFINITION_CONSTRUCTOR);
-        publicConstructor.visitInsn(RETURN);
+        publicConstructor.returnValue();
         publicConstructor.visitMaxs(5, 1);
         publicConstructor.visitEnd();
 
@@ -4200,9 +4439,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             protectedConstructor.loadArg(0);
             // 2: `AbstractBeanDefinition2.MethodOrFieldReference.class` constructor
             protectedConstructor.loadArg(1);
-
-            AbstractAnnotationMetadataWriter.writeAnnotationDefault(classWriter, staticInit, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
-            AbstractAnnotationMetadataWriter.initializeAnnotationMetadata(staticInit, classWriter, beanDefinitionType, annotationMetadata, defaultsStorage, loadTypeMethods);
 
             // 3: annotationMetadata
             if (annotationMetadata.isEmpty()) {
@@ -4236,19 +4472,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (executableMethodsDefinitionWriter == null) {
                 protectedConstructor.push((String) null);
             } else {
-                String fieldName = "$EXEC";
                 Type execType = executableMethodsDefinitionWriter.getClassType();
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC,
-                    fieldName,
-                    execType.getDescriptor(),
-                    null,
-                    null
-                );
-                staticInit.newInstance(execType);
-                staticInit.dup();
-                staticInit.invokeConstructor(execType, METHOD_DEFAULT_CONSTRUCTOR);
-                staticInit.putStatic(beanDefinitionType, fieldName, execType);
-                protectedConstructor.getStatic(beanDefinitionType, fieldName, execType);
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_EXECUTABLE_METHODS, execType);
             }
             // 8: `Map<String, Argument<?>[]>` typeArgumentsMap
             if (!hasTypeArguments()) {
@@ -4258,23 +4483,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
 
             // 9: `PrecalculatedInfo`
-            pushPrecalculatedInfo(staticInit, protectedConstructor, annotationMetadata);
+            protectedConstructor.getStatic(beanDefinitionType, FIELD_PRECALCULATED_INFO, PRECALCULATED_INFO);
 
-            protectedConstructor.invokeConstructor(
-                    getSuperType(),
-                    BEAN_DEFINITION_CLASS_CONSTRUCTOR
-            );
+            List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
+            if (requirements.isEmpty()) {
+                // 10: Pre conditions
+                pushNewArray(protectedConstructor, Condition.class, 0);
+                // 11: Post conditions
+                pushNewArray(protectedConstructor, Condition.class, 0);
+            } else {
+                // 10: Pre conditions
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_PRE_START_CONDITIONS, Type.getType(Condition[].class));
+                // 11: Post conditions
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_POST_START_CONDITIONS, Type.getType(Condition[].class));
+            }
+            // 12: Exception
+            protectedConstructor.getStatic(beanDefinitionType, FIELD_FAILED_INITIALIZATION, Type.getType(Throwable.class));
 
-            protectedConstructor.visitInsn(RETURN);
+            protectedConstructor.invokeConstructor(getSuperType(), BEAN_DEFINITION_CLASS_CONSTRUCTOR);
+
+            protectedConstructor.returnValue();
             protectedConstructor.visitMaxs(20, 1);
             protectedConstructor.visitEnd();
         }
     }
 
-    private void pushPrecalculatedInfo(GeneratorAdapter staticInit, GeneratorAdapter protectedConstructor, AnnotationMetadata annotationMetadata) {
-        String fieldName = "$INFO";
+    private void pushPrecalculatedInfo(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
         classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC,
-            fieldName,
+            FIELD_PRECALCULATED_INFO,
             PRECALCULATED_INFO.getDescriptor(),
             null,
             null
@@ -4318,8 +4554,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         staticInit.push(evaluatedExpressionProcessor.hasEvaluatedExpressions());
 
         staticInit.invokeConstructor(PRECALCULATED_INFO, PRECALCULATED_INFO_CONSTRUCTOR);
-        staticInit.putStatic(beanDefinitionType, fieldName, PRECALCULATED_INFO);
-        protectedConstructor.getStatic(beanDefinitionType, fieldName, PRECALCULATED_INFO);
+        staticInit.putStatic(beanDefinitionType, FIELD_PRECALCULATED_INFO, PRECALCULATED_INFO);
     }
 
     private boolean isContainerType() {
