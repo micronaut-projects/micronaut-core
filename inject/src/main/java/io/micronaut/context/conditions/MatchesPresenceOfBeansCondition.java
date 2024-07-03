@@ -22,6 +22,9 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Matches presence of beans condition.
  *
@@ -31,7 +34,8 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
  */
 @UsedByGeneratedCode
 @Internal
-public record MatchesPresenceOfBeansCondition(AnnotationClassValue<?>[] beans) implements Condition {
+public record MatchesPresenceOfBeansCondition(
+    AnnotationClassValue<?>[] beans) implements Condition {
 
     @Override
     public boolean matches(ConditionContext context) {
@@ -44,5 +48,22 @@ public record MatchesPresenceOfBeansCondition(AnnotationClassValue<?>[] beans) i
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesPresenceOfBeansCondition that = (MatchesPresenceOfBeansCondition) o;
+        return Objects.deepEquals(beans, that.beans);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(beans);
     }
 }

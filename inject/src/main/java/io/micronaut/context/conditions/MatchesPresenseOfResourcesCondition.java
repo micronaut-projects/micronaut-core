@@ -28,6 +28,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Matches resources of classes condition.
@@ -60,5 +61,22 @@ public record MatchesPresenseOfResourcesCondition(String[] resourcePaths) implem
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesPresenseOfResourcesCondition that = (MatchesPresenseOfResourcesCondition) o;
+        return Objects.deepEquals(resourcePaths, that.resourcePaths);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(resourcePaths);
     }
 }

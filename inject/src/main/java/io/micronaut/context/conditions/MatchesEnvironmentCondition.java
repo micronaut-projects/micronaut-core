@@ -24,6 +24,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.util.ArrayUtils;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -58,5 +60,22 @@ public record MatchesEnvironmentCondition(String[] env) implements Condition {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesEnvironmentCondition that = (MatchesEnvironmentCondition) o;
+        return Objects.deepEquals(env, that.env);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(env);
     }
 }

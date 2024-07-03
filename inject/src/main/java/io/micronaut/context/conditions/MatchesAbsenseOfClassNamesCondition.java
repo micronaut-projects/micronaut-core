@@ -21,6 +21,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Missing classes condition.
  *
@@ -41,5 +44,22 @@ public record MatchesAbsenseOfClassNamesCondition(String[] classes) implements C
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesAbsenseOfClassNamesCondition that = (MatchesAbsenseOfClassNamesCondition) o;
+        return Objects.deepEquals(classes, that.classes);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(classes);
     }
 }

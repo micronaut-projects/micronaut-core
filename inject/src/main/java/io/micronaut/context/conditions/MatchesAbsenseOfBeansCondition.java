@@ -25,7 +25,9 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Objects;
 
 /**
  * Missing beans condition.
@@ -63,5 +65,22 @@ public record MatchesAbsenseOfBeansCondition(AnnotationClassValue<?>[] missingBe
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesAbsenseOfBeansCondition that = (MatchesAbsenseOfBeansCondition) o;
+        return Objects.deepEquals(missingBeans, that.missingBeans);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(missingBeans);
     }
 }

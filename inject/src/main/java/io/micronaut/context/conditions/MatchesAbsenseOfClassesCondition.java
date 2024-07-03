@@ -21,6 +21,9 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Missing classes condition.
  *
@@ -40,5 +43,22 @@ public record MatchesAbsenseOfClassesCondition(AnnotationClassValue<?>[] classes
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesAbsenseOfClassesCondition that = (MatchesAbsenseOfClassesCondition) o;
+        return Objects.deepEquals(classes, that.classes);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(classes);
     }
 }
