@@ -76,4 +76,11 @@ public record MatchesPresenceOfEntitiesCondition(AnnotationClassValue<?>[] class
     public int hashCode() {
         return Arrays.hashCode(classes);
     }
+
+    @Override
+    public String toString() {
+        return "MatchesPresenceOfEntitiesCondition{" +
+            "classes=" + Arrays.toString(classes) +
+            '}';
+    }
 }

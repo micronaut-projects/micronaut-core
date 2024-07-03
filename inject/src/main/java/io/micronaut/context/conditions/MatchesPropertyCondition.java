@@ -26,6 +26,8 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
+import java.util.Objects;
+
 /**
  * Matches property condition.
  *
@@ -93,6 +95,33 @@ public record MatchesPropertyCondition(@NonNull String property,
 
     private String resolvePropertyValue(String property, PropertyResolver propertyResolver, String defaultValue) {
         return propertyResolver.getProperty(property, ConversionContext.STRING).orElse(defaultValue);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesPropertyCondition that = (MatchesPropertyCondition) o;
+        return Objects.equals(value, that.value) && Objects.equals(property, that.property) && Objects.equals(defaultValue, that.defaultValue) && condition == that.condition;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(property, value, defaultValue, condition);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesPropertyCondition{" +
+            "property='" + property + '\'' +
+            ", value='" + value + '\'' +
+            ", defaultValue='" + defaultValue + '\'' +
+            ", condition=" + condition +
+            '}';
     }
 
     public enum Condition {

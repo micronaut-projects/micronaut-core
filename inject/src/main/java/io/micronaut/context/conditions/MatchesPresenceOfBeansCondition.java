@@ -66,4 +66,11 @@ public record MatchesPresenceOfBeansCondition(
     public int hashCode() {
         return Arrays.hashCode(beans);
     }
+
+    @Override
+    public String toString() {
+        return "MatchesPresenceOfBeansCondition{" +
+            "beans=" + Arrays.toString(beans) +
+            '}';
+    }
 }

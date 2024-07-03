@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -80,5 +81,29 @@ public record MatchesCustomCondition(AnnotationClassValue<?> customConditionClas
             context.fail("Custom condition [" + conditionClass + "] failed evaluation");
         }
         return conditionResult;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesCustomCondition that = (MatchesCustomCondition) o;
+        return Objects.equals(customConditionClass, that.customConditionClass);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(customConditionClass);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesCustomCondition{" +
+            "customConditionClass=" + customConditionClass +
+            '}';
     }
 }

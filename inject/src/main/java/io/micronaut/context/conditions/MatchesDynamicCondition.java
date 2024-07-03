@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
+import java.util.Objects;
+
 /**
  * The dynamic condition for requirements with expressions.
  *
@@ -36,6 +38,30 @@ public record MatchesDynamicCondition(AnnotationMetadata annotationMetadata) imp
     @Override
     public boolean matches(ConditionContext context) {
         return new RequiresCondition(annotationMetadata).matches(context);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesDynamicCondition that = (MatchesDynamicCondition) o;
+        return Objects.equals(annotationMetadata, that.annotationMetadata);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(annotationMetadata);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesDynamicCondition{" +
+            "annotationMetadata=" + annotationMetadata +
+            '}';
     }
 }
 

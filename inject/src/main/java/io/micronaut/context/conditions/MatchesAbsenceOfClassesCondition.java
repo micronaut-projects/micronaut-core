@@ -17,9 +17,9 @@ package io.micronaut.context.conditions;
 
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.reflect.ClassUtils;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -27,19 +27,18 @@ import java.util.Objects;
 /**
  * Missing classes condition.
  *
- * @param classes The class names
+ * @param classes The classes
  * @author Denis Stepanov
  * @since 4.6
  */
 @UsedByGeneratedCode
 @Internal
-public record MatchesAbsenseOfClassNamesCondition(String[] classes) implements Condition {
+public record MatchesAbsenceOfClassesCondition(AnnotationClassValue<?>[] classes) implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        final ClassLoader classLoader = context.getBeanContext().getClassLoader();
-        for (String name : classes) {
-            if (ClassUtils.isPresent(name, classLoader)) {
-                context.fail("Class [" + name + "] is not absent");
+        for (AnnotationClassValue<?> classValue : classes) {
+            if (classValue.getType().isPresent()) {
+                context.fail("Class [" + classValue.getName() + "] is not absent");
                 return false;
             }
         }
@@ -54,12 +53,19 @@ public record MatchesAbsenseOfClassNamesCondition(String[] classes) implements C
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        MatchesAbsenseOfClassNamesCondition that = (MatchesAbsenseOfClassNamesCondition) o;
+        MatchesAbsenceOfClassesCondition that = (MatchesAbsenceOfClassesCondition) o;
         return Objects.deepEquals(classes, that.classes);
     }
 
     @Override
     public int hashCode() {
         return Arrays.hashCode(classes);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesAbsenceOfClassesCondition{" +
+            "classes=" + Arrays.toString(classes) +
+            '}';
     }
 }

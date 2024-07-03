@@ -38,7 +38,7 @@ import java.util.Objects;
  */
 @UsedByGeneratedCode
 @Internal
-public record MatchesAbsenseOfBeansCondition(AnnotationClassValue<?>[] missingBeans) implements Condition {
+public record MatchesAbsenceOfBeansCondition(AnnotationClassValue<?>[] missingBeans) implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         AnnotationMetadataProvider component = context.getComponent();
@@ -75,12 +75,19 @@ public record MatchesAbsenseOfBeansCondition(AnnotationClassValue<?>[] missingBe
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        MatchesAbsenseOfBeansCondition that = (MatchesAbsenseOfBeansCondition) o;
+        MatchesAbsenceOfBeansCondition that = (MatchesAbsenceOfBeansCondition) o;
         return Objects.deepEquals(missingBeans, that.missingBeans);
     }
 
     @Override
     public int hashCode() {
         return Arrays.hashCode(missingBeans);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesAbsenceOfBeansCondition{" +
+            "missingBeans=" + Arrays.toString(missingBeans) +
+            '}';
     }
 }

@@ -44,9 +44,9 @@ import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.condition.Condition;
-import io.micronaut.context.conditions.MatchesAbsenseOfBeansCondition;
-import io.micronaut.context.conditions.MatchesAbsenseOfClassNamesCondition;
-import io.micronaut.context.conditions.MatchesAbsenseOfClassesCondition;
+import io.micronaut.context.conditions.MatchesAbsenceOfBeansCondition;
+import io.micronaut.context.conditions.MatchesAbsenceOfClassNamesCondition;
+import io.micronaut.context.conditions.MatchesAbsenceOfClassesCondition;
 import io.micronaut.context.conditions.MatchesConditionUtils;
 import io.micronaut.context.conditions.MatchesConfigurationCondition;
 import io.micronaut.context.conditions.MatchesCurrentNotOsCondition;
@@ -59,7 +59,7 @@ import io.micronaut.context.conditions.MatchesNotEnvironmentCondition;
 import io.micronaut.context.conditions.MatchesPresenceOfBeansCondition;
 import io.micronaut.context.conditions.MatchesPresenceOfClassesCondition;
 import io.micronaut.context.conditions.MatchesPresenceOfEntitiesCondition;
-import io.micronaut.context.conditions.MatchesPresenseOfResourcesCondition;
+import io.micronaut.context.conditions.MatchesPresenceOfResourcesCondition;
 import io.micronaut.context.conditions.MatchesPropertyCondition;
 import io.micronaut.context.conditions.MatchesSdkCondition;
 import io.micronaut.context.env.ConfigurationPath;
@@ -1387,7 +1387,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         staticInit.push(matchesPropertyCondition.defaultValue());
                         pushEnumValue(matchesPropertyCondition.condition());
                     });
-                } else if (condition instanceof MatchesAbsenseOfBeansCondition matchesAbsenseOfBeansCondition) {
+                } else if (condition instanceof MatchesAbsenceOfBeansCondition matchesAbsenseOfBeansCondition) {
                     pushRecord(matchesAbsenseOfBeansCondition.getClass(), () -> {
                         pushAnnotationClassValues(matchesAbsenseOfBeansCondition.missingBeans());
                     });
@@ -1395,7 +1395,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     pushRecord(matchesPresenceOfBeansCondition.getClass(), () -> {
                         pushAnnotationClassValues(matchesPresenceOfBeansCondition.beans());
                     });
-                } else if (condition instanceof MatchesAbsenseOfClassesCondition matchesAbsenseOfClassesCondition) {
+                } else if (condition instanceof MatchesAbsenceOfClassesCondition matchesAbsenseOfClassesCondition) {
                     pushRecord(matchesAbsenseOfClassesCondition.getClass(), () -> {
                         pushAnnotationClassValues(matchesAbsenseOfClassesCondition.classes());
                     });
@@ -1407,7 +1407,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     pushRecord(matchesPresenceOfEntitiesCondition.getClass(), () -> {
                         pushAnnotationClassValues(matchesPresenceOfEntitiesCondition.classes());
                     });
-                } else if (condition instanceof MatchesAbsenseOfClassNamesCondition matchesAbsenseOfClassNamesCondition) {
+                } else if (condition instanceof MatchesAbsenceOfClassNamesCondition matchesAbsenseOfClassNamesCondition) {
                     pushRecord(matchesAbsenseOfClassNamesCondition.getClass(), () -> {
                         pushNewArray(staticInit, String.class, matchesAbsenseOfClassNamesCondition.classes(), staticInit::push);
                     });
@@ -1460,7 +1460,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     pushRecord(matchesNotEnvironmentCondition.getClass(), () -> {
                         pushNewArray(staticInit, String.class, matchesNotEnvironmentCondition.env(), staticInit::push);
                     });
-                } else if (condition instanceof MatchesPresenseOfResourcesCondition matchesPresenseOfResourcesCondition) {
+                } else if (condition instanceof MatchesPresenceOfResourcesCondition matchesPresenseOfResourcesCondition) {
                     pushRecord(matchesPresenseOfResourcesCondition.getClass(), () -> {
                         pushNewArray(staticInit, String.class, matchesPresenseOfResourcesCondition.resourcePaths(), staticInit::push);
                     });

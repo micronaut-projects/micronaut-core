@@ -22,6 +22,7 @@ import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -42,5 +43,29 @@ public record MatchesCurrentOsCondition(Set<Requires.Family> os) implements Cond
             return false;
         }
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesCurrentOsCondition that = (MatchesCurrentOsCondition) o;
+        return Objects.equals(os, that.os);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(os);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesCurrentOsCondition{" +
+            "os=" + os +
+            '}';
     }
 }

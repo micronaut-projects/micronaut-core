@@ -26,6 +26,8 @@ import io.micronaut.core.version.SemanticVersion;
 import io.micronaut.core.version.VersionUtils;
 import kotlin.KotlinVersion;
 
+import java.util.Objects;
+
 /**
  * Matches SDK condition.
  *
@@ -126,6 +128,31 @@ public record MatchesSdkCondition(Requires.Sdk sdk, String version) implements C
             }
         }
         return majorVersion;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MatchesSdkCondition that = (MatchesSdkCondition) o;
+        return Objects.equals(version, that.version) && sdk == that.sdk;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(sdk, version);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesSdkCondition{" +
+            "sdk=" + sdk +
+            ", version='" + version + '\'' +
+            '}';
     }
 }
 

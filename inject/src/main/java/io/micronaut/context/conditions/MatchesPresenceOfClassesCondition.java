@@ -62,4 +62,11 @@ public record MatchesPresenceOfClassesCondition(
     public int hashCode() {
         return Arrays.hashCode(classes);
     }
+
+    @Override
+    public String toString() {
+        return "MatchesPresenceOfClassesCondition{" +
+            "classes=" + Arrays.toString(classes) +
+            '}';
+    }
 }

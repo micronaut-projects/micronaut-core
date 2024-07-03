@@ -78,4 +78,11 @@ public record MatchesNotEnvironmentCondition(String[] env) implements Condition 
     public int hashCode() {
         return Arrays.hashCode(env);
     }
+
+    @Override
+    public String toString() {
+        return "MatchesNotEnvironmentCondition{" +
+            "env=" + Arrays.toString(env) +
+            '}';
+    }
 }

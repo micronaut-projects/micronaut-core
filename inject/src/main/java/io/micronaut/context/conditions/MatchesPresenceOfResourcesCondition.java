@@ -39,7 +39,7 @@ import java.util.Objects;
  */
 @UsedByGeneratedCode
 @Internal
-public record MatchesPresenseOfResourcesCondition(String[] resourcePaths) implements Condition {
+public record MatchesPresenceOfResourcesCondition(String[] resourcePaths) implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         final BeanContext beanContext = context.getBeanContext();
@@ -71,12 +71,19 @@ public record MatchesPresenseOfResourcesCondition(String[] resourcePaths) implem
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        MatchesPresenseOfResourcesCondition that = (MatchesPresenseOfResourcesCondition) o;
+        MatchesPresenceOfResourcesCondition that = (MatchesPresenceOfResourcesCondition) o;
         return Objects.deepEquals(resourcePaths, that.resourcePaths);
     }
 
     @Override
     public int hashCode() {
         return Arrays.hashCode(resourcePaths);
+    }
+
+    @Override
+    public String toString() {
+        return "MatchesPresenceOfResourcesCondition{" +
+            "resourcePaths=" + Arrays.toString(resourcePaths) +
+            '}';
     }
 }

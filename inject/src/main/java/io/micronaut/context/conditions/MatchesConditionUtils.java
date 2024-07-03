@@ -58,7 +58,7 @@ public class MatchesConditionUtils {
         if (requirement.contains(RequiresCondition.MEMBER_MISSING_CLASSES)) {
             AnnotationClassValue<?>[] classes = requirement.annotationClassValues(RequiresCondition.MEMBER_MISSING_CLASSES);
             if (classes.length > 0) {
-                preConditions.add(new MatchesAbsenseOfClassesCondition(classes));
+                preConditions.add(new MatchesAbsenceOfClassesCondition(classes));
             }
         }
         if (requirement.contains(RequiresCondition.MEMBER_ENV)) {
@@ -127,7 +127,7 @@ public class MatchesConditionUtils {
         if (requirement.contains(RequiresCondition.MEMBER_RESOURCES)) {
             final String[] resourcePaths = requirement.stringValues(RequiresCondition.MEMBER_RESOURCES);
             if (ArrayUtils.isNotEmpty(resourcePaths)) {
-                preConditions.add(new MatchesPresenseOfResourcesCondition(resourcePaths));
+                preConditions.add(new MatchesPresenceOfResourcesCondition(resourcePaths));
             }
         }
         if (requirement.contains(RequiresCondition.MEMBER_OS)) {
@@ -158,7 +158,7 @@ public class MatchesConditionUtils {
         if (requirement.contains(RequiresCondition.MEMBER_MISSING_BEANS)) {
             AnnotationClassValue<?>[] beans = requirement.annotationClassValues(RequiresCondition.MEMBER_MISSING_BEANS);
             if (beans.length != 0) {
-                postConditions.add(new MatchesAbsenseOfBeansCondition(beans));
+                postConditions.add(new MatchesAbsenceOfBeansCondition(beans));
             }
         }
         if (requirement.contains(RequiresCondition.MEMBER_CONDITION)) {
