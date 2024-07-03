@@ -18,8 +18,8 @@ package io.micronaut.http.server.netty.handler.accesslog;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
+import io.micronaut.http.server.netty.handler.accesslog.element.ConnectionMetadata;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http2.Http2Connection;
 import org.slf4j.Logger;
@@ -68,7 +68,7 @@ public final class Http2AccessLogManager {
             accessLog = formatParser.newAccessLogger();
         }
         connection.stream(streamId).setProperty(accessLogKey, accessLog);
-        accessLog.onRequestHeaders((SocketChannel) ctx.channel(), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
+        accessLog.onRequestHeaders(ConnectionMetadata.ofNettyChannel(ctx.channel()), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
     }
 
     public record Factory(Logger logger, String spec, Predicate<String> uriInclusion) {
