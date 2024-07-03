@@ -43,7 +43,7 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
     }
 
     @Override
-    public String resolveUri(Class type) {
+    public String resolveUri(Class<?> type) {
         return contextPath + super.resolveUri(type);
     }
 
@@ -58,7 +58,7 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
     }
 
     @Override
-    public @NonNull String resolveUri(Class type, PropertyConvention id) {
+    public @NonNull String resolveUri(Class<?> type, PropertyConvention id) {
         return contextPath + super.resolveUri(type, id);
     }
 }

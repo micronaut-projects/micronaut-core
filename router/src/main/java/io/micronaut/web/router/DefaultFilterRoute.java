@@ -93,6 +93,7 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
+    @NonNull
     public GenericHttpFilter getFilter() {
         GenericHttpFilter filter = this.filter;
         if (filter == null) {

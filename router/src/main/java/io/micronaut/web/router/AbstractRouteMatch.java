@@ -120,6 +120,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return executableMethod.getAnnotationMetadata();
     }
@@ -178,7 +179,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
-    public Class getDeclaringType() {
+    public Class<T> getDeclaringType() {
         return executableMethod.getDeclaringType();
     }
 

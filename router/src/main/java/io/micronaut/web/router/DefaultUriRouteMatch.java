@@ -22,7 +22,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -68,15 +67,10 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     public Map<String, Object> getVariableValues() {
         Map<String, Object> variables = matchInfo.getVariableValues();
         if (CollectionUtils.isNotEmpty(variables)) {
-            final String charset = defaultCharset.toString();
             Map<String, Object> decoded = CollectionUtils.newLinkedHashMap(variables.size());
             variables.forEach((k, v) -> {
                 if (v instanceof CharSequence) {
-                    try {
-                        v = URLDecoder.decode(v.toString(), charset);
-                    } catch (UnsupportedEncodingException e) {
-                        // ignore
-                    }
+                    v = URLDecoder.decode(v.toString(), defaultCharset);
                 }
                 decoded.put(k, v);
             });

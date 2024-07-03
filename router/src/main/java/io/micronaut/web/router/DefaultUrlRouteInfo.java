@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -96,7 +97,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public UriRouteMatch<T, R> tryMatch(String uri) {
+    public UriRouteMatch<T, R> tryMatch(@NonNull String uri) {
         UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
@@ -110,22 +111,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public int compareTo(UriRouteInfo o) {
+    public int compareTo(@NonNull UriRouteInfo o) {
         return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
     }
 
     @Override
     public String toString() {
-        return new StringBuilder(getHttpMethodName()).append(' ')
-                .append(uriMatchTemplate)
-                .append(" -> ")
-                .append(getTargetMethod().getDeclaringType().getSimpleName())
-                .append('#')
-                .append(getTargetMethod().getName())
-                .append(" (")
-                .append(String.join(",", consumesMediaTypes))
-                .append(")")
-                .toString();
+        return getHttpMethodName() + ' '
+                + uriMatchTemplate + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
+                + '#' + getTargetMethod().getName()
+                + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 
     @Override

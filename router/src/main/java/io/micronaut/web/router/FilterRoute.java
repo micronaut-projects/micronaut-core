@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -36,6 +37,7 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry {
      * @return The filter for this {@link FilterRoute}
      */
     @Override
+    @NonNull
     GenericHttpFilter getFilter();
 
     /**
