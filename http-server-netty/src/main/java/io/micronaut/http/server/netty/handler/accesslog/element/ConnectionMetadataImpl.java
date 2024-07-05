@@ -69,6 +69,8 @@ final class ConnectionMetadataImpl {
     /**
      * This one is separate from {@link GenericChannelMetadata} because it has special handling for
      * compatibility.
+     *
+     * @param ch The channel
      */
     @Internal
     record SocketChannelMetadata(SocketChannel ch) implements ConnectionMetadata {

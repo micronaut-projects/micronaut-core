@@ -63,7 +63,6 @@ public class AccessLog {
         onLastResponseWriteElements.forEach(this::resetIndexedLogElement);
     }
 
-
     /**
      * Triggers LogElements for the ON_REQUEST_HEADERS event.
      *
