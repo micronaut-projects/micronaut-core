@@ -948,7 +948,7 @@ public class Implementation2 implements Interface {
         when:
         try { context.close() } catch(e) { println "Caught $e.message" }
 
-        then: 'the non-factory bean wasnt closed'
+        then: "the non-factory bean wasn't closed"
         implementation2Class.getDeclaredField('closed').get(null).intValue() == 0
 
         and: 'the factory beans were all closed'

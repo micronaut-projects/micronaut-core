@@ -1,6 +1,7 @@
 package io.micronaut.inject.beanbuilder;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -29,7 +30,7 @@ public class ApplyAopToMethodVisitor implements TypeElementVisitor<Object, Objec
     }
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

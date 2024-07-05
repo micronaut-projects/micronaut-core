@@ -2,7 +2,6 @@ package io.micronaut.inject.factory.generics
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.BeanDefinition
 
 class GenericFactorySpec extends AbstractTypeElementSpec {

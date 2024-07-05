@@ -691,7 +691,7 @@ class Test extends Middle {
 
             def bean1 = ctx.getBean(BeanWithPackagePrivate)
             def bean2 = ctx.getBean(definition)
-        then: """By Java rules the base method is not overriden and should have been injected too, but it's not possible to invoked using the reflection,
+        then: """By Java rules the base method is not overridden and should have been injected too, but it's not possible to invoked using the reflection,
 so we mark it as overridden
 """
             !bean1.@root

@@ -361,7 +361,7 @@ class Parent {
         definition.hasStereotype(AnnotationUtil.NAMED)
         definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
-        and:"but not as declared annotations or stereotyes"
+        and:"but not as declared annotations or stereotypes"
         !definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
         !definition.hasDeclaredStereotype(AnnotationUtil.NAMED)
@@ -429,7 +429,7 @@ class Parent {
         definition.hasStereotype(AnnotationUtil.NAMED)
         definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
-        and:"but not as declared annotations or stereotyes"
+        and:"but not as declared annotations or stereotypes"
         definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
         definition.hasDeclaredStereotype(AnnotationUtil.NAMED)

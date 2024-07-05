@@ -49,7 +49,7 @@ import javax.tools.StandardLocation;
  */
 final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> {
     private final LoadingCache<URI, JavaFileObject> inMemoryFileObjects =
-            CacheBuilder.newBuilder().build(new CacheLoader<URI, JavaFileObject>() {
+            CacheBuilder.newBuilder().build(new CacheLoader<>() {
                 @Override
                 public JavaFileObject load(URI key) {
                     return new InMemoryJavaFileManager.InMemoryJavaFileObject(key);

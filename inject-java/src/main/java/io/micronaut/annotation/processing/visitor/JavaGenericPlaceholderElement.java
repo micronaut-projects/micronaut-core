@@ -65,13 +65,13 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
                                   int arrayDimensions,
                                   boolean isRawType) {
         this(genericNativeType,
-                realTypeVariable,
-                declaredElement,
-                resolved,
-                bounds,
-                selectClassElementRepresentingThisPlaceholder(resolved, bounds),
-                annotationMetadataFactory,
-                arrayDimensions, isRawType);
+            realTypeVariable,
+            declaredElement,
+            resolved,
+            bounds,
+            selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+            annotationMetadataFactory,
+            arrayDimensions, isRawType);
     }
 
     JavaGenericPlaceholderElement(JavaNativeElement.Placeholder genericNativeType,
@@ -84,12 +84,12 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
                                   int arrayDimensions,
                                   boolean isRawType) {
         super(
-                classElementRepresentingThisPlaceholder.getNativeType(),
-                annotationMetadataFactory,
-                classElementRepresentingThisPlaceholder.visitorContext,
-                classElementRepresentingThisPlaceholder.typeArguments,
-                classElementRepresentingThisPlaceholder.getTypeArguments(),
-                arrayDimensions
+            classElementRepresentingThisPlaceholder.getNativeType(),
+            annotationMetadataFactory,
+            classElementRepresentingThisPlaceholder.visitorContext,
+            classElementRepresentingThisPlaceholder.typeArguments,
+            classElementRepresentingThisPlaceholder.getTypeArguments(),
+            arrayDimensions
         );
         this.genericNativeType = genericNativeType;
         this.declaredElement = declaredElement;

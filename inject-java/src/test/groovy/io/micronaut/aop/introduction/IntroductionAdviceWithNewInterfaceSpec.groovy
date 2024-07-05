@@ -17,7 +17,6 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -83,12 +82,12 @@ class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
     }
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on abstract classes"() {
@@ -122,13 +121,13 @@ abstract class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
 
         cleanup:
         context.close()
@@ -168,15 +167,15 @@ interface MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.getBar() == null
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
-        listenerAdviceInterceptor.recievedMessages.size() == 1
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.size() == 1
 
         cleanup:
         context.close()
