@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import org.reactivestreams.Publisher;
@@ -47,6 +48,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
         this.discoveryClients = discoveryClients;
     }
 
+    @NonNull
     @Override
     public String getDescription() {
         return toString();
@@ -54,6 +56,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     /**
      * The underlying clients.
+     *
      * @return The clients
      */
     public DiscoveryClient[] getDiscoveryClients() {
@@ -68,11 +71,11 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
         }
         String finalServiceId = serviceId;
         Mono<List<ServiceInstance>> reduced = Flux.fromArray(discoveryClients)
-                .flatMap(client -> client.getInstances(finalServiceId))
-                .reduce(new ArrayList<>(), (instances, otherInstances) -> {
-                    instances.addAll(otherInstances);
-                    return instances;
-                });
+            .flatMap(client -> client.getInstances(finalServiceId))
+            .reduce(new ArrayList<>(), (instances, otherInstances) -> {
+                instances.addAll(otherInstances);
+                return instances;
+            });
         return reduced.flux();
     }
 
@@ -82,11 +85,11 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
             return Flux.just(Collections.emptyList());
         }
         Mono<List<String>> reduced = Flux.fromArray(discoveryClients)
-                .flatMap(DiscoveryClient::getServiceIds)
-                .reduce(new ArrayList<>(), (serviceIds, otherServiceIds) -> {
-                    serviceIds.addAll(otherServiceIds);
-                    return serviceIds;
-                });
+            .flatMap(DiscoveryClient::getServiceIds)
+            .reduce(new ArrayList<>(), (serviceIds, otherServiceIds) -> {
+                serviceIds.addAll(otherServiceIds);
+                return serviceIds;
+            });
         return reduced.flux();
     }
 
