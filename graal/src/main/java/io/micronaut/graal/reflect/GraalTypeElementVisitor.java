@@ -251,7 +251,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         } else {
             // fields that are injected and private need reflection
             beanElement
-                    .getEnclosedElements(reflectiveFieldQuery.modifiers((elementModifiers -> elementModifiers.contains(ElementModifier.PRIVATE))))
+                    .getEnclosedElements(reflectiveFieldQuery.filter(methodElement -> !methodElement.isAccessible(beanElement)))
                     .forEach(e -> processFieldElement(e, reflectiveClasses));
 
         }
@@ -278,17 +278,16 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                             .annotated(ann -> ann.hasAnnotation(Executable.class))
             ).forEach(m -> processMethodElement(m, reflectiveClasses));
         } else {
-            final Predicate<Set<ElementModifier>> privateOnly = elementModifiers ->
-                    elementModifiers.contains(ElementModifier.PRIVATE);
+            final Predicate<MethodElement> inaccessibleMethods = methodElement -> !methodElement.isAccessible(beanElement);
             beanElement
                     .getEnclosedElements(injectedMethodsThatNeedReflection
-                                                 .modifiers(privateOnly))
+                                                 .filter(inaccessibleMethods))
                     .forEach(m -> processMethodElement(m, reflectiveClasses));
             beanElement.getEnclosedElements(
                     ElementQuery
                             .ALL_METHODS
                             .onlyInstance()
-                            .modifiers(privateOnly)
+                            .filter(inaccessibleMethods)
                             .annotated(ann -> ann.hasAnnotation(Executable.class))
             ).forEach(m -> processMethodElement(m, reflectiveClasses));
         }
