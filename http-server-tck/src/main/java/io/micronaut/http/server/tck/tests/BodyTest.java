@@ -32,11 +32,13 @@ import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -168,6 +170,20 @@ public class BodyTest {
                     .build()));
     }
 
+    @Test
+    void testRedirectFuture() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-body/redirect-future"))
+            .configuration(Map.of("micronaut.http.client.follow-redirects", false))
+            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.FOUND)
+                    .header("Location", "https://example.com")
+                    .build()))
+            .run();
+    }
+
     @Controller("/response-body")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -231,6 +247,11 @@ public class BodyTest {
         @SingleResult
         Publisher<HttpResponse<?>> emptySingleResult() {
             return Mono.just(HttpResponse.ok());
+        }
+
+        @Get(uri = "/redirect-future")
+        CompletableFuture<HttpResponse<?>> redirectFuture() {
+            return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.FOUND).header("Location", "https://example.com"));
         }
     }
 
