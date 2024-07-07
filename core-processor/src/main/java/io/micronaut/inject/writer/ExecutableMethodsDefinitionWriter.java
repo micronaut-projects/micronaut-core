@@ -61,24 +61,24 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     public static final String CLASS_SUFFIX = "$Exec";
 
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class)
+        ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class)
     );
 
     public static final Type SUPER_TYPE = Type.getType(AbstractExecutableMethodsDefinition.class);
 
     private static final Method SUPER_CONSTRUCTOR = Method.getMethod(ReflectionUtils.getRequiredInternalConstructor(
-                    AbstractExecutableMethodsDefinition.class,
-                    AbstractExecutableMethodsDefinition.MethodReference[].class)
-            );
+        AbstractExecutableMethodsDefinition.class,
+        AbstractExecutableMethodsDefinition.MethodReference[].class)
+    );
 
     private static final Method WITH_INTERCEPTED_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(boolean.class));
 
     private static final Method GET_METHOD = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getMethod", String.class, Class[].class)
+        ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getMethod", String.class, Class[].class)
     );
 
     private static final Method AT_INDEX_MATCHED_METHOD = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class)
+        ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class)
     );
 
     private static final String FIELD_METHODS_REFERENCES = "$METHODS_REFERENCES";
@@ -188,10 +188,10 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
-     *                                         name of the type
-     * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
+     * @param declaringType The declaring type of the method. Either a Class or a string representing the
+     * name of the type
+     * @param methodElement The method element
+     * @param interceptedProxyClassName The intercepted proxy class name
      * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
      * @return The method index
      */
@@ -202,11 +202,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
-                "(" +
-                Arrays.stream(methodElement.getSuspendParameters())
-                        .map(p -> toTypeString(p.getType()))
-                        .collect(Collectors.joining(",")) +
-                ")";
+            "(" +
+            Arrays.stream(methodElement.getSuspendParameters())
+                .map(p -> toTypeString(p.getType()))
+                .collect(Collectors.joining(",")) +
+            ")";
 
         int index = addedMethods.indexOf(methodKey);
         if (index > -1) {
@@ -233,10 +233,10 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     public final void visitDefinitionEnd() {
         classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
-                internalName,
-                null,
-                SUPER_TYPE.getInternalName(),
-                null);
+            internalName,
+            null,
+            SUPER_TYPE.getInternalName(),
+            null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
 
         Type methodsFieldType = Type.getType(AbstractExecutableMethodsDefinition.MethodReference[].class);
@@ -312,18 +312,18 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
 
     private void buildGetMethod(ClassWriter classWriter) {
         GeneratorAdapter findMethod = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
-                GET_METHOD.getName(),
-                GET_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PRIVATE | Opcodes.ACC_FINAL,
-                GET_METHOD.getName(),
-                GET_METHOD.getDescriptor()
+            Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+            GET_METHOD.getName(),
+            GET_METHOD.getDescriptor(),
+            null,
+            null),
+            ACC_PRIVATE | Opcodes.ACC_FINAL,
+            GET_METHOD.getName(),
+            GET_METHOD.getDescriptor()
         );
         findMethod.loadThis();
         findMethod.loadArg(0);
-        findMethod.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
+        findMethod.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[] {}));
 
         Map<Integer, List<DispatchWriter.MethodDispatchTarget>> hashToMethods = new TreeMap<>();
         for (DispatchWriter.DispatchTarget dispatchTarget : methodDispatchWriter.getDispatchTargets()) {
@@ -373,7 +373,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                         MethodElement methodElement) {
         int index = 1;
         String prefix = "$metadata$";
-        String methodName =  prefix + methodElement.getName();
+        String methodName = prefix + methodElement.getName();
         while (methodNames.contains(methodName)) {
             methodName = prefix + methodElement.getName() + "$" + (index++);
         }
@@ -382,14 +382,14 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         Method newMethod = new Method(methodName, Type.getType(AbstractExecutableMethodsDefinition.MethodReference.class), new Type[0]);
 
         GeneratorAdapter newMethodAdapter = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
-                newMethod.getName(),
-                newMethod.getDescriptor(),
-                null,
-                null),
-                ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
-                newMethod.getName(),
-                newMethod.getDescriptor()
+            Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
+            newMethod.getName(),
+            newMethod.getDescriptor(),
+            null,
+            null),
+            ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
+            newMethod.getName(),
+            newMethod.getDescriptor()
         );
 
         pushNewMethodReference0(classWriter, newMethodAdapter, declaringType, methodElement, new LinkedHashMap<>());
@@ -439,14 +439,14 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             staticInit.visitInsn(ACONST_NULL);
         } else {
             pushBuildArgumentsForMethod(
-                    annotationMetadataWithDefaults,
-                    typeReference.getClassName(),
-                    thisType,
-                    classWriter,
-                    staticInit,
-                    Arrays.asList(parameters),
-                    defaultsStorage,
-                    loadTypeMethods
+                annotationMetadataWithDefaults,
+                typeReference.getClassName(),
+                thisType,
+                classWriter,
+                staticInit,
+                Arrays.asList(parameters),
+                defaultsStorage,
+                loadTypeMethods
             );
         }
         // 6: isAbstract
@@ -455,15 +455,15 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         staticInit.push(methodElement.isSuspend());
 
         invokeConstructor(
-                staticInit,
-                AbstractExecutableMethodsDefinition.MethodReference.class,
-                Class.class,
-                AnnotationMetadata.class,
-                String.class,
-                Argument.class,
-                Argument[].class,
-                boolean.class,
-                boolean.class);
+            staticInit,
+            AbstractExecutableMethodsDefinition.MethodReference.class,
+            Class.class,
+            AnnotationMetadata.class,
+            String.class,
+            Argument.class,
+            Argument[].class,
+            boolean.class,
+            boolean.class);
     }
 
     private void pushAnnotationMetadata(AnnotationMetadata annotationMetadataWithDefaults,
@@ -484,12 +484,12 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             );
 
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
-                    thisType,
-                    classWriter,
-                    staticInit,
-                    annotationMetadataHierarchy,
-                    defaultsStorage,
-                    loadTypeMethods);
+                thisType,
+                classWriter,
+                staticInit,
+                annotationMetadataHierarchy,
+                defaultsStorage,
+                loadTypeMethods);
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
@@ -497,12 +497,12 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             );
 
             AnnotationMetadataWriter.instantiateNewMetadata(
-                    thisType,
-                    classWriter,
-                    staticInit,
-                    mutableAnnotationMetadata,
-                    defaultsStorage,
-                    loadTypeMethods);
+                thisType,
+                classWriter,
+                staticInit,
+                mutableAnnotationMetadata,
+                defaultsStorage,
+                loadTypeMethods);
         } else {
             throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
         }

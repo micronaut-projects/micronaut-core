@@ -51,7 +51,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
 
     static {
         final ServiceLoader<BeanImportHandler> handlers = ServiceLoader.load(BeanImportHandler.class);
-        List<BeanImportHandler> beanImportHandlers = new ArrayList<>();
+        var beanImportHandlers = new ArrayList<BeanImportHandler>();
         for (BeanImportHandler handler : handlers) {
             beanImportHandlers.add(handler);
         }
@@ -65,7 +65,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
 
         for (ClassElement beanElement : beanElements) {
             final BeanElementBuilder beanElementBuilder =
-                    element.addAssociatedBean(beanElement)
+                element.addAssociatedBean(beanElement)
                     .inject();
             for (BeanImportHandler beanImportHandler : BEAN_IMPORT_HANDLERS) {
                 beanImportHandler.beanAdded(beanElementBuilder, context);
@@ -75,7 +75,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
 
     @NonNull
     public static List<ClassElement> collectInjectableElements(ClassElement element, VisitorContext context) {
-        List<ClassElement> beanElements = new ArrayList<>();
+        var beanElements = new ArrayList<ClassElement>();
         final String[] classNames = element.getAnnotationMetadata().stringValues(Import.class, "classes");
         if (ArrayUtils.isNotEmpty(classNames)) {
             for (String className : classNames) {
@@ -100,7 +100,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         if (ArrayUtils.isNotEmpty(packages)) {
             for (String aPackage : packages) {
                 final ClassElement[] classElements = context
-                            .getClassElements(aPackage, annotationSet.toArray(EMPTY_STRING_ARRAY));
+                    .getClassElements(aPackage, annotationSet.toArray(EMPTY_STRING_ARRAY));
                 for (ClassElement classElement : classElements) {
                     if (!classElement.isAbstract()) {
                         beanElements.add(classElement);

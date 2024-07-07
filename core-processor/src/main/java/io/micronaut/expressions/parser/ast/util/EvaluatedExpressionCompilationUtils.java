@@ -60,7 +60,7 @@ import static org.objectweb.asm.Opcodes.L2F;
 import static org.objectweb.asm.Opcodes.L2I;
 
 /**
- * Unility methods for used when compiling evaluated expressions.
+ * Utility methods for used when compiling evaluated expressions.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
@@ -85,7 +85,7 @@ public final class EvaluatedExpressionCompilationUtils {
             Type argumentType = getTypeReference(argument);
 
             return toUnboxedIfNecessary(parameterType).equals(toUnboxedIfNecessary(argumentType))
-                       || toBoxedIfNecessary(parameterType).equals(toBoxedIfNecessary(argumentType));
+                || toBoxedIfNecessary(parameterType).equals(toBoxedIfNecessary(argumentType));
         }
 
         if (parameter.getArrayDimensions() > 0 || argument.getArrayDimensions() > 0) {
@@ -100,8 +100,8 @@ public final class EvaluatedExpressionCompilationUtils {
      * if class element can not be provided.
      *
      * @param type Type element for which {@link ClassElement} needs to be obtained.
-     *             This type can also represent a primitive type. In this case it will be
-     *             boxed
+     * This type can also represent a primitive type. In this case it will be
+     * boxed
      * @param visitorContext visitor context
      * @return resolved class element
      * @throws ExpressionCompilationException if class element can not be obtained
@@ -131,8 +131,7 @@ public final class EvaluatedExpressionCompilationUtils {
 
     private static ClassElement getClassElementForName(VisitorContext visitorContext, String className) {
         return visitorContext.getClassElement(className)
-                   .orElseThrow(() -> new ExpressionCompilationException(
-                       "Can not resolve type information for [" + className + "]"));
+            .orElseThrow(() -> new ExpressionCompilationException("Can not resolve type information for [" + className + "]"));
     }
 
     /**
@@ -171,21 +170,21 @@ public final class EvaluatedExpressionCompilationUtils {
     public static void pushBoxPrimitiveIfNecessary(@NonNull Type type,
                                                    @NonNull GeneratorAdapter mv) {
         if (type.equals(BOOLEAN)) {
-            mv.invokeStatic(BOOLEAN_WRAPPER, new Method("valueOf", BOOLEAN_WRAPPER, new Type[]{BOOLEAN}));
+            mv.invokeStatic(BOOLEAN_WRAPPER, new Method("valueOf", BOOLEAN_WRAPPER, new Type[] {BOOLEAN}));
         } else if (type.equals(INT)) {
-            mv.invokeStatic(INT_WRAPPER, new Method("valueOf", INT_WRAPPER, new Type[]{INT}));
+            mv.invokeStatic(INT_WRAPPER, new Method("valueOf", INT_WRAPPER, new Type[] {INT}));
         } else if (type.equals(DOUBLE)) {
-            mv.invokeStatic(DOUBLE_WRAPPER, new Method("valueOf", DOUBLE_WRAPPER, new Type[]{DOUBLE}));
+            mv.invokeStatic(DOUBLE_WRAPPER, new Method("valueOf", DOUBLE_WRAPPER, new Type[] {DOUBLE}));
         } else if (type.equals(LONG)) {
-            mv.invokeStatic(LONG_WRAPPER, new Method("valueOf", LONG_WRAPPER, new Type[]{LONG}));
+            mv.invokeStatic(LONG_WRAPPER, new Method("valueOf", LONG_WRAPPER, new Type[] {LONG}));
         } else if (type.equals(FLOAT)) {
-            mv.invokeStatic(FLOAT_WRAPPER, new Method("valueOf", FLOAT_WRAPPER, new Type[]{FLOAT}));
+            mv.invokeStatic(FLOAT_WRAPPER, new Method("valueOf", FLOAT_WRAPPER, new Type[] {FLOAT}));
         } else if (type.equals(SHORT)) {
-            mv.invokeStatic(SHORT_WRAPPER, new Method("valueOf", SHORT_WRAPPER, new Type[]{SHORT}));
+            mv.invokeStatic(SHORT_WRAPPER, new Method("valueOf", SHORT_WRAPPER, new Type[] {SHORT}));
         } else if (type.equals(CHAR)) {
-            mv.invokeStatic(CHAR_WRAPPER, new Method("valueOf", CHAR_WRAPPER, new Type[]{CHAR}));
+            mv.invokeStatic(CHAR_WRAPPER, new Method("valueOf", CHAR_WRAPPER, new Type[] {CHAR}));
         } else if (type.equals(BYTE)) {
-            mv.invokeStatic(BYTE_WRAPPER, new Method("valueOf", BYTE_WRAPPER, new Type[]{BYTE}));
+            mv.invokeStatic(BYTE_WRAPPER, new Method("valueOf", BYTE_WRAPPER, new Type[] {BYTE}));
         }
     }
 
@@ -221,7 +220,8 @@ public final class EvaluatedExpressionCompilationUtils {
                     case "I" -> mv.visitInsn(I2L);
                     case "D" -> mv.visitInsn(D2L);
                     case "F" -> mv.visitInsn(F2L);
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
             case "I" -> {
@@ -229,7 +229,8 @@ public final class EvaluatedExpressionCompilationUtils {
                     case "J" -> mv.visitInsn(L2I);
                     case "D" -> mv.visitInsn(D2I);
                     case "F" -> mv.visitInsn(F2I);
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
             case "D" -> {
@@ -237,7 +238,8 @@ public final class EvaluatedExpressionCompilationUtils {
                     case "J" -> mv.visitInsn(L2D);
                     case "I" -> mv.visitInsn(I2D);
                     case "F" -> mv.visitInsn(F2D);
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
             case "F" -> {
@@ -245,10 +247,12 @@ public final class EvaluatedExpressionCompilationUtils {
                     case "J" -> mv.visitInsn(L2F);
                     case "I" -> mv.visitInsn(I2F);
                     case "D" -> mv.visitInsn(D2F);
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
-            default -> { }
+            default -> {
+            }
         }
     }
 }

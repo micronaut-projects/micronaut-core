@@ -23,8 +23,8 @@ import java.lang.annotation.Annotation;
  * is problematic consider {@link NamedAnnotationMapper}.
  *
  * @param <T> The annotation type.
- * @since 2.0
  * @author graemerocher
+ * @since 2.0
  */
 public interface TypedAnnotationTransformer<T extends Annotation> extends AnnotationTransformer<T> {
 

@@ -25,7 +25,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
  * Context class used for compiling expressions.
  *
  * @param evaluationVisitorContext evaluation visitor context
- * @param methodVisitor            method visitor for compiled expression class
+ * @param methodVisitor method visitor for compiled expression class
  * @author Sergey Gavrilov
  * @since 4.0.0
  */

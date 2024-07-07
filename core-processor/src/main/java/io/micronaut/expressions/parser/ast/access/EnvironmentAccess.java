@@ -42,7 +42,7 @@ public final class EnvironmentAccess extends ExpressionNode {
 
     private static final Method GET_PROPERTY_METHOD =
         new Method("getProperty", Type.getType(String.class),
-            new Type[]{Type.getType(String.class)});
+            new Type[] {Type.getType(String.class)});
 
     private final ExpressionNode propertyName;
 
@@ -51,7 +51,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
         propertyName.compile(ctx);
@@ -65,12 +65,13 @@ public final class EnvironmentAccess extends ExpressionNode {
         return ctx.visitorContext().getClassElement(String.class).orElse(STRING_ELEMENT);
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type propertyNameType = propertyName.resolveType(ctx);
         if (!propertyNameType.equals(STRING)) {
             throw new ExpressionCompilationException("Invalid environment access operation. The expression inside environment " +
-                                                         "access must resolve to String value of property name");
+                "access must resolve to String value of property name");
         }
 
         // Property value is always returned as string

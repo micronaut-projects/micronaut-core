@@ -34,7 +34,8 @@ public interface AttributeHolder {
      *
      * @return The attributes of the object
      */
-    @NonNull ConvertibleValues<Object> getAttributes();
+    @NonNull
+    ConvertibleValues<Object> getAttributes();
 
     /**
      * Obtain the value of an attribute on the HTTP method.

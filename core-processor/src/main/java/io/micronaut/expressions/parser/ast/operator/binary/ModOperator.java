@@ -37,11 +37,13 @@ import static org.objectweb.asm.Opcodes.LREM;
  */
 @Internal
 public final class ModOperator extends MathOperator {
+
     private static final Map<String, Integer> MOD_OPERATION_OPCODES = Map.of(
         "D", DREM,
         "I", IREM,
         "F", FREM,
-        "J", LREM);
+        "J", LREM
+    );
 
     public ModOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
@@ -52,7 +54,6 @@ public final class ModOperator extends MathOperator {
         Type type = resolveType(ctx);
         String typeDescriptor = type.getDescriptor();
         return Optional.ofNullable(MOD_OPERATION_OPCODES.get(typeDescriptor))
-                   .orElseThrow(() -> new ExpressionCompilationException(
-                       "'%' operation can not be applied to " + type));
+            .orElseThrow(() -> new ExpressionCompilationException("'%' operation can not be applied to " + type));
     }
 }

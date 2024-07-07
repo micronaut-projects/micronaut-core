@@ -34,6 +34,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
  */
 @Internal
 public final class BoolLiteral extends ExpressionNode {
+
     private final boolean value;
 
     public BoolLiteral(boolean value) {
@@ -41,7 +42,7 @@ public final class BoolLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -50,6 +51,7 @@ public final class BoolLiteral extends ExpressionNode {
         return PrimitiveElement.BOOLEAN;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return BOOLEAN;

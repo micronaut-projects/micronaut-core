@@ -40,8 +40,7 @@ public abstract sealed class LogicalOperator extends BinaryOperator permits AndO
     protected Type resolveOperationType(Type leftOperandType,
                                         Type rightOperandType) {
         if (!isBoolean(leftOperandType) && !isBoolean(rightOperandType)) {
-            throw new ExpressionCompilationException(
-                "Logical operation can only be applied to boolean types");
+            throw new ExpressionCompilationException("Logical operation can only be applied to boolean types");
         }
 
         return BOOLEAN_TYPE;

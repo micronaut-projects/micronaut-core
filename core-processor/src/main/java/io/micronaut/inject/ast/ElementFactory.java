@@ -35,7 +35,7 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new class element for the given type.
      *
-     * @param type                      The type
+     * @param type The type
      * @param annotationMetadataFactory The element annotation metadata factory
      * @return The class element
      * @since 4.0.0
@@ -46,9 +46,9 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new class element for the given type.
      *
-     * @param type                      The type
+     * @param type The type
      * @param annotationMetadataFactory The element annotation metadata factory
-     * @param typeArguments             The resolved generics
+     * @param typeArguments The resolved generics
      * @return The class element
      * @since 4.0.0
      * @deprecated no longer used
@@ -56,8 +56,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     @NonNull
     @Deprecated
     default ClassElement newClassElement(@NonNull C type,
-                                 @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                 @NonNull Map<String, ClassElement> typeArguments) {
+                                         @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                         @NonNull Map<String, ClassElement> typeArguments) {
         return newClassElement(type, annotationMetadataFactory).withTypeArguments(typeArguments);
     }
 
@@ -66,7 +66,7 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * differs from {@link #newClassElement(Object, ElementAnnotationMetadataFactory)} in that
      * it should only be called from elements that are known to originate from source code.
      *
-     * @param type                             The type
+     * @param type The type
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The class element
      * @since 4.0.0
@@ -79,8 +79,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * differs from {@link #newMethodElement(ClassElement, Object, ElementAnnotationMetadataFactory)} in that
      * it should only be called from elements that are known to originate from source code.
      *
-     * @param owningClass                      The owning class
-     * @param method                           The method
+     * @param owningClass The owning class
+     * @param method The method
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The class element
      * @since 4.0.0
@@ -93,8 +93,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new method element for the given type.
      *
-     * @param owningClass                      The owning class
-     * @param method                           The method
+     * @param owningClass The owning class
+     * @param method The method
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The method element
      * @since 4.0.0
@@ -107,8 +107,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new constructor element for the given type.
      *
-     * @param owningClass                      The owning class
-     * @param constructor                      The constructor
+     * @param owningClass The owning class
+     * @param constructor The constructor
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The constructor element
      * @since 4.0.0
@@ -121,8 +121,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new enum constant element for the given type.
      *
-     * @param owningClass                      The owning class
-     * @param enumConstant                     The enum constant
+     * @param owningClass The owning class
+     * @param enumConstant The enum constant
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The enum constant element
      * @since 4.0.0
@@ -135,8 +135,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     /**
      * Builds a new field element for the given type.
      *
-     * @param owningClass                      The owning class
-     * @param field                            The field
+     * @param owningClass The owning class
+     * @param field The field
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The field element
      * @since 4.0.0

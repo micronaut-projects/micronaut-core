@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.visitor;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -85,7 +85,6 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      *
      * @param element The element
      * @param context The visitor context
-     *
      * @since 3.6.0
      */
     default void visitEnumConstant(EnumConstantElement element, VisitorContext context) {
@@ -150,7 +149,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
     /**
      * Called once when processor loads.
-     *
+     * <p>
      * Used to expose visitors custom processor options.
      *
      * @return Set with custom options
@@ -169,11 +168,11 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
     /**
      * Implementors of the {@link TypeElementVisitor} interface should specify what kind of visitor it is.
-     *
+     * <p>
      * If the visitor looks at multiple {@link io.micronaut.inject.ast.Element} and builds a file that references
      * multiple {@link io.micronaut.inject.ast.Element} (meaning it doesn't have an originating element) then
      * {@link VisitorKind#AGGREGATING} should be used
-     *
+     * <p>
      * If the visitor generates classes from an originating {@link io.micronaut.inject.ast.Element} then {@link VisitorKind#ISOLATING} should be used.
      */
     enum VisitorKind {

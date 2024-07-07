@@ -104,10 +104,10 @@ public interface ParameterElement extends TypedElement {
     /**
      * Creates a parameter element for the given arguments.
      *
-     * @param type                       The element type
-     * @param name                       The name
+     * @param type The element type
+     * @param name The name
      * @param annotationMetadataProvider The name
-     * @param metadataBuilder            The name
+     * @param metadataBuilder The name
      * @return The parameter element
      * @since 4.0.0
      */
@@ -126,7 +126,7 @@ public interface ParameterElement extends TypedElement {
             public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
                 return of(type, name, new AnnotationMetadataProvider() {
                     @Override
-                    public AnnotationMetadata getAnnotationMetadata() {
+                    public @NonNull AnnotationMetadata getAnnotationMetadata() {
                         return annotationMetadata;
                     }
                 }, metadataBuilder);
@@ -134,7 +134,7 @@ public interface ParameterElement extends TypedElement {
 
             @Override
             @SuppressWarnings("java:S1192")
-            public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+            public <T extends Annotation> @NonNull Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
                 //noinspection ConstantConditions
@@ -148,7 +148,7 @@ public interface ParameterElement extends TypedElement {
             }
 
             @Override
-            public AnnotationMetadata getAnnotationMetadata() {
+            public @NonNull AnnotationMetadata getAnnotationMetadata() {
                 if (annotationMetadata == null) {
                     annotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
                 }
@@ -156,21 +156,21 @@ public interface ParameterElement extends TypedElement {
             }
 
             @Override
-            public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+            public <T extends Annotation> @NonNull Element annotate(@NonNull AnnotationValue<T> annotationValue) {
                 ArgumentUtils.requireNonNull("annotationValue", annotationValue);
                 annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
                 return this;
             }
 
             @Override
-            public Element removeAnnotation(@NonNull String annotationType) {
+            public @NonNull Element removeAnnotation(@NonNull String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
                 return this;
             }
 
             @Override
-            public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+            public <T extends Annotation> @NonNull Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
                 ArgumentUtils.requireNonNull("predicate", predicate);
                 annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
                 return this;
@@ -178,7 +178,7 @@ public interface ParameterElement extends TypedElement {
             }
 
             @Override
-            public Element removeStereotype(@NonNull String annotationType) {
+            public @NonNull Element removeStereotype(@NonNull String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                 return this;

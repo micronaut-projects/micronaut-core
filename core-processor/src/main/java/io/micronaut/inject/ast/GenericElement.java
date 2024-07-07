@@ -25,8 +25,8 @@ import java.util.Optional;
 /**
  * Represents a generic element that can appear as a type argument.
  *
- * @since 4.0.0
  * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Experimental
 public interface GenericElement extends ClassElement {
@@ -49,6 +49,7 @@ public interface GenericElement extends ClassElement {
      * Added to this generic element by:
      * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
      * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
+     *
      * @return the type annotations
      */
     @Experimental

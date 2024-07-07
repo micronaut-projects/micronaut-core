@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
@@ -43,14 +44,14 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
 public final class PowOperator extends BinaryOperator {
 
     private static final Type MATH_TYPE = Type.getType(Math.class);
-    private static final Method POW_METHOD = new Method("pow", DOUBLE, new Type[]{DOUBLE, DOUBLE});
+    private static final Method POW_METHOD = new Method("pow", DOUBLE, new Type[] {DOUBLE, DOUBLE});
 
     public PowOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
         Type leftType = leftOperand.resolveType(ctx);
@@ -77,8 +78,8 @@ public final class PowOperator extends BinaryOperator {
             throw new ExpressionCompilationException("Power operation can only be applied to numeric types");
         }
 
-        if (isOneOf(toUnboxedIfNecessary(leftOperandType), DOUBLE, FLOAT) ||
-                isOneOf(toUnboxedIfNecessary(rightOperandType), DOUBLE, FLOAT)) {
+        if (isOneOf(toUnboxedIfNecessary(leftOperandType), DOUBLE, FLOAT)
+            || isOneOf(toUnboxedIfNecessary(rightOperandType), DOUBLE, FLOAT)) {
             return DOUBLE;
         }
 

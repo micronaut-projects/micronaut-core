@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -56,7 +57,7 @@ public class GroovyConstructorElement extends GroovyMethodElement implements Con
     }
 
     @Override
-    public boolean overrides(MethodElement overridden) {
+    public boolean overrides(@NonNull MethodElement overridden) {
         return false;
     }
 }

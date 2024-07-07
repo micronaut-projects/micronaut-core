@@ -50,7 +50,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     @Override
     @SuppressWarnings("java:S3878")
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-        return visitClass(classname, new Element[]{ originatingElement });
+        return visitClass(classname, new Element[] {originatingElement});
     }
 
     @Override
@@ -68,8 +68,8 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
             final Path filePath = targetDir.toPath().resolve(path);
             makeParent(filePath);
             Files.writeString(filePath, "",
-                        StandardOpenOption.WRITE,
-                        StandardOpenOption.CREATE
+                StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE
             );
         } catch (IOException e) {
             throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);

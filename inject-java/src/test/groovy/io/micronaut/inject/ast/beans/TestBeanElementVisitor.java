@@ -1,6 +1,7 @@
 package io.micronaut.inject.ast.beans;
 
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
@@ -15,7 +16,7 @@ public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
 
 
     @Override
-    public BeanElement visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
+    public BeanElement visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext) {
         Element producingElement = beanElement.getProducingElement();
         if (producingElement instanceof MemberElement element) {
             producingElement = element.getDeclaringType();

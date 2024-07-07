@@ -42,17 +42,17 @@ public final class MethodElementAnnotationMetadata extends AbstractElementAnnota
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return readAnnotationMetadata;
     }
 
     @Override
-    protected MethodElement getReturnInstance() {
+    protected @NonNull MethodElement getReturnInstance() {
         return methodElement;
     }
 
     @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+    protected @NonNull MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return writeAnnotationMetadata;
     }
 }

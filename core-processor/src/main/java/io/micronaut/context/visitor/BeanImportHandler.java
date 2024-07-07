@@ -15,12 +15,12 @@
  */
 package io.micronaut.context.visitor;
 
-import java.util.Collections;
-import java.util.Set;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * Interface that allows extension of Bean import handling in other to support
@@ -40,6 +40,7 @@ public interface BeanImportHandler {
 
     /**
      * Callback method invoked when a bean is added.
+     *
      * @param beanElementBuilder The bean element builder
      * @param context The visitor context
      */

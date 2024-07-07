@@ -26,7 +26,7 @@ import io.micronaut.core.annotation.NonNull;
 public interface ConstructorElement extends MethodElement {
 
     @Override
-    default String getName() {
+    default @NonNull String getName() {
         return "<init>";
     }
 
@@ -37,17 +37,17 @@ public interface ConstructorElement extends MethodElement {
     }
 
     @Override
-    default boolean hides(MemberElement memberElement) {
+    default boolean hides(@NonNull MemberElement memberElement) {
         return false;
     }
 
     @Override
-    default boolean hides(MethodElement hiddenMethod) {
+    default boolean hides(@NonNull MethodElement hiddenMethod) {
         return false;
     }
 
     @Override
-    default boolean overrides(MethodElement overridden) {
+    default boolean overrides(@NonNull MethodElement overridden) {
         return false;
     }
 }

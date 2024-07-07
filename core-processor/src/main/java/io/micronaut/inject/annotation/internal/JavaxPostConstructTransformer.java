@@ -34,6 +34,7 @@ import java.util.List;
  */
 @Internal
 public final class JavaxPostConstructTransformer implements NamedAnnotationTransformer {
+
     @NonNull
     @Override
     public String getName() {
@@ -43,7 +44,7 @@ public final class JavaxPostConstructTransformer implements NamedAnnotationTrans
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.POST_CONSTRUCT).build()
+            AnnotationValue.builder(AnnotationUtil.POST_CONSTRUCT).build()
         );
     }
 }

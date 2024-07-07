@@ -125,7 +125,7 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return variable.getName();
     }
 

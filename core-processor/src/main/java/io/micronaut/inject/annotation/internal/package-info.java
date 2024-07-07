@@ -16,8 +16,8 @@
 /**
  * Internal annotation mappers, not for public consumption.
  *
- * @since 1.1.0
  * @author graemerocher
+ * @since 1.1.0
  */
 @Internal
 package io.micronaut.inject.annotation.internal;

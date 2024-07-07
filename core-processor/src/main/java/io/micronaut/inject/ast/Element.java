@@ -41,6 +41,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
 
     /**
      * An empty array of elements.
+     *
      * @since 2.1.1
      */
     Element[] EMPTY_ELEMENT_ARRAY = new Element[0];
@@ -49,7 +50,8 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return The name of the element. For a type this represents the binary name.
      */
     @Override
-    @NonNull String getName();
+    @NonNull
+    String getName();
 
     /**
      * @return True if the element is package private.
@@ -85,7 +87,8 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      *
      * @return The native type
      */
-    @NonNull Object getNativeType();
+    @NonNull
+    Object getNativeType();
 
     /**
      * @return The {@link ElementModifier} types for this class element

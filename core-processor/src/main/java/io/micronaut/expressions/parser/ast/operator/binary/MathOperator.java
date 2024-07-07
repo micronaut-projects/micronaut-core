@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Type;
@@ -34,15 +35,16 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
  */
 @Internal
 public abstract sealed class MathOperator extends BinaryOperator permits DivOperator,
-                                                                         ModOperator,
-                                                                         MulOperator,
-                                                                         SubOperator {
+    ModOperator,
+    MulOperator,
+    SubOperator {
+
     public MathOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type targetType = resolveType(ctx);
 

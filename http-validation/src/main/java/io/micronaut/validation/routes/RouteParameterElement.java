@@ -54,7 +54,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return name;
     }
 
@@ -69,7 +69,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
     }
 
     @Override
-    public Object getNativeType() {
+    public @NonNull Object getNativeType() {
         return delegate.getNativeType();
     }
 

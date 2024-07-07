@@ -59,11 +59,11 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     private final boolean writeAnnotationDefault;
 
     /**
-     * @param className               The class name
-     * @param originatingElements     The originating elements
-     * @param annotationMetadata      The annotation metadata
+     * @param className The class name
+     * @param originatingElements The originating elements
+     * @param annotationMetadata The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
-     * @param visitorContext          The visitor context
+     * @param visitorContext The visitor context
      */
     protected AbstractAnnotationMetadataWriter(
         String className,
@@ -80,18 +80,18 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     }
 
     /**
-     * @param className               The class name
-     * @param originatingElement     The originating element
-     * @param annotationMetadata      The annotation metadata
+     * @param className The class name
+     * @param originatingElement The originating element
+     * @param annotationMetadata The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
-     * @param visitorContext          The visitor context
+     * @param visitorContext The visitor context
      */
     protected AbstractAnnotationMetadataWriter(
-            String className,
-            Element originatingElement,
-            AnnotationMetadata annotationMetadata,
-            boolean writeAnnotationDefaults,
-            VisitorContext visitorContext) {
+        String className,
+        Element originatingElement,
+        AnnotationMetadata annotationMetadata,
+        boolean writeAnnotationDefaults,
+        VisitorContext visitorContext) {
         super(originatingElement);
         this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
@@ -143,7 +143,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
     /**
      * @param classWriter The {@link ClassWriter}
-     * @param defaults    The annotation defaults
+     * @param defaults The annotation defaults
      */
     protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter, Map<String, Integer> defaults) {
         if (!(annotationMetadata instanceof AnnotationMetadataReference)) {
@@ -163,12 +163,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     }
 
     /**
-     * @param classWriter        The class writer
-     * @param staticInit         The static init
-     * @param targetClassType    The targetClassType
+     * @param classWriter The class writer
+     * @param staticInit The static init
+     * @param targetClassType The targetClassType
      * @param annotationMetadata The annotation metadata
-     * @param defaults           The defaults
-     * @param loadTypeMethods    The loadTypeMethods
+     * @param defaults The defaults
+     * @param loadTypeMethods The loadTypeMethods
      */
     public static void writeAnnotationDefault(ClassWriter classWriter,
                                               GeneratorAdapter staticInit,
@@ -198,12 +198,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     }
 
     /**
-     * @param staticInit         The {@link GeneratorAdapter}
-     * @param classWriter        The {@link ClassWriter}
-     * @param targetClassType    The targetClassType
+     * @param staticInit The {@link GeneratorAdapter}
+     * @param classWriter The {@link ClassWriter}
+     * @param targetClassType The targetClassType
      * @param annotationMetadata The annotation metadata
-     * @param defaults           The annotation defaults
-     * @param loadTypeMethods    The loadTypeMethods
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The loadTypeMethods
      */
     public static void initializeAnnotationMetadata(GeneratorAdapter staticInit,
                                                     ClassWriter classWriter,

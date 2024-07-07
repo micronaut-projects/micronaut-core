@@ -73,6 +73,7 @@ public interface ClassElement extends TypedElement {
      * Added by:
      * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
      * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
+     *
      * @return the type annotations
      * @since 4.0.0
      */
@@ -122,6 +123,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Is raw type.
+     *
      * @return true if the type is raw
      * @since 4.0.0
      */
@@ -243,15 +245,15 @@ public interface ClassElement extends TypedElement {
             return Optional.of(constructors.get(0));
         }
         Optional<ConstructorElement> annotatedConstructor = constructors.stream()
-                .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
-                .findFirst();
+            .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
+            .findFirst();
         if (annotatedConstructor.isPresent()) {
             return annotatedConstructor.map(c -> c);
         }
         return constructors.stream()
-                .filter(io.micronaut.inject.ast.Element::isPublic)
-                .<MethodElement>map(c -> c)
-                .findFirst();
+            .filter(io.micronaut.inject.ast.Element::isPublic)
+            .<MethodElement>map(c -> c)
+            .findFirst();
     }
 
     /**
@@ -270,8 +272,8 @@ public interface ClassElement extends TypedElement {
             return Optional.empty();
         }
         List<ConstructorElement> constructors = getAccessibleConstructors()
-                .stream()
-                .filter(ctor -> ctor.getParameters().length == 0).toList();
+            .stream()
+            .filter(ctor -> ctor.getParameters().length == 0).toList();
         if (constructors.isEmpty()) {
             return Optional.empty();
         }
@@ -279,9 +281,9 @@ public interface ClassElement extends TypedElement {
             return Optional.of(constructors.get(0));
         }
         return constructors.stream()
-                .filter(Element::isPublic)
-                .<MethodElement>map(c -> c)
-                .findFirst();
+            .filter(Element::isPublic)
+            .<MethodElement>map(c -> c)
+            .findFirst();
 
     }
 
@@ -320,8 +322,8 @@ public interface ClassElement extends TypedElement {
      */
     default Optional<MethodElement> findDefaultStaticCreator() {
         List<MethodElement> staticCreators = getAccessibleStaticCreators()
-                .stream()
-                .filter(c -> c.getParameters().length == 0).toList();
+            .stream()
+            .filter(c -> c.getParameters().length == 0).toList();
         if (staticCreators.isEmpty()) {
             return Optional.empty();
         }
@@ -340,9 +342,9 @@ public interface ClassElement extends TypedElement {
     @NonNull
     default List<ConstructorElement> getAccessibleConstructors() {
         return getEnclosedElements(ElementQuery.CONSTRUCTORS)
-                .stream()
-                .filter(ctor -> !ctor.isPrivate())
-                .toList();
+            .stream()
+            .filter(ctor -> !ctor.isPrivate())
+            .toList();
     }
 
     /**
@@ -356,23 +358,23 @@ public interface ClassElement extends TypedElement {
     @NonNull
     default List<MethodElement> getAccessibleStaticCreators() {
         List<MethodElement> creators = getEnclosedElements(ElementQuery.ALL_METHODS
-                .onlyDeclared()
+            .onlyDeclared()
+            .onlyStatic()
+            .onlyAccessible()
+            .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))
+        )
+            .stream()
+            .filter(method -> method.getReturnType().isAssignable(this))
+            .toList();
+        if (creators.isEmpty() && isEnum()) {
+            return getEnclosedElements(ElementQuery.ALL_METHODS
+                .named("valueOf")
                 .onlyStatic()
                 .onlyAccessible()
-                .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))
-        )
+            )
                 .stream()
                 .filter(method -> method.getReturnType().isAssignable(this))
                 .toList();
-        if (creators.isEmpty() && isEnum()) {
-            return getEnclosedElements(ElementQuery.ALL_METHODS
-                    .named("valueOf")
-                    .onlyStatic()
-                    .onlyAccessible()
-            )
-                    .stream()
-                    .filter(method -> method.getReturnType().isAssignable(this))
-                    .toList();
         }
         return creators;
     }
@@ -405,7 +407,7 @@ public interface ClassElement extends TypedElement {
      * @return The simple name
      */
     @Override
-    default String getSimpleName() {
+    default @NonNull String getSimpleName() {
         return NameUtils.getSimpleName(getName());
     }
 
@@ -513,7 +515,7 @@ public interface ClassElement extends TypedElement {
      * Return the elements that match the given query.
      *
      * @param query The query to use.
-     * @param <T>   The element type
+     * @param <T> The element type
      * @return The fields
      * @since 2.3.0
      */
@@ -536,7 +538,7 @@ public interface ClassElement extends TypedElement {
      * Return the first enclosed element matching the given query.
      *
      * @param query The query to use.
-     * @param <T>   The element type
+     * @param <T> The element type
      * @return The fields
      * @since 2.3.0
      */
@@ -698,8 +700,8 @@ public interface ClassElement extends TypedElement {
     default Map<String, Map<String, ClassElement>> getAllTypeArguments() {
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
         Stream.concat(
-                getInterfaces().stream(),
-                getSuperType().stream()
+            getInterfaces().stream(),
+            getSuperType().stream()
         ).map(ClassElement::getAllTypeArguments).forEach(result::putAll);
         result.put(getName(), getTypeArguments());
         return result;
@@ -808,7 +810,7 @@ public interface ClassElement extends TypedElement {
     @NonNull
     static ClassElement of(@NonNull Class<?> type) {
         return new ReflectClassElement(
-                Objects.requireNonNull(type, "Type cannot be null")
+            Objects.requireNonNull(type, "Type cannot be null")
         );
     }
 
@@ -837,8 +839,8 @@ public interface ClassElement extends TypedElement {
                 @Override
                 public List<? extends ClassElement> getBoundGenericTypes() {
                     return Arrays.stream(pType.getActualTypeArguments())
-                            .map(ClassElement::of)
-                            .toList();
+                        .map(ClassElement::of)
+                        .toList();
                 }
             };
         } else if (type instanceof GenericArrayType genericArrayType) {
@@ -851,9 +853,9 @@ public interface ClassElement extends TypedElement {
     /**
      * Create a class element for the given simple type.
      *
-     * @param type               The type
+     * @param type The type
      * @param annotationMetadata The annotation metadata
-     * @param typeArguments      The type arguments
+     * @param typeArguments The type arguments
      * @return The class element
      * @since 2.4.0
      */
@@ -864,15 +866,15 @@ public interface ClassElement extends TypedElement {
         Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
         Objects.requireNonNull(typeArguments, "Type arguments cannot be null");
         return new ReflectClassElement(
-                Objects.requireNonNull(type, "Type cannot be null")
+            Objects.requireNonNull(type, "Type cannot be null")
         ) {
             @Override
-            public AnnotationMetadata getAnnotationMetadata() {
+            public @NonNull AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
             }
 
             @Override
-            public Map<String, ClassElement> getTypeArguments() {
+            public @NonNull Map<String, ClassElement> getTypeArguments() {
                 return Collections.unmodifiableMap(typeArguments);
             }
 
@@ -880,8 +882,8 @@ public interface ClassElement extends TypedElement {
             @Override
             public List<? extends ClassElement> getBoundGenericTypes() {
                 return getDeclaredGenericPlaceholders().stream()
-                        .map(tv -> typeArguments.get(tv.getVariableName()))
-                        .toList();
+                    .map(tv -> typeArguments.get(tv.getVariableName()))
+                    .toList();
             }
         };
     }
@@ -901,8 +903,8 @@ public interface ClassElement extends TypedElement {
     /**
      * Create a class element for the given simple type.
      *
-     * @param typeName           The type
-     * @param isInterface        Is the type an interface
+     * @param typeName The type
+     * @param isInterface Is the type an interface
      * @param annotationMetadata The annotation metadata
      * @return The class element
      */
@@ -915,10 +917,10 @@ public interface ClassElement extends TypedElement {
     /**
      * Create a class element for the given simple type.
      *
-     * @param typeName           The type
-     * @param isInterface        Is the type an interface
+     * @param typeName The type
+     * @param isInterface Is the type an interface
      * @param annotationMetadata The annotation metadata
-     * @param typeArguments      The type arguments
+     * @param typeArguments The type arguments
      * @return The class element
      */
     @Internal

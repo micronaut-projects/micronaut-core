@@ -42,7 +42,7 @@ public final class IntLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -51,6 +51,7 @@ public final class IntLiteral extends ExpressionNode {
         return PrimitiveElement.INT;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return INT;

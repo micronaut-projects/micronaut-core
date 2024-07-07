@@ -33,10 +33,12 @@ import java.util.Objects;
 public interface ConfigurableElement extends Element {
     /**
      * Fills the type arguments for this element from the given types.
+     *
      * @param types The types
      * @return This element
      */
-    @NonNull ConfigurableElement typeArguments(@NonNull ClassElement... types);
+    @NonNull
+    ConfigurableElement typeArguments(@NonNull ClassElement... types);
 
     /**
      * Adds a {@link jakarta.inject.Named} qualifier to the element.
@@ -59,7 +61,7 @@ public interface ConfigurableElement extends Element {
     ConfigurableElement qualifier(@NonNull AnnotationValue<?> qualifier) {
         Objects.requireNonNull(qualifier, "Qualifier cannot be null");
         annotate(qualifier.getAnnotationName(), (builder) ->
-                builder.members(qualifier.getValues())
+            builder.members(qualifier.getValues())
         );
         return this;
     }

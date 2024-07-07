@@ -16,8 +16,8 @@
 /**
  * The AST package contains internal classes to support annotation metadata on {@link io.micronaut.inject.ast.Element} instances.
  *
- * @see io.micronaut.inject.visitor.TypeElementVisitor
  * @author graemerocher
+ * @see io.micronaut.inject.visitor.TypeElementVisitor
  * @since 1.0
  */
 @Internal

@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -27,12 +28,12 @@ import org.objectweb.asm.commons.Method;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.VOID;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.computeNumericOperationTargetType;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static org.objectweb.asm.Opcodes.DADD;
 import static org.objectweb.asm.Opcodes.DUP;
 import static org.objectweb.asm.Opcodes.FADD;
@@ -54,15 +55,16 @@ public final class AddOperator extends BinaryOperator {
         "D", DADD,
         "I", IADD,
         "F", FADD,
-        "J", LADD);
+        "J", LADD
+    );
 
     private static final Type STRING_BUILDER_TYPE = Type.getType(StringBuilder.class);
 
     private static final Method STRING_BUILD_CONSTRUCTOR =
-        new Method("<init>", VOID, new Type[]{});
+        new Method("<init>", VOID, new Type[] {});
 
     private static final Method STRING_BUILD_TO_STRING =
-        new Method("toString", STRING, new Type[]{});
+        new Method("toString", STRING, new Type[] {});
 
     public AddOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
@@ -71,14 +73,13 @@ public final class AddOperator extends BinaryOperator {
     @Override
     protected Type resolveOperationType(Type leftOperandType, Type rightOperandType) {
         if (!(leftOperandType.equals(STRING)
-                  || rightOperandType.equals(STRING)
-                  || (isNumeric(leftOperandType) && isNumeric(rightOperandType)))) {
-            throw new ExpressionCompilationException(
-                "'+' operation can only be applied to numeric and string types");
+            || rightOperandType.equals(STRING)
+            || (isNumeric(leftOperandType) && isNumeric(rightOperandType)))) {
+            throw new ExpressionCompilationException("'+' operation can only be applied to numeric and string types");
         }
 
         if (leftOperandType.equals(STRING)
-                || rightOperandType.equals(STRING)) {
+            || rightOperandType.equals(STRING)) {
             return STRING;
         }
 
@@ -86,7 +87,7 @@ public final class AddOperator extends BinaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
 
@@ -104,10 +105,8 @@ public final class AddOperator extends BinaryOperator {
             pushUnboxPrimitiveIfNecessary(rightType, mv);
             pushPrimitiveCastIfNecessary(rightType, targetType, mv);
 
-            int opcode =
-                Optional.ofNullable(ADD_OPERATION_OPCODES.get(targetType.getDescriptor()))
-                    .orElseThrow(() -> new ExpressionCompilationException(
-                        "Can not apply '+' operation to " + targetType));
+            int opcode = Optional.ofNullable(ADD_OPERATION_OPCODES.get(targetType.getDescriptor()))
+                .orElseThrow(() -> new ExpressionCompilationException("Can not apply '+' operation to " + targetType));
 
             mv.visitInsn(opcode);
         }
@@ -146,10 +145,10 @@ public final class AddOperator extends BinaryOperator {
 
     private void pushAppendMethod(Type operandType, GeneratorAdapter mv) {
         Type argumentType = TypeDescriptors.isPrimitive(operandType)
-                                ? operandType
-                                : Type.getType(Object.class);
+            ? operandType
+            : Type.getType(Object.class);
 
-        Method appendMethod = new Method("append", STRING_BUILDER_TYPE, new Type[]{argumentType});
+        var appendMethod = new Method("append", STRING_BUILDER_TYPE, new Type[] {argumentType});
         mv.invokeVirtual(STRING_BUILDER_TYPE, appendMethod);
     }
 }

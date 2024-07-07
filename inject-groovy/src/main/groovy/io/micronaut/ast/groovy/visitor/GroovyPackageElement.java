@@ -61,7 +61,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     }
 
     @Override
-    public String getSimpleName() {
+    public @NonNull String getSimpleName() {
         String name = getName();
         int index = name.lastIndexOf(".");
         if (index > -1) {

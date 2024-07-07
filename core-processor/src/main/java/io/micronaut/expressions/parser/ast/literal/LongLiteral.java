@@ -34,6 +34,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
  */
 @Internal
 public final class LongLiteral extends ExpressionNode {
+
     private final long value;
 
     public LongLiteral(long value) {
@@ -41,7 +42,7 @@ public final class LongLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -50,6 +51,7 @@ public final class LongLiteral extends ExpressionNode {
         return PrimitiveElement.LONG;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return LONG;

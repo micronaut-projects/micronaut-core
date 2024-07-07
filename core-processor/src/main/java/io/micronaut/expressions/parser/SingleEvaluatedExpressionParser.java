@@ -16,14 +16,15 @@
 package io.micronaut.expressions.parser;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.access.BeanContextAccess;
 import io.micronaut.expressions.parser.ast.access.ContextElementAccess;
 import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
 import io.micronaut.expressions.parser.ast.access.EnvironmentAccess;
-import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
+import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.ThisAccess;
 import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
 import io.micronaut.expressions.parser.ast.conditional.TernaryExpression;
@@ -34,22 +35,22 @@ import io.micronaut.expressions.parser.ast.literal.IntLiteral;
 import io.micronaut.expressions.parser.ast.literal.LongLiteral;
 import io.micronaut.expressions.parser.ast.literal.NullLiteral;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
-import io.micronaut.expressions.parser.ast.operator.binary.InstanceofOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.MatchesOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.PowOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.AndOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.OrOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.AddOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.AndOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.DivOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.ModOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.MulOperator;
-import io.micronaut.expressions.parser.ast.operator.binary.SubOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.EqOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.GtOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.GteOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.InstanceofOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.LtOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.LteOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.MatchesOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.ModOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.MulOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.NeqOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.OrOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.PowOperator;
+import io.micronaut.expressions.parser.ast.operator.binary.SubOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.EmptyOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.NegOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.NotOperator;
@@ -63,7 +64,49 @@ import io.micronaut.expressions.parser.token.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.micronaut.expressions.parser.token.TokenType.*;
+import static io.micronaut.expressions.parser.token.TokenType.AND;
+import static io.micronaut.expressions.parser.token.TokenType.BEAN_CONTEXT;
+import static io.micronaut.expressions.parser.token.TokenType.BOOL;
+import static io.micronaut.expressions.parser.token.TokenType.COLON;
+import static io.micronaut.expressions.parser.token.TokenType.COMMA;
+import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
+import static io.micronaut.expressions.parser.token.TokenType.DIV;
+import static io.micronaut.expressions.parser.token.TokenType.DOT;
+import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
+import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
+import static io.micronaut.expressions.parser.token.TokenType.ENVIRONMENT;
+import static io.micronaut.expressions.parser.token.TokenType.EQ;
+import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
+import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
+import static io.micronaut.expressions.parser.token.TokenType.GT;
+import static io.micronaut.expressions.parser.token.TokenType.GTE;
+import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
+import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
+import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
+import static io.micronaut.expressions.parser.token.TokenType.INT;
+import static io.micronaut.expressions.parser.token.TokenType.LONG;
+import static io.micronaut.expressions.parser.token.TokenType.LT;
+import static io.micronaut.expressions.parser.token.TokenType.LTE;
+import static io.micronaut.expressions.parser.token.TokenType.L_PAREN;
+import static io.micronaut.expressions.parser.token.TokenType.L_SQUARE;
+import static io.micronaut.expressions.parser.token.TokenType.MATCHES;
+import static io.micronaut.expressions.parser.token.TokenType.MINUS;
+import static io.micronaut.expressions.parser.token.TokenType.MOD;
+import static io.micronaut.expressions.parser.token.TokenType.MUL;
+import static io.micronaut.expressions.parser.token.TokenType.NE;
+import static io.micronaut.expressions.parser.token.TokenType.NOT;
+import static io.micronaut.expressions.parser.token.TokenType.NULL;
+import static io.micronaut.expressions.parser.token.TokenType.OR;
+import static io.micronaut.expressions.parser.token.TokenType.PLUS;
+import static io.micronaut.expressions.parser.token.TokenType.POW;
+import static io.micronaut.expressions.parser.token.TokenType.QMARK;
+import static io.micronaut.expressions.parser.token.TokenType.R_PAREN;
+import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
+import static io.micronaut.expressions.parser.token.TokenType.SAFE_NAV;
+import static io.micronaut.expressions.parser.token.TokenType.STRING;
+import static io.micronaut.expressions.parser.token.TokenType.THIS;
+import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
 
 /**
  * Parser for building AST for single evaluated expression.
@@ -75,6 +118,7 @@ import static io.micronaut.expressions.parser.token.TokenType.*;
  */
 @Internal
 public final class SingleEvaluatedExpressionParser implements EvaluatedExpressionParser {
+
     private final Tokenizer tokenizer;
     private Token lookahead;
 
@@ -89,6 +133,7 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
         this.lookahead = tokenizer.getNextToken();
     }
 
+    @NonNull
     @Override
     public ExpressionNode parse() throws ExpressionParsingException {
         try {
@@ -185,7 +230,7 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
     private ExpressionNode relationalExpression() {
         ExpressionNode leftNode = additiveExpression();
         while (lookahead != null && (lookahead.type()
-                                         .isOneOf(GT, GTE, LT, LTE, INSTANCEOF, MATCHES))) {
+            .isOneOf(GT, GTE, LT, LTE, INSTANCEOF, MATCHES))) {
             TokenType tokenType = lookahead.type();
             eat(lookahead.type());
             leftNode = switch (tokenType) {
@@ -297,14 +342,12 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
     private ExpressionNode postfixExpression() {
         ExpressionNode leftNode = primaryExpression();
         while (lookahead != null && (lookahead.type()
-                                         .isOneOf(DOT, SAFE_NAV, L_SQUARE, INCREMENT, DECREMENT))) {
+            .isOneOf(DOT, SAFE_NAV, L_SQUARE, INCREMENT, DECREMENT))) {
             TokenType tokenType = lookahead.type();
             if (tokenType == INCREMENT) {
-                throw new ExpressionParsingException("Postfix increment operation is not " +
-                                                         "supported");
+                throw new ExpressionParsingException("Postfix increment operation is not supported");
             } else if (tokenType == DECREMENT) {
-                throw new ExpressionParsingException("Postfix decrement operation is not " +
-                                                         "supported");
+                throw new ExpressionParsingException("Postfix decrement operation is not supported");
             } else if (tokenType == DOT) {
                 eat(DOT);
                 leftNode = methodOrPropertyAccess(leftNode, false);
@@ -379,8 +422,8 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
         TypeIdentifier typeIdentifier;
         if (lookahead != null) {
             typeIdentifier = lookahead.type() == TYPE_IDENTIFIER
-                                 ? typeIdentifier(true)
-                                 : typeIdentifier(false);
+                ? typeIdentifier(true)
+                : typeIdentifier(false);
         } else {
             throw new ExpressionParsingException("Bean context access must be followed by type reference");
         }
@@ -444,7 +487,7 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
     //  | MethodArgumentsList ',' Expression
     //  ;
     private List<ExpressionNode> methodArgumentsList() {
-        List<ExpressionNode> arguments = new ArrayList<>();
+        var arguments = new ArrayList<ExpressionNode>();
         if (lookahead.type() != R_PAREN) {
             ExpressionNode firstArgument = expression();
             arguments.add(firstArgument);
@@ -465,7 +508,7 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
             eat(TYPE_IDENTIFIER);
         }
 
-        List<String> parts = new ArrayList<>();
+        var parts = new ArrayList<String>();
         parts.add(eat(IDENTIFIER).value());
         while (lookahead != null && lookahead.type() == DOT) {
             eat(DOT);

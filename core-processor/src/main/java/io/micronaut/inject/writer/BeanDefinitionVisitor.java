@@ -59,7 +59,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * <p>In the case where the produced class is produced by a factory method annotated with
      * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
      *
-     * @param factoryClass  The factory class
+     * @param factoryClass The factory class
      * @param factoryMethod The factory method
      */
     void visitBeanFactoryMethod(ClassElement factoryClass,
@@ -69,9 +69,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * <p>In the case where the produced class is produced by a factory method annotated with
      * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
      *
-     * @param factoryClass  The factory class
+     * @param factoryClass The factory class
      * @param factoryMethod The factory method
-     * @param parameters    The parameters
+     * @param parameters The parameters
      */
     void visitBeanFactoryMethod(ClassElement factoryClass,
                                 MethodElement factoryMethod,
@@ -89,9 +89,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits the constructor used to create the bean definition.
      *
-     * @param constructor        The method element that represents the constructor
+     * @param constructor The method element that represents the constructor
      * @param requiresReflection Whether invoking the constructor requires reflection
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitBeanDefinitionConstructor(MethodElement constructor,
                                         boolean requiresReflection,
@@ -102,11 +102,11 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * This method should only be called in the class defines no constructor.
      *
      * @param annotationMetadata The annotation metadata for the constructor
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitDefaultConstructor(
-            AnnotationMetadata annotationMetadata,
-            VisitorContext visitorContext
+        AnnotationMetadata annotationMetadata,
+        VisitorContext visitorContext
     );
 
     /**
@@ -220,11 +220,11 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits an injection point for a setter.
      *
-     * @param declaringType      The declaring type
-     * @param methodElement      The method element
+     * @param declaringType The declaring type
+     * @param methodElement The method element
      * @param annotationMetadata The annotationMetadata
      * @param requiresReflection Whether the setter requires reflection
-     * @param isOptional         Whether the setter is optional
+     * @param isOptional Whether the setter is optional
      */
     void visitSetterValue(TypedElement declaringType,
                           MethodElement methodElement,
@@ -234,11 +234,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * Visits a method injection point.
-     *  @param declaringType      The declaring type of the method. Either a Class or a string representing
-     *                           the name of the type
-     * @param methodElement      The method element
+     *
+     * @param declaringType The declaring type of the method. Either a Class or a string representing
+     * the name of the type
+     * @param methodElement The method element
      * @param requiresReflection Whether the method requires reflection
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitPostConstructMethod(TypedElement declaringType,
                                   MethodElement methodElement,
@@ -248,10 +249,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits a method injection point.
      *
-     * @param beanType           The bean type of the method
-     * @param methodElement      The method element
+     * @param beanType The bean type of the method
+     * @param methodElement The method element
      * @param requiresReflection Whether the method requires reflection
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitPreDestroyMethod(TypedElement beanType,
                                MethodElement methodElement,
@@ -261,10 +262,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits a method injection point.
      *
-     * @param beanType           The bean type of the method
-     * @param methodElement      The method element
+     * @param beanType The bean type of the method
+     * @param methodElement The method element
      * @param requiresReflection Whether the method requires reflection
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitMethodInjectionPoint(TypedElement beanType,
                                    MethodElement methodElement,
@@ -274,22 +275,22 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringBean  The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
-     * @param methodElement  The method element
+     * @param declaringBean The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
+     * @param methodElement The method element
      * @param visitorContext The visitor context
      * @return The index of a new method
      */
     int visitExecutableMethod(TypedElement declaringBean,
-                                                 MethodElement methodElement,
-                                                 VisitorContext visitorContext);
+                              MethodElement methodElement,
+                              VisitorContext visitorContext);
 
     /**
      * Visits a field injection point.
      *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldElement       The field element
+     * @param declaringType The declaring type. Either a Class or a string representing the name of the type
+     * @param fieldElement The field element
      * @param requiresReflection Whether accessing the field requires reflection
-     * @param visitorContext     The visitor context
+     * @param visitorContext The visitor context
      */
     void visitFieldInjectionPoint(TypedElement declaringType,
                                   FieldElement fieldElement,
@@ -299,11 +300,11 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits an annotation injection point.
      *
-     * @param annotationMemberBeanType     The type of the injected bean
-     * @param annotationMemberProperty       Required property of the injected bean
-     * @param requiredValue      Required value of the bean property for the bean to be loaded
-     * @param notEqualsValue      The bean property value which should not be equal to present value for the bean to
-     *                           be loaded
+     * @param annotationMemberBeanType The type of the injected bean
+     * @param annotationMemberProperty Required property of the injected bean
+     * @param requiredValue Required value of the bean property for the bean to be loaded
+     * @param notEqualsValue The bean property value which should not be equal to present value for the bean to
+     * be loaded
      */
     void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
                                                      String annotationMemberProperty,
@@ -313,10 +314,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits a field injection point.
      *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldElement       The field element
+     * @param declaringType The declaring type. Either a Class or a string representing the name of the type
+     * @param fieldElement The field element
      * @param requiresReflection Whether accessing the field requires reflection
-     * @param isOptional         Is the value optional
+     * @param isOptional Is the value optional
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
@@ -341,46 +342,46 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Begin defining a configuration builder.
      *
-     * @param type               The type of the builder
-     * @param field              The name of the field that represents the builder
+     * @param type The type of the builder
+     * @param field The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
-     * @param isInterface        Whether the builder type is an interface or not
+     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
+     * @param isInterface Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
-            ClassElement type,
-            String field,
-            AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
-            boolean isInterface);
+        ClassElement type,
+        String field,
+        AnnotationMetadata annotationMetadata,
+        ConfigurationMetadataBuilder metadataBuilder,
+        boolean isInterface);
 
     /**
      * Begin defining a configuration builder.
      *
-     * @param type               The type of the builder
-     * @param methodName         The name of the method that returns the builder
+     * @param type The type of the builder
+     * @param methodName The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
-     * @param isInterface        Whether the builder type is an interface or not
+     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
+     * @param isInterface Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-            ClassElement type,
-            String methodName,
-            AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
-            boolean isInterface);
+        ClassElement type,
+        String methodName,
+        AnnotationMetadata annotationMetadata,
+        ConfigurationMetadataBuilder metadataBuilder,
+        boolean isInterface);
 
     /**
      * Visit a configuration builder method.
      *
      * @param propertyName The property name
-     * @param returnType   The return type
-     * @param methodName   The method name
-     * @param paramType    The method type
-     * @param generics     The generic types of the method
-     * @param path         The property path
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param paramType The method type
+     * @param generics The generic types of the method
+     * @param path The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(String propertyName,
@@ -394,9 +395,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
      * @param propertyName The property name
-     * @param returnType   The return type
-     * @param methodName   The method name
-     * @param path         The property path
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param path The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(String propertyName,

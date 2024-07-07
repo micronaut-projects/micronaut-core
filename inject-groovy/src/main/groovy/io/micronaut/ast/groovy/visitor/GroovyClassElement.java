@@ -219,7 +219,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+    public @NonNull ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
         return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, typeArguments, arrayDimensions);
     }
 
@@ -254,7 +254,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
+    public <T extends Element> @NonNull List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return groovyEnclosedElementsQuery.getEnclosedElements(this, query);
     }
 
@@ -368,7 +368,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getSyntheticBeanProperties() {
+    public @NonNull List<PropertyElement> getSyntheticBeanProperties() {
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
             PropertyElementQuery configuration = new PropertyElementQuery();
@@ -388,7 +388,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
+    public @NonNull List<PropertyElement> getBeanProperties(@NonNull PropertyElementQuery propertyElementQuery) {
         Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
         return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
                 this,
@@ -402,7 +402,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties() {
+    public @NonNull List<PropertyElement> getBeanProperties() {
         if (properties == null) {
             properties = getBeanProperties(PropertyElementQuery.of(this));
         }
@@ -523,12 +523,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return classNode.getName();
     }
 
     @Override
-    public String getSimpleName() {
+    public @NonNull String getSimpleName() {
         return classNode.getNameWithoutPackage();
     }
 
@@ -647,7 +647,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public ClassElement getType() {
+    public @NonNull ClassElement getType() {
         if (theType == null) {
             GroovyNativeElement nativeType = getNativeType();
             ClassNode thisClassNode = (ClassNode) nativeType.annotatedNode();
@@ -659,7 +659,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         if (elementTypeAnnotationMetadata == null) {
             elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
         }
@@ -705,7 +705,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Set<AnnotatedNode> getExcludedNativeElements(ElementQuery.Result<?> result) {
+        protected Set<AnnotatedNode> getExcludedNativeElements(ElementQuery.@NonNull Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 Set<AnnotatedNode> excluded = new HashSet<>();
                 for (PropertyElement excludePropertyElement : getBeanProperties()) {
@@ -728,16 +728,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Collection<ClassNode> getInterfaces(ClassNode classNode) {
+        protected @NonNull Collection<ClassNode> getInterfaces(ClassNode classNode) {
             return Arrays.stream(classNode.getInterfaces())
                     .filter(interfaceNode -> !interfaceNode.getName().equals(GroovyObject.class.getName()))
                     .toList();
         }
 
         @Override
-        protected List<AnnotatedNode> getEnclosedElements(ClassNode classNode,
-                                                          ElementQuery.Result<?> result,
-                                                          boolean includeAbstract) {
+        protected @NonNull List<AnnotatedNode> getEnclosedElements(ClassNode classNode,
+                                                                   ElementQuery.Result<?> result,
+                                                                   boolean includeAbstract) {
             Class<?> elementType = result.getElementType();
             return getEnclosedElements(classNode, result, elementType, includeAbstract);
         }
@@ -826,7 +826,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Element toAstElement(AnnotatedNode nativeType, Class<?> elementType) {
+        protected @NonNull Element toAstElement(AnnotatedNode nativeType, Class<?> elementType) {
             final GroovyElementFactory elementFactory = visitorContext.getElementFactory();
             if (isSource) {
                 if (!(nativeType instanceof ConstructorNode) && nativeType instanceof MethodNode methodNode) {

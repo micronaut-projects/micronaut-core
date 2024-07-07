@@ -111,6 +111,7 @@ public class ConfigurationMetadataBuilder {
 
     /**
      * Resolves the javadoc description for the given element.
+     *
      * @param element The element
      * @return The javadoc description.
      */
@@ -155,13 +156,13 @@ public class ConfigurationMetadataBuilder {
     /**
      * Visit a configuration property.
      *
-     * @param owningType    The type that owns the property
+     * @param owningType The type that owns the property
      * @param declaringType The declaring type of the property
-     * @param propertyType  The property type
-     * @param name          The property name
-     * @param description   A description for the property
-     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers,
-     *                      enums etc.)
+     * @param propertyType The property type
+     * @param name The property name
+     * @param description A description for the property
+     * @param defaultValue The default value of the property (only used for constant values such as strings, numbers,
+     * enums etc.)
      * @return This property metadata
      */
     public PropertyMetadata visitProperty(ClassElement owningType,
@@ -192,14 +193,14 @@ public class ConfigurationMetadataBuilder {
      */
     @SuppressWarnings("MagicNumber")
     static String quote(String string) {
-        if (string == null || string.length() == 0) {
+        if (string == null || string.isEmpty()) {
             return "\"\"";
         }
 
         char c = 0;
         int i;
         int len = string.length();
-        StringBuilder sb = new StringBuilder(len + 4);
+        var sb = new StringBuilder(len + 4);
         String t;
 
         sb.append('"');
@@ -241,8 +242,8 @@ public class ConfigurationMetadataBuilder {
     /**
      * Write a quoted attribute with a value to a writer.
      *
-     * @param out   The out writer
-     * @param name  The name of the attribute
+     * @param out The out writer
+     * @param name The name of the attribute
      * @param value The value
      * @throws IOException If an error occurred writing output
      */

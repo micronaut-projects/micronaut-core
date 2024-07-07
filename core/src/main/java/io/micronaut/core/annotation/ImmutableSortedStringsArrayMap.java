@@ -72,7 +72,7 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
 
     private int findKeyIndex(Object key) {
         // Performance optimization to check for the String first to avoid the type-check pollution
-        if (!(key instanceof String) && !(key instanceof Comparable)) {
+        if (!(key instanceof Comparable)) {
             return -1;
         }
         int v = index[reduceHashCode(key.hashCode(), keys.length)];
@@ -161,6 +161,7 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     @Override
     public Collection<V> values() {
         return new AbstractCollection<>() {
+            @NonNull
             @Override
             public Iterator<V> iterator() {
                 return new Iterator<>() {
@@ -220,7 +221,7 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     @NonNull
     @Override
     public Set<Entry<String, V>> entrySet() {
-        Set<Entry<String, V>> set = new HashSet<>();
+        var set = new HashSet<Entry<String, V>>();
         for (int i = 0; i < keys.length; i += 1) {
             set.add(new AbstractMap.SimpleEntry<>(keys[i], (V) values[i]));
         }

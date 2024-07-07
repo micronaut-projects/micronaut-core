@@ -34,6 +34,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
  */
 @Internal
 public final class FloatLiteral extends ExpressionNode {
+
     private final float value;
 
     public FloatLiteral(float value) {
@@ -41,7 +42,7 @@ public final class FloatLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -50,6 +51,7 @@ public final class FloatLiteral extends ExpressionNode {
         return PrimitiveElement.FLOAT;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return FLOAT;

@@ -68,7 +68,7 @@ public final class ConfigurationUtils {
         String finalPath = path;
         classElement.annotate(ConfigurationReader.class, builder ->
             builder.member(ConfigurationReader.PREFIX, finalPath)
-                   .member(ConfigurationReader.PREFIX_CALCULATED, true)
+                .member(ConfigurationReader.PREFIX_CALCULATED, true)
         );
         return Optional.of(path);
     }
@@ -129,7 +129,7 @@ public final class ConfigurationUtils {
             ClassElement enclosingType = inner.get();
             if (enclosingType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
                 String parentPrefix = enclosingType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-                        .orElse(StringUtils.EMPTY_STRING);
+                    .orElse(StringUtils.EMPTY_STRING);
                 path = combinePaths(parentPrefix, path);
                 break;
             } else {
@@ -151,7 +151,7 @@ public final class ConfigurationUtils {
                 ClassElement superType = optionalSuperType.get();
                 if (superType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
                     String parentPrefix = superType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-                            .orElse(StringUtils.EMPTY_STRING);
+                        .orElse(StringUtils.EMPTY_STRING);
                     path = combinePaths(parentPrefix, path);
                     break;
                 } else {
@@ -180,9 +180,9 @@ public final class ConfigurationUtils {
 
     private static ClassElement resolveSuperInterface(ClassElement declaringType) {
         return declaringType.getInterfaces().stream()
-                .filter(tm -> tm.hasStereotype(ConfigurationReader.class))
-                .findFirst()
-                .orElse(null);
+            .filter(tm -> tm.hasStereotype(ConfigurationReader.class))
+            .findFirst()
+            .orElse(null);
     }
 
 }

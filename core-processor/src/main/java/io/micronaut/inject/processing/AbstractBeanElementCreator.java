@@ -90,15 +90,15 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
     protected void visitAnnotationMetadata(BeanDefinitionVisitor writer, AnnotationMetadata annotationMetadata) {
         for (io.micronaut.core.annotation.AnnotationValue<Requires> annotation : annotationMetadata.getAnnotationValuesByType(Requires.class)) {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
-                .ifPresent(beanProperty -> {
+                .ifPresent(beanProperty ->
                     annotation.stringValue(RequiresCondition.MEMBER_BEAN)
                         .flatMap(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()))
                         .ifPresent(classElement -> {
                             String requiredValue = annotation.stringValue().orElse(null);
                             String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
                             writer.visitAnnotationMemberPropertyInjectionPoint(classElement, beanProperty, requiredValue, notEqualsValue);
-                        });
-                });
+                        })
+                );
         }
     }
 

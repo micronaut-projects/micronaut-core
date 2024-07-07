@@ -18,8 +18,8 @@ package io.micronaut.inject.ast;
 /**
  * Represents an annotation in the AST.
  *
- * @see io.micronaut.inject.visitor.VisitorContext#getClassElement(String)
  * @author graemerocher
+ * @see io.micronaut.inject.visitor.VisitorContext#getClassElement(String)
  * @since 3.1.0
  */
 public interface AnnotationElement extends ClassElement {

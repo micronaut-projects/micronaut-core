@@ -34,8 +34,9 @@ import static org.objectweb.asm.Opcodes.ACONST_NULL;
  */
 @Internal
 public final class NullLiteral extends ExpressionNode {
+
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().visitInsn(ACONST_NULL);
     }
 
@@ -44,6 +45,7 @@ public final class NullLiteral extends ExpressionNode {
         return ClassElement.of(Object.class);
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return OBJECT;

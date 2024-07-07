@@ -62,7 +62,7 @@ public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnot
             beanPropertiesBuilder = beanPropertiesBuilder.member(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS, excludedAnnotations);
         }
         return List.of(
-                annotation.mutate().stereotype(beanPropertiesBuilder.build()).build()
+            annotation.mutate().stereotype(beanPropertiesBuilder.build()).build()
         );
     }
 

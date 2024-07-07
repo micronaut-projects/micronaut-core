@@ -42,7 +42,8 @@ public final class SubOperator extends MathOperator {
         "D", DSUB,
         "I", ISUB,
         "F", FSUB,
-        "J", LSUB);
+        "J", LSUB
+    );
 
     public SubOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
@@ -53,7 +54,6 @@ public final class SubOperator extends MathOperator {
         Type type = resolveType(ctx);
         String typeDescriptor = type.getDescriptor();
         return Optional.ofNullable(SUB_OPERATION_OPCODES.get(typeDescriptor))
-                   .orElseThrow(() -> new ExpressionCompilationException(
-                       "'*' operation can not be applied to " + type));
+            .orElseThrow(() -> new ExpressionCompilationException("'*' operation can not be applied to " + type));
     }
 }

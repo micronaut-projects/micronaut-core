@@ -61,7 +61,7 @@ final class SimpleClassElement implements ClassElement {
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
     }
 
@@ -81,12 +81,12 @@ final class SimpleClassElement implements ClassElement {
     }
 
     @Override
-    public ClassElement toArray() {
+    public @NonNull ClassElement toArray() {
         throw new UnsupportedOperationException("Cannot convert class elements produced by name to an array");
     }
 
     @Override
-    public ClassElement fromArray() {
+    public @NonNull ClassElement fromArray() {
         throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
     }
 

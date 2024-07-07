@@ -158,7 +158,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected String getOriginatingClassName(AnnotatedNode originatingElement) {
+    protected String getOriginatingClassName(@NonNull AnnotatedNode originatingElement) {
         if (originatingElement instanceof ClassNode classNode) {
             return classNode.getName();
         } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
@@ -176,7 +176,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
+    protected @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations();
         for (AnnotationNode ann : annotations) {
             if (ann.getClassNode().getName().equals(Retention.class.getName())) {

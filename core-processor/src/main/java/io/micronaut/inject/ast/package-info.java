@@ -16,8 +16,8 @@
 /**
  * The AST package contains a generic AST over different languages (currently Groovy, Java and Kotlin).
  *
- * @see io.micronaut.inject.visitor.TypeElementVisitor
  * @author graemerocher
+ * @see io.micronaut.inject.visitor.TypeElementVisitor
  * @since 1.0
  */
 package io.micronaut.inject.ast;

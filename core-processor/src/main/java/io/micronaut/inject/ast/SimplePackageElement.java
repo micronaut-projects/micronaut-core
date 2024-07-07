@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Simple implementation of {@link io.micronaut.inject.ast.PackageElement}.
@@ -32,7 +33,7 @@ final class SimplePackageElement implements PackageElement {
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return packageName;
     }
 
@@ -47,7 +48,7 @@ final class SimplePackageElement implements PackageElement {
     }
 
     @Override
-    public Object getNativeType() {
+    public @NonNull Object getNativeType() {
         return packageName;
     }
 }

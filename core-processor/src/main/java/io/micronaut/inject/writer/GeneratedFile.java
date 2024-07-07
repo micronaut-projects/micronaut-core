@@ -46,9 +46,9 @@ public interface GeneratedFile {
      * Gets an InputStream for this file object.
      *
      * @return an InputStream
-     * @throws IllegalStateException         if this file object was opened for writing and does not support reading
+     * @throws IllegalStateException if this file object was opened for writing and does not support reading
      * @throws UnsupportedOperationException if this kind of file object does not support byte access
-     * @throws IOException                   if an I/O error occurred
+     * @throws IOException if an I/O error occurred
      */
     InputStream openInputStream() throws IOException;
 
@@ -56,9 +56,9 @@ public interface GeneratedFile {
      * Gets an OutputStream for this file object.
      *
      * @return an OutputStream
-     * @throws IllegalStateException         if this file object was opened for reading and does not support writing
+     * @throws IllegalStateException if this file object was opened for reading and does not support writing
      * @throws UnsupportedOperationException if this kind of file object does not support byte access
-     * @throws IOException                   if an I/O error occurred
+     * @throws IOException if an I/O error occurred
      */
     OutputStream openOutputStream() throws IOException;
 
@@ -68,9 +68,9 @@ public interface GeneratedFile {
      * is true.
      *
      * @return a Reader
-     * @throws IllegalStateException         if this file object was opened for writing and does not support reading
+     * @throws IllegalStateException if this file object was opened for writing and does not support reading
      * @throws UnsupportedOperationException if this kind of file object does not support character access
-     * @throws IOException                   if an I/O error occurred
+     * @throws IOException if an I/O error occurred
      */
     Reader openReader() throws IOException;
 
@@ -80,9 +80,9 @@ public interface GeneratedFile {
      * {@code ignoreEncodingErrors} is true.
      *
      * @return a CharSequence if available; {@code null} otherwise
-     * @throws IllegalStateException         if this file object was opened for writing and does not support reading
+     * @throws IllegalStateException if this file object was opened for writing and does not support reading
      * @throws UnsupportedOperationException if this kind of file object does not support character access
-     * @throws IOException                   if an I/O error occurred
+     * @throws IOException if an I/O error occurred
      */
     CharSequence getTextContent() throws IOException;
 
@@ -90,14 +90,15 @@ public interface GeneratedFile {
      * Gets a Writer for this file object.
      *
      * @return a Writer
-     * @throws IllegalStateException         if this file object was opened for reading and does not support writing
+     * @throws IllegalStateException if this file object was opened for reading and does not support writing
      * @throws UnsupportedOperationException if this kind of file object does not support character access
-     * @throws IOException                   if an I/O error occurred
+     * @throws IOException if an I/O error occurred
      */
     Writer openWriter() throws IOException;
 
     /**
      * Writes the context to the file.
+     *
      * @param consumer the code generating block
      * @throws IOException in case of I/O error
      * @since 4.2.0
@@ -110,6 +111,7 @@ public interface GeneratedFile {
 
     /**
      * A consumer which may throw an IOException.
+     *
      * @param <T> the type of the consumed element
      * @since 4.2.0
      */

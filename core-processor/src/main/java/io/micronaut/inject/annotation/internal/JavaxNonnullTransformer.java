@@ -28,20 +28,22 @@ import java.util.List;
 
 /**
  * A transformer that remaps {@code javax.annotation.Nonnull} to {@link io.micronaut.core.annotation.AnnotationUtil#NON_NULL}.
+ *
  * @since 4.0
  */
 @Internal
 public class JavaxNonnullTransformer implements NamedAnnotationTransformer {
 
+    @NonNull
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return "javax.annotation.Nonnull";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
+            AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
         );
     }
 }

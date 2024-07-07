@@ -37,11 +37,13 @@ import static org.objectweb.asm.Opcodes.LDIV;
  */
 @Internal
 public final class DivOperator extends MathOperator {
+
     private static final Map<String, Integer> DIV_OPERATION_OPCODES = Map.of(
         "D", DDIV,
         "I", IDIV,
         "F", FDIV,
-        "J", LDIV);
+        "J", LDIV
+    );
 
     public DivOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
@@ -52,7 +54,6 @@ public final class DivOperator extends MathOperator {
         Type type = resolveType(ctx);
         String typeDescriptor = type.getDescriptor();
         return Optional.ofNullable(DIV_OPERATION_OPCODES.get(typeDescriptor))
-                   .orElseThrow(() -> new ExpressionCompilationException(
-                       "'/' operation can not be applied to " + type));
+            .orElseThrow(() -> new ExpressionCompilationException("'/' operation can not be applied to " + type));
     }
 }

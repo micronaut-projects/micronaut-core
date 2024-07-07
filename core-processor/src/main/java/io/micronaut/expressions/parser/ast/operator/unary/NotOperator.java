@@ -37,10 +37,12 @@ import static org.objectweb.asm.Opcodes.IFNE;
  */
 @Internal
 public final class NotOperator extends UnaryOperator {
+
     public NotOperator(ExpressionNode operand) {
         super(operand);
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (nodeType != null) {
@@ -58,10 +60,10 @@ public final class NotOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label returnLabel = new Label();
+        var falseLabel = new Label();
+        var returnLabel = new Label();
 
         operand.compile(ctx);
         mv.visitJumpInsn(IFNE, falseLabel);

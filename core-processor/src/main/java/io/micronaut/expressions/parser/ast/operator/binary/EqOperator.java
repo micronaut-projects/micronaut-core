@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Type;
@@ -24,9 +25,9 @@ import org.objectweb.asm.commons.Method;
 
 import java.util.Objects;
 
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.OBJECT;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 
 /**
  * Expression AST node for binary '==' operator.
@@ -36,12 +37,13 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
  */
 @Internal
 public sealed class EqOperator extends BinaryOperator permits NeqOperator {
+
     public EqOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type lefType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
@@ -52,7 +54,7 @@ public sealed class EqOperator extends BinaryOperator permits NeqOperator {
         rightOperand.compile(ctx);
         pushBoxPrimitiveIfNecessary(rightType, mv);
 
-        mv.invokeStatic(Type.getType(Objects.class), new Method("equals", BOOLEAN, new Type[]{OBJECT, OBJECT}));
+        mv.invokeStatic(Type.getType(Objects.class), new Method("equals", BOOLEAN, new Type[] {OBJECT, OBJECT}));
     }
 
     @Override

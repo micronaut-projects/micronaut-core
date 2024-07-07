@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Interface for class elements that can be converted to/from an array type.
@@ -23,12 +24,12 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 public interface ArrayableClassElement extends ClassElement {
     @Override
-    default ClassElement toArray() {
+    default @NonNull ClassElement toArray() {
         return withArrayDimensions(getArrayDimensions() + 1);
     }
 
     @Override
-    default ClassElement fromArray() {
+    default @NonNull ClassElement fromArray() {
         if (!isArray()) {
             throw new IllegalStateException("Not an array");
         }

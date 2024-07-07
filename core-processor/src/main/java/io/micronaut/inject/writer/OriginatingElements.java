@@ -20,8 +20,9 @@ import io.micronaut.inject.ast.Element;
 
 /**
  * Interface for types that provide originating elements.
- * @since 2.1.1
+ *
  * @author graemerocher
+ * @since 2.1.1
  */
 public interface OriginatingElements {
     /**
@@ -33,6 +34,7 @@ public interface OriginatingElements {
 
     /**
      * Add another element that should be included in the originating elements.
+     *
      * @param element The element to add
      * @since 2.1.1
      */
@@ -40,6 +42,7 @@ public interface OriginatingElements {
 
     /**
      * Factory to create the originating elements.
+     *
      * @param elements The elements
      * @return The originating elements
      */

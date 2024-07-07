@@ -27,9 +27,9 @@ import java.util.Optional;
  * <p>
  * For compatibility, this a {@link io.micronaut.inject.ast.GenericPlaceholderElement} acts like its first upper bound when used as a {@link ClassElement}.
  *
- * @since 3.1.0
  * @author Jonas Konrad
  * @author graemerocher
+ * @since 3.1.0
  */
 @Experimental
 public interface GenericPlaceholderElement extends GenericElement {

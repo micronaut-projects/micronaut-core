@@ -35,6 +35,7 @@ import java.util.Set;
 
 /**
  * The mapper visitor.
+ *
  * @since 4.1.0
  */
 public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
@@ -97,7 +98,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                                 });
                             }
                         }
-                        if (lastClassElement !=  null) {
+                        if (lastClassElement != null) {
                             lastClassElement.annotate(Mapper.class);
                         }
                     }

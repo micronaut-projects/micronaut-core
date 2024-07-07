@@ -55,7 +55,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         contextOperation.compile(ctx);
     }
 
@@ -64,6 +64,7 @@ public final class ContextElementAccess extends ExpressionNode {
         return resolveContextOperation(ctx).resolveClassElement(ctx);
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return resolveContextOperation(ctx).resolveType(ctx);

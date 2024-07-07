@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A reference class writer counter.
+ *
  * @author Denis Stepanov
  * @since 4.3.0
  */

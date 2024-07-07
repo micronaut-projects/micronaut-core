@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -123,12 +124,12 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public ClassElement getType() {
+    public @NonNull ClassElement getType() {
         return type;
     }
 
     @Override
-    public ClassElement getGenericType() {
+    public @NonNull ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -163,7 +164,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return name;
     }
 

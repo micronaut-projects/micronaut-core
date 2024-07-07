@@ -29,6 +29,7 @@ import static org.objectweb.asm.Opcodes.IF_ICMPLE;
  */
 @Internal
 public final class GtOperator extends RelationalOperator {
+
     public GtOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }

@@ -2,6 +2,7 @@ package io.micronaut.annotation.mapping
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.annotation.AnnotationRemapper
 import io.micronaut.inject.visitor.VisitorContext
 
@@ -32,12 +33,13 @@ class RemapToRepeatableAnnotationsTo {
 
     static class TheAnnotationMapper implements AnnotationRemapper {
 
-
+        @NonNull
         @Override
         String getPackageName() {
             return "io.micronaut.annotation.mapping"
         }
 
+        @NonNull
         @Override
         List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
             if (annotation.getAnnotationName() == RemapMeToRepeatable.class.name) {

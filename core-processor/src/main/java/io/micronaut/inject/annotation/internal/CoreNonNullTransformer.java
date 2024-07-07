@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -36,6 +37,7 @@ import java.util.List;
 @Internal
 public class CoreNonNullTransformer implements NamedAnnotationTransformer {
 
+    @NonNull
     @Override
     public String getName() {
         return "io.micronaut.core.annotation.NonNull";
@@ -50,7 +52,7 @@ public class CoreNonNullTransformer implements NamedAnnotationTransformer {
             }
         });
         return Collections.singletonList(
-                builder.build()
+            builder.build()
         );
     }
 }

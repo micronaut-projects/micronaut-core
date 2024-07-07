@@ -35,7 +35,7 @@ public interface ExpressionEvaluationContextRegistrar extends TypeElementVisitor
         visitorContext.getClassElement(getContextClassName())
             .ifPresent(contextClass ->
                 visitorContext.getExpressionCompilationContextFactory()
-                              .registerContextClass(contextClass)
+                    .registerContextClass(contextClass)
             );
     }
 

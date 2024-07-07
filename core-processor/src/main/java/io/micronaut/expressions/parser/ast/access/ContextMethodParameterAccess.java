@@ -42,7 +42,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
 
     private static final Method GET_ARGUMENT_METHOD =
         new Method("getArgument", Type.getType(Object.class),
-            new Type[]{TypeDescriptors.INT});
+            new Type[] {TypeDescriptors.INT});
 
     private final ParameterElement parameterElement;
 
@@ -53,7 +53,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
         mv.push(parameterIndex);
@@ -91,6 +91,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
         return parameterElement.getGenericType();
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         doResolveClassElement(ctx);

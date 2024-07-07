@@ -42,7 +42,8 @@ public final class MulOperator extends MathOperator {
         "D", DMUL,
         "I", IMUL,
         "F", FMUL,
-        "J", LMUL);
+        "J", LMUL
+    );
 
     public MulOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
@@ -53,7 +54,6 @@ public final class MulOperator extends MathOperator {
         Type type = resolveType(ctx);
         String typeDescriptor = type.getDescriptor();
         return Optional.ofNullable(MUL_OPERATION_OPCODES.get(typeDescriptor))
-                   .orElseThrow(() -> new ExpressionCompilationException(
-                       "'*' operation can not be applied to " + type));
+            .orElseThrow(() -> new ExpressionCompilationException("'*' operation can not be applied to " + type));
     }
 }

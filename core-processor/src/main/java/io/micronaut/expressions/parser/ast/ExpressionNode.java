@@ -58,7 +58,6 @@ public abstract class ExpressionNode {
      * is resolved, type resolution result is cached.
      *
      * @param ctx expression compilation context
-     *
      * @return resolved type
      */
     @NonNull
@@ -74,7 +73,6 @@ public abstract class ExpressionNode {
      * is resolved, type resolution result is cached.
      *
      * @param ctx expression compilation context
-     *
      * @return resolved type
      */
     @NonNull
@@ -87,7 +85,6 @@ public abstract class ExpressionNode {
      * is resolved, type resolution result is cached.
      *
      * @param ctx expression compilation context
-     *
      * @return resolved type
      */
     @NonNull
@@ -103,7 +100,6 @@ public abstract class ExpressionNode {
      * is resolved, type resolution result is cached.
      *
      * @param ctx expression compilation context
-     *
      * @return resolved type
      */
     @NonNull
@@ -113,6 +109,7 @@ public abstract class ExpressionNode {
 
     /**
      * Resolves the class element for this node.
+     *
      * @param ctx The expression compilation context
      * @return The resolved type
      */
@@ -127,6 +124,7 @@ public abstract class ExpressionNode {
 
     /**
      * Resolves the class element for this node.
+     *
      * @param ctx The expression compilation context
      * @return The resolved type
      */
@@ -138,7 +136,6 @@ public abstract class ExpressionNode {
      * Resolves expression AST node type.
      *
      * @param ctx expression compilation context
-     *
      * @return resolved type
      */
     @NonNull

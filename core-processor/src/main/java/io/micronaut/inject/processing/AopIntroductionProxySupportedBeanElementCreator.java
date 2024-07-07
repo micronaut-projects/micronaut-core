@@ -18,6 +18,7 @@ package io.micronaut.inject.processing;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -38,7 +39,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
     }
 
     @Override
-    protected BeanDefinitionVisitor createBeanDefinitionVisitor() {
+    protected @NonNull BeanDefinitionVisitor createBeanDefinitionVisitor() {
         if (classElement.isFinal()) {
             throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
         }

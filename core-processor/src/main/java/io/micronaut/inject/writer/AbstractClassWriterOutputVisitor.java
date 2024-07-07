@@ -23,7 +23,12 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Abstract implementation of the {@link ClassWriterOutputVisitor} interface that deals with service descriptors in a
@@ -39,6 +44,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
 
     /**
      * Default constructor.
+     *
      * @param isWriteOnFinish Is this the eclipse compiler
      */
     protected AbstractClassWriterOutputVisitor(boolean isWriteOnFinish) {

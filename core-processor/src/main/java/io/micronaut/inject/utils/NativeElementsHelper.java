@@ -47,8 +47,8 @@ public abstract class NativeElementsHelper<C, M> {
     /**
      * Check if one method overrides another.
      *
-     * @param m1    The override method
-     * @param m2    The overridden method
+     * @param m1 The override method
+     * @param m2 The overridden method
      * @param owner The class owner of the methods
      * @return true if overridden
      */
@@ -67,7 +67,7 @@ public abstract class NativeElementsHelper<C, M> {
      * Extracts the super class.
      *
      * @param classNode The class
-     * @return The super calss
+     * @return The super class
      */
     @Nullable
     protected abstract C getSuperClass(C classNode);
@@ -129,7 +129,7 @@ public abstract class NativeElementsHelper<C, M> {
     /**
      * Populate with the class hierarchy.
      *
-     * @param element   The element
+     * @param element The element
      * @param hierarchy The hierarchy
      */
     public final void populateTypeHierarchy(C element, List<C> hierarchy) {
@@ -148,7 +148,7 @@ public abstract class NativeElementsHelper<C, M> {
     /**
      * Find overridden methods.
      *
-     * @param classNode     The class of the method
+     * @param classNode The class of the method
      * @param methodElement The method
      * @return the overridden methods
      */
@@ -272,8 +272,8 @@ public abstract class NativeElementsHelper<C, M> {
      * The method element.
      *
      * @param methodElement The element
-     * @param overridden    The overridden collection
-     * @param <N>           The native method element type
+     * @param overridden The overridden collection
+     * @param <N> The native method element type
      */
     public record MethodElement<N>(N methodElement, LinkedHashSet<N> overridden) {
     }

@@ -33,20 +33,22 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
 
 /**
  * Internal utility class for writing annotation metadata with evaluated expressions.
  */
 @Internal
 public final class EvaluatedExpressionProcessor {
-    protected static final Type TYPE_BUILD_TIME_INIT = Type.getType(BuildTimeInit.class);
+
+    private static final Type TYPE_BUILD_TIME_INIT = Type.getType(BuildTimeInit.class);
+
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final VisitorContext visitorContext;
@@ -54,6 +56,7 @@ public final class EvaluatedExpressionProcessor {
 
     /**
      * Default constructor.
+     *
      * @param visitorContext The visitor context
      * @param originatingElement The originating element
      */
@@ -74,8 +77,9 @@ public final class EvaluatedExpressionProcessor {
 
     /**
      * Process evaluated expression contained within annotation metadata.
+     *
      * @param annotationMetadata The annotation metadata
-     * @param thisElement If the expressino is evaluated in a non-static context, this type represents {@code this}
+     * @param thisElement If the expression is evaluated in a non-static context, this type represents {@code this}
      */
     public void processEvaluatedExpressions(AnnotationMetadata annotationMetadata, @Nullable ClassElement thisElement) {
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -105,7 +109,7 @@ public final class EvaluatedExpressionProcessor {
             .forEach(this::addExpression);
 
         ClassElement resolvedThis = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
-        for (ParameterElement parameter: methodElement.getParameters()) {
+        for (ParameterElement parameter : methodElement.getParameters()) {
             processEvaluatedExpressions(parameter.getAnnotationMetadata(), resolvedThis);
         }
     }
@@ -121,7 +125,7 @@ public final class EvaluatedExpressionProcessor {
     }
 
     public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        for (ExpressionWithContext expressionMetadata: getEvaluatedExpressions()) {
+        for (ExpressionWithContext expressionMetadata : getEvaluatedExpressions()) {
             EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
                 expressionMetadata,
                 visitorContext,

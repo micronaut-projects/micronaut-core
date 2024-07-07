@@ -43,6 +43,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Intercept the bean.
+     *
      * @param annotationValue The annotation to intercept
      * @return This bean method
      * @since 3.5.2
@@ -105,6 +106,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Alters the exposed types for the bean limiting the exposed type to the given types.
+     *
      * @param types 1 or more types to expose
      * @return This builder
      */
@@ -113,6 +115,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Fills the type arguments for the bean with the given types.
+     *
      * @param types The types
      * @return This bean builder
      */
@@ -122,6 +125,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Fills the type arguments for the given interface or super class with the given types.
+     *
      * @param type The type or interface. If null, results in a no-op
      * @param types The types
      * @return This bean builder
@@ -157,6 +161,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Allows configuring the bean constructor.
+     *
      * @param constructorElement The constructor element
      * @return This bean builder
      */
@@ -165,28 +170,31 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Allows configuring methods of the bean.
+     *
      * @param methods The {@link ElementQuery} to locate selected methods.
      * @param beanMethods A consumer that receives each {@link BeanMethodElement}
      * @return This builder
      */
     @NonNull
     BeanElementBuilder withMethods(
-            @NonNull ElementQuery<MethodElement> methods,
-            @NonNull Consumer<BeanMethodElement> beanMethods);
+        @NonNull ElementQuery<MethodElement> methods,
+        @NonNull Consumer<BeanMethodElement> beanMethods);
 
     /**
      * Allows configuring fields of the bean.
+     *
      * @param fields The {@link ElementQuery} to locate fields.
      * @param beanFields The bean fields
      * @return This builder
      */
     @NonNull
     BeanElementBuilder withFields(
-            @NonNull ElementQuery<FieldElement> fields,
-            @NonNull Consumer<BeanFieldElement> beanFields);
+        @NonNull ElementQuery<FieldElement> fields,
+        @NonNull Consumer<BeanFieldElement> beanFields);
 
     /**
      * Allows configuring the parameters for the current constructor.
+     *
      * @param parameters The parameters
      * @return This builder
      */
@@ -213,27 +221,27 @@ public interface BeanElementBuilder extends ConfigurableElement {
     }
 
     @Override
-    default BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
+    default @NonNull BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotation(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeAnnotation(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> @NonNull BeanElementBuilder removeAnnotation(@NonNull Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotation(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> @NonNull BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotationIf(predicate);
     }
 
     @Override
-    default BeanElementBuilder removeStereotype(@NonNull String annotationType) {
+    default @NonNull BeanElementBuilder removeStereotype(@NonNull String annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeStereotype(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeStereotype(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> @NonNull BeanElementBuilder removeStereotype(@NonNull Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeStereotype(annotationType);
     }
 
@@ -258,24 +266,27 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Dependency inject this bean.
+     *
      * @return this bean builder
      */
     BeanElementBuilder inject();
 
     /**
      * Produce additional beans from the given methods.
+     *
      * @param methodsOrFields The {@link io.micronaut.inject.ast.ElementQuery} representing the methods or fields
      * @param childBeanBuilder Configure the child bean builder
-     * @return This bean builder
      * @param <E> A type variable to
+     * @return This bean builder
      */
     <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields, @Nullable Consumer<BeanElementBuilder> childBeanBuilder);
 
     /**
      * Produce additional beans from the given methods.
+     *
      * @param methodsOrFields The {@link io.micronaut.inject.ast.ElementQuery} representing the methods or fields
-     * @return This bean builder
      * @param <E> A type variable to
+     * @return This bean builder
      */
     default <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields) {
         return produceBeans(methodsOrFields, null);

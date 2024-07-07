@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -376,7 +377,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull String annotation) {
         AnnotationValue<Annotation> av = getAnnotationMetadata().getAnnotation(annotation);
         if (av != null) {
             //noinspection unchecked
@@ -386,25 +387,25 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().findAnnotation(annotationClass)
                    .map(this::mapAnnotationValue);
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         return findDeclaredAnnotation(annotationClass.getName());
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull String annotation) {
         Optional<AnnotationValue<T>> av =
             getAnnotationMetadata().findDeclaredAnnotation(annotation);
         return av.map(this::mapAnnotationValue);
     }
 
     @Override
-    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getDeclaredAnnotationValuesByType(annotationClass).stream()
                    .map(annotation -> AnnotationMetadataSupport.buildAnnotation(annotationClass,
                        annotation))
@@ -412,7 +413,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
-    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getAnnotationValuesByType(annotationClass).stream()
                    .map(annotation -> AnnotationMetadataSupport.buildAnnotation(annotationClass,
                        annotation))
@@ -420,14 +421,14 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
-    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
         return findDeclaredAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
                    .orElse(null);
     }
 
     @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         return findAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
                    .orElse(null);

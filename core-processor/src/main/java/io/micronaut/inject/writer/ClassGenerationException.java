@@ -25,7 +25,7 @@ public class ClassGenerationException extends RuntimeException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public ClassGenerationException(String message, Throwable cause) {
         super(message, cause);

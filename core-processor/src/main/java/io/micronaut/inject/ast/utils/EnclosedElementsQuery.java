@@ -84,8 +84,8 @@ public abstract class EnclosedElementsQuery<C, N> {
      * Return the elements that match the given query.
      *
      * @param classElement The class element
-     * @param query        The query to use.
-     * @param <T>          The element type
+     * @param query The query to use.
+     * @param <T> The element type
      * @return The fields
      */
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ClassElement classElement, @NonNull ElementQuery<T> query) {
@@ -435,7 +435,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * Extracts the super class.
      *
      * @param classNode The class
-     * @return The super calss
+     * @return The super class
      */
     @Nullable
     protected abstract C getSuperClass(C classNode);
@@ -452,8 +452,8 @@ public abstract class EnclosedElementsQuery<C, N> {
     /**
      * Extracts the enclosed elements of the class.
      *
-     * @param classNode       The class
-     * @param result          The query result
+     * @param classNode The class
+     * @param result The query result
      * @param includeAbstract If abstract/non-default elements should be included
      * @return The enclosed elements
      */
@@ -464,7 +464,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * Extracts the enclosed elements of the class.
      *
      * @param classNode The class
-     * @param result    The query result
+     * @param result The query result
      * @return The enclosed elements
      */
     @NonNull
@@ -501,7 +501,7 @@ public abstract class EnclosedElementsQuery<C, N> {
     /**
      * Converts the native element to the AST element.
      *
-     * @param nativeType  The native element.
+     * @param nativeType The native element.
      * @param elementType The result type
      * @return The AST element
      */

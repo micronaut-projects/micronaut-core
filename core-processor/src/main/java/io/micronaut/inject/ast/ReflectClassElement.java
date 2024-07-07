@@ -60,13 +60,13 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     }
 
     @Override
-    public ClassElement toArray() {
+    public @NonNull ClassElement toArray() {
         Class<?> arrayType = Array.newInstance(type, 0).getClass();
         return ClassElement.of(arrayType);
     }
 
     @Override
-    public ClassElement fromArray() {
+    public @NonNull ClassElement fromArray() {
         return new ReflectClassElement(type.getComponentType());
     }
 
@@ -74,7 +74,7 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return Arrays.stream(type.getTypeParameters())
-                .map(tv -> new ReflectGenericPlaceholderElement(tv, 0))
-                .collect(Collectors.toList());
+            .map(tv -> new ReflectGenericPlaceholderElement(tv, 0))
+            .collect(Collectors.toList());
     }
 }

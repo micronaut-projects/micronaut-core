@@ -51,7 +51,7 @@ public abstract class StringSwitchWriter {
      * Generate on case matches statement.
      *
      * @param value The string that matched
-     * @param end   The end label
+     * @param end The end label
      */
     protected abstract void onMatch(String value, Label end);
 
@@ -85,7 +85,7 @@ public abstract class StringSwitchWriter {
         int[] hashCodeArray = hashToValue.keySet().stream().mapToInt(i -> i).toArray();
         Arrays.sort(hashCodeArray);
         pushStringValue();
-        writer.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
+        writer.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[] {}));
         writer.tableSwitch(hashCodeArray, new TableSwitchGenerator() {
             @Override
             public void generateCase(int hashCode, Label end) {
@@ -107,12 +107,12 @@ public abstract class StringSwitchWriter {
      *
      * @param writer The writer
      * @param string The string matched
-     * @param end    The end label
+     * @param end The end label
      */
     protected void generateValueCase(GeneratorAdapter writer, String string, Label end) {
         pushStringValue();
         writer.push(string);
-        writer.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[]{Type.getType(Object.class)}));
+        writer.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[] {Type.getType(Object.class)}));
         writer.push(true);
         Label falseLabel = new Label();
         writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, falseLabel);

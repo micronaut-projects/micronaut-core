@@ -59,7 +59,7 @@ public class CollectionUtils {
      * @since 4.0.0
      */
     public static <E> Set<E> concat(Set<E> set, E element) {
-        Set<E> newList = CollectionUtils.newHashSet(set.size() + 1);
+        var newList = CollectionUtils.<E>newHashSet(set.size() + 1);
         newList.addAll(set);
         newList.add(element);
         return newList;
@@ -75,7 +75,7 @@ public class CollectionUtils {
      * @since 4.0.0
      */
     public static <E> Set<E> concat(Set<E> set1, Collection<E> collection) {
-        Set<E> newSet = newHashSet(set1.size() + collection.size());
+        var newSet = CollectionUtils.<E>newHashSet(set1.size() + collection.size());
         newSet.addAll(set1);
         newSet.addAll(collection);
         return newSet;
@@ -91,7 +91,7 @@ public class CollectionUtils {
      * @since 4.0.0
      */
     public static <E> List<E> concat(List<E> list, E element) {
-        List<E> newList = new ArrayList<>(list.size() + 1);
+        var newList = new ArrayList<E>(list.size() + 1);
         newList.addAll(list);
         newList.add(element);
         return newList;
@@ -107,7 +107,7 @@ public class CollectionUtils {
      * @since 4.0.0
      */
     public static <E> List<E> concat(List<E> list1, Collection<E> collection) {
-        List<E> newList = new ArrayList<>(list1.size() + collection.size());
+        var newList = new ArrayList<E>(list1.size() + collection.size());
         newList.addAll(list1);
         newList.addAll(collection);
         return newList;
@@ -200,7 +200,7 @@ public class CollectionUtils {
      * @param collection The collection
      * @return True if it is empty or null
      */
-    public static boolean isEmpty(@Nullable Collection collection) {
+    public static boolean isEmpty(@Nullable Collection<?> collection) {
         return collection == null || collection.isEmpty();
     }
 

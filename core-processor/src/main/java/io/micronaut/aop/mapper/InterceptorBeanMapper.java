@@ -43,7 +43,7 @@ public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorB
     public List<AnnotationValue<?>> map(AnnotationValue<InterceptorBean> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         final AnnotationClassValue<?>[] values = annotation.annotationClassValues("value");
-        AnnotationValue<?>[] bindings = new AnnotationValue[values.length];
+        var bindings = new AnnotationValue<?>[values.length];
         for (int i = 0; i < values.length; i++) {
             bindings[i] = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING).value(values[i].getName()).build();
         }

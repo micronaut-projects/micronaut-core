@@ -17,10 +17,10 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -58,7 +58,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     public ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
                                                              @NonNull MethodElement methodElement) {
         return buildForExpression(expression, null)
-                 .extendWith(methodElement);
+            .extendWith(methodElement);
     }
 
     @Override
@@ -98,11 +98,11 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         ClassElement annotation) {
 
         return annotation.findAnnotation(AnnotationExpressionContext.class)
-                   .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER))
-                   .map(AnnotationClassValue::getName)
-                   .flatMap(visitorContext::getClassElement)
-                   .map(currentEvaluationContext::extendWith)
-                   .orElse(currentEvaluationContext);
+            .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER))
+            .map(AnnotationClassValue::getName)
+            .flatMap(visitorContext::getClassElement)
+            .map(currentEvaluationContext::extendWith)
+            .orElse(currentEvaluationContext);
     }
 
     private ExtensibleExpressionEvaluationContext addAnnotationMemberEvaluationContext(
@@ -117,11 +117,11 @@ public final class DefaultExpressionCompilationContextFactory implements Express
                 .named(annotationMember);
 
         return annotation.getEnclosedElements(memberQuery).stream()
-                   .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())
-                   .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER).stream())
-                   .map(AnnotationClassValue::getName)
-                   .flatMap(className -> visitorContext.getClassElement(className).stream())
-                   .reduce(currentEvaluationContext, ExtensibleExpressionEvaluationContext::extendWith, (a, b) -> a);
+            .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())
+            .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER).stream())
+            .map(AnnotationClassValue::getName)
+            .flatMap(className -> visitorContext.getClassElement(className).stream())
+            .reduce(currentEvaluationContext, ExtensibleExpressionEvaluationContext::extendWith, (a, b) -> a);
     }
 
     /**

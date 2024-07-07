@@ -22,7 +22,12 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.Type;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.NestingKind;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -119,7 +124,6 @@ public class JavaModelUtils {
      * @param type type to check
      * @return true if it is
      */
-    @NonNull
     public static boolean isNumeric(@NonNull Type type) {
         return isOneOf(type,
             DOUBLE, DOUBLE_WRAPPER,
@@ -312,6 +316,7 @@ public class JavaModelUtils {
 
     /**
      * Return whether this is a record or a component of a record.
+     *
      * @param e The element
      * @return True if it is
      */
@@ -321,6 +326,7 @@ public class JavaModelUtils {
 
     /**
      * Return whether this is a component of a record.
+     *
      * @param e The element
      * @return True if it is
      */
@@ -398,7 +404,7 @@ public class JavaModelUtils {
      * @return true if checked type is amount compared types
      */
     private static boolean isOneOf(Type type, Type... comparedTypes) {
-        for (Type comparedType: comparedTypes) {
+        for (Type comparedType : comparedTypes) {
             if (type.equals(comparedType)) {
                 return true;
             }

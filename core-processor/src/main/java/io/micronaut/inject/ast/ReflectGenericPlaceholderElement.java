@@ -34,8 +34,8 @@ import java.util.stream.Collectors;
  */
 @Internal
 final class ReflectGenericPlaceholderElement
-        extends ReflectTypeElement<TypeVariable<?>>
-        implements GenericPlaceholderElement, ArrayableClassElement {
+    extends ReflectTypeElement<TypeVariable<?>>
+    implements GenericPlaceholderElement, ArrayableClassElement {
     private final int arrayDimensions;
 
     ReflectGenericPlaceholderElement(TypeVariable<?> typeVariable, int arrayDimensions) {
@@ -68,7 +68,7 @@ final class ReflectGenericPlaceholderElement
     @Override
     public Optional<Element> getDeclaringElement() {
         GenericDeclaration declaration = type.getGenericDeclaration();
-        if (declaration instanceof Class class1) {
+        if (declaration instanceof Class<?> class1) {
             return Optional.of(ClassElement.of(class1));
         } else {
             return Optional.empty();

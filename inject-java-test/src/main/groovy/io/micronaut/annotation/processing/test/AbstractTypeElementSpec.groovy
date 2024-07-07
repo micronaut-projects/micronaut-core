@@ -578,6 +578,7 @@ class Test {
             );
             JavaNativeElementsHelper helper = new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils())
             JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, modelUtils, helper, visitorContext) {
+                @NonNull
                 @Override
                 protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
                     def loadedMappers = super.getAnnotationMappers(annotationName)
@@ -598,6 +599,7 @@ class Test {
                     }
                 }
 
+                @NonNull
                 @Override
                 protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
                     def loadedTransformers = super.getAnnotationTransformers(annotationName)

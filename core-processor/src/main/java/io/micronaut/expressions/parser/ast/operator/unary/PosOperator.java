@@ -33,10 +33,12 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric
  */
 @Internal
 public final class PosOperator extends UnaryOperator {
+
     public PosOperator(ExpressionNode operand) {
         super(operand);
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type nodeType = super.doResolveType(ctx);
@@ -49,7 +51,7 @@ public final class PosOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         operand.compile(ctx);
     }
 }

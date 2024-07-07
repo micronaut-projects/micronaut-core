@@ -37,11 +37,12 @@ import java.util.Set;
 @Internal
 public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfigurer, Object> {
     private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
-            ApplicationContextConfigurer.class.getName()
+        ApplicationContextConfigurer.class.getName()
     );
 
+    @NonNull
     @Override
-    public @NonNull VisitorKind getVisitorKind() {
+    public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 
@@ -54,25 +55,26 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
     public void visitClass(ClassElement element, VisitorContext context) {
         assertNoConstructorForContextAnnotation(element);
         element.getInterfaces()
-                .stream()
-                .map(Element::getName)
-                .filter(SUPPORTED_SERVICE_TYPES::contains)
-                .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName(), element));
+            .stream()
+            .map(Element::getName)
+            .filter(SUPPORTED_SERVICE_TYPES::contains)
+            .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName(), element));
     }
 
     /**
      * Checks that a class annotated with {@link ContextConfigurer} doesn't have any constructor
      * with parameters, which is unsupported.
+     *
      * @param element the class to check
      */
     public static void assertNoConstructorForContextAnnotation(ClassElement element) {
         element.getEnclosedElements(ElementQuery.CONSTRUCTORS)
-                .stream()
-                .filter(e -> e.getParameters().length > 0)
-                .findAny()
-                .ifPresent(e -> {
-                    throw typeShouldNotHaveConstructorsWithArgs(element.getName());
-                });
+            .stream()
+            .filter(e -> e.getParameters().length > 0)
+            .findAny()
+            .ifPresent(e -> {
+                throw typeShouldNotHaveConstructorsWithArgs(element.getName());
+            });
     }
 
     @NonNull

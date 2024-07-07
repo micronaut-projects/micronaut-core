@@ -24,8 +24,7 @@ import io.micronaut.inject.visitor.VisitorContext;
  * Context class used for compiling expressions.
  *
  * @param evaluationContext expression compilation context
- * @param visitorContext     visitor context
- *
+ * @param visitorContext visitor context
  * @author Sergey Gavrilov
  * @since 4.0.0
  */

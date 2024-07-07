@@ -34,6 +34,7 @@ import static java.util.stream.Collectors.toMap;
  */
 @Internal
 public final class TypeDescriptors {
+
     public static final Type EVALUATION_CONTEXT_TYPE = Type.getType(ExpressionEvaluationContext.class);
 
     public static final Type STRING = Type.getType(String.class);
@@ -102,7 +103,6 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    @NonNull
     public static boolean isNumeric(@NonNull Type type) {
         return isOneOf(type,
             DOUBLE, DOUBLE_WRAPPER,
@@ -161,13 +161,13 @@ public final class TypeDescriptors {
         }
 
         if (toUnboxedIfNecessary(leftOperandType).equals(DOUBLE)
-                || toUnboxedIfNecessary(rightOperandType).equals(DOUBLE)) {
+            || toUnboxedIfNecessary(rightOperandType).equals(DOUBLE)) {
             return DOUBLE;
         } else if (toUnboxedIfNecessary(leftOperandType).equals(FLOAT)
-                       || toUnboxedIfNecessary(rightOperandType).equals(FLOAT)) {
+            || toUnboxedIfNecessary(rightOperandType).equals(FLOAT)) {
             return FLOAT;
         } else if (toUnboxedIfNecessary(leftOperandType).equals(LONG)
-                       || toUnboxedIfNecessary(rightOperandType).equals(LONG)) {
+            || toUnboxedIfNecessary(rightOperandType).equals(LONG)) {
             return LONG;
         } else {
             return INT;
@@ -183,7 +183,7 @@ public final class TypeDescriptors {
      * @return true if checked type is amount compared types
      */
     public static boolean isOneOf(Type type, Type... comparedTypes) {
-        for (Type comparedType: comparedTypes) {
+        for (Type comparedType : comparedTypes) {
             if (type.equals(comparedType)) {
                 return true;
             }

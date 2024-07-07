@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
@@ -70,7 +71,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         ClassElement calleeClass = callee.resolveClassElement(ctx);
         Method method = usedMethod.toAsmMethod();
@@ -116,6 +117,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
         }
     }
 
+    @NonNull
     @Override
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
@@ -128,9 +130,9 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
 
         ElementQuery<MethodElement> methodQuery = buildMethodQuery();
         List<CandidateMethod> candidateMethods = classElement.getEnclosedElements(methodQuery).stream()
-                .map(method -> toCandidateMethod(ctx, method, argumentTypes))
-                .filter(method -> method.isMatching(ctx.visitorContext()))
-                .toList();
+            .map(method -> toCandidateMethod(ctx, method, argumentTypes))
+            .filter(method -> method.isMatching(ctx.visitorContext()))
+            .toList();
 
         if (candidateMethods.isEmpty()) {
             throw new ExpressionCompilationException(
@@ -146,7 +148,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
 
     private ElementQuery<MethodElement> buildMethodQuery() {
         ElementQuery<MethodElement> query = ElementQuery.ALL_METHODS.onlyAccessible()
-                                                .named(name);
+            .named(name);
 
         if (callee instanceof TypeIdentifier) {
             query = query.onlyStatic();

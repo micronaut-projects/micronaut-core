@@ -85,9 +85,9 @@ public class ConfigurationMetadata implements Writable {
     @Override
     public String toString() {
         return "ConfigurationMetadata{" +
-                "type='" + type + '\'' +
-                ", name='" + name + '\'' +
-                ", description='" + description + '\'' +
-                '}';
+            "type='" + type + '\'' +
+            ", name='" + name + '\'' +
+            ", description='" + description + '\'' +
+            '}';
     }
 }

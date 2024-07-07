@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 /**
  * Internal common helper functions to share among {@link VisitorContext} implementations.
+ *
  * @author Miguel A. Baldi Horlle
  * @since 1.3.0
  */
@@ -41,17 +42,18 @@ public class VisitorContextUtils {
      * Transforms {@link System#getProperties()} into {@link Map}
      * allowing only Micronaut's properties, filtering everything else.
      * </p>
+     *
      * @return options map
      */
     public static Map<String, String> getSystemOptions() {
         return Optional.ofNullable(System.getProperties())
-                .map(properties ->
-                        properties.stringPropertyNames()
-                                .stream()
-                                .filter(name -> name.startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-                                .map(k -> new AbstractMap.SimpleEntry<>(k, CachedEnvironment.getProperty(k)))
-                                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue)))
-                .orElse(Collections.emptyMap());
+            .map(properties ->
+                properties.stringPropertyNames()
+                    .stream()
+                    .filter(name -> name.startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
+                    .map(k -> new AbstractMap.SimpleEntry<>(k, CachedEnvironment.getProperty(k)))
+                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue)))
+            .orElse(Collections.emptyMap());
     }
 
     /**
@@ -60,18 +62,19 @@ public class VisitorContextUtils {
      * Get {@link ProcessingEnvironment#getOptions()}
      * allowing only Micronaut's properties, filtering everything else.
      * </p>
+     *
      * @param processingEnv {@link ProcessingEnvironment}
      * @return options map
      */
     public static Map<String, String> getProcessorOptions(ProcessingEnvironment processingEnv) {
         return Optional.ofNullable(processingEnv)
-                .map(ProcessingEnvironment::getOptions)
-                .map(Map::entrySet)
-                .map(Set::stream)
-                // Only collects properties with name starting with MICRONAUT_BASE_OPTION_NAME
-                .map(entryStream -> entryStream.filter(e -> e.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
-                .orElse(Collections.emptyMap());
+            .map(ProcessingEnvironment::getOptions)
+            .map(Map::entrySet)
+            .map(Set::stream)
+            // Only collects properties with name starting with MICRONAUT_BASE_OPTION_NAME
+            .map(entryStream -> entryStream.filter(e -> e.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+            .orElse(Collections.emptyMap());
     }
 
 }

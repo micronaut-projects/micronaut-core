@@ -16,6 +16,7 @@
 package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArgumentUtils;
@@ -111,7 +112,7 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
-            public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+            public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
                 T annotation = childContext.synthesize(annotationClass);
                 if (annotation == null) {
                     return thisContext.synthesize(annotationClass);

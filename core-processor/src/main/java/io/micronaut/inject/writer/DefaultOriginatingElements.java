@@ -20,7 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.Element;
 
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Default implementation of the {@link OriginatingElements} interface.
@@ -34,6 +35,7 @@ final class DefaultOriginatingElements implements OriginatingElements {
 
     /**
      * Default constructor.
+     *
      * @param originatingElements The elements
      */
     DefaultOriginatingElements(Element... originatingElements) {
@@ -51,8 +53,8 @@ final class DefaultOriginatingElements implements OriginatingElements {
     public void addOriginatingElement(@NonNull Element element) {
         Objects.requireNonNull(element, "Element cannot be null");
         this.originatingElements.put(
-                element.getName(),
-                element
+            element.getName(),
+            element
         );
     }
 

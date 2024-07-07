@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
-import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
+import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
@@ -33,10 +33,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isPrimitive;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isPrimitive;
 import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
 
 /**
@@ -46,8 +46,7 @@ import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class AbstractMethodCall extends ExpressionNode permits ContextMethodCall,
-                                                                               ElementMethodCall {
+public abstract sealed class AbstractMethodCall extends ExpressionNode permits ContextMethodCall, ElementMethodCall {
     protected final String name;
     protected final List<ExpressionNode> arguments;
 
@@ -59,6 +58,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
         this.arguments = arguments;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (usedMethod == null) {
@@ -87,10 +87,9 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     /**
      * Builds candidate method for method element.
      *
-     * @param ctx           expression compilation context
+     * @param ctx expression compilation context
      * @param methodElement method element
      * @param argumentTypes types of arguments used for method invocation in expression
-     *
      * @return candidate method
      */
     protected CandidateMethod toCandidateMethod(ExpressionVisitorContext ctx,
@@ -113,10 +112,10 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @return list of arguments, including varargs arguments wrapped in array
      */
     protected List<ExpressionNode> prepareVarargsArguments() {
-        List<ExpressionNode> arguments = new ArrayList<>();
+        var arguments = new ArrayList<ExpressionNode>();
         int varargsIndex = usedMethod.getVarargsIndex();
 
-        List<ExpressionNode> nodesWrappedInArray = new ArrayList<>();
+        var nodesWrappedInArray = new ArrayList<ExpressionNode>();
         for (int i = 0; i < this.arguments.size(); i++) {
             ExpressionNode argument = this.arguments.get(i);
             if (varargsIndex > i) {
@@ -128,10 +127,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
 
         ClassElement lastParameter = this.usedMethod.getLastParameter();
 
-        OneDimensionalArray varargsArray =
-            new OneDimensionalArray(
-                new TypeIdentifier(lastParameter.getCanonicalName()),
-                nodesWrappedInArray);
+        var varargsArray = new OneDimensionalArray(new TypeIdentifier(lastParameter.getCanonicalName()), nodesWrappedInArray);
 
         arguments.add(varargsArray);
         return arguments;
@@ -141,15 +137,14 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * Resolve types of method invocation arguments.
      *
      * @param ctx expression evaluation context
-     *
      * @return types of method arguments
      */
     protected List<Type> resolveArgumentTypes(ExpressionVisitorContext ctx) {
         return arguments.stream()
-                   .map(argument -> argument instanceof TypeIdentifier
-                       ? TypeDescriptors.CLASS
-                       : argument.resolveType(ctx))
-                   .toList();
+            .map(argument -> argument instanceof TypeIdentifier
+                ? TypeDescriptors.CLASS
+                : argument.resolveType(ctx))
+            .toList();
     }
 
     /**
@@ -171,9 +166,9 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     /**
      * Compiles given method argument.
      *
-     * @param ctx           expression evaluation context
+     * @param ctx expression evaluation context
      * @param argumentIndex argument index
-     * @param argument      compiled argument
+     * @param argument compiled argument
      */
     private void compileArgument(ExpressionCompilationContext ctx,
                                  int argumentIndex,
@@ -196,13 +191,12 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * Prepares arguments string for logging purposes.
      *
      * @param ctx expression compilation context
-     *
      * @return arguments string
      */
     protected String stringifyArguments(ExpressionVisitorContext ctx) {
         return arguments.stream()
-                   .map(argument -> argument.resolveType(ctx))
-                   .map(Type::getClassName)
-                   .collect(Collectors.joining(", ", "(", ")"));
+            .map(argument -> argument.resolveType(ctx))
+            .map(Type::getClassName)
+            .collect(Collectors.joining(", ", "(", ")"));
     }
 }

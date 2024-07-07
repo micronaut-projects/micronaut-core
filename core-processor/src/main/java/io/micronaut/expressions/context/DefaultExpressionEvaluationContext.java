@@ -16,6 +16,7 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -39,8 +40,8 @@ import static java.util.function.Predicate.not;
  * Default implementation of {@link ExtensibleExpressionEvaluationContext}. Extending
  * this context will always return new instance instead of modifying the existing one.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public class DefaultExpressionEvaluationContext implements ExtensibleExpressionEvaluationContext {
@@ -63,7 +64,7 @@ public class DefaultExpressionEvaluationContext implements ExtensibleExpressionE
     }
 
     @Override
-    public ExtensibleExpressionEvaluationContext withThis(ClassElement classElement) {
+    public ExtensibleExpressionEvaluationContext withThis(@NonNull ClassElement classElement) {
         return new DefaultExpressionEvaluationContext(
             classElement,
             methodElement,
@@ -71,8 +72,9 @@ public class DefaultExpressionEvaluationContext implements ExtensibleExpressionE
         );
     }
 
+    @NonNull
     @Override
-    public DefaultExpressionEvaluationContext extendWith(MethodElement methodElement) {
+    public DefaultExpressionEvaluationContext extendWith(@NonNull MethodElement methodElement) {
         ClassElement resolvedThis = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
         return new DefaultExpressionEvaluationContext(
             resolvedThis,
@@ -81,8 +83,9 @@ public class DefaultExpressionEvaluationContext implements ExtensibleExpressionE
         );
     }
 
+    @NonNull
     @Override
-    public DefaultExpressionEvaluationContext extendWith(ClassElement classElement) {
+    public DefaultExpressionEvaluationContext extendWith(@NonNull ClassElement classElement) {
         return new DefaultExpressionEvaluationContext(
             this.thisType,
             this.methodElement,
@@ -96,10 +99,10 @@ public class DefaultExpressionEvaluationContext implements ExtensibleExpressionE
     }
 
     @Override
-    public List<MethodElement> findMethods(String name) {
+    public @NonNull List<MethodElement> findMethods(@NonNull String name) {
         return classElements.stream()
-                   .flatMap(element -> findMatchingMethods(element, name).stream())
-                   .toList();
+            .flatMap(element -> findMatchingMethods(element, name).stream())
+            .toList();
     }
 
     private List<MethodElement> findMatchingMethods(ClassElement classElement, String name) {
@@ -112,35 +115,37 @@ public class DefaultExpressionEvaluationContext implements ExtensibleExpressionE
                 getNamedProperties(classElement, propertyName).stream()
                     .map(PropertyElement::getReadMethod)
                     .flatMap(Optional::stream))
-                   .distinct()
-                   .filter(method -> method.getSimpleName().equals(name))
-                   .toList();
+            .distinct()
+            .filter(method -> method.getSimpleName().equals(name))
+            .toList();
     }
 
+    @NonNull
     @Override
-    public List<PropertyElement> findProperties(String name) {
+    public List<PropertyElement> findProperties(@NonNull String name) {
         return classElements.stream()
-                   .flatMap(classElement -> getNamedProperties(classElement, name).stream())
-                   .toList();
+            .flatMap(classElement -> getNamedProperties(classElement, name).stream())
+            .toList();
     }
 
+    @NonNull
     @Override
-    public List<ParameterElement> findParameters(String name) {
+    public List<ParameterElement> findParameters(@NonNull String name) {
         if (this.methodElement == null) {
             return Collections.emptyList();
         }
 
         return Arrays.stream(methodElement.getParameters())
-                   .filter(parameter -> parameter.getName().equals(name))
-                   .toList();
+            .filter(parameter -> parameter.getName().equals(name))
+            .toList();
     }
 
     private List<PropertyElement> getNamedProperties(ClassElement classElement, String name) {
         return classElement.getBeanProperties(
                 PropertyElementQuery.of(classElement.getAnnotationMetadata())
                     .includes(Collections.singleton(name)))
-                   .stream()
-                   .filter(not(PropertyElement::isExcluded))
-                   .toList();
+            .stream()
+            .filter(not(PropertyElement::isExcluded))
+            .toList();
     }
 }

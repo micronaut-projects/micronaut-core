@@ -29,6 +29,7 @@ import static org.objectweb.asm.Opcodes.IF_ICMPGT;
  */
 @Internal
 public final class LteOperator extends RelationalOperator {
+
     public LteOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }

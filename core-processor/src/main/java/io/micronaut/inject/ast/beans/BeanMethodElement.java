@@ -34,6 +34,7 @@ public interface BeanMethodElement extends MethodElement {
 
     /**
      * Intercept the method.
+     *
      * @param annotationValue The annotation to intercept
      * @return This bean method
      * @since 3.5.2

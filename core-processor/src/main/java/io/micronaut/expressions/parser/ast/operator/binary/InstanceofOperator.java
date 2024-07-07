@@ -27,9 +27,9 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isPrimitive;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 import static org.objectweb.asm.Opcodes.INSTANCEOF;
 
 /**
@@ -40,6 +40,7 @@ import static org.objectweb.asm.Opcodes.INSTANCEOF;
  */
 @Internal
 public final class InstanceofOperator extends ExpressionNode {
+
     private final ExpressionNode operand;
     private final TypeIdentifier typeIdentifier;
 
@@ -49,11 +50,10 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         Type targetType = typeIdentifier.resolveType(ctx);
         if (isPrimitive(targetType)) {
-            throw new ExpressionCompilationException(
-                "'instanceof' operation can not be used with primitive right-hand side type");
+            throw new ExpressionCompilationException("'instanceof' operation can not be used with primitive right-hand side type");
         }
 
         GeneratorAdapter mv = ctx.methodVisitor();
@@ -70,6 +70,7 @@ public final class InstanceofOperator extends ExpressionNode {
         return PrimitiveElement.BOOLEAN;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return BOOLEAN;

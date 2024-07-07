@@ -29,6 +29,11 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.isAssignable;
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN_WRAPPER;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.OBJECT;
@@ -36,11 +41,6 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.computeNu
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.toUnboxedIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.isAssignable;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.commons.GeneratorAdapter.NE;
 
@@ -67,10 +67,10 @@ public class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label returnLabel = new Label();
+        var falseLabel = new Label();
+        var returnLabel = new Label();
 
         Type trueType = trueExpr.resolveType(ctx);
         Type falseType = falseExpr.resolveType(ctx);
@@ -130,6 +130,7 @@ public class TernaryExpression extends ExpressionNode {
         return false;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (!shouldCoerceConditionToBoolean() && !isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {

@@ -24,8 +24,8 @@ import java.util.List;
  * Represents a wildcard, for example {@code List<?>}. For compatibility, this wildcard acts like its first upper bound when used as a
  * {@link ClassElement}.
  *
- * @since 3.1.0
  * @author Jonas Konrad
+ * @since 3.1.0
  */
 @Experimental
 public interface WildcardElement extends GenericElement {
@@ -46,6 +46,7 @@ public interface WildcardElement extends GenericElement {
 
     /**
      * Is bounded wildcard - not "{@code < ? >}".
+     *
      * @return true if the wildcard is bounded, false otherwise
      * @since 4.0.0
      */
@@ -55,6 +56,7 @@ public interface WildcardElement extends GenericElement {
 
     /**
      * Find the most upper type.
+     *
      * @param bounds1 The bounds 1
      * @param bounds2 The bounds 2
      * @param <T> The class element type

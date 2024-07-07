@@ -46,8 +46,8 @@ public class JakartaEntityIntrospectedAnnotationMapper implements NamedAnnotatio
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class);
         return Arrays.asList(
-                builder.build(),
-                AnnotationValue.builder(ReflectiveAccess.class).build()
+            builder.build(),
+            AnnotationValue.builder(ReflectiveAccess.class).build()
         );
     }
 }

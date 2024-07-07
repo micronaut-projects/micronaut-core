@@ -28,20 +28,22 @@ import java.util.List;
 
 /**
  * A transformer that remaps {@code javax.annotation.Nullable} to {@link io.micronaut.core.annotation.AnnotationUtil#NULLABLE}.
+ *
  * @since 4.0
  */
 @Internal
 public class JavaxNullableTransformer implements NamedAnnotationTransformer {
 
+    @NonNull
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return "javax.annotation.Nullable";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+            AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
         );
     }
 }

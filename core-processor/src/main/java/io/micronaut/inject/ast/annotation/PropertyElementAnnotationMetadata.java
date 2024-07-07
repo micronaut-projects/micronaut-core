@@ -138,7 +138,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull AnnotationValue<T> annotationValue) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.annotate(annotationValue);
         }
@@ -146,7 +146,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.annotate(annotationType, consumer);
         }
@@ -154,7 +154,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull Class<T> annotationType) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.annotate(annotationType);
         }
@@ -162,7 +162,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public io.micronaut.inject.ast.Element annotate(String annotationType) {
+    public io.micronaut.inject.ast.@NonNull Element annotate(@NonNull String annotationType) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.annotate(annotationType);
         }
@@ -170,7 +170,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.annotate(annotationType, consumer);
         }
@@ -178,7 +178,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
+    public io.micronaut.inject.ast.@NonNull Element removeAnnotation(@NonNull String annotationType) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.removeAnnotation(annotationType);
         }
@@ -186,7 +186,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         for (MutableAnnotationMetadataDelegate<?> am : elements) {
             am.removeAnnotationIf(predicate);
         }
@@ -194,7 +194,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return propertyAnnotationMetadata;
     }
 

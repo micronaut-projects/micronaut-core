@@ -30,7 +30,7 @@ public interface ConfigurationMetadataWriter {
     /**
      * An interface for classes that can write metadata produced by a {@link ConfigurationMetadataBuilder}.
      *
-     * @param metadataBuilder          The metadata builder
+     * @param metadataBuilder The metadata builder
      * @param classWriterOutputVisitor The class output visitor
      * @throws IOException If an error occurred writing output
      */

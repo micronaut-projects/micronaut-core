@@ -82,9 +82,8 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
         return getType().getArrayDimensions();
     }
 
-    @Nullable
     @Override
-    public ClassElement getGenericType() {
+    public @NonNull ClassElement getGenericType() {
         if (genericType == null) {
             genericType = newClassElement(parameter.getType(), methodElement.getTypeArguments());
         }
@@ -92,7 +91,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return parameter.getName();
     }
 

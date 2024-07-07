@@ -111,7 +111,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Create an AOP proxy visitor.
      *
-     * @param visitor       the parent visitor
+     * @param visitor the parent visitor
      * @param methodElement the method that is originating the AOP proxy
      * @return The AOP proxy visitor
      */
@@ -207,7 +207,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property.
      *
-     * @param visitor         The visitor
+     * @param visitor The visitor
      * @param propertyElement The property
      * @return true if processed
      */
@@ -233,6 +233,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     /**
      * Makes the method intercepted by the validation advice.
+     *
      * @param element The method element
      */
     protected void makeInterceptedForValidationIfNeeded(MethodElement element) {
@@ -245,9 +246,9 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property read element.
      *
-     * @param visitor         The visitor
+     * @param visitor The visitor
      * @param propertyElement The property
-     * @param readElement     The read element
+     * @param readElement The read element
      * @return true if processed
      */
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
@@ -262,9 +263,9 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property method read element.
      *
-     * @param visitor         The visitor
+     * @param visitor The visitor
      * @param propertyElement The property
-     * @param readElement     The read element
+     * @param readElement The read element
      * @return true if processed
      */
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
@@ -276,9 +277,9 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property write element.
      *
-     * @param visitor         The visitor
+     * @param visitor The visitor
      * @param propertyElement The property
-     * @param writeElement    The write element
+     * @param writeElement The write element
      * @return true if processed
      */
     protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
@@ -293,9 +294,9 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property write element.
      *
-     * @param visitor         The visitor
+     * @param visitor The visitor
      * @param propertyElement The property
-     * @param writeElement    The write element
+     * @param writeElement The write element
      * @return true if processed
      */
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
@@ -321,7 +322,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a method.
      *
-     * @param visitor       The visitor
+     * @param visitor The visitor
      * @param methodElement The method
      * @return true if processed
      */
@@ -371,6 +372,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     /**
      * Visit a method injection point.
+     *
      * @param visitor The visitor
      * @param methodElement The method element
      */
@@ -408,7 +410,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit an AOP method.
      *
-     * @param visitor       The visitor
+     * @param visitor The visitor
      * @param methodElement The method
      * @return true if processed
      */
@@ -448,7 +450,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Apply configuration injection for the constructor.
      *
-     * @param visitor     The visitor
+     * @param visitor The visitor
      * @param constructor The constructor
      */
     protected void applyConfigurationInjectionIfNecessary(BeanDefinitionVisitor visitor,
@@ -488,7 +490,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a field.
      *
-     * @param visitor      The visitor
+     * @param visitor The visitor
      * @param fieldElement The field
      * @return true if processed
      */
@@ -529,7 +531,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit an executable method.
      *
-     * @param visitor       The visitor
+     * @param visitor The visitor
      * @param methodElement The method
      * @return true if processed
      */
@@ -592,7 +594,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             false,
             sourceMethod,
             new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata),
-            new ClassElement[]{interfaceToAdapt},
+            new ClassElement[] {interfaceToAdapt},
             visitorContext
         );
 

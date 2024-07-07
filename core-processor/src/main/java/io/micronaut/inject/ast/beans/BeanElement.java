@@ -15,20 +15,20 @@
  */
 package io.micronaut.inject.ast.beans;
 
-import java.util.Collection;
-import java.util.Optional;
-import java.util.Set;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.util.Collection;
+import java.util.Optional;
+import java.util.Set;
+
 /**
  * Models a bean that will be produced by Micronaut.
  *
- * @since 3.0.0
  * @author graemerocher
+ * @since 3.0.0
  */
 public interface BeanElement extends Element {
 
@@ -67,6 +67,7 @@ public interface BeanElement extends Element {
 
     /**
      * The type names produced by the bean.
+     *
      * @return A set of types
      */
     @NonNull
@@ -74,6 +75,7 @@ public interface BeanElement extends Element {
 
     /**
      * The scope of the bean.
+     *
      * @return The fully qualified name of the scope or empty if no scope is defined.
      */
     @NonNull
@@ -90,6 +92,7 @@ public interface BeanElement extends Element {
      *
      * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
      * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     *
      * @param type The type of the bean
      * @param visitorContext The visitor context
      * @return A bean builder

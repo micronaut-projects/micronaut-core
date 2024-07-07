@@ -24,6 +24,7 @@ import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
+import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE_WRAPPER;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
@@ -34,7 +35,6 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG_WRAPPER;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 import static org.objectweb.asm.Opcodes.DNEG;
 import static org.objectweb.asm.Opcodes.FNEG;
 import static org.objectweb.asm.Opcodes.INEG;
@@ -48,10 +48,12 @@ import static org.objectweb.asm.Opcodes.LNEG;
  */
 @Internal
 public final class NegOperator extends UnaryOperator {
+
     public NegOperator(ExpressionNode operand) {
         super(operand);
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type nodeType = super.doResolveType(ctx);
@@ -63,7 +65,7 @@ public final class NegOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
         operand.compile(ctx);

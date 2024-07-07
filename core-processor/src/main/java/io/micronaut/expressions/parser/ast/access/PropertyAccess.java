@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
@@ -45,6 +46,7 @@ public final class PropertyAccess extends ElementMethodCall {
         super(callee, name, emptyList(), nullSafe);
     }
 
+    @NonNull
     @Override
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         ClassElement classElement = callee.resolveClassElement(ctx);
@@ -56,9 +58,9 @@ public final class PropertyAccess extends ElementMethodCall {
 
         List<PropertyElement> propertyElements =
             classElement.getBeanProperties(
-                PropertyElementQuery.of(classElement.getAnnotationMetadata())
-                    .allowStaticProperties(false)
-                    .includes(Collections.singleton(name))).stream()
+                    PropertyElementQuery.of(classElement.getAnnotationMetadata())
+                        .allowStaticProperties(false)
+                        .includes(Collections.singleton(name))).stream()
                 .filter(not(PropertyElement::isExcluded))
                 .toList();
 

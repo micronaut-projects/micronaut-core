@@ -28,10 +28,10 @@ import java.util.List;
  * <p>Unlike {@link AnnotationMapper} which retains the original annotation information this interface can
  * be used to optimize produced annotation metadata and discard unnecessary annotations.</p>
  *
- * @since 2.0
+ * @param <T> The annotation type
  * @author graemerocher
  * @see AnnotationMapper
- * @param <T> The annotation type
+ * @since 2.0
  */
 public interface AnnotationTransformer<T extends Annotation> {
 

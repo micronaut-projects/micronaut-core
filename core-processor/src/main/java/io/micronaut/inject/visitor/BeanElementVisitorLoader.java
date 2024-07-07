@@ -15,12 +15,12 @@
  */
 package io.micronaut.inject.visitor;
 
-import java.util.Collections;
-import java.util.List;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Loads the {@link io.micronaut.inject.visitor.BeanElementVisitor} instances.
@@ -34,15 +34,14 @@ final class BeanElementVisitorLoader {
      */
     @SuppressWarnings("unchecked")
     static @NonNull List<BeanElementVisitor<?>> load() {
-        List<? extends BeanElementVisitor<?>> visitors = (List) SoftServiceLoader.load(BeanElementVisitor.class)
+        var visitors = (List<? extends BeanElementVisitor<?>>) SoftServiceLoader.load(BeanElementVisitor.class)
             .disableFork()
             .collectAll(BeanElementVisitor::isEnabled);
 
         if (visitors.isEmpty()) {
             return Collections.emptyList();
-        } else {
-            OrderUtil.sort(visitors);
-            return Collections.unmodifiableList(visitors);
         }
+        OrderUtil.sort(visitors);
+        return Collections.unmodifiableList(visitors);
     }
 }

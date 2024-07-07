@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -48,7 +49,7 @@ public abstract class AbstractAnnotationElement implements io.micronaut.inject.a
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return getElementAnnotationMetadata();
     }
 
@@ -80,61 +81,61 @@ public abstract class AbstractAnnotationElement implements io.micronaut.inject.a
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadataToWrite().annotate(annotationType, consumer);
         return this;
     }
 
     @Override
-    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
+    public io.micronaut.inject.ast.@NonNull Element removeAnnotation(@NonNull String annotationType) {
         getAnnotationMetadataToWrite().removeAnnotation(annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotation(Class<T> annotationType) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element removeAnnotation(@NonNull Class<T> annotationType) {
         getAnnotationMetadataToWrite().removeAnnotation(annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         getAnnotationMetadataToWrite().removeAnnotationIf(predicate);
         return this;
     }
 
     @Override
-    public io.micronaut.inject.ast.Element removeStereotype(String annotationType) {
+    public io.micronaut.inject.ast.@NonNull Element removeStereotype(@NonNull String annotationType) {
         getAnnotationMetadataToWrite().removeStereotype(annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeStereotype(Class<T> annotationType) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element removeStereotype(@NonNull Class<T> annotationType) {
         getAnnotationMetadataToWrite().removeStereotype(annotationType);
         return this;
     }
 
     @Override
-    public io.micronaut.inject.ast.Element annotate(String annotationType) {
+    public io.micronaut.inject.ast.@NonNull Element annotate(@NonNull String annotationType) {
         getAnnotationMetadataToWrite().annotate(annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadataToWrite().annotate(annotationType, consumer);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull Class<T> annotationType) {
         getAnnotationMetadataToWrite().annotate(annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+    public <T extends Annotation> io.micronaut.inject.ast.@NonNull Element annotate(@NonNull AnnotationValue<T> annotationValue) {
         getAnnotationMetadataToWrite().annotate(annotationValue);
         return this;
     }

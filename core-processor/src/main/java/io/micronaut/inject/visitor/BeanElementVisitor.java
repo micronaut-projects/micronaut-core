@@ -15,9 +15,6 @@
  */
 package io.micronaut.inject.visitor;
 
-import java.lang.annotation.Annotation;
-import java.util.List;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
@@ -25,12 +22,15 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.beans.BeanElement;
 
+import java.lang.annotation.Annotation;
+import java.util.List;
+
 /**
  * Allows visiting a bean to perform any validation prior to when bean definitions are written out.
  *
+ * @param <A> An annotation type to limit visitation to a subset of beans
  * @author graemerocher
  * @since 3.0.0
- * @param <A> An annotation type to limit visitation to a subset of beans
  */
 public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggleable {
     /**
@@ -46,7 +46,8 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
      * @param visitorContext The visitor context
      * @return The bean element or {@code null} if the bean should not be written
      */
-    @Nullable BeanElement visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
+    @Nullable
+    BeanElement visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
 
     /**
      * Called once when visitor processing starts.
@@ -68,6 +69,7 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
 
     /**
      * Returns whether this visitor supports visiting the specified element.
+     *
      * @param beanElement The bean element
      * @return True if it does
      */
@@ -77,7 +79,7 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
             return false;
         }
         final Class<?> t = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), BeanElementVisitor.class)
-                .orElse(Annotation.class);
+            .orElse(Annotation.class);
         if (t == Annotation.class) {
             return true;
         } else {

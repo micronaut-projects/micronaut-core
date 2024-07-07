@@ -32,8 +32,8 @@ import java.util.Objects;
  * Abstract implementation of {@link io.micronaut.inject.ast.ClassElement} that uses reflection.
  *
  * @param <T> The generic type
- * @since 3.1.0
  * @author Jonas Konrad
+ * @since 3.1.0
  */
 @Internal
 @Experimental
@@ -137,6 +137,7 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
 
     /**
      * Gets the erasure for the given type.
+     *
      * @param type The type
      * @return The erased class, never {@code null}
      */

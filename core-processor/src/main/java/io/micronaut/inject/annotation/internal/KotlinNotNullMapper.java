@@ -18,10 +18,10 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +34,7 @@ import java.util.List;
  */
 @Internal
 public class KotlinNotNullMapper implements NamedAnnotationTransformer {
+
     @NonNull
     @Override
     public String getName() {
@@ -43,7 +44,7 @@ public class KotlinNotNullMapper implements NamedAnnotationTransformer {
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
+            AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
         );
     }
 }

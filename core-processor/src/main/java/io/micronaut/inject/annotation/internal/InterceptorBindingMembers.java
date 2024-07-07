@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -50,14 +51,16 @@ import java.util.Set;
 public final class InterceptorBindingMembers implements AnnotationRemapper {
 
     private static final Set<String> SKIP_ANNOTATIONS = Set.of(
-            Around.class.getName(), AroundConstruct.class.getName(), InterceptorBinding.class.getName(), Introduction.class.getName()
+        Around.class.getName(), AroundConstruct.class.getName(), InterceptorBinding.class.getName(), Introduction.class.getName()
     );
 
+    @NonNull
     @Override
     public String getPackageName() {
         return ALL_PACKAGES;
     }
 
+    @NonNull
     @Override
     public List<AnnotationValue<?>> remap(AnnotationValue<?> annotationValue, VisitorContext visitorContext) {
         if (annotationValue.getStereotypes() == null) {
@@ -68,13 +71,13 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
             return List.of(annotationValue.mutate().replaceStereotypes(Collections.emptyList()).build());
         }
 
-        List<AnnotationValueBuilder<?>> interceptorBindings = new ArrayList<>();
+        var interceptorBindings = new ArrayList<AnnotationValueBuilder<?>>();
         for (AnnotationValue<?> stereotype : annotationValue.getStereotypes()) {
             String stereotypeName = stereotype.getAnnotationName();
             AnnotationValueBuilder<?> newInterceptorBinding = null;
             if (InterceptorBinding.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = stereotype.mutate()
-                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName));
+                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName));
 
                 if (stereotype.booleanValue(InterceptorBinding.META_BIND_MEMBERS).orElse(false)) {
                     String[] nonBinding = annotationValue.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE);
@@ -83,22 +86,22 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
                     Arrays.asList(nonBinding).forEach(bindingValues.keySet()::remove);
 
                     AnnotationValue<Annotation> binding = AnnotationValue.builder(annotationValue.getAnnotationName())
-                            .members(bindingValues)
-                            .build();
+                        .members(bindingValues)
+                        .build();
                     newInterceptorBinding.member(InterceptorBindingQualifier.META_BINDING_VALUES, binding);
                 }
             } else if (Around.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
-                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
-                        .member("kind", InterceptorKind.AROUND);
+                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
+                    .member("kind", InterceptorKind.AROUND);
             } else if (Introduction.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
-                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
-                        .member("kind", InterceptorKind.INTRODUCTION);
+                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
+                    .member("kind", InterceptorKind.INTRODUCTION);
             } else if (AroundConstruct.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
-                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
-                        .member("kind", InterceptorKind.AROUND_CONSTRUCT);
+                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
+                    .member("kind", InterceptorKind.AROUND_CONSTRUCT);
             }
             if (newInterceptorBinding != null) {
                 interceptorBindings.add(newInterceptorBinding);
@@ -130,11 +133,11 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
         if (!interceptorBindings.isEmpty()) {
             AnnotationValue<?>[] interceptors = interceptorBindings.stream().map(AnnotationValueBuilder::build).toArray(AnnotationValue<?>[]::new);
             AnnotationValue<Annotation> interceptorsContainer = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
-                    .values(interceptors)
-                    .build();
+                .values(interceptors)
+                .build();
             annotationValue = annotationValue.mutate()
-                    .stereotype(interceptorsContainer)
-                    .build();
+                .stereotype(interceptorsContainer)
+                .build();
         }
         return List.of(annotationValue);
     }

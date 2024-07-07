@@ -98,12 +98,12 @@ public class PropertyMetadata implements Writable {
     @Override
     public String toString() {
         return "PropertyMetadata{" +
-                "type='" + type + '\'' +
-                ", name='" + name + '\'' +
-                ", description='" + description + '\'' +
-                ", path='" + path + '\'' +
-                ", defaultValue='" + defaultValue + '\'' +
-                ", declaringType='" + declaringType + '\'' +
-                '}';
+            "type='" + type + '\'' +
+            ", name='" + name + '\'' +
+            ", description='" + description + '\'' +
+            ", path='" + path + '\'' +
+            ", defaultValue='" + defaultValue + '\'' +
+            ", declaringType='" + declaringType + '\'' +
+            '}';
     }
 }

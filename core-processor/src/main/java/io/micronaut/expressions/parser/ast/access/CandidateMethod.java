@@ -54,8 +54,8 @@ final class CandidateMethod {
         this.methodElement = methodElement;
         this.argumentTypes = argumentTypes;
         this.parameterTypes = Arrays.stream(methodElement.getParameters())
-                                  .map(ParameterElement::getType)
-                                  .toList();
+            .map(ParameterElement::getType)
+            .toList();
     }
 
     public CandidateMethod(MethodElement methodElement) {
@@ -70,7 +70,7 @@ final class CandidateMethod {
     }
 
     /**
-     * Whether candidate method is vargars method.
+     * Whether candidate method is varargs method.
      *
      * @return true if it is
      */
@@ -133,8 +133,8 @@ final class CandidateMethod {
      * a match. This check also supports varargs resolution for cases when method is explicitly
      * defined as varargs method or when last method parameter is a one-dimensional array.
      *
-     * @param ctx
-     * @return
+     * @param ctx visitor context
+     * @return is matching
      */
     public boolean isMatching(VisitorContext ctx) {
         int totalParams = parameterTypes.size();
@@ -151,7 +151,7 @@ final class CandidateMethod {
         ClassElement lastArgument = CollectionUtils.last(argumentTypes);
         ClassElement lastParameter = getLastParameter();
         boolean varargsCandidate = methodElement.isVarArgs() ||
-                                       (lastParameter.isArray() && lastParameter.getArrayDimensions() == 1);
+            (lastParameter.isArray() && lastParameter.getArrayDimensions() == 1);
 
         if (varargsCandidate) {
             // maybe just array argument
@@ -188,7 +188,7 @@ final class CandidateMethod {
      * @return asm method
      */
     public Method toAsmMethod() {
-        StringBuilder builder = new StringBuilder();
+        var builder = new StringBuilder();
         builder.append('(');
 
         for (TypedElement parameterType : parameterTypes) {

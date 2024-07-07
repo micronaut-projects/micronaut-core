@@ -30,7 +30,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -47,17 +46,17 @@ public final class EvaluatedExpressionsUtils {
      * Evaluates the expression return type.
      *
      * @param visitorContext The visitor context
-     * @param methodElement  The method element
-     * @param reference      The expression reference
+     * @param methodElement The method element
+     * @param reference The expression reference
      * @return The resolved type
      * @since 4.3.0
      */
     public static ClassElement evaluateExpressionType(VisitorContext visitorContext,
                                                       MethodElement methodElement,
                                                       EvaluatedExpressionReference reference) {
-        DefaultExpressionCompilationContextFactory factory = new DefaultExpressionCompilationContextFactory(visitorContext);
+        var factory = new DefaultExpressionCompilationContextFactory(visitorContext);
         ExpressionEvaluationContext context = factory.buildContextForMethod(reference, methodElement);
-        String expression = (String) reference.annotationValue();
+        var expression = (String) reference.annotationValue();
         return new CompoundEvaluatedExpressionParser(expression)
             .parse()
             .resolveClassElement(new ExpressionVisitorContext(context, visitorContext));
@@ -67,17 +66,17 @@ public final class EvaluatedExpressionsUtils {
      * Evaluates the expression return type.
      *
      * @param visitorContext The visitor context
-     * @param thisElement    The this element
-     * @param reference      The expression reference
+     * @param thisElement this element
+     * @param reference The expression reference
      * @return The resolved type
      * @since 4.3.0
      */
     public static ClassElement evaluateExpressionType(VisitorContext visitorContext,
                                                       ClassElement thisElement,
                                                       EvaluatedExpressionReference reference) {
-        DefaultExpressionCompilationContextFactory factory = new DefaultExpressionCompilationContextFactory(visitorContext);
+        var factory = new DefaultExpressionCompilationContextFactory(visitorContext);
         ExpressionEvaluationContext context = factory.buildContext(reference, thisElement);
-        String expression = (String) reference.annotationValue();
+        var expression = (String) reference.annotationValue();
         return new CompoundEvaluatedExpressionParser(expression)
             .parse()
             .resolveClassElement(new ExpressionVisitorContext(context, visitorContext));
@@ -104,7 +103,7 @@ public final class EvaluatedExpressionsUtils {
     }
 
     private static Collection<AnnotationValue<?>> getNestedAnnotationValues(Object value) {
-        List<AnnotationValue<?>> result = new ArrayList<>();
+        var result = new ArrayList<AnnotationValue<?>>();
         if (value instanceof AnnotationValue<?> annotationValue) {
             for (Object nestedValue : annotationValue.getValues().values()) {
                 result.addAll(getNestedAnnotationValues(nestedValue));

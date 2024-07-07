@@ -29,7 +29,7 @@ import io.micronaut.inject.ast.ParameterElement;
 public interface BeanParameterElement extends ParameterElement, InjectableElement {
 
     /**
-     * Constant for an empty bean prameter element array.
+     * Constant for an empty bean parameter element array.
      *
      * @since 4.4.0
      */

@@ -51,6 +51,7 @@ import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
  */
 @Internal
 public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
+
     private static final Method EVALUATED_EXPRESSIONS_CONSTRUCTOR =
         new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(Object.class));
 
@@ -86,7 +87,7 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
     }
 
     private ClassWriter generateClassBytes(String expressionClassName) {
-        ClassWriter classWriter = new ClassWriter(COMPUTE_MAXS | COMPUTE_FRAMES);
+        var classWriter = new ClassWriter(COMPUTE_MAXS | COMPUTE_FRAMES);
 
         startPublicClass(
             classWriter,
@@ -107,7 +108,7 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         GeneratorAdapter evaluateMethodVisitor = startProtectedMethod(classWriter, "doEvaluate",
             Object.class.getName(), ExpressionEvaluationContext.class.getName());
 
-        ExpressionCompilationContext ctx = new ExpressionCompilationContext(
+        var ctx = new ExpressionCompilationContext(
             new ExpressionVisitorContext(expressionMetadata.evaluationContext(), visitorContext),
             evaluateMethodVisitor);
 
@@ -138,10 +139,10 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         String message = null;
         if (ex instanceof ExpressionParsingException parsingException) {
             message = "Failed to parse evaluated expression [" + strRepresentation + "]. " +
-                          "Cause: " + parsingException.getMessage();
+                "Cause: " + parsingException.getMessage();
         } else if (ex instanceof ExpressionCompilationException compilationException) {
             message = "Failed to compile evaluated expression [" + strRepresentation + "]. " +
-                          "Cause: " + compilationException.getMessage();
+                "Cause: " + compilationException.getMessage();
         }
 
         visitorContext.fail(message, originatingElement);

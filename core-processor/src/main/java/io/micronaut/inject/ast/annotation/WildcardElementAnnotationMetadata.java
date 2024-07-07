@@ -17,6 +17,7 @@ package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.WildcardElement;
@@ -44,19 +45,19 @@ public final class WildcardElementAnnotationMetadata extends AbstractElementAnno
     }
 
     @Override
-    public AnnotationMetadata getReturnInstance() {
+    public @NonNull AnnotationMetadata getReturnInstance() {
         return getAnnotationMetadata();
     }
 
     @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+    protected @NonNull MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return wildcardElement.getGenericTypeAnnotationMetadata();
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         if (annotationMetadata == null) {
-            List<AnnotationMetadata> allAnnotationMetadata = new ArrayList<>();
+            var allAnnotationMetadata = new ArrayList<AnnotationMetadata>();
             wildcardElement.getLowerBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
             wildcardElement.getUpperBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
             allAnnotationMetadata.add(representingClassElement.getTypeAnnotationMetadata());

@@ -22,9 +22,9 @@ import io.micronaut.core.annotation.Internal;
  *
  * @param type token type
  * @param value token string value
- *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
-public record Token(TokenType type, String value) { }
+public record Token(TokenType type, String value) {
+}

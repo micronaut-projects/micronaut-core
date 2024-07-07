@@ -31,12 +31,14 @@ import org.objectweb.asm.Type;
  */
 @Internal
 public abstract sealed class UnaryOperator extends ExpressionNode permits EmptyOperator, NegOperator, NotOperator, PosOperator {
+
     protected final ExpressionNode operand;
 
     public UnaryOperator(ExpressionNode operand) {
         this.operand = operand;
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return operand.resolveType(ctx);

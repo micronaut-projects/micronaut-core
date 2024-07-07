@@ -43,8 +43,8 @@ import static org.objectweb.asm.Type.BOOLEAN_TYPE;
  * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * numeric types.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public final class NumericComparisonOperation extends ExpressionNode {
@@ -64,25 +64,25 @@ public final class NumericComparisonOperation extends ExpressionNode {
         this.nonIntComparisonOpcode = nonIntComparisonOpcode;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
 
         if (!isNumeric(leftType) || !isNumeric(rightType)) {
-            throw new ExpressionCompilationException(
-                "Numeric comparison operation can only be applied to numeric types");
+            throw new ExpressionCompilationException("Numeric comparison operation can only be applied to numeric types");
         }
 
         return BOOLEAN_TYPE;
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
+        var elseLabel = new Label();
+        var endOfCmpLabel = new Label();
 
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
@@ -103,7 +103,8 @@ public final class NumericComparisonOperation extends ExpressionNode {
                 case "D" -> mv.visitInsn(DCMPL);
                 case "F" -> mv.visitInsn(FCMPL);
                 case "J" -> mv.visitInsn(LCMP);
-                default -> { }
+                default -> {
+                }
             }
             mv.visitJumpInsn(nonIntComparisonOpcode, elseLabel);
         } else {

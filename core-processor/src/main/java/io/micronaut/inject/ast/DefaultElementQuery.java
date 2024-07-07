@@ -109,7 +109,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public Class<T> getElementType() {
+    public @NonNull Class<T> getElementType() {
         return elementType;
     }
 
@@ -162,7 +162,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public List<Predicate<String>> getNamePredicates() {
+    public @NonNull List<Predicate<String>> getNamePredicates() {
         if (namePredicates == null) {
             return Collections.emptyList();
         }
@@ -179,7 +179,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public List<Predicate<AnnotationMetadata>> getAnnotationPredicates() {
+    public @NonNull List<Predicate<AnnotationMetadata>> getAnnotationPredicates() {
         if (annotationPredicates == null) {
             return Collections.emptyList();
         }
@@ -187,7 +187,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public List<Predicate<Set<ElementModifier>>> getModifierPredicates() {
+    public @NonNull List<Predicate<Set<ElementModifier>>> getModifierPredicates() {
         if (modifiersPredicates == null) {
             return Collections.emptyList();
         }
@@ -195,7 +195,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public List<Predicate<T>> getElementPredicates() {
+    public @NonNull List<Predicate<T>> getElementPredicates() {
         if (elementPredicates == null) {
             return Collections.emptyList();
         }

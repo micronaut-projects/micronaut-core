@@ -41,7 +41,7 @@ public final class MethodElementAnnotationsHelper {
     /**
      * The constructor.
      *
-     * @param methodElement                    The method element
+     * @param methodElement The method element
      * @param elementAnnotationMetadataFactory The annotations factory
      */
     public MethodElementAnnotationsHelper(AbstractAnnotationElement methodElement,

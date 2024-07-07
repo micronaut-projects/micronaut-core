@@ -55,6 +55,6 @@ final class AptClassWriter extends ClassWriter {
 
     private ClassElement loadClass(String binaryName) {
         return visitorContext.getClassElement(binaryName.replace('/', '.'))
-                .orElseThrow(() -> new TypeNotPresentException(binaryName, null));
+            .orElseThrow(() -> new TypeNotPresentException(binaryName, null));
     }
 }

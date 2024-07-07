@@ -27,7 +27,6 @@ import java.util.Objects;
  *
  * @param expressionReference reference to evaluated expression in annotation
  * @param evaluationContext the context against which expression will be evaluated
- *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */

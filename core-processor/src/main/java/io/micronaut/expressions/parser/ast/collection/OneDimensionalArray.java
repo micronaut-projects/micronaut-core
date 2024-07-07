@@ -54,7 +54,7 @@ public final class OneDimensionalArray extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         int arraySize = initializer.size();
 
@@ -87,9 +87,10 @@ public final class OneDimensionalArray extends ExpressionNode {
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
         return getRequiredClassElement(elementTypeIdentifier.resolveType(ctx), ctx.visitorContext())
-                    .toArray();
+            .toArray();
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return getTypeReference(doResolveClassElement(ctx));

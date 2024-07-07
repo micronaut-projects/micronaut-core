@@ -44,7 +44,8 @@ public final class JavaxRemapper implements AnnotationRemapper {
     }
 
     @Override
-    @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
+    @NonNull
+    public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
         String name = annotation.getAnnotationName();
         Matcher matcher = JAVAX.matcher(name);
 
@@ -56,10 +57,10 @@ public final class JavaxRemapper implements AnnotationRemapper {
         }
 
         return Collections.singletonList(
-                AnnotationValue.builder(matcher.replaceFirst("jakarta"))
-                        .members(annotation.getValues())
-                        .stereotype(stereotype)
-                        .build()
+            AnnotationValue.builder(matcher.replaceFirst("jakarta"))
+                .members(annotation.getValues())
+                .stereotype(stereotype)
+                .build()
         );
     }
 }

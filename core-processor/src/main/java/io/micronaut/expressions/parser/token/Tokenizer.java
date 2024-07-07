@@ -25,7 +25,52 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.micronaut.expressions.parser.token.TokenType.*;
+import static io.micronaut.expressions.parser.token.TokenType.AND;
+import static io.micronaut.expressions.parser.token.TokenType.BEAN_CONTEXT;
+import static io.micronaut.expressions.parser.token.TokenType.BOOL;
+import static io.micronaut.expressions.parser.token.TokenType.COLON;
+import static io.micronaut.expressions.parser.token.TokenType.COMMA;
+import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
+import static io.micronaut.expressions.parser.token.TokenType.DIV;
+import static io.micronaut.expressions.parser.token.TokenType.DOT;
+import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
+import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
+import static io.micronaut.expressions.parser.token.TokenType.ENVIRONMENT;
+import static io.micronaut.expressions.parser.token.TokenType.EQ;
+import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
+import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
+import static io.micronaut.expressions.parser.token.TokenType.GT;
+import static io.micronaut.expressions.parser.token.TokenType.GTE;
+import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
+import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
+import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
+import static io.micronaut.expressions.parser.token.TokenType.INT;
+import static io.micronaut.expressions.parser.token.TokenType.LONG;
+import static io.micronaut.expressions.parser.token.TokenType.LT;
+import static io.micronaut.expressions.parser.token.TokenType.LTE;
+import static io.micronaut.expressions.parser.token.TokenType.L_CURLY;
+import static io.micronaut.expressions.parser.token.TokenType.L_PAREN;
+import static io.micronaut.expressions.parser.token.TokenType.L_SQUARE;
+import static io.micronaut.expressions.parser.token.TokenType.MATCHES;
+import static io.micronaut.expressions.parser.token.TokenType.MINUS;
+import static io.micronaut.expressions.parser.token.TokenType.MOD;
+import static io.micronaut.expressions.parser.token.TokenType.MUL;
+import static io.micronaut.expressions.parser.token.TokenType.NE;
+import static io.micronaut.expressions.parser.token.TokenType.NOT;
+import static io.micronaut.expressions.parser.token.TokenType.NULL;
+import static io.micronaut.expressions.parser.token.TokenType.OR;
+import static io.micronaut.expressions.parser.token.TokenType.PLUS;
+import static io.micronaut.expressions.parser.token.TokenType.POW;
+import static io.micronaut.expressions.parser.token.TokenType.QMARK;
+import static io.micronaut.expressions.parser.token.TokenType.R_CURLY;
+import static io.micronaut.expressions.parser.token.TokenType.R_PAREN;
+import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
+import static io.micronaut.expressions.parser.token.TokenType.SAFE_NAV;
+import static io.micronaut.expressions.parser.token.TokenType.STRING;
+import static io.micronaut.expressions.parser.token.TokenType.THIS;
+import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
+import static io.micronaut.expressions.parser.token.TokenType.WHITESPACE;
 
 /**
  * Tokenizer for parsing evaluated expressions.
@@ -143,7 +188,7 @@ public final class Tokenizer {
         }
 
         remaining = expression.substring(cursor);
-        for (TokenPattern pattern: PATTERNS) {
+        for (TokenPattern pattern : PATTERNS) {
             Token token = pattern.matches(remaining);
             if (token == null) {
                 continue;
@@ -166,6 +211,7 @@ public final class Tokenizer {
     }
 
     private record TokenPattern(Pattern pattern, TokenType tokenType) {
+
         public static TokenPattern of(String pattern, TokenType tokenType) {
             return new TokenPattern(Pattern.compile(pattern), tokenType);
         }

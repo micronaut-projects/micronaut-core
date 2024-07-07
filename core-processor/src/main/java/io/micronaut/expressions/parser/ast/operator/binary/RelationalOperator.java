@@ -37,9 +37,10 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric
  */
 @Internal
 public abstract sealed class RelationalOperator extends ExpressionNode permits GtOperator,
-                                                                               GteOperator,
-                                                                               LtOperator,
-                                                                               LteOperator {
+    GteOperator,
+    LtOperator,
+    LteOperator {
+
     protected final ExpressionNode leftOperand;
     protected final ExpressionNode rightOperand;
 
@@ -54,25 +55,23 @@ public abstract sealed class RelationalOperator extends ExpressionNode permits G
 
     protected abstract Integer nonIntComparisonOpcode();
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
 
         if (isNumeric(leftType) && isNumeric(rightType)) {
-            comparisonOperation = new NumericComparisonOperation(
-                leftOperand, rightOperand,
-                intComparisonOpcode(), nonIntComparisonOpcode());
+            comparisonOperation = new NumericComparisonOperation(leftOperand, rightOperand, intComparisonOpcode(), nonIntComparisonOpcode());
         } else {
-            comparisonOperation = new ComparablesComparisonOperation(
-                leftOperand, rightOperand, nonIntComparisonOpcode());
+            comparisonOperation = new ComparablesComparisonOperation(leftOperand, rightOperand, nonIntComparisonOpcode());
         }
 
         return comparisonOperation.resolveType(ctx);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         comparisonOperation.compile(ctx);
     }
 }

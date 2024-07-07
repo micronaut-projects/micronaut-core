@@ -202,12 +202,12 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+    public @NonNull ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return this.expressionCompilationContextFactory;
     }
 
     @Override
-    public GroovyAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
+    public @NonNull GroovyAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return annotationMetadataBuilder;
     }
 

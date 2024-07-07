@@ -92,69 +92,69 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static final Pattern ARRAY_PATTERN = Pattern.compile("(\\[\\])+$");
 
     protected static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Class.class,
-                    String.class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "of",
+            Class.class,
+            String.class
+        )
     );
     protected static final Method METHOD_GENERIC_PLACEHOLDER_SIMPLE = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "ofTypeVariable",
-                    Class.class,
-                    String.class,
-                    String.class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "ofTypeVariable",
+            Class.class,
+            String.class,
+            String.class
+        )
     );
     protected static final Method METHOD_CREATE_TYPE_VARIABLE_SIMPLE = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "ofTypeVariable",
-                    Class.class,
-                    String.class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "ofTypeVariable",
+            Class.class,
+            String.class
+        )
     );
     private static final Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Class.class,
-                    String.class,
-                    AnnotationMetadata.class,
-                    Argument[].class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "of",
+            Class.class,
+            String.class,
+            AnnotationMetadata.class,
+            Argument[].class
+        )
     );
     private static final Method METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "ofTypeVariable",
-                    Class.class,
-                    String.class,
-                    AnnotationMetadata.class,
-                    Argument[].class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "ofTypeVariable",
+            Class.class,
+            String.class,
+            AnnotationMetadata.class,
+            Argument[].class
+        )
     );
     private static final Method METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "ofTypeVariable",
-                    Class.class,
-                    String.class,
-                    String.class,
-                    AnnotationMetadata.class,
-                    Argument[].class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "ofTypeVariable",
+            Class.class,
+            String.class,
+            String.class,
+            AnnotationMetadata.class,
+            Argument[].class
+        )
     );
     private static final Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_CLASS_GENERICS = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Class.class,
-                    AnnotationMetadata.class,
-                    Class[].class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            Argument.class,
+            "of",
+            Class.class,
+            AnnotationMetadata.class,
+            Class[].class
+        )
     );
 
     private static final Type MAP_TYPE = Type.getType(Map.class);
@@ -169,7 +169,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     static {
         MAP_OF = new Method[11];
         for (int i = 0; i < MAP_OF.length; i++) {
-            Class[] mapArgs = new Class[i * 2];
+            var mapArgs = new Class<?>[i * 2];
             for (int k = 0; k < i * 2; k += 2) {
                 mapArgs[k] = Object.class;
                 mapArgs[k + 1] = Object.class;
@@ -183,7 +183,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     static {
         LIST_OF = new Method[11];
         for (int i = 0; i < LIST_OF.length; i++) {
-            Class[] listArgs = new Class[i];
+            var listArgs = new Class<?>[i];
             for (int k = 0; k < i; k += 1) {
                 listArgs[k] = Object.class;
             }
@@ -223,23 +223,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Pushes type arguments onto the stack.
      *
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param owningType           The owning type
-     * @param owningTypeWriter     The declaring class writer
-     * @param generatorAdapter     The generator adapter
+     * @param owningType The owning type
+     * @param owningTypeWriter The declaring class writer
+     * @param generatorAdapter The generator adapter
      * @param declaringElementName The declaring class element of the generics
-     * @param types                The type references
-     * @param defaults             The annotation defaults
-     * @param loadTypeMethods      The load type methods
+     * @param types The type references
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected static void pushTypeArgumentElements(
-            AnnotationMetadata annotationMetadataWithDefaults,
-            Type owningType,
-            ClassWriter owningTypeWriter,
-            GeneratorAdapter generatorAdapter,
-            String declaringElementName,
-            Map<String, ClassElement> types,
-            Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+        AnnotationMetadata annotationMetadataWithDefaults,
+        Type owningType,
+        ClassWriter owningTypeWriter,
+        GeneratorAdapter generatorAdapter,
+        String declaringElementName,
+        Map<String, ClassElement> types,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
         if (types == null || types.isEmpty()) {
             pushNewArray(generatorAdapter, Argument.class, 0);
             return;
@@ -249,23 +249,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     @SuppressWarnings("java:S1872")
     private static void pushTypeArgumentElements(
-            AnnotationMetadata annotationMetadataWithDefaults,
-            Type owningType,
-            ClassWriter declaringClassWriter,
-            GeneratorAdapter generatorAdapter,
-            String declaringElementName,
-            @Nullable
-            ClassElement element,
-            Map<String, ClassElement> types,
-            Set<Object> visitedTypes,
-            Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+        AnnotationMetadata annotationMetadataWithDefaults,
+        Type owningType,
+        ClassWriter declaringClassWriter,
+        GeneratorAdapter generatorAdapter,
+        String declaringElementName,
+        @Nullable
+        ClassElement element,
+        Map<String, ClassElement> types,
+        Set<Object> visitedTypes,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
         if (element == null) {
             if (visitedTypes.contains(declaringElementName)) {
                 generatorAdapter.getStatic(
-                        TYPE_ARGUMENT,
-                        ZERO_ARGUMENTS_CONSTANT,
-                        TYPE_ARGUMENT_ARRAY
+                    TYPE_ARGUMENT,
+                    ZERO_ARGUMENTS_CONSTANT,
+                    TYPE_ARGUMENT_ARRAY
                 );
                 return;
             } else {
@@ -303,8 +303,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Builds an argument instance.
      *
      * @param generatorAdapter The generator adapter.
-     * @param argumentName     The argument name
-     * @param objectType       The object type
+     * @param argumentName The argument name
+     * @param objectType The object type
      */
     protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Type objectType) {
         // 1st argument: the type
@@ -314,9 +314,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                METHOD_CREATE_ARGUMENT_SIMPLE
+            generatorAdapter,
+            Argument.class,
+            METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
 
@@ -324,8 +324,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Builds an argument instance.
      *
      * @param generatorAdapter The generator adapter.
-     * @param argumentName     The argument name
-     * @param objectType       The object type
+     * @param argumentName The argument name
+     * @param objectType The object type
      */
     protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, ClassElement objectType) {
         // 1st argument: the type
@@ -349,16 +349,16 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
             // Argument.create( .. )
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    hasVariable ? METHOD_GENERIC_PLACEHOLDER_SIMPLE : METHOD_CREATE_TYPE_VARIABLE_SIMPLE
+                generatorAdapter,
+                Argument.class,
+                hasVariable ? METHOD_GENERIC_PLACEHOLDER_SIMPLE : METHOD_CREATE_TYPE_VARIABLE_SIMPLE
             );
         } else {
             // Argument.create( .. )
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_SIMPLE
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_SIMPLE
             );
         }
     }
@@ -367,29 +367,29 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Builds generic type arguments recursively.
      *
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param owningType        The owning type
+     * @param owningType The owning type
      * @param owningClassWriter The declaring writer
-     * @param generatorAdapter  The generator adapter to use
-     * @param argumentName      The argument name
-     * @param typeReference     The type name
-     * @param classElement      The class element that declares the generics
-     * @param typeArguments     The nested type arguments
-     * @param visitedTypes      The visited types
-     * @param defaults          The annotation defaults
-     * @param loadTypeMethods   The load type methods
+     * @param generatorAdapter The generator adapter to use
+     * @param argumentName The argument name
+     * @param typeReference The type name
+     * @param classElement The class element that declares the generics
+     * @param typeArguments The nested type arguments
+     * @param visitedTypes The visited types
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected static void buildArgumentWithGenerics(
-            AnnotationMetadata annotationMetadataWithDefaults,
-            Type owningType,
-            ClassWriter owningClassWriter,
-            GeneratorAdapter generatorAdapter,
-            String argumentName,
-            Type typeReference,
-            ClassElement classElement,
-            Map<String, ClassElement> typeArguments,
-            Set<Object> visitedTypes,
-            Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+        AnnotationMetadata annotationMetadataWithDefaults,
+        Type owningType,
+        ClassWriter owningClassWriter,
+        GeneratorAdapter generatorAdapter,
+        String argumentName,
+        Type typeReference,
+        ClassElement classElement,
+        Map<String, ClassElement> typeArguments,
+        Set<Object> visitedTypes,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
         // 1st argument: the type
         generatorAdapter.push(typeReference);
         // 2nd argument: the name
@@ -401,7 +401,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         }
 
         // Persist only type annotations added to the type argument
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
+        var annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -419,9 +419,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_SIMPLE
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_SIMPLE
             );
             return;
         }
@@ -436,57 +436,57 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             );
 
             AnnotationMetadataWriter.instantiateNewMetadata(
-                    owningType,
-                    owningClassWriter,
-                    generatorAdapter,
-                    (MutableAnnotationMetadata) annotationMetadata,
-                    defaults,
-                    loadTypeMethods
+                owningType,
+                owningClassWriter,
+                generatorAdapter,
+                annotationMetadata,
+                defaults,
+                loadTypeMethods
             );
         }
 
         // 4th argument, more generics
         pushTypeArgumentElements(
-                annotationMetadataWithDefaults,
-                owningType,
-                owningClassWriter,
-                generatorAdapter,
-                classElement.getName(),
-                classElement,
-                typeArguments,
-                visitedTypes,
-                defaults,
-                loadTypeMethods
+            annotationMetadataWithDefaults,
+            owningType,
+            owningClassWriter,
+            generatorAdapter,
+            classElement.getName(),
+            classElement,
+            typeArguments,
+            visitedTypes,
+            defaults,
+            loadTypeMethods
         );
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+            generatorAdapter,
+            Argument.class,
+            typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
     /**
      * Builds generic type arguments recursively.
      *
-     * @param generatorAdapter   The generator adapter to use
-     * @param type               The type that declares the generics
+     * @param generatorAdapter The generator adapter to use
+     * @param type The type that declares the generics
      * @param annotationMetadata The annotation metadata reference
-     * @param generics           The generics
+     * @param generics The generics
      * @since 3.0.0
      */
     protected static void buildArgumentWithGenerics(
-            GeneratorAdapter generatorAdapter,
-            Type type,
-            AnnotationMetadataReference annotationMetadata,
-            ClassElement[] generics) {
+        GeneratorAdapter generatorAdapter,
+        Type type,
+        AnnotationMetadataReference annotationMetadata,
+        ClassElement[] generics) {
         // 1st argument: the type
         generatorAdapter.push(type);
         // 2nd argument: the annotation metadata
         AnnotationMetadataWriter.pushAnnotationMetadataReference(
-                generatorAdapter,
-                annotationMetadata
+            generatorAdapter,
+            annotationMetadata
         );
 
         // 3rd argument, the generics
@@ -494,31 +494,31 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_CLASS_GENERICS
+            generatorAdapter,
+            Argument.class,
+            METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_CLASS_GENERICS
         );
     }
 
     /**
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param declaringElementName           The declaring element name
-     * @param owningType                     The owning type
-     * @param declaringClassWriter           The declaring class writer
-     * @param generatorAdapter               The {@link GeneratorAdapter}
-     * @param argumentTypes                  The argument types
-     * @param defaults                       The annotation defaults
-     * @param loadTypeMethods                The load type methods
+     * @param declaringElementName The declaring element name
+     * @param owningType The owning type
+     * @param declaringClassWriter The declaring class writer
+     * @param generatorAdapter The {@link GeneratorAdapter}
+     * @param argumentTypes The argument types
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected static void pushBuildArgumentsForMethod(
-            AnnotationMetadata annotationMetadataWithDefaults,
-            String declaringElementName,
-            Type owningType,
-            ClassWriter declaringClassWriter,
-            GeneratorAdapter generatorAdapter,
-            Collection<ParameterElement> argumentTypes,
-            Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+        AnnotationMetadata annotationMetadataWithDefaults,
+        String declaringElementName,
+        Type owningType,
+        ClassWriter declaringClassWriter,
+        GeneratorAdapter generatorAdapter,
+        Collection<ParameterElement> argumentTypes,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
         pushNewArray(generatorAdapter, Argument.class, argumentTypes, entry -> {
 
             ClassElement genericType = entry.getGenericType();
@@ -563,13 +563,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Pushes an argument.
      *
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param owningType                     The owning type
-     * @param classWriter                    The declaring class writer
-     * @param generatorAdapter               The generator adapter
-     * @param declaringTypeName              The declaring type name
-     * @param argument                       The argument
-     * @param defaults                       The annotation defaults
-     * @param loadTypeMethods                The load type methods
+     * @param owningType The owning type
+     * @param classWriter The declaring class writer
+     * @param generatorAdapter The generator adapter
+     * @param declaringTypeName The declaring type name
+     * @param argument The argument
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected void pushReturnTypeArgument(AnnotationMetadata annotationMetadataWithDefaults,
                                           Type owningType,
@@ -595,26 +595,26 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         }
 
         if (annotationMetadata.isEmpty()
-                && !argument.isArray()
-                && String.class.getName().equals(argument.getType().getName())
-                && argument.getName().equals(argument.getType().getName())
-                && argument.getAnnotationMetadata().isEmpty()) {
+            && !argument.isArray()
+            && String.class.getName().equals(argument.getType().getName())
+            && argument.getName().equals(argument.getType().getName())
+            && argument.getAnnotationMetadata().isEmpty()) {
             generatorAdapter.getStatic(argumentType, "STRING", argumentType);
             return;
         }
 
         pushCreateArgument(
-                annotationMetadataWithDefaults,
-                declaringTypeName,
-                owningType,
-                classWriter,
-                generatorAdapter,
-                argument.getName(),
-                argument,
-                annotationMetadata,
-                argument.getTypeArguments(),
-                defaults,
-                loadTypeMethods
+            annotationMetadataWithDefaults,
+            declaringTypeName,
+            owningType,
+            classWriter,
+            generatorAdapter,
+            argument.getName(),
+            argument,
+            annotationMetadata,
+            argument.getTypeArguments(),
+            defaults,
+            loadTypeMethods
         );
     }
 
@@ -622,14 +622,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Pushes a new Argument creation.
      *
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param declaringTypeName    The declaring type name
-     * @param owningType           The owning type
-     * @param classWriter          The class writer
-     * @param generatorAdapter     The generator adapter
-     * @param argumentName         The argument name
-     * @param classElement         The typed element
-     * @param defaults             The annotation defaults
-     * @param loadTypeMethods      The load type methods
+     * @param declaringTypeName The declaring type name
+     * @param owningType The owning type
+     * @param classWriter The class writer
+     * @param generatorAdapter The generator adapter
+     * @param argumentName The argument name
+     * @param classElement The typed element
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected static void pushCreateArgument(
         AnnotationMetadata annotationMetadataWithDefaults,
@@ -661,29 +661,29 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Pushes a new Argument creation.
      *
      * @param annotationMetadataWithDefaults The annotation metadata with defaults
-     * @param declaringTypeName    The declaring type name
-     * @param owningType           The owning type
+     * @param declaringTypeName The declaring type name
+     * @param owningType The owning type
      * @param declaringClassWriter The declaring class writer
-     * @param generatorAdapter     The generator adapter
-     * @param argumentName         The argument name
-     * @param typedElement         The typed element
-     * @param annotationMetadata   The annotation metadata
-     * @param typeArguments        The type arguments
-     * @param defaults             The annotation defaults
-     * @param loadTypeMethods      The load type methods
+     * @param generatorAdapter The generator adapter
+     * @param argumentName The argument name
+     * @param typedElement The typed element
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments The type arguments
+     * @param defaults The annotation defaults
+     * @param loadTypeMethods The load type methods
      */
     protected static void pushCreateArgument(
-            AnnotationMetadata annotationMetadataWithDefaults,
-            String declaringTypeName,
-            Type owningType,
-            ClassWriter declaringClassWriter,
-            GeneratorAdapter generatorAdapter,
-            String argumentName,
-            TypedElement typedElement,
-            AnnotationMetadata annotationMetadata,
-            Map<String, ClassElement> typeArguments,
-            Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+        AnnotationMetadata annotationMetadataWithDefaults,
+        String declaringTypeName,
+        Type owningType,
+        ClassWriter declaringClassWriter,
+        GeneratorAdapter generatorAdapter,
+        String argumentName,
+        TypedElement typedElement,
+        AnnotationMetadata annotationMetadata,
+        Map<String, ClassElement> typeArguments,
+        Map<String, Integer> defaults,
+        Map<String, GeneratorAdapter> loadTypeMethods) {
         annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
 
         Type argumentType = JavaModelUtils.getTypeReference(typedElement);
@@ -710,9 +710,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_SIMPLE
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_SIMPLE
             );
             return;
         }
@@ -729,12 +729,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             );
 
             AnnotationMetadataWriter.instantiateNewMetadata(
-                    owningType,
-                    declaringClassWriter,
-                    generatorAdapter,
-                    (MutableAnnotationMetadata) annotationMetadata,
-                    defaults,
-                    loadTypeMethods
+                owningType,
+                declaringClassWriter,
+                generatorAdapter,
+                (MutableAnnotationMetadata) annotationMetadata,
+                defaults,
+                loadTypeMethods
             );
         } else {
             generatorAdapter.push((String) null);
@@ -743,14 +743,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 4th argument: The generic types
         if (hasTypeArguments) {
             pushTypeArgumentElements(
-                    annotationMetadataWithDefaults,
-                    owningType,
-                    declaringClassWriter,
-                    generatorAdapter,
-                    declaringTypeName,
-                    typeArguments,
-                    defaults,
-                    loadTypeMethods
+                annotationMetadataWithDefaults,
+                owningType,
+                declaringClassWriter,
+                generatorAdapter,
+                declaringTypeName,
+                typeArguments,
+                defaults,
+                loadTypeMethods
             );
         } else {
             generatorAdapter.visitInsn(ACONST_NULL);
@@ -759,17 +759,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         if (isTypeVariable) {
             // Argument.create( .. )
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS
+                generatorAdapter,
+                Argument.class,
+                hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS
             );
         } else {
 
             // Argument.create( .. )
             invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
             );
         }
     }
@@ -787,7 +787,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * @return The originating element
      */
-    public @Nullable
+    public @NonNull
     Element getOriginatingElement() {
         Element[] originatingElements = getOriginatingElements();
         if (ArrayUtils.isNotEmpty(originatingElements)) {
@@ -801,13 +801,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * Implements a method called "getInterceptedType" for the given type and class writer.
      *
      * @param interceptedType The intercepted type
-     * @param classWriter     The class writer
+     * @param classWriter The class writer
      */
     protected void implementInterceptedTypeMethod(Type interceptedType, ClassWriter classWriter) {
         GeneratorAdapter getTargetTypeMethod = startPublicMethodZeroArgs(
-                classWriter,
-                Class.class,
-                "getInterceptedType"
+            classWriter,
+            Class.class,
+            "getInterceptedType"
         );
         getTargetTypeMethod.loadThis();
         getTargetTypeMethod.push(interceptedType);
@@ -848,7 +848,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Returns the Type reference corresponding to the given class.
      *
-     * @param className    The class name
+     * @param className The class name
      * @param genericTypes The generic types
      * @return The {@link Type}
      */
@@ -868,7 +868,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param fieldType           The field type
+     * @param fieldType The field type
      * @param injectMethodVisitor The {@link GeneratorAdapter}
      */
     protected static void pushBoxPrimitiveIfNecessary(Type fieldType, GeneratorAdapter injectMethodVisitor) {
@@ -878,7 +878,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param fieldType           The field type
+     * @param fieldType The field type
      * @param injectMethodVisitor The {@link MethodVisitor}
      */
     protected static void pushBoxPrimitiveIfNecessary(Class<?> fieldType, GeneratorAdapter injectMethodVisitor) {
@@ -886,7 +886,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param fieldType           The field type
+     * @param fieldType The field type
      * @param injectMethodVisitor The {@link GeneratorAdapter}
      */
     protected static void pushBoxPrimitiveIfNecessary(TypedElement fieldType, GeneratorAdapter injectMethodVisitor) {
@@ -894,7 +894,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param ga   The {@link GeneratorAdapter}
+     * @param ga The {@link GeneratorAdapter}
      * @param type The type
      */
     protected static void pushCastToType(GeneratorAdapter ga, Type type) {
@@ -906,7 +906,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param ga   The {@link MethodVisitor}
+     * @param ga The {@link MethodVisitor}
      * @param type The type
      */
     protected static void pushCastToType(GeneratorAdapter ga, TypedElement type) {
@@ -914,7 +914,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param ga   The {@link MethodVisitor}
+     * @param ga The {@link MethodVisitor}
      * @param to The type
      */
     protected static void pushCastFromObjectToType(GeneratorAdapter ga, TypedElement to) {
@@ -929,9 +929,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Cast from one type to another.
      *
-     * @param ga   The {@link MethodVisitor}
+     * @param ga The {@link MethodVisitor}
      * @param from The from type
-     * @param to   The to type
+     * @param to The to type
      */
     protected static void pushCastToType(GeneratorAdapter ga, TypedElement from, TypedElement to) {
         Type toType = JavaModelUtils.getTypeReference(to);
@@ -947,7 +947,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param ga   The {@link MethodVisitor}
+     * @param ga The {@link MethodVisitor}
      * @param type The type
      */
     protected static void pushCastToType(GeneratorAdapter ga, Class<?> type) {
@@ -956,7 +956,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param methodName    The method name
+     * @param methodName The method name
      * @param argumentTypes The argument types
      */
     protected static void pushMethodNameAndTypesArguments(GeneratorAdapter methodVisitor, String methodName, Collection<ClassElement> argumentTypes) {
@@ -967,9 +967,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param collection    The collection
-     * @param itemConsumer  The item consumer
+     * @param arrayType The array class
+     * @param collection The collection
+     * @param itemConsumer The item consumer
      * @param <T> The type
      */
     protected static <T> void pushNewArray(GeneratorAdapter methodVisitor,
@@ -1004,9 +1004,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param collection    The collection
-     * @param itemConsumer  The item consumer
+     * @param arrayType The array class
+     * @param collection The collection
+     * @param itemConsumer The item consumer
      * @param <T> The type
      */
     protected static <T> void pushNewArrayIndexed(GeneratorAdapter methodVisitor,
@@ -1041,9 +1041,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param array    The collection
-     * @param itemConsumer  The item consumer
+     * @param arrayType The array class
+     * @param array The collection
+     * @param itemConsumer The item consumer
      * @param <T> The type
      */
     protected static <T> void pushNewArray(GeneratorAdapter methodVisitor,
@@ -1055,8 +1055,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param size          The size
+     * @param arrayType The array class
+     * @param size The size
      */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Class<?> arrayType, int size) {
         final Type t = Type.getType(arrayType);
@@ -1065,8 +1065,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link org.objectweb.asm.commons.GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param size          The size
+     * @param arrayType The array class
+     * @param size The size
      */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Type arrayType, int size) {
         // the size of the array
@@ -1081,9 +1081,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link org.objectweb.asm.commons.GeneratorAdapter}
-     * @param arrayType     The array class
-     * @param size          The size
-     * @param itemConsumer  The item consumer
+     * @param arrayType The array class
+     * @param size The size
+     * @param itemConsumer The item consumer
      */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Type arrayType, int size, Consumer<Integer> itemConsumer) {
         // the size of the array
@@ -1110,9 +1110,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param index         The index
-     * @param size          The size
-     * @param runnable      The runnable
+     * @param index The index
+     * @param size The size
+     * @param runnable The runnable
      */
     protected static void pushStoreInArray(GeneratorAdapter methodVisitor, int index, int size, Runnable runnable) {
         pushStoreInArray(methodVisitor, TYPE_OBJECT, index, size, runnable);
@@ -1120,10 +1120,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
-     * @param type          The type of the array
-     * @param index         The index
-     * @param size          The size
-     * @param runnable      The runnable
+     * @param type The type of the array
+     * @param index The index
+     * @param size The size
+     * @param runnable The runnable
      */
     protected static void pushStoreInArray(GeneratorAdapter methodVisitor, Type type, int index, int size, Runnable runnable) {
         // the array index position
@@ -1166,7 +1166,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             String name = element.getType().getName();
             String internalName = getTypeDescriptor(name);
             return Type.getType(internalName);
-        } else if (type instanceof Class class1) {
+        } else if (type instanceof Class<?> class1) {
             return Type.getType(class1);
         } else if (type instanceof String) {
             String className = type.toString();
@@ -1179,7 +1179,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param className    The class name
+     * @param className The class name
      * @param genericTypes The generic types
      * @return The type descriptor as String
      */
@@ -1209,7 +1209,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param returnType    The return type
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
@@ -1228,7 +1228,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param returnType    The return type
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
@@ -1247,7 +1247,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param returnType    The return type
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
@@ -1266,7 +1266,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param returnType    The return type
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
@@ -1285,7 +1285,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param returnType    The return type
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
@@ -1305,7 +1305,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param returnTypeReference The return type reference
-     * @param argReferenceTypes   The argument reference types
+     * @param argReferenceTypes The argument reference types
      * @return The method signature
      */
     protected static String getMethodSignature(String returnTypeReference, String... argReferenceTypes) {
@@ -1368,7 +1368,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param out         The output stream
+     * @param out The output stream
      * @param classWriter The current class writer
      * @throws IOException if there is a problem writing the class to disk
      */
@@ -1387,7 +1387,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param classWriter   The current class writer
+     * @param classWriter The current class writer
      * @param argumentTypes The argument types
      * @return The {@link GeneratorAdapter} for the constructor
      */
@@ -1398,8 +1398,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param classWriter The current class writer
-     * @param className   The class name
-     * @param superType   The super type
+     * @param className The class name
+     * @param superType The super type
      */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V17, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
@@ -1408,8 +1408,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param classWriter The current class writer
-     * @param className   The class name
-     * @param superType   The super type
+     * @param className The class name
+     * @param superType The super type
      */
     protected void startPublicClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V17, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
@@ -1417,21 +1417,21 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param classWriter       The current class writer
-     * @param serviceType       The service type
+     * @param classWriter The current class writer
+     * @param serviceType The service type
      * @param internalClassName The class name
-     * @param superType         The super type
+     * @param superType The super type
      */
     protected void startService(ClassVisitor classWriter, Class<?> serviceType, String internalClassName, Type superType) {
         startService(classWriter, serviceType.getName(), internalClassName, superType);
     }
 
     /**
-     * @param classWriter       The current class writer
-     * @param serviceName       The service name
+     * @param classWriter The current class writer
+     * @param serviceName The service name
      * @param internalClassName The class name
-     * @param superType         The super type
-     * @param interfaces        The interfaces
+     * @param superType The super type
+     * @param interfaces The interfaces
      */
     protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType, String... interfaces) {
         classWriter.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
@@ -1445,8 +1445,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param cv            The constructor visitor
-     * @param superClass    The super class
+     * @param cv The constructor visitor
+     * @param superClass The super class
      * @param argumentTypes The argument types
      */
     protected void invokeConstructor(GeneratorAdapter cv, Class<?> superClass, Class<?>... argumentTypes) {
@@ -1454,22 +1454,22 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param visitor    The interface visitor
+     * @param visitor The interface visitor
      * @param targetType The target type
-     * @param method     The method
+     * @param method The method
      */
     protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class<?> targetType, Method method) {
         Type type = Type.getType(targetType);
         String owner = type.getSort() == Type.ARRAY ? type.getDescriptor()
-                : type.getInternalName();
+            : type.getInternalName();
         visitor.visitMethodInsn(Opcodes.INVOKESTATIC, owner, method.getName(),
-                method.getDescriptor(), true);
+            method.getDescriptor(), true);
     }
 
     /**
      * @param classWriter The current class writer
-     * @param returnType  The return type
-     * @param methodName  The method name
+     * @param returnType The return type
+     * @param methodName The method name
      * @return TheThe {@link GeneratorAdapter} for the method
      */
     protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class<?> returnType, String methodName) {
@@ -1480,21 +1480,21 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param classWriter The current class writer
-     * @param returnType  The return type
-     * @param methodName  The method name
+     * @param returnType The return type
+     * @param methodName The method name
      * @return TheThe {@link GeneratorAdapter} for the method
      */
     protected GeneratorAdapter startPublicFinalMethodZeroArgs(ClassWriter classWriter, Class<?> returnType, String methodName) {
         Type methodType = Type.getMethodType(Type.getType(returnType));
 
         return new GeneratorAdapter(
-                classWriter.visitMethod(
-                        ACC_PUBLIC | ACC_FINAL,
-                        methodName,
-                        methodType.getDescriptor(),
-                        null,
-                        null
-                ), ACC_PUBLIC, methodName, methodType.getDescriptor());
+            classWriter.visitMethod(
+                ACC_PUBLIC | ACC_FINAL,
+                methodName,
+                methodType.getDescriptor(),
+                null,
+                null
+            ), ACC_PUBLIC, methodName, methodType.getDescriptor());
     }
 
     /**
@@ -1528,45 +1528,45 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param writer        The class writer
-     * @param methodName    The method name
-     * @param returnType    The return type
+     * @param writer The class writer
+     * @param methodName The method name
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The {@link GeneratorAdapter}
      */
     protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
         return new GeneratorAdapter(writer.visitMethod(
-                ACC_PUBLIC,
-                methodName,
-                getMethodDescriptor(returnType, argumentTypes),
-                null,
-                null
+            ACC_PUBLIC,
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes),
+            null,
+            null
         ), ACC_PUBLIC,
-                methodName,
-                getMethodDescriptor(returnType, argumentTypes));
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes));
     }
 
     /**
-     * @param writer        The class writer
-     * @param methodName    The method name
-     * @param returnType    The return type
+     * @param writer The class writer
+     * @param methodName The method name
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The {@link GeneratorAdapter}
      */
     protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, Class<?> returnType, Class<?>... argumentTypes) {
         return new GeneratorAdapter(writer.visitMethod(
-                ACC_PUBLIC,
-                methodName,
-                getMethodDescriptor(returnType, List.of(argumentTypes)),
-                null,
-                null
+            ACC_PUBLIC,
+            methodName,
+            getMethodDescriptor(returnType, List.of(argumentTypes)),
+            null,
+            null
         ), ACC_PUBLIC,
-                methodName,
-                getMethodDescriptor(returnType, List.of(argumentTypes)));
+            methodName,
+            getMethodDescriptor(returnType, List.of(argumentTypes)));
     }
 
     /**
-     * @param writer    The class writer
+     * @param writer The class writer
      * @param asmMethod The asm method
      * @return The {@link GeneratorAdapter}
      * @since 2.3.0
@@ -1574,39 +1574,39 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected GeneratorAdapter startPublicMethod(ClassWriter writer, Method asmMethod) {
         String methodName = asmMethod.getName();
         return new GeneratorAdapter(writer.visitMethod(
-                ACC_PUBLIC,
-                methodName,
-                asmMethod.getDescriptor(),
-                null,
-                null
+            ACC_PUBLIC,
+            methodName,
+            asmMethod.getDescriptor(),
+            null,
+            null
         ), ACC_PUBLIC,
-                methodName,
-                asmMethod.getDescriptor());
+            methodName,
+            asmMethod.getDescriptor());
     }
 
     /**
-     * @param writer        The class writer
-     * @param methodName    The method name
-     * @param returnType    The return type
+     * @param writer The class writer
+     * @param methodName The method name
+     * @param returnType The return type
      * @param argumentTypes The argument types
      * @return The {@link GeneratorAdapter}
      */
     protected GeneratorAdapter startProtectedMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
         return new GeneratorAdapter(writer.visitMethod(
-                ACC_PROTECTED,
-                methodName,
-                getMethodDescriptor(returnType, argumentTypes),
-                null,
-                null
+            ACC_PROTECTED,
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes),
+            null,
+            null
         ), ACC_PROTECTED,
-                methodName,
-                getMethodDescriptor(returnType, argumentTypes));
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes));
     }
 
     /**
      * Push the instantiation of the given type.
      *
-     * @param generatorAdapter  The generator adaptor
+     * @param generatorAdapter The generator adaptor
      * @param typeToInstantiate The type to instantiate.
      */
     protected void pushNewInstance(GeneratorAdapter generatorAdapter, Type typeToInstantiate) {
@@ -1621,10 +1621,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                                            T empty,
                                            Consumer<T> pushValue) {
         Set<? extends Map.Entry<String, T>> entrySet = annotationData != null ? annotationData.entrySet()
-                .stream()
-                .filter(e -> !skipEmpty || (e.getKey() != null && isSupportedMapValue(e.getValue())))
-                .map(e -> e.getValue() == null && empty != null ? new AbstractMap.SimpleEntry<>(e.getKey().toString(), empty) : new AbstractMap.SimpleEntry<>(e.getKey().toString(), e.getValue()))
-                .collect(Collectors.toCollection(() -> new TreeSet<>(Map.Entry.comparingByKey()))) : null;
+            .stream()
+            .filter(e -> !skipEmpty || (e.getKey() != null && isSupportedMapValue(e.getValue())))
+            .map(e -> e.getValue() == null && empty != null ? new AbstractMap.SimpleEntry<>(e.getKey().toString(), empty) : new AbstractMap.SimpleEntry<>(e.getKey().toString(), e.getValue()))
+            .collect(Collectors.toCollection(() -> new TreeSet<>(Map.Entry.comparingByKey()))) : null;
         if (entrySet == null || entrySet.isEmpty()) {
             invokeInterfaceStatic(generatorAdapter, MAP_TYPE, MAP_OF[0]);
             return;

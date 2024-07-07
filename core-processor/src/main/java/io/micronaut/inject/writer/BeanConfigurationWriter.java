@@ -48,10 +48,10 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
     private final String configurationClassInternalName;
 
     /**
-     * @param packageName        The package name
+     * @param packageName The package name
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext          The visitor context
+     * @param visitorContext The visitor context
      */
     public BeanConfigurationWriter(
         String packageName,
@@ -71,9 +71,9 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             outputStream.write(classWriter.toByteArray());
         }
         classWriterOutputVisitor.visitServiceDescriptor(
-                BeanConfiguration.class,
-                configurationClassName,
-                getOriginatingElement()
+            BeanConfiguration.class,
+            configurationClassName,
+            getOriginatingElement()
         );
     }
 

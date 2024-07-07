@@ -39,6 +39,7 @@ import java.util.Optional;
  */
 @Internal
 public final class TypeIdentifier extends ExpressionNode {
+
     private static final Map<String, Type> PRIMITIVES = Map.of(
         "int", TypeDescriptors.INT,
         "long", TypeDescriptors.LONG,
@@ -47,7 +48,8 @@ public final class TypeIdentifier extends ExpressionNode {
         "char", TypeDescriptors.CHAR,
         "boolean", TypeDescriptors.BOOLEAN,
         "double", TypeDescriptors.DOUBLE,
-        "float", TypeDescriptors.FLOAT);
+        "float", TypeDescriptors.FLOAT
+    );
 
     private final String name;
 
@@ -60,7 +62,7 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(resolveType(ctx));
     }
 
@@ -78,6 +80,7 @@ public final class TypeIdentifier extends ExpressionNode {
             .orElseThrow(() -> new ExpressionCompilationException("Unknown type identifier: " + name));
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         String name = this.toString();
@@ -101,8 +104,8 @@ public final class TypeIdentifier extends ExpressionNode {
 
     private Type resolveObjectType(ExpressionVisitorContext ctx, String name) {
         return ctx.visitorContext().getClassElement(name)
-                   .map(JavaModelUtils::getTypeReference)
-                   .orElse(null);
+            .map(JavaModelUtils::getTypeReference)
+            .orElse(null);
     }
 
     @Override

@@ -50,7 +50,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
     }
 
     @Override
-    public ClassElement newClassElement(ClassNode classNode, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public @NonNull ClassElement newClassElement(@NonNull ClassNode classNode, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
             ClassElement componentElement = newClassElement(componentType, annotationMetadataFactory);
@@ -73,9 +73,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public ClassElement newClassElement(ClassNode classNode,
-                                        ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                        Map<String, ClassElement> resolvedGenerics) {
+    public ClassElement newClassElement(@NonNull ClassNode classNode,
+                                        @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                        @NonNull Map<String, ClassElement> resolvedGenerics) {
         if (CollectionUtils.isNotEmpty(resolvedGenerics)) {
             return newClassElement(classNode, annotationMetadataFactory).withTypeArguments(resolvedGenerics);
         }
@@ -84,9 +84,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public GroovyMethodElement newMethodElement(ClassElement owningType,
-                                                MethodNode method,
-                                                ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
+    public GroovyMethodElement newMethodElement(@NonNull ClassElement owningType,
+                                                @NonNull MethodNode method,
+                                                @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
@@ -101,7 +101,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public ClassElement newSourceClassElement(ClassNode classNode, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public ClassElement newSourceClassElement(@NonNull ClassNode classNode, @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
             ClassElement componentElement = newSourceClassElement(componentType, annotationMetadataFactory);
@@ -140,9 +140,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
     }
 
     @Override
-    public GroovyMethodElement newSourceMethodElement(ClassElement owningType,
-                                                      MethodNode method,
-                                                      ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
+    public @NonNull GroovyMethodElement newSourceMethodElement(@NonNull ClassElement owningType,
+                                                               @NonNull MethodNode method,
+                                                               @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
@@ -169,9 +169,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public ConstructorElement newConstructorElement(ClassElement owningType,
-                                                    MethodNode constructor,
-                                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public ConstructorElement newConstructorElement(@NonNull ClassElement owningType,
+                                                    @NonNull MethodNode constructor,
+                                                    @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
@@ -188,9 +188,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
     }
 
     @Override
-    public EnumConstantElement newEnumConstantElement(ClassElement declaringClass,
-                                                      FieldNode enumConstant,
-                                                      ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public @NonNull EnumConstantElement newEnumConstantElement(@NonNull ClassElement declaringClass,
+                                                               @NonNull FieldNode enumConstant,
+                                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(declaringClass instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyEnumElement");
         }
@@ -204,9 +204,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public GroovyFieldElement newFieldElement(ClassElement owningType,
-                                              FieldNode field,
-                                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public GroovyFieldElement newFieldElement(@NonNull ClassElement owningType,
+                                              @NonNull FieldNode field,
+                                              @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }

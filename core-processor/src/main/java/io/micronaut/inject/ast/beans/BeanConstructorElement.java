@@ -15,11 +15,11 @@
  */
 package io.micronaut.inject.ast.beans;
 
-import java.util.Objects;
-import java.util.function.Consumer;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
+
+import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Represents the current bean constructor when used through the {@link io.micronaut.inject.ast.beans.BeanElementBuilder} API.

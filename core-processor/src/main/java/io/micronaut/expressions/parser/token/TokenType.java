@@ -83,7 +83,7 @@ public enum TokenType {
     EMPTY;
 
     public boolean isOneOf(TokenType... others) {
-        for (TokenType comparedType: others) {
+        for (TokenType comparedType : others) {
             if (comparedType == this) {
                 return true;
             }

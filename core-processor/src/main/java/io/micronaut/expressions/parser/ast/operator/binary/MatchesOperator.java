@@ -43,7 +43,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 @Internal
 public final class MatchesOperator extends ExpressionNode {
 
-    private static final Method MATCHES = new Method("matches", BOOLEAN, new Type[]{STRING});
+    private static final Method MATCHES = new Method("matches", BOOLEAN, new Type[] {STRING});
 
     private final ExpressionNode operand;
     private final StringLiteral pattern;
@@ -54,7 +54,7 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         operand.compile(ctx);
         pattern.compile(ctx);
@@ -66,11 +66,11 @@ public final class MatchesOperator extends ExpressionNode {
         return PrimitiveElement.BOOLEAN;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (!operand.resolveType(ctx).equals(STRING)) {
-            throw new ExpressionCompilationException(
-                "Operator 'matches' can only be applied to String operand");
+            throw new ExpressionCompilationException("Operator 'matches' can only be applied to String operand");
         }
 
         String patternValue = pattern.getValue();

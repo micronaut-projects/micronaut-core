@@ -134,9 +134,9 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     /**
      * Default constructor.
      *
-     * @param classElement           The class element
+     * @param classElement The class element
      * @param annotationMetadata The bean annotation metadata
-     * @param visitorContext          The visitor context
+     * @param visitorContext The visitor context
      */
     BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata annotationMetadata,
                             VisitorContext visitorContext) {
@@ -156,12 +156,12 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     /**
      * Constructor used to generate a reference for already compiled classes.
      *
-     * @param generatingType         The originating type
-     * @param index                  A unique index
-     * @param originatingElement     The originating element
-     * @param classElement           The class element
+     * @param generatingType The originating type
+     * @param index A unique index
+     * @param originatingElement The originating element
+     * @param classElement The class element
      * @param annotationMetadata The bean annotation metadata
-     * @param visitorContext          The visitor context
+     * @param visitorContext The visitor context
      */
     BeanIntrospectionWriter(
         String targetPackage,
@@ -211,14 +211,14 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     /**
      * Visit a property.
      *
-     * @param type               The property type
-     * @param genericType        The generic type
-     * @param name               The property name
-     * @param readMember         The read method
-     * @param readType           The read type
-     * @param writeMember        The write member
-     * @param writeType          The write type
-     * @param isReadOnly         Is read only
+     * @param type The property type
+     * @param genericType The generic type
+     * @param name The property name
+     * @param readMember The read method
+     * @param readType The read type
+     * @param writeMember The write member
+     * @param writeType The write type
+     * @param isReadOnly Is read only
      */
     void visitProperty(
         @NonNull ClassElement type,
@@ -316,8 +316,8 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
      * Builds an index for the given property and annotation.
      *
      * @param annotationName The annotation
-     * @param property       The property
-     * @param value          the value of the annotation
+     * @param property The property
+     * @param value the value of the annotation
      */
     void indexProperty(String annotationName, String property, @Nullable String value) {
         indexByAnnotationAndValue.put(new AnnotationWithValue(annotationName, value), property);
@@ -371,26 +371,26 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs.getDescriptor(), null, null);
 
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanPropertyRef.class, beanProperties, beanPropertyData -> {
+            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanPropertyRef.class, beanProperties, beanPropertyData ->
                 pushBeanPropertyReference(
                     classWriter,
                     staticInit,
                     beanPropertyData
-                );
-            });
+                )
+            );
             staticInit.putStatic(introspectionType, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs);
         }
         if (!beanMethods.isEmpty()) {
             Type beanMethodsRefs = Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class);
 
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanMethodRef.class, beanMethods, beanMethodData -> {
+            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanMethodRef.class, beanMethods, beanMethodData ->
                 pushBeanMethodReference(
                     classWriter,
                     staticInit,
                     beanMethodData
-                );
-            });
+                )
+            );
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
         }
         if (isEnum) {
@@ -401,13 +401,13 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                 null,
                 null
             );
-            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
+            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class, ((EnumElement) classElement).elements(), enumConstantElement ->
                 pushEnumConstantReference(
                     classWriter,
                     staticInit,
                     enumConstantElement
-                );
-            });
+                )
+            );
             staticInit.putStatic(introspectionType, FIELD_ENUM_CONSTANTS_REFERENCES, type);
         }
 
@@ -787,7 +787,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         );
         writer.loadThis();
         writer.loadArg(0);
-        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[]{}));
+        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[] {}));
         int classNameLocal = writer.newLocal(Type.getType(String.class));
         writer.storeLocal(classNameLocal);
         writer.loadLocal(classNameLocal);
@@ -886,7 +886,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         );
         writer.loadThis();
         writer.loadArg(0);
-        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[]{}));
+        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[] {}));
         int classNameLocal = writer.newLocal(Type.getType(String.class));
         writer.storeLocal(classNameLocal);
         writer.loadLocal(classNameLocal);
@@ -1068,11 +1068,11 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
     /**
      * Shared implementation of {@link CopyConstructorDispatchTarget#writeDispatchOne}. <br>
-     *
+     * <p>
      * A non-shared copy constructor implementation would be O(n²) in the number of properties: For
      * every property we generate a constructor call, and that constructor call has that many
      * parameters too that all have to be loaded.<br>
-     *
+     * <p>
      * This shared implementation instead only generates one constructor call, and branches on each
      * loaded property to figure out whether to copy it or to use the replacement from the
      * {@code dispatchOne} parameter.

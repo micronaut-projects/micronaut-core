@@ -186,7 +186,7 @@ public final class WriterUtils {
      * Pushed a default value.
      *
      * @param writer The writer
-     * @param type   The type
+     * @param type The type
      */
     public static void pushDefaultTypeValue(GeneratorAdapter writer, ClassElement type) {
         if (type.isPrimitive() && !type.isArray()) {
@@ -214,6 +214,7 @@ public final class WriterUtils {
 
     /**
      * Create a method for Kotlin default invocation.
+     *
      * @param method The method
      * @param declaringTypeObject The declaring type
      * @param numberOfMasks The number of default masks
@@ -235,10 +236,10 @@ public final class WriterUtils {
     /**
      * Computes Kotlin default method mask.
      *
-     * @param writer                       The writer
-     * @param argumentValuePusher          The argument value pusher
+     * @param writer The writer
+     * @param argumentValuePusher The argument value pusher
      * @param argumentValueIsPresentPusher The argument is present pusher
-     * @param parameters                   The arguments
+     * @param parameters The arguments
      * @return The masks
      */
     public static int[] computeKotlinDefaultsMask(GeneratorAdapter writer,

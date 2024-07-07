@@ -53,10 +53,9 @@ public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object,
     public void visitMethod(MethodElement element, VisitorContext context) {
         if (element.hasDeclaredAnnotation(ANN)) {
             ClassElement returnType = element.getReturnType();
-            boolean isValid = returnType != null &&
-                (returnType.isAssignable(CompletionStage.class) || returnType.isAssignable(void.class) ||
-                    returnType.isAssignable(Publisher.class) ||
-                    Publishers.getKnownReactiveTypes().stream().anyMatch(returnType::isAssignable));
+            boolean isValid = returnType.isAssignable(CompletionStage.class) || returnType.isAssignable(void.class)
+                || returnType.isAssignable(Publisher.class)
+                || Publishers.getKnownReactiveTypes().stream().anyMatch(returnType::isAssignable);
 
             if (!isValid) {
                 context.fail("Method must return void, a Reactive Streams type or a subtype of CompletionStage", element);

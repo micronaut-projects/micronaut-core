@@ -29,10 +29,11 @@ import org.objectweb.asm.Type;
  */
 @Internal
 public abstract sealed class BinaryOperator extends ExpressionNode permits AddOperator,
-                                                                           EqOperator,
-                                                                           LogicalOperator,
-                                                                           MathOperator,
-                                                                           PowOperator {
+    EqOperator,
+    LogicalOperator,
+    MathOperator,
+    PowOperator {
+
     protected final ExpressionNode leftOperand;
     protected final ExpressionNode rightOperand;
 
@@ -41,6 +42,7 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits AddOp
         this.rightOperand = rightOperand;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);

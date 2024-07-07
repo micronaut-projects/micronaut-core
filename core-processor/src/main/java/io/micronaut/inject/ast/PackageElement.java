@@ -34,6 +34,7 @@ public interface PackageElement extends Element {
 
     /**
      * Creates a new package element for the given name.
+     *
      * @param name The package name
      * @return The package element
      */

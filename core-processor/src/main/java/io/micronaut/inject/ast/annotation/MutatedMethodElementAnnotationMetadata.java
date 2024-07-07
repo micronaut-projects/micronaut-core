@@ -43,17 +43,17 @@ public final class MutatedMethodElementAnnotationMetadata extends AbstractElemen
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return readAnnotationMetadata;
     }
 
     @Override
-    protected MethodElement getReturnInstance() {
+    protected @NonNull MethodElement getReturnInstance() {
         return methodElement;
     }
 
     @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+    protected @NonNull MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return writeAnnotationMetadata;
     }
 }

@@ -173,6 +173,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * Does this property override the given property. Supported only with languages that have native properties.
+     *
      * @param overridden The overridden method.
      * @return True this property overrides the given property.
      * @since 4.0.0
@@ -183,6 +184,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * The access type for bean properties.
+     *
      * @since 4.0.0
      */
     enum AccessKind {

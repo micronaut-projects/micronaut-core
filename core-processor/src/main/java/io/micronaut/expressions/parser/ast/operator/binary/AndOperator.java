@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Label;
@@ -32,15 +33,16 @@ import static org.objectweb.asm.Opcodes.IFEQ;
  */
 @Internal
 public final class AndOperator extends LogicalOperator {
+
     public AndOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label trueLabel = new Label();
+        var falseLabel = new Label();
+        var trueLabel = new Label();
 
         pushOperand(ctx, leftOperand, falseLabel);
         pushOperand(ctx, rightOperand, falseLabel);

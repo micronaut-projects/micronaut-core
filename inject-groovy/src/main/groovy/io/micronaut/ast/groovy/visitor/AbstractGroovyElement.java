@@ -122,7 +122,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     }
 
     @Override
-    public GroovyNativeElement getNativeType() {
+    public @NonNull GroovyNativeElement getNativeType() {
         return nativeElement;
     }
 

@@ -55,7 +55,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
 
     @NonNull
     @Override
-    public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element) {
+    public ElementAnnotationMetadata build(io.micronaut.inject.ast.@NonNull Element element) {
         AbstractJavaElement javaElement = (AbstractJavaElement) element;
         if (!allowedAnnotations(javaElement)) {
             return EMPTY;

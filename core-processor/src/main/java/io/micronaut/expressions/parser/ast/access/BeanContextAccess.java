@@ -39,8 +39,7 @@ import static org.objectweb.asm.Opcodes.CHECKCAST;
 public class BeanContextAccess extends ExpressionNode {
 
     private static final Method GET_BEAN_METHOD =
-        new Method("getBean", Type.getType(Object.class),
-            new Type[]{Type.getType(Class.class)});
+        new Method("getBean", Type.getType(Object.class), new Type[] {Type.getType(Class.class)});
 
     private final TypeIdentifier typeIdentifier;
 
@@ -49,7 +48,7 @@ public class BeanContextAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
 
@@ -68,6 +67,7 @@ public class BeanContextAccess extends ExpressionNode {
         return typeIdentifier.resolveClassElement(ctx);
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return typeIdentifier.doResolveType(ctx);

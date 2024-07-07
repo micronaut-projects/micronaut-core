@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -94,6 +95,7 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The concatenated array
      */
+    @SafeVarargs
     public static <T> T[] concat(T[] a, T... b) {
         int bLen = b.length;
 
@@ -190,6 +192,7 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
+    @SafeVarargs
     public static <T> Iterator<T> iterator(T... array) {
         if (isNotEmpty(array)) {
             return new ArrayIterator<>(array);
@@ -204,6 +207,7 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
+    @SafeVarargs
     public static <T> Iterator<T> reverseIterator(T... array) {
         if (isNotEmpty(array)) {
             return new ReverseArrayIterator<>(array);
@@ -253,7 +257,7 @@ public final class ArrayUtils {
                     "Only primitive arrays are supported");
         }
         final int length = Array.getLength(primitiveArray);
-        Object[] arr = (Object[]) Array.newInstance(ReflectionUtils.getWrapperType(componentType), length);
+        var arr = (Object[]) Array.newInstance(ReflectionUtils.getWrapperType(componentType), length);
         for (int i = 0; i < length; i++) {
             arr[i] = Array.get(primitiveArray, i);
         }
@@ -336,11 +340,14 @@ public final class ArrayUtils {
             return array[index++];
         }
 
-        @Override public void remove() {
+        @Override
+        public void remove() {
             throw new UnsupportedOperationException();
         }
 
-        @Override public Iterator<T> iterator() {
+        @NonNull
+        @Override
+        public Iterator<T> iterator() {
             return new ArrayIterator<>(array);
         }
     }
@@ -374,11 +381,14 @@ public final class ArrayUtils {
             return array[index--];
         }
 
-        @Override public void remove() {
+        @Override
+        public void remove() {
             throw new UnsupportedOperationException();
         }
 
-        @Override public Iterator<T> iterator() {
+        @NonNull
+        @Override
+        public Iterator<T> iterator() {
             return new ReverseArrayIterator<>(array);
         }
     }

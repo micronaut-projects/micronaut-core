@@ -23,8 +23,8 @@ import io.micronaut.inject.ast.MethodElement;
 /**
  * Expression compilation context that can be extended with extra elements.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public interface ExtensibleExpressionEvaluationContext extends ExpressionEvaluationContext {

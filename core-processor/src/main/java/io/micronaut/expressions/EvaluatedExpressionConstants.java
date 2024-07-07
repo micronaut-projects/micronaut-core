@@ -18,8 +18,8 @@ package io.micronaut.expressions;
 /**
  * Set of constants used for evaluated expressions processing.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 public class EvaluatedExpressionConstants {
     /**

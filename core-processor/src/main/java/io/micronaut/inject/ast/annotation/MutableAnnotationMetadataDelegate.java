@@ -73,10 +73,10 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
     }
 
     /**
-     * @see #removeAnnotation(String)
      * @param annotationType The annotation type
      * @param <T> The annotation generic type
      * @return This element
+     * @see #removeAnnotation(String)
      */
     @NonNull
     default <T extends Annotation> R removeAnnotation(@NonNull Class<T> annotationType) {
@@ -85,6 +85,7 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
 
     /**
      * Removes all annotations that pass the given predicate.
+     *
      * @param predicate The predicate
      * @param <T> The annotation generic type
      * @return This element
@@ -96,6 +97,7 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
 
     /**
      * Removes a stereotype of the given name from the element.
+     *
      * @param annotationType The annotation type
      * @return This element
      */
@@ -106,6 +108,7 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
 
     /**
      * Removes a stereotype annotation of the given type from the element.
+     *
      * @param annotationType The annotation type
      * @param <T> The annotation generic type
      * @return This element
@@ -124,7 +127,8 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
      */
     @NonNull
     default R annotate(@NonNull String annotationType) {
-        return annotate(annotationType, annotationValueBuilder -> { });
+        return annotate(annotationType, annotationValueBuilder -> {
+        });
     }
 
     /**
@@ -154,7 +158,8 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
     @NonNull
     default <T extends Annotation> R annotate(@NonNull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        return annotate(annotationType.getName(), annotationValueBuilder -> { });
+        return annotate(annotationType.getName(), annotationValueBuilder -> {
+        });
     }
 
     /**

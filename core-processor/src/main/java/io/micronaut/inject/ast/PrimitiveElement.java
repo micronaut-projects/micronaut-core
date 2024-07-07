@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.Objects;
@@ -44,6 +44,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
 
     /**
      * Default constructor.
+     *
      * @param name The type name
      */
     private PrimitiveElement(String name, @Nullable Class<?> boxedType) {
@@ -53,8 +54,8 @@ public final class PrimitiveElement implements ArrayableClassElement {
     /**
      * Default constructor.
      *
-     * @param name               The type name
-     * @param arrayDimensions    The number of array dimensions
+     * @param name The type name
+     * @param arrayDimensions The number of array dimensions
      * @param annotationMetadata The annotation metadata
      */
     private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata) {
@@ -115,7 +116,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
@@ -151,7 +152,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     public static PrimitiveElement valueOf(String name) {
-        for (PrimitiveElement element: PRIMITIVES) {
+        for (PrimitiveElement element : PRIMITIVES) {
             if (element.getName().equalsIgnoreCase(name)) {
                 return element;
             }

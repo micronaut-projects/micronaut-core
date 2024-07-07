@@ -21,10 +21,10 @@ import io.micronaut.core.annotation.NonNull;
  * An element that has an underlying type.
  *
  * @author graemerocher
- * @since 1.0
  * @see PropertyElement
  * @see ClassElement
  * @see FieldElement
+ * @since 1.0
  */
 public interface TypedElement extends Element {
     /**
@@ -49,6 +49,7 @@ public interface TypedElement extends Element {
 
     /**
      * Whether the type is primitive.
+     *
      * @return True if it is
      */
     default boolean isPrimitive() {
@@ -57,6 +58,7 @@ public interface TypedElement extends Element {
 
     /**
      * Whether the type is void.
+     *
      * @return True if it is
      * @since 4.0.0
      */
@@ -66,6 +68,7 @@ public interface TypedElement extends Element {
 
     /**
      * Is the type an array.
+     *
      * @return True if it is.
      */
     default boolean isArray() {
@@ -75,6 +78,7 @@ public interface TypedElement extends Element {
     /**
      * If the type is an array, the number of dimensions.
      * String[] should return 1, String[][] should return 2
+     *
      * @return The number of dimensions
      */
     default int getArrayDimensions() {

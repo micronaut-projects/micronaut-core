@@ -58,6 +58,7 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
         this.expression = expression;
     }
 
+    @NonNull
     @Override
     public ExpressionNode parse() throws ExpressionParsingException {
         // if expression doesn't have prefix, the whole string is treated as expression
@@ -81,7 +82,7 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
                 return expressionParts.get(0);
             } else {
                 return expressionParts.stream()
-                           .reduce(new StringLiteral(""), AddOperator::new);
+                    .reduce(new StringLiteral(""), AddOperator::new);
             }
         } else {
             List<ExpressionNode> arrayNodes =
@@ -94,12 +95,12 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
     }
 
     private ExpressionNode buildArrayOfExpressions(List<ExpressionNode> nodes) {
-        TypeIdentifier arrayElementType = new TypeIdentifier("Object");
+        var arrayElementType = new TypeIdentifier("Object");
         return new OneDimensionalArray(arrayElementType, nodes);
     }
 
     private List<String> splitExpressionParts(String expression) {
-        List<String> parts = new ArrayList<>();
+        var parts = new ArrayList<String>();
         String nextPart = nextPart(expression);
         while (!nextPart.isEmpty()) {
             parts.add(nextPart);
@@ -114,7 +115,7 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
         if (expression.startsWith(EXPRESSION_PREFIX)) {
             int unbalancedParenthesis = 1;
 
-            StringBuilder expressionPart = new StringBuilder(EXPRESSION_PREFIX);
+            var expressionPart = new StringBuilder(EXPRESSION_PREFIX);
             int pointer = EXPRESSION_PREFIX.length();
             while (unbalancedParenthesis > 0 && pointer < expression.length()) {
                 char nextChar = expression.charAt(pointer++);
@@ -133,18 +134,17 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
             return expressionPart.toString();
         } else {
             int substringUntil = expression.contains(EXPRESSION_PREFIX)
-                                     ? expression.indexOf(EXPRESSION_PREFIX)
-                                     : expression.length();
+                ? expression.indexOf(EXPRESSION_PREFIX)
+                : expression.length();
             return expression.substring(0, substringUntil);
         }
     }
 
     private String prepareExpressionPart(String expressionPart) {
         if (expressionPart.startsWith(EXPRESSION_PREFIX)) {
-            return expressionPart.substring(EXPRESSION_PREFIX.length(),
-                expressionPart.length() - 1);
+            return expressionPart.substring(EXPRESSION_PREFIX.length(), expressionPart.length() - 1);
         } else {
-            return "'" + expressionPart + "'";
+            return "'" + expressionPart + '\'';
         }
     }
 }

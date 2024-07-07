@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -37,6 +38,7 @@ public final class JakartaPersistenceContextAnnotationMapper implements NamedAnn
 
     private static final String SOURCE_ANNOTATION = "jakarta.persistence.PersistenceContext";
 
+    @NonNull
     @Override
     public String getName() {
         return SOURCE_ANNOTATION;

@@ -50,13 +50,13 @@ public interface ClassWriterOutputVisitor {
      * Visits a new class and returns the output stream with which should be written the bytes of the class to be
      * generated.
      *
-     * @param classname          the fully qualified classname
+     * @param classname the fully qualified classname
      * @param originatingElement The originating element
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
      */
     default OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-        return visitClass(classname, new Element[]{originatingElement});
+        return visitClass(classname, new Element[] {originatingElement});
     }
 
     /**
@@ -65,7 +65,7 @@ public interface ClassWriterOutputVisitor {
      * <p>
      * Note that this method should only be called from a {@link io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind#AGGREGATING} visitor from within the {@link io.micronaut.inject.visitor.TypeElementVisitor#finish(io.micronaut.inject.visitor.VisitorContext)} method. If the file
      *
-     * @param classname           the fully qualified classname
+     * @param classname the fully qualified classname
      * @param originatingElements The originating elements
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
@@ -76,7 +76,7 @@ public interface ClassWriterOutputVisitor {
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      the fully qualified service name
+     * @param type the fully qualified service name
      * @param classname the fully qualified classname
      */
     void visitServiceDescriptor(String type, String classname);
@@ -85,7 +85,7 @@ public interface ClassWriterOutputVisitor {
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      the fully qualified service name
+     * @param type the fully qualified service name
      * @param classname the fully qualified classname
      * @param originatingElement The originating element
      * @since 3.5.0
@@ -128,7 +128,7 @@ public interface ClassWriterOutputVisitor {
      * Visit a file that will be generated within the generated 'sources' directory.
      *
      * @param path The path
-     * @param originatingElements  the originating elements
+     * @param originatingElements the originating elements
      * @return The file if it was possible to create it
      * @since 4.0.0
      */
@@ -139,7 +139,7 @@ public interface ClassWriterOutputVisitor {
      *
      * @param packageName The package for the source file
      * @param fileNameWithoutExtension the name of the source file, without extension (determined automatically)
-     * @param originatingElements  the originating elements
+     * @param originatingElements the originating elements
      * @return The file if it was possible to create it
      * @since 4.2.0
      */
@@ -165,7 +165,7 @@ public interface ClassWriterOutputVisitor {
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      The service type
+     * @param type The service type
      * @param classname the fully qualified classname
      * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
@@ -180,7 +180,7 @@ public interface ClassWriterOutputVisitor {
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      The service type
+     * @param type The service type
      * @param classname the fully qualified classname
      * @param originatingElement The originating element
      * @since 3.5.0

@@ -21,13 +21,13 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,15 +54,15 @@ public final class AstBeanPropertiesUtils {
     /**
      * Resolve the bean properties based on the configuration.
      *
-     * @param configuration                    The configuration
-     * @param classElement                     The class element
-     * @param methodsSupplier                  The methods supplier
-     * @param fieldSupplier                    The fields supplier
-     * @param excludeElementsInRole            Should exclude elements in role?
-     * @param propertyFields                   The fields that are properties
+     * @param configuration The configuration
+     * @param classElement The class element
+     * @param methodsSupplier The methods supplier
+     * @param fieldSupplier The fields supplier
+     * @param excludeElementsInRole Should exclude elements in role?
+     * @param propertyFields The fields that are properties
      * @param customReaderPropertyNameResolver Custom resolver of the property name from the reader
      * @param customWriterPropertyNameResolver Custom resolver of the property name from the writer
-     * @param propertyCreator                  The property creator
+     * @param propertyCreator The property creator
      * @return the list of properties
      */
     public static List<PropertyElement> resolveBeanProperties(PropertyElementQuery configuration,
@@ -321,7 +321,7 @@ public final class AstBeanPropertiesUtils {
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
         if (beanPropertyData.type == null || fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
             beanPropertyData.field = fieldElement;
-        }  else {
+        } else {
             isAccessor = false; // not compatible field or getter is present
         }
         if (beanPropertyData.getter == null && isAccessor) {
@@ -353,8 +353,7 @@ public final class AstBeanPropertiesUtils {
 
     private static boolean isAccessible(MemberElement memberElement, BeanProperties.Visibility visibility) {
         return switch (visibility) {
-            case DEFAULT ->
-                !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
+            case DEFAULT -> !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
             case PUBLIC -> memberElement.isPublic();
             case ANY -> true;
         };

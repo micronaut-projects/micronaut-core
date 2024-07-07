@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -28,8 +29,8 @@ import org.objectweb.asm.commons.Method;
 
 import java.util.List;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 /**
@@ -44,12 +45,13 @@ public final class ContextMethodCall extends AbstractMethodCall {
 
     private static final Method GET_BEAN_METHOD =
         new Method("getBean", Type.getType(Object.class),
-            new Type[]{Type.getType(Class.class)});
+            new Type[] {Type.getType(Class.class)});
 
     public ContextMethodCall(String name, List<ExpressionNode> arguments) {
         super(name, arguments);
     }
 
+    @NonNull
     @Override
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
@@ -75,7 +77,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type calleeType = usedMethod.getOwningType();
 
@@ -93,7 +95,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
     /**
      * Pushing method obtaining bean of provided type from beanContext.
      *
-     * @param mv       methodVisitor
+     * @param mv methodVisitor
      * @param beanType required bean typ
      */
     private void pushGetBeanFromContext(GeneratorAdapter mv, Type beanType) {

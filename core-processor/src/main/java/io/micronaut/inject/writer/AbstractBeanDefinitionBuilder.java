@@ -35,7 +35,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -43,6 +42,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanConstructorElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
@@ -123,10 +123,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     /**
      * Default constructor.
      *
-     * @param originatingElement               The originating element
-     * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
-     * @param visitorContext                   the visitor context
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @param metadataBuilder the metadata builder
+     * @param visitorContext the visitor context
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      */
     protected AbstractBeanDefinitionBuilder(
@@ -155,7 +155,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     @Override
-    public BeanElementBuilder intercept(AnnotationValue<?>... annotationValue) {
+    public @NonNull BeanElementBuilder intercept(AnnotationValue<?>... annotationValue) {
         for (AnnotationValue<?> value : annotationValue) {
             annotate(value);
         }
@@ -375,7 +375,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     @Override
-    public BeanElementBuilder withConstructor(Consumer<BeanConstructorElement> constructorElement) {
+    public @NonNull BeanElementBuilder withConstructor(@NonNull Consumer<BeanConstructorElement> constructorElement) {
         if (constructorElement != null && this.constructorElement != null) {
             constructorElement.accept(this.constructorElement);
         }
@@ -462,25 +462,25 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     @Override
-    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+    public <T extends Annotation> @NonNull Element annotate(@NonNull AnnotationValue<T> annotationValue) {
         annotate(this.annotationMetadata, annotationValue);
         return this;
     }
 
     @Override
-    public BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
+    public @NonNull BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
         removeAnnotation(this.annotationMetadata, annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    public <T extends Annotation> @NonNull BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         removeAnnotationIf(this.annotationMetadata, predicate);
         return this;
     }
 
     @Override
-    public BeanElementBuilder removeStereotype(@NonNull String annotationType) {
+    public @NonNull BeanElementBuilder removeStereotype(@NonNull String annotationType) {
         removeStereotype(this.annotationMetadata, annotationType);
         return this;
     }
@@ -557,7 +557,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                         .onlyInstance()
                         .modifiers(mods -> !mods.contains(ElementModifier.FINAL) && mods.contains(ElementModifier.PUBLIC))
                 ).forEach(method -> {
-                    InternalBeanElementMethod ibem = new InternalBeanElementMethod(
+                    var ibem = new InternalBeanElementMethod(
                         method,
                         true
                     );
@@ -569,7 +569,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
     private void handleMethod(ClassElement beanClass, MethodElement method, BiConsumer<TypedElement, MethodElement> consumer) {
         consumer.accept(
             beanClass,
@@ -602,7 +601,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             if (isIntercepted() && parentVisitor instanceof BeanDefinitionWriter beanDefinitionWriter) {
                 return new BeanClassWriter() {
                     @Override
-                    public BeanDefinitionVisitor getBeanDefinitionVisitor() {
+                    public @NonNull BeanDefinitionVisitor getBeanDefinitionVisitor() {
                         return parentVisitor;
                     }
 
@@ -644,7 +643,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Creates the AOP writer.
      *
      * @param beanDefinitionWriter The bean definition writer
-     * @param annotationMetadata   The annotation metadata
+     * @param annotationMetadata The annotation metadata
      * @return The AOP writer
      */
     @NonNull
@@ -655,7 +654,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         final BeanDefinitionVisitor beanDefinitionWriter = createBeanDefinitionWriter();
         return new BeanClassWriter() {
             @Override
-            public BeanDefinitionVisitor getBeanDefinitionVisitor() {
+            public @NonNull BeanDefinitionVisitor getBeanDefinitionVisitor() {
                 return beanDefinitionWriter;
             }
 
@@ -758,7 +757,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Finish the given bean and write it to the output.
      *
      * @param classWriterOutputVisitor The output
-     * @param beanDefinitionWriter     The writer
+     * @param beanDefinitionWriter The writer
      * @throws IOException If an error occurred
      */
     protected void finalizeAndWriteBean(ClassWriterOutputVisitor classWriterOutputVisitor, BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
@@ -839,9 +838,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Add an annotation to the given metadata.
      *
      * @param annotationMetadata The annotation metadata
-     * @param annotationType     the annotation type
-     * @param consumer           The builder
-     * @param <T>                The annotation generic type
+     * @param annotationType the annotation type
+     * @param consumer The builder
+     * @param <T> The annotation generic type
      */
     protected abstract <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, String annotationType, Consumer<AnnotationValueBuilder<T>> consumer);
 
@@ -849,8 +848,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Add an annotation to the given metadata.
      *
      * @param annotationMetadata The annotation metadata
-     * @param annotationValue    The value
-     * @param <T>                The annotation generic type
+     * @param annotationValue The value
+     * @param <T> The annotation generic type
      * @since 3.3.0
      */
     protected abstract <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue);
@@ -859,7 +858,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Remove a stereotype from the given metadata.
      *
      * @param annotationMetadata The metadata
-     * @param annotationType     The stereotype
+     * @param annotationType The stereotype
      */
     protected abstract void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType);
 
@@ -867,8 +866,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Remove an annotation if it matches the given condition.
      *
      * @param annotationMetadata The metadata
-     * @param predicate          The predicate
-     * @param <T>                The annotation type
+     * @param predicate The predicate
+     * @param <T> The annotation type
      */
     protected abstract <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate);
 
@@ -876,7 +875,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Remove an annotation for the given name.
      *
      * @param annotationMetadata The metadata
-     * @param annotationType     The type
+     * @param annotationType The type
      */
     protected abstract void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType);
 
@@ -951,25 +950,25 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
-        public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        public <T extends Annotation> @NonNull Element annotate(@NonNull AnnotationValue<T> annotationValue) {
             AbstractBeanDefinitionBuilder.this.annotate(elementMetadata, annotationValue);
             return this;
         }
 
         @Override
-        public Element removeAnnotation(@NonNull String annotationType) {
+        public @NonNull Element removeAnnotation(@NonNull String annotationType) {
             AbstractBeanDefinitionBuilder.this.removeAnnotation(elementMetadata, annotationType);
             return this;
         }
 
         @Override
-        public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        public <T extends Annotation> @NonNull Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
             AbstractBeanDefinitionBuilder.this.removeAnnotationIf(elementMetadata, predicate);
             return this;
         }
 
         @Override
-        public Element removeStereotype(@NonNull String annotationType) {
+        public @NonNull Element removeStereotype(@NonNull String annotationType) {
             AbstractBeanDefinitionBuilder.this.removeStereotype(elementMetadata, annotationType);
             return this;
         }
@@ -1013,7 +1012,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
-        public boolean isReflectionRequired(ClassElement callingType) {
+        public boolean isReflectionRequired(@NonNull ClassElement callingType) {
             return requiresReflection;
         }
 
@@ -1072,7 +1071,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
-        public BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
+        public @NonNull BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
             if (!AbstractBeanDefinitionBuilder.this.interceptedMethods.contains(this)) {
                 AbstractBeanDefinitionBuilder.this.interceptedMethods.add(this);
             }
@@ -1080,7 +1079,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
-        public BeanMethodElement executable(boolean processOnStartup) {
+        public @NonNull BeanMethodElement executable(boolean processOnStartup) {
             if (!AbstractBeanDefinitionBuilder.this.executableMethods.contains(this)) {
                 AbstractBeanDefinitionBuilder.this.executableMethods.add(this);
             }
@@ -1348,11 +1347,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         @NonNull
         @Override
         public ClassElement getGenericType() {
-            if (genericType != null) {
-                return genericType;
-            } else {
-                return parameterElement.getGenericType();
-            }
+            return Objects.requireNonNullElseGet(genericType, parameterElement::getGenericType);
         }
 
         @NonNull
@@ -1361,7 +1356,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return parameterElement.getType();
         }
 
-        @SuppressWarnings("rawtypes")
         @NonNull
         @Override
         public BeanParameterElement typeArguments(@NonNull ClassElement... types) {

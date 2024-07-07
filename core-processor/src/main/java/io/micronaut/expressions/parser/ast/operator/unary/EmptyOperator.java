@@ -48,7 +48,7 @@ public final class EmptyOperator extends UnaryOperator {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ClassElement type = operand.resolveClassElement(ctx);
 
         GeneratorAdapter mv = ctx.methodVisitor();
@@ -125,6 +125,7 @@ public final class EmptyOperator extends UnaryOperator {
         }
     }
 
+    @NonNull
     @Override
     public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return Type.BOOLEAN_TYPE;

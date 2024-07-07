@@ -56,7 +56,7 @@ public class SubscriptOperator extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         callee.compile(ctx);
         GeneratorAdapter methodVisitor = ctx.methodVisitor();
         ClassElement indexType = index.resolveClassElement(ctx);
@@ -65,12 +65,11 @@ public class SubscriptOperator extends ExpressionNode {
         if (isMap) {
             if (!indexType.isAssignable(String.class)) {
                 throw new ExpressionCompilationException("Invalid subscript operator. Map key must be a string.");
-            } else {
-                methodVisitor.invokeInterface(
-                    Type.getType(Map.class),
-                    MAP_GET_METHOD
-                );
             }
+            methodVisitor.invokeInterface(
+                Type.getType(Map.class),
+                MAP_GET_METHOD
+            );
         } else {
             if (!indexType.equals(PrimitiveElement.INT)) {
                 throw new ExpressionCompilationException("Invalid subscript operator. Index must be an integer.");
@@ -112,6 +111,7 @@ public class SubscriptOperator extends ExpressionNode {
         }
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         ClassElement valueElement = resolveClassElement(ctx);

@@ -35,6 +35,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 public final class StringLiteral extends ExpressionNode {
 
     private static final ClassElement STRING_ELEMENT = ClassElement.of(String.class);
+
     private final String value;
 
     public StringLiteral(String value) {
@@ -46,7 +47,7 @@ public final class StringLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -55,6 +56,7 @@ public final class StringLiteral extends ExpressionNode {
         return ctx.visitorContext().getClassElement(String.class).orElse(STRING_ELEMENT);
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return STRING;

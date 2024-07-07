@@ -88,8 +88,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Gets the annotation metadata builder.
      *
      * @return The annotation metadata builder
-     *
-     * @since  4.0.0
+     * @since 4.0.0
      */
     @Internal
     @NonNull
@@ -235,7 +234,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * This method will look up another class element by name. If it cannot be found an empty optional will be returned.
      *
-     * @param name                      The name
+     * @param name The name
      * @param annotationMetadataFactory The element annotation metadata factory
      * @return The class element
      * @since 4.0.0
@@ -247,7 +246,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * This method will look up another class element by name. If it cannot be found an exception thrown.
      *
-     * @param name                      The name
+     * @param name The name
      * @param annotationMetadataFactory The element annotation metadata factory
      * @return The class element
      * @since 4.0.0
@@ -272,7 +271,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * Find all the classes within the given package and having the given annotation.
      *
-     * @param aPackage    The package
+     * @param aPackage The package
      * @param stereotypes The stereotypes
      * @return The class elements
      */

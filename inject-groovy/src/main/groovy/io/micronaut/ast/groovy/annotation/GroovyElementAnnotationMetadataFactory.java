@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.annotation;
 
 import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
@@ -44,7 +45,7 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     }
 
     @Override
-    public ElementAnnotationMetadataFactory readOnly() {
+    public @NonNull ElementAnnotationMetadataFactory readOnly() {
         return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
     }
 

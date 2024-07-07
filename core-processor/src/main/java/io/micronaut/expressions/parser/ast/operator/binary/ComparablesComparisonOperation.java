@@ -46,8 +46,8 @@ import static org.objectweb.asm.Type.BOOLEAN_TYPE;
  * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * types that implement {@link Comparable} interface.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public final class ComparablesComparisonOperation extends ExpressionNode {
@@ -69,6 +69,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
         this.comparisonOpcode = comparisonOpcode;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         // resolving non-primitive class elements is necessary to handle cases
@@ -88,8 +89,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
             comparableTypeArgument = rightComparableTypeArgument;
         } else {
             throw new ExpressionCompilationException(
-                "Comparison operation can only be applied to numeric types or types that are " +
-                    "Comparable to each other");
+                "Comparison operation can only be applied to numeric types or types that are Comparable to each other");
         }
 
         return BOOLEAN_TYPE;
@@ -105,8 +105,8 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
         ClassElement classElement = expressionNode.resolveClassElement(ctx);
         if (classElement instanceof PrimitiveElement) {
             return ctx.visitorContext()
-                       .getClassElement(toBoxedIfNecessary(expressionNode.resolveType(ctx)).getClassName())
-                       .orElseThrow();
+                .getClassElement(toBoxedIfNecessary(expressionNode.resolveType(ctx)).getClassName())
+                .orElseThrow();
         }
         return classElement;
     }
@@ -114,18 +114,18 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     @Nullable
     private ClassElement resolveComparableTypeArgument(ClassElement classElement) {
         return Optional.ofNullable(classElement
-                                       .getAllTypeArguments()
-                                       .get(COMPARABLE_CLASS_NAME))
-                   .map(types -> types.get("T"))
-                   .orElse(null);
+                .getAllTypeArguments()
+                .get(COMPARABLE_CLASS_NAME))
+            .map(types -> types.get("T"))
+            .orElse(null);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
+        var elseLabel = new Label();
+        var endOfCmpLabel = new Label();
 
         if (comparisonType == ComparisonType.LEFT) {
             pushCompareToMethodCall(leftOperand, rightOperand, ctx);
@@ -160,22 +160,22 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
         if (comparableClass.isInterface()) {
             mv.invokeInterface(comparableType,
                 new Method("compareTo", TypeDescriptors.INT,
-                    new org.objectweb.asm.Type[]{TypeDescriptors.OBJECT}));
+                    new org.objectweb.asm.Type[] {TypeDescriptors.OBJECT}));
         } else {
             mv.invokeVirtual(comparableType,
                 new Method("compareTo", TypeDescriptors.INT,
-                new org.objectweb.asm.Type[]{JavaModelUtils.getTypeReference(comparableTypeArgument)}));
+                    new org.objectweb.asm.Type[] {JavaModelUtils.getTypeReference(comparableTypeArgument)}));
         }
     }
 
     private Integer invertInstruction(Integer instruction) {
         return switch (instruction) {
-                       case IFLE -> IFGE;
-                       case IFLT -> IFGT;
-                       case IFGE -> IFLE;
-                       case IFGT -> IFLT;
-                       default -> instruction;
-                   };
+            case IFLE -> IFGE;
+            case IFLT -> IFGT;
+            case IFGE -> IFLE;
+            case IFGT -> IFLT;
+            default -> instruction;
+        };
     }
 
     private enum ComparisonType {

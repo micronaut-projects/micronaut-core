@@ -26,6 +26,6 @@ import io.micronaut.core.annotation.Internal;
  */
 @Internal
 public abstract class AbstractElementAnnotationMetadata
-        extends AbstractMutableAnnotationMetadata<AnnotationMetadata>
-        implements ElementAnnotationMetadata {
+    extends AbstractMutableAnnotationMetadata<AnnotationMetadata>
+    implements ElementAnnotationMetadata {
 }

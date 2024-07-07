@@ -34,6 +34,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
  */
 @Internal
 public final class DoubleLiteral extends ExpressionNode {
+
     private final double value;
 
     public DoubleLiteral(double value) {
@@ -41,7 +42,7 @@ public final class DoubleLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
@@ -50,6 +51,7 @@ public final class DoubleLiteral extends ExpressionNode {
         return PrimitiveElement.DOUBLE;
     }
 
+    @NonNull
     @Override
     protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return DOUBLE;

@@ -29,6 +29,7 @@ import static org.objectweb.asm.Opcodes.IF_ICMPLT;
  */
 @Internal
 public final class GteOperator extends RelationalOperator {
+
     public GteOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }

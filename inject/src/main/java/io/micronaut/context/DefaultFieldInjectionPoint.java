@@ -142,7 +142,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     }
 
     @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
     }
 

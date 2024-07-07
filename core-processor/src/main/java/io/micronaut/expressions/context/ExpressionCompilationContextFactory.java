@@ -32,7 +32,7 @@ public interface ExpressionCompilationContextFactory {
      * Builds expression evaluation context for method. Expression evaluation context
      * for method allows referencing method parameter names in evaluated expressions.
      *
-     * @param expression    expression reference
+     * @param expression expression reference
      * @param methodElement annotated method
      * @return evaluation context for method
      */
@@ -43,8 +43,8 @@ public interface ExpressionCompilationContextFactory {
     /**
      * Builds expression evaluation context for expression reference.
      *
-     * @param expression  expression reference
-     * @param thisElement
+     * @param expression expression reference
+     * @param thisElement this element
      * @return evaluation context for method
      */
     @NonNull

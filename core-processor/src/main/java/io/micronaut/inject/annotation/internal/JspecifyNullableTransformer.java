@@ -15,16 +15,16 @@
  */
 package io.micronaut.inject.annotation.internal;
 
-import java.lang.annotation.Annotation;
-import java.util.Collections;
-import java.util.List;
-
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
+
+import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A transformer that remaps org.jspecify.annotations.Nullable to {@code javax.annotation.Nullable}.
@@ -34,8 +34,9 @@ import io.micronaut.inject.visitor.VisitorContext;
 @Internal
 public class JspecifyNullableTransformer implements NamedAnnotationTransformer {
 
+    @NonNull
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return "org.jspecify.annotations.Nullable";
     }
 

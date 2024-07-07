@@ -28,13 +28,19 @@ import org.objectweb.asm.signature.SignatureVisitor;
 @Internal
 final class ArrayAwareSignatureWriter extends SignatureVisitor {
 
-    /** The builder used to construct the visited signature. */
+    /**
+     * The builder used to construct the visited signature.
+     */
     private final StringBuilder stringBuilder = new StringBuilder();
 
-    /** Whether the visited signature contains formal type parameters. */
+    /**
+     * Whether the visited signature contains formal type parameters.
+     */
     private boolean hasFormals;
 
-    /** Whether the visited signature contains method parameter types. */
+    /**
+     * Whether the visited signature contains method parameter types.
+     */
     private boolean hasParameters;
 
     /**
@@ -56,7 +62,9 @@ final class ArrayAwareSignatureWriter extends SignatureVisitor {
      */
     private int argumentStack;
 
-    /** Constructs a new {@link org.objectweb.asm.signature.SignatureWriter}. */
+    /**
+     * Constructs a new {@link org.objectweb.asm.signature.SignatureWriter}.
+     */
     public ArrayAwareSignatureWriter() {
         super(Opcodes.ASM7);
     }
@@ -217,7 +225,9 @@ final class ArrayAwareSignatureWriter extends SignatureVisitor {
     // Utility methods
     // -----------------------------------------------------------------------------------------------
 
-    /** Ends the formal type parameters section of the signature. */
+    /**
+     * Ends the formal type parameters section of the signature.
+     */
     private void endFormals() {
         if (hasFormals) {
             hasFormals = false;
@@ -225,7 +235,9 @@ final class ArrayAwareSignatureWriter extends SignatureVisitor {
         }
     }
 
-    /** Ends the type arguments of a class or inner class type. */
+    /**
+     * Ends the type arguments of a class or inner class type.
+     */
     private void endArguments() {
         // If the top of the stack is 'true', this means that some type arguments have been visited for
         // the type whose visit is now ending. We therefore need to append a '>', and to pop one element

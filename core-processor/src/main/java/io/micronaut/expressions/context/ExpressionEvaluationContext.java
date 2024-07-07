@@ -29,8 +29,8 @@ import java.util.List;
  * Compilation context is a set of entries which can be referenced in evaluated expression
  * using the '#' sign followed by entry name.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public interface ExpressionEvaluationContext {

@@ -46,7 +46,7 @@ public class EntityReflectiveAccessAnnotationMapper implements NamedAnnotationMa
         final AnnotationValueBuilder<ReflectiveAccess> builder = AnnotationValue.builder(ReflectiveAccess.class);
 
         return Collections.singletonList(
-                builder.build()
+            builder.build()
         );
     }
 }

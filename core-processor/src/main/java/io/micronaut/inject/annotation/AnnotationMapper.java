@@ -31,11 +31,11 @@ import java.util.List;
  * <p>AnnotationMapper instances can be registered with the service loader pattern via {@code META-INF/services} and will be picked up at compile time and should implement
  * either {@link NamedAnnotationMapper} or {@link TypedAnnotationMapper}</p>
  *
- * @author graemerocher
- * @since 1.0
  * @param <T> The annotation type
+ * @author graemerocher
  * @see NamedAnnotationMapper
  * @see TypedAnnotationMapper
+ * @since 1.0
  */
 public interface AnnotationMapper<T extends Annotation> {
 

@@ -171,10 +171,10 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
         }
 
         BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(
-                producingElement,
-                OriginatingElements.of(producingElement),
-                visitorContext,
-                factoryMethodIndex.getAndIncrement()
+            producingElement,
+            OriginatingElements.of(producingElement),
+            visitorContext,
+            factoryMethodIndex.getAndIncrement()
         );
 
         beanDefinitionWriters.add(producedBeanDefinitionWriter);

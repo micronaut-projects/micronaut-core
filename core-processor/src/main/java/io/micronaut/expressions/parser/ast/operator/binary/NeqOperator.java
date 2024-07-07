@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Label;
@@ -34,17 +35,18 @@ import static org.objectweb.asm.Type.BOOLEAN_TYPE;
  */
 @Internal
 public final class NeqOperator extends EqOperator {
+
     public NeqOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(@NonNull ExpressionCompilationContext ctx) {
         super.generateBytecode(ctx);
 
         GeneratorAdapter mv = ctx.methodVisitor();
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
+        var elseLabel = new Label();
+        var endOfCmpLabel = new Label();
 
         mv.visitJumpInsn(IFNE, elseLabel);
 

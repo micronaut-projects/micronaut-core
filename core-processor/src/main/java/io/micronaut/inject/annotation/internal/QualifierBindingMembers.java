@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Qualifier;
@@ -34,24 +35,26 @@ import java.util.Optional;
 @Internal
 public final class QualifierBindingMembers implements AnnotationRemapper {
 
+    @NonNull
     @Override
     public String getPackageName() {
         return ALL_PACKAGES;
     }
 
+    @NonNull
     @Override
     public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
         if (annotation.getStereotypes() != null) {
             String[] nonBindingMembers = annotation.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE);
             if (nonBindingMembers.length > 0) {
                 Optional<AnnotationValue<?>> qualifier = annotation.getStereotypes()
-                        .stream()
-                        .filter(av -> av.getAnnotationName().equals(AnnotationUtil.QUALIFIER) || av.getAnnotationName().equals(Qualifier.class.getName()))
-                        .findFirst();
+                    .stream()
+                    .filter(av -> av.getAnnotationName().equals(AnnotationUtil.QUALIFIER) || av.getAnnotationName().equals(Qualifier.class.getName()))
+                    .findFirst();
                 if (qualifier.isPresent()) {
                     AnnotationValue<?> originalQualifier = qualifier.get();
                     AnnotationValue<?> newQualifier = originalQualifier.mutate()
-                            .member(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers).build();
+                        .member(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers).build();
                     annotation = annotation.mutate().replaceStereotype(originalQualifier, newQualifier).build();
                 }
             }

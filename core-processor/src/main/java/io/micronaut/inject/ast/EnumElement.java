@@ -37,7 +37,6 @@ public interface EnumElement extends ClassElement {
      * The enum constant elements that make up this enum.
      *
      * @return The enum constant elements
-     *
      * @since 3.6.0
      */
     default List<EnumConstantElement> elements() {

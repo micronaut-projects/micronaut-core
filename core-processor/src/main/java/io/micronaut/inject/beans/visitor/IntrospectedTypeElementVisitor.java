@@ -178,7 +178,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             String creatorMethod = builder.stringValue("creatorMethod").orElse(null);
             AnnotationClassValue<?> builderClass = builder.annotationClassValue("builderClass").orElse(null);
             String[] writePrefixes = builder.getAnnotation("accessorStyle", AccessorsStyle.class)
-                .map(a -> a.stringValues("writePrefixes")).orElse(new String[]{""});
+                .map(a -> a.stringValues("writePrefixes")).orElse(new String[] {""});
             if (builderMethod != null) {
                 MethodElement methodElement = element
                     .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()

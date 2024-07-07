@@ -39,11 +39,12 @@ class ConfigBuilderState {
 
     /**
      * Constructs a config builder.
-     * @param type               The builder type
-     * @param name               The name of the field or method
-     * @param isMethod           Is the configuration builder resolver a method
+     *
+     * @param type The builder type
+     * @param name The name of the field or method
+     * @param isMethod Is the configuration builder resolver a method
      * @param annotationMetadata The annotation metadata
-     * @param isInterface        Whether the type is an interface or not
+     * @param isInterface Whether the type is an interface or not
      */
     ConfigBuilderState(ClassElement type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, boolean isInterface) {
         this.type = JavaModelUtils.getTypeReference(type);

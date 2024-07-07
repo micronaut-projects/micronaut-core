@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Value;
 /**
  * Shared interface for injectable elements.
  *
- * @since 3.0.0
  * @author graemerocher
+ * @since 3.0.0
  */
 public interface InjectableElement extends ConfigurableElement {
     /**

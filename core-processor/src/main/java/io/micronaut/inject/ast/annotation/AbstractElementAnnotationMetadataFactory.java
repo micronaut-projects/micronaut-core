@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
 
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -57,8 +58,9 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         this.metadataBuilder = metadataBuilder;
     }
 
+    @NonNull
     @Override
-    public ElementAnnotationMetadata build(Element element) {
+    public ElementAnnotationMetadata build(@NonNull Element element) {
         if (element instanceof ClassElement classElement) {
             return buildForClass(classElement);
         }
@@ -86,8 +88,9 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         throw new IllegalStateException("Unknown element: " + element.getClass() + " with native type: " + element.getNativeType());
     }
 
+    @NonNull
     @Override
-    public ElementAnnotationMetadata buildMutable(AnnotationMetadata originalAnnotationMetadata) {
+    public ElementAnnotationMetadata buildMutable(@NonNull AnnotationMetadata originalAnnotationMetadata) {
         if (originalAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
             throw new IllegalStateException();
         }
@@ -98,6 +101,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             private AnnotationMetadata thisAnnotationMetadata = originalAnnotationMetadata;
 
+            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return thisAnnotationMetadata;
@@ -116,13 +120,15 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
+    @NonNull
     @Override
-    public ElementAnnotationMetadata buildTypeAnnotations(ClassElement element) {
+    public ElementAnnotationMetadata buildTypeAnnotations(@NonNull ClassElement element) {
         return buildTypeAnnotationsForClass(element);
     }
 
+    @NonNull
     @Override
-    public ElementAnnotationMetadata buildGenericTypeAnnotations(GenericElement element) {
+    public ElementAnnotationMetadata buildGenericTypeAnnotations(@NonNull GenericElement element) {
         if (element instanceof GenericPlaceholderElement placeholderElement) {
             return buildTypeAnnotationsForGenericPlaceholder(placeholderElement);
         }
@@ -210,6 +216,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
         return new AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata() {
+            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return AnnotationMetadata.EMPTY_METADATA;
@@ -221,7 +228,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             }
 
             @Override
-            public void update(AnnotationMetadata annotationMetadata) {
+            public void update(@NonNull AnnotationMetadata annotationMetadata) {
                 throw new IllegalStateException("Class element: [" + classElement + "] doesn't support type annotations!");
             }
         };
@@ -454,7 +461,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         @Override
-        public AnnotationMetadata getAnnotationMetadata() {
+        public @NonNull AnnotationMetadata getAnnotationMetadata() {
             if (annotationMetadata != null) {
                 return annotationMetadata;
             }
@@ -463,10 +470,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
         @Override
         protected AnnotationMetadata getAnnotationMetadataToModify() {
-            if (annotationMetadata != null) {
-                return annotationMetadata;
-            }
-            return getCacheEntry().copyAnnotationMetadata();
+            return Objects.requireNonNullElseGet(annotationMetadata, () -> getCacheEntry().copyAnnotationMetadata());
         }
 
         @Override
@@ -518,7 +522,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
         @Override
         @SuppressWarnings("java:S1192")
-        public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+        public <T extends Annotation> @NonNull AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
             //noinspection ConstantConditions
@@ -531,25 +535,25 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         @Override
-        public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
+        public <T extends Annotation> @NonNull AnnotationMetadata annotate(@NonNull AnnotationValue<T> annotationValue) {
             ArgumentUtils.requireNonNull("annotationValue", annotationValue);
             return replaceAnnotationsInternal(metadataBuilder.annotate(getAnnotationMetadataToModify(), annotationValue));
         }
 
         @Override
-        public AnnotationMetadata removeAnnotation(@NonNull String annotationType) {
+        public @NonNull AnnotationMetadata removeAnnotation(@NonNull String annotationType) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             return replaceAnnotationsInternal(metadataBuilder.removeAnnotation(getAnnotationMetadataToModify(), annotationType));
         }
 
         @Override
-        public <T extends Annotation> AnnotationMetadata removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        public <T extends Annotation> @NonNull AnnotationMetadata removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
             ArgumentUtils.requireNonNull("predicate", predicate);
             return replaceAnnotationsInternal(metadataBuilder.removeAnnotationIf(getAnnotationMetadataToModify(), predicate));
         }
 
         @Override
-        public AnnotationMetadata removeStereotype(@NonNull String annotationType) {
+        public @NonNull AnnotationMetadata removeStereotype(@NonNull String annotationType) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             return replaceAnnotationsInternal(metadataBuilder.removeStereotype(getAnnotationMetadataToModify(), annotationType));
         }

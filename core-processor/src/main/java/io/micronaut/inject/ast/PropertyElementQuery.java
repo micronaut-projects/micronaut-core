@@ -33,15 +33,15 @@ import java.util.Set;
  * Represents a query for {@link PropertyElement} definitions.
  *
  * @author Denis Stepanov
- * @since 4.0.0
  * @see PropertyElement
  * @see ClassElement#getBeanProperties(PropertyElementQuery)
  * @see BeanProperties
+ * @since 4.0.0
  */
 public final class PropertyElementQuery {
 
-    private static final String[] DEFAULT_READ_PREFIXES = { AccessorsStyle.DEFAULT_READ_PREFIX };
-    private static final String[] DEFAULT_WRITE_PREFIXES = { AccessorsStyle.DEFAULT_WRITE_PREFIX };
+    private static final String[] DEFAULT_READ_PREFIXES = {AccessorsStyle.DEFAULT_READ_PREFIX};
+    private static final String[] DEFAULT_WRITE_PREFIXES = {AccessorsStyle.DEFAULT_WRITE_PREFIX};
     private static final EnumSet<BeanProperties.AccessKind> DEFAULT_ACCESS_KINDS = EnumSet.of(BeanProperties.AccessKind.METHOD);
     private BeanProperties.Visibility visibility = BeanProperties.Visibility.DEFAULT;
     private Set<BeanProperties.AccessKind> accessKinds = DEFAULT_ACCESS_KINDS;
@@ -58,6 +58,7 @@ public final class PropertyElementQuery {
 
     /**
      * Creates a query for the given metadata.
+     *
      * @param annotationMetadata The metadata
      * @return The query
      */
@@ -104,6 +105,7 @@ public final class PropertyElementQuery {
 
     /**
      * Set whether to ignore setters that have a different receiver type to the getter return type.
+     *
      * @param shouldIgnore True if they should be ignored.
      * @return This PropertyElementQuery
      */
@@ -123,6 +125,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the visibility strategy.
+     *
      * @param visibility The visibility strategy
      * @return This PropertyElementQuery
      * @see io.micronaut.context.annotation.BeanProperties.Visibility
@@ -134,6 +137,7 @@ public final class PropertyElementQuery {
 
     /**
      * The access kinds.
+     *
      * @return A set of access kinds
      * @see BeanProperties.AccessKind
      */
@@ -144,6 +148,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the access kinds.
+     *
      * @param accessKinds The access kinds
      * @return This PropertyElementQuery
      */
@@ -158,6 +163,7 @@ public final class PropertyElementQuery {
 
     /**
      * The property names to include.
+     *
      * @return The includes.
      */
     @NonNull
@@ -167,6 +173,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the property names to include.
+     *
      * @param includes The includes
      * @return This PropertyElementQuery
      */
@@ -182,6 +189,7 @@ public final class PropertyElementQuery {
 
     /**
      * The property names to exclude.
+     *
      * @return The excludes
      */
     @NonNull
@@ -191,6 +199,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the excluded property names.
+     *
      * @param excludes The property names to exclude
      * @return This PropertyElementQuery
      */
@@ -213,7 +222,8 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the read method prefixes.
-     * @param readPrefixes The read methos prefixes
+     *
+     * @param readPrefixes The read method prefixes
      * @return This PropertyElementQuery
      */
     public @NonNull PropertyElementQuery readPrefixes(String... readPrefixes) {
@@ -234,6 +244,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the write method prefixes.
+     *
      * @param writePrefixes The write prefixes
      * @return This PropertyElementQuery
      */
@@ -255,6 +266,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets whether to allow zero argument setters for boolean properties etc.
+     *
      * @param allowSetterWithZeroArgs True to allow zero argument setters
      * @return This PropertyElementQuery
      */
@@ -265,6 +277,7 @@ public final class PropertyElementQuery {
 
     /**
      * Whether to allow setters with multiple arguments.
+     *
      * @return True if setters with multiple arguments are allowed.
      */
     public boolean isAllowSetterWithMultipleArgs() {
@@ -273,6 +286,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets whether to allow setters with multiple arguments.
+     *
      * @param allowSetterWithMultipleArgs True if setters with multiple arguments are allowed.
      * @return This PropertyElementQuery
      */
@@ -290,6 +304,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets whether to allow static properties.
+     *
      * @param allowStaticProperties True if static properties are allowed.
      * @return This PropertyElementQuery
      */
@@ -308,6 +323,7 @@ public final class PropertyElementQuery {
 
     /**
      * Sets the annotations names that should be used to indicate a property is excluded.
+     *
      * @param excludedAnnotations The excluded annotation names
      * @return This PropertyElementQuery
      */

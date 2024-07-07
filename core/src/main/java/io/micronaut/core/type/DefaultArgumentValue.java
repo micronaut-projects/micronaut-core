@@ -76,7 +76,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         return argument.synthesize(annotationClass);
     }
 
