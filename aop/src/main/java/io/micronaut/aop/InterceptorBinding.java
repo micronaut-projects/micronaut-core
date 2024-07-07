@@ -15,7 +15,12 @@
  */
 package io.micronaut.aop;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -59,9 +64,9 @@ public @interface InterceptorBinding {
      * <p>The {@link io.micronaut.context.annotation.NonBinding} annotation should
      * then be used on any annotation members that should not be included in this binding computation.</p>
      *
-     * @since 3.3.0
      * @return Whether members should be included in interceptor binding
      * @see io.micronaut.context.annotation.NonBinding
+     * @since 3.3.0
      */
     boolean bindMembers() default false;
 }
