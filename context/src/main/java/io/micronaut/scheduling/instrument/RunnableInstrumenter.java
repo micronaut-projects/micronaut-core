@@ -32,6 +32,6 @@ public interface RunnableInstrumenter {
      * @return The instrumented runnable
      */
     default Runnable instrument(Runnable command) {
-       return command;
+        return command;
     }
 }

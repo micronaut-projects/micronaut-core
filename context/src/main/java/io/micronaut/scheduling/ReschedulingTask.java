@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
 
 import java.util.concurrent.Callable;
@@ -29,7 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Wraps a {@link Runnable} and re-schedules the tasks.
  *
  * @param <V> The result type returned by this Future
- *
  * @author graemerocher
  * @since 1.0
  */
@@ -38,13 +38,13 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
     private final Callable<V> task;
     private final TaskScheduler taskScheduler;
     private final NextFireTime nextTime;
-    private ScheduledFuture<?> currentFuture;
-    private AtomicBoolean cancelled = new AtomicBoolean(false);
+    private final AtomicBoolean cancelled = new AtomicBoolean(false);
+    private ScheduledFuture<V> currentFuture;
 
     /**
-     * @param task          The task
+     * @param task The task
      * @param taskScheduler To schedule the task for next time
-     * @param nextTime      The next time
+     * @param nextTime The next time
      */
     ReschedulingTask(Callable<V> task, TaskScheduler taskScheduler, NextFireTime nextTime) {
         this.task = task;
@@ -77,8 +77,8 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
     }
 
     @Override
-    public long getDelay(TimeUnit unit) {
-        ScheduledFuture current;
+    public long getDelay(@NonNull TimeUnit unit) {
+        ScheduledFuture<V> current;
         synchronized (this) {
             current = this.currentFuture;
         }
@@ -86,8 +86,8 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
     }
 
     @Override
-    public int compareTo(Delayed o) {
-        ScheduledFuture current;
+    public int compareTo(@NonNull Delayed o) {
+        ScheduledFuture<V> current;
         synchronized (this) {
             current = this.currentFuture;
         }
@@ -97,7 +97,7 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
-        ScheduledFuture current;
+        ScheduledFuture<V> current;
         synchronized (this) {
             cancelled.set(true);
             current = this.currentFuture;
@@ -119,21 +119,21 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
 
     @Override
     public V get() throws InterruptedException, ExecutionException {
-        ScheduledFuture current;
+        ScheduledFuture<V> current;
         synchronized (this) {
             cancelled.set(true);
             current = this.currentFuture;
         }
-        return (V) current.get();
+        return current.get();
     }
 
     @Override
-    public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        ScheduledFuture current;
+    public V get(long timeout, @NonNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        ScheduledFuture<V> current;
         synchronized (this) {
             cancelled.set(true);
             current = this.currentFuture;
         }
-        return (V) current.get(timeout, unit);
+        return current.get(timeout, unit);
     }
 }

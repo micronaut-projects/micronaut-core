@@ -17,10 +17,10 @@ package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 
-import io.micronaut.core.annotation.NonNull;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -89,6 +89,7 @@ public class FileWatchConfiguration implements Toggleable {
 
     /**
      * Whether watch is enabled.
+     *
      * @param enabled True if is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -97,6 +98,7 @@ public class FileWatchConfiguration implements Toggleable {
 
     /**
      * The paths to watch.
+     *
      * @return A lists of {@link Path} objects
      */
     public List<Path> getPaths() {
@@ -105,6 +107,7 @@ public class FileWatchConfiguration implements Toggleable {
 
     /**
      * Sets the watch paths to use.
+     *
      * @param paths The watch paths
      */
     public void setPaths(@NonNull List<Path> paths) {
@@ -114,6 +117,7 @@ public class FileWatchConfiguration implements Toggleable {
 
     /**
      * The interval to wait between checks.
+     *
      * @return The interval to wait.
      */
     public @NonNull Duration getCheckInterval() {

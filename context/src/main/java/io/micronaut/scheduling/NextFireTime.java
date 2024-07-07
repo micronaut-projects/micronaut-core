@@ -15,13 +15,13 @@
  */
 package io.micronaut.scheduling;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.cron.CronExpression;
+
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.function.Supplier;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.cron.CronExpression;
 
 /**
  * Represents the next fire time for a cron expression.
@@ -57,7 +57,7 @@ final class NextFireTime implements Supplier<Duration> {
 
     @Override
     public Duration get() {
-        ZonedDateTime now = ZonedDateTime.now(zoneId);
+        var now = ZonedDateTime.now(zoneId);
         // check if the task have fired too early
         computeNextFireTime(now.isAfter(nextFireTime) ? now : nextFireTime);
         return duration;

@@ -47,7 +47,7 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder {
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -221,6 +221,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.singletons(beans);
     }
 
+    @NonNull
     @Override
     public Micronaut beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
         return (Micronaut) super.beanDefinitions(definitions);
@@ -280,8 +281,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * Maps an exception to the given error code.
      *
      * @param exception The exception
-     * @param mapper    The mapper
-     * @param <T>       The exception type
+     * @param mapper The mapper
+     * @param <T> The exception type
      * @return This application
      */
     public <T extends Throwable> Micronaut mapError(Class<T> exception, Function<T, Integer> mapper) {
@@ -312,19 +313,19 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     /**
      * Run the application for the given arguments.
      *
-     * @param cls  The application class
+     * @param cls The application class
      * @param args The arguments
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(Class<?> cls, String... args) {
-        return run(new Class<?>[]{cls}, args);
+        return run(new Class<?>[] {cls}, args);
     }
 
     /**
      * Run the application for the given arguments.
      *
      * @param classes The application classes
-     * @param args    The arguments
+     * @param args The arguments
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(Class<?>[] classes, String... args) {
@@ -338,7 +339,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * Default handling of startup exceptions.
      *
      * @param environment The environment
-     * @param exception   The exception
+     * @param exception The exception
      * @throws ApplicationStartupException If the server cannot be shutdown with an appropriate exist code
      */
     protected void handleStartupException(Environment environment, Throwable exception) {
