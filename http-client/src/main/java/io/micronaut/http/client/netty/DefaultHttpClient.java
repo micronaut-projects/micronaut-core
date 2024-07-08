@@ -163,6 +163,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.resolver.AddressResolverGroup;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -304,7 +305,8 @@ public class DefaultHttpClient implements
             NioDatagramChannel::new,
             CompositeNettyClientCustomizer.EMPTY,
             null,
-            conversionService);
+            conversionService,
+            null);
     }
 
     /**
@@ -327,6 +329,7 @@ public class DefaultHttpClient implements
      * @param clientCustomizer                The pipeline customizer
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      * @param conversionService               The conversion service
+     * @param resolverGroup                   Optional predefined resolver group
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable HttpVersionSelection explicitHttpVersion,
@@ -345,7 +348,8 @@ public class DefaultHttpClient implements
                              @NonNull ChannelFactory<? extends DatagramChannel> udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
                              @Nullable String informationalServiceId,
-                             ConversionService conversionService
+                             ConversionService conversionService,
+                             @Nullable AddressResolverGroup<?> resolverGroup
     ) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
@@ -392,7 +396,8 @@ public class DefaultHttpClient implements
             udpChannelFactory,
             nettyClientSslBuilder,
             clientCustomizer,
-            informationalServiceId);
+            informationalServiceId,
+            resolverGroup);
     }
 
     /**
