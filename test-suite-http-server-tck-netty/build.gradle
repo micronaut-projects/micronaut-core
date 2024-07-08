@@ -3,11 +3,6 @@ plugins {
     id("org.graalvm.buildtools.native")
 }
 
-
-repositories {
-    mavenCentral()
-}
-
 micronautBuild {
     enableBom = false
     enableProcessing = false

@@ -19,10 +19,6 @@ micronautBuild {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor platform(libs.test.boms.micronaut.validation)
