@@ -4209,11 +4209,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             this.reference = reference;
         }
 
-        public boolean isReferenceEnabled(DefaultBeanContext context) {
+        boolean isReferenceEnabled(DefaultBeanContext context) {
             return isReferenceEnabled(context, null);
         }
 
-        public boolean isReferenceEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        boolean isReferenceEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
             BeanDefinitionReference<?> ref = reference;
             // The reference needs to be assigned to a new variable as it can change between checks
             if (ref == null) {
@@ -4231,13 +4231,16 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
 
         private boolean isReferenceEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
+            if (ref == null) {
+                return false;
+            }
             if (ref instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> referenceAndDefinition) {
                 return referenceAndDefinition.isEnabled(context, resolutionContext, true);
             }
-            return reference.isEnabled(context);
+            return ref.isEnabled(context);
         }
 
-        public boolean isDisabled() {
+        boolean isDisabled() {
             if (reference == null) {
                 return true;
             }
@@ -4251,11 +4254,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return defEnabled != null && !defEnabled;
         }
 
-        public boolean isDefinitionEnabled(DefaultBeanContext defaultBeanContext) {
+        boolean isDefinitionEnabled(DefaultBeanContext defaultBeanContext) {
             return isDefinitionEnabled(defaultBeanContext, null);
         }
 
-        public boolean isDefinitionEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        private boolean isDefinitionEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
             if (definitionEnabled == null) {
                 if (isReferenceEnabled(context, resolutionContext)) {
                     BeanDefinition <?> def = getDefinition(context);
@@ -4272,14 +4275,20 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return definitionEnabled;
         }
 
-        private boolean isDefinitionEnabled(DefaultBeanContext context, BeanResolutionContext resolutionContext, BeanDefinition<?> def) {
+        private boolean isDefinitionEnabled(@NonNull DefaultBeanContext context,
+                                            @NonNull BeanResolutionContext resolutionContext,
+                                            @Nullable BeanDefinition<?> def) {
+            if (def == null) {
+                return false;
+            }
             if (def instanceof io.micronaut.context.AbstractInitializableBeanDefinitionAndReference<?> definitionAndReference) {
                 return definitionAndReference.isEnabled(context, resolutionContext, false);
             }
             return def.isEnabled(context, resolutionContext);
         }
 
-        public <T> BeanDefinitionReference<T> getReference() {
+        @NonNull
+        <T> BeanDefinitionReference<T> getReference() {
             // The reference needs to be assigned to a new variable as it can change between checks
             Boolean refEnabled = referenceEnabled;
             if (reference == null || refEnabled == null || !refEnabled) {
@@ -4288,7 +4297,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return reference;
         }
 
-        public <T> BeanDefinition<T> getDefinition(BeanContext beanContext) {
+        @NonNull
+        private <T> BeanDefinition<T> getDefinition(BeanContext beanContext) {
             // The reference needs to be assigned to a new variable as it can change between checks
             Boolean defEnabled = definitionEnabled;
             if (defEnabled != null && !defEnabled) {
@@ -4306,13 +4316,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             }
         }
 
-        public <T> boolean isReferenceCandidateBean(Argument<T> beanType) {
+        <T> boolean isReferenceCandidateBean(Argument<T> beanType) {
             // The reference needs to be assigned to a new variable as it can change between checks
             BeanDefinitionReference ref = reference;
             return ref != null && ref.isCandidateBean(beanType);
         }
 
-        public void disable(BeanDefinitionReference<?> reference) {
+        void disable(BeanDefinitionReference<?> reference) {
             // The reference needs to be assigned to a new variable as it can change between checks
             BeanDefinitionReference ref = this.reference;
             if (ref != null && ref.equals(reference)) {
