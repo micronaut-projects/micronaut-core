@@ -45,6 +45,10 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+ReportExceptionStackTraces")
+            if (org.apache.tools.ant.util.JavaEnvUtils.isAtLeastJavaVersion("21")) {
+                println("Enabling strict image heap!")
+                buildArgs.add("--strict-image-heap")
+            }
             resources.autodetect()
         }
     }
