@@ -811,7 +811,6 @@ public abstract class HttpClientConfiguration {
         this.dnsResolutionMode = dnsResolutionMode;
     }
 
-
     /**
      * Name of a fixed netty AddressResolverGroup to use for this client, or {@code null} to
      * instead use {@link #getDnsResolutionMode()}. This option is specific to the netty client.
