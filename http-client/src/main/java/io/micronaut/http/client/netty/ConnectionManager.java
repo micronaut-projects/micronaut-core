@@ -147,7 +147,7 @@ public class ConnectionManager {
     private EventLoopGroup group;
     private final boolean shutdownGroup;
 
-    private final AddressResolverGroup resolverGroup;
+    private final AddressResolverGroup<?> resolverGroup;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ThreadFactory threadFactory;
@@ -197,7 +197,8 @@ public class ConnectionManager {
         ChannelFactory<? extends Channel> udpChannelFactory,
         ClientSslBuilder nettyClientSslBuilder,
         NettyClientCustomizer clientCustomizer,
-        String informationalServiceId) {
+        String informationalServiceId,
+        @Nullable AddressResolverGroup<?> resolverGroup) {
 
         if (httpVersion == null) {
             httpVersion = HttpVersionSelection.forClientConfiguration(configuration);
@@ -221,7 +222,7 @@ public class ConnectionManager {
             shutdownGroup = true;
         }
 
-        resolverGroup = getResolver(configuration.getDnsResolutionMode());
+        this.resolverGroup = resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : resolverGroup;
 
         refresh();
     }

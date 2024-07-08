@@ -176,6 +176,9 @@ public abstract class HttpClientConfiguration {
 
     private DnsResolutionMode dnsResolutionMode = DEFAULT_DNS_RESOLUTION_MODE;
 
+    @Nullable
+    private String addressResolverGroupName = null;
+
     /**
      * Default constructor.
      */
@@ -786,9 +789,11 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Configure how DNS records are resolved. This option is specific to the netty client.
+     * Configure how DNS records are resolved. Ignored if {@link #getAddressResolverGroupName()} is
+     * non-null. This option is specific to the netty client.
      *
      * @return The DNS resolution mode
+     * @since 4.6.0
      */
     @NonNull
     public DnsResolutionMode getDnsResolutionMode() {
@@ -796,12 +801,37 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Configure how DNS records are resolved. This option is specific to the netty client.
+     * Configure how DNS records are resolved. Ignored if {@link #getAddressResolverGroupName()} is
+     * non-null. This option is specific to the netty client.
      *
      * @param dnsResolutionMode The DNS resolution mode
+     * @since 4.6.0
      */
     public void setDnsResolutionMode(@NonNull DnsResolutionMode dnsResolutionMode) {
         this.dnsResolutionMode = dnsResolutionMode;
+    }
+
+
+    /**
+     * Name of a fixed netty AddressResolverGroup to use for this client, or {@code null} to
+     * instead use {@link #getDnsResolutionMode()}. This option is specific to the netty client.
+     *
+     * @return The bean name of the resolver group
+     * @since 4.6.0
+     */
+    public @Nullable String getAddressResolverGroupName() {
+        return addressResolverGroupName;
+    }
+
+    /**
+     * Name of a fixed netty AddressResolverGroup to use for this client, or {@code null} to
+     * instead use {@link #getDnsResolutionMode()}. This option is specific to the netty client.
+     *
+     * @param addressResolverGroupName The bean name of the resolver group
+     * @since 4.6.0
+     */
+    public void setAddressResolverGroupName(@Nullable String addressResolverGroupName) {
+        this.addressResolverGroupName = addressResolverGroupName;
     }
 
     /**
@@ -1012,6 +1042,8 @@ public abstract class HttpClientConfiguration {
 
     /**
      * The DNS resolution mode.
+     *
+     * @since 4.6.0
      */
     public enum DnsResolutionMode {
         /**
