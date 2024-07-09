@@ -52,6 +52,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
  *     parameter</li>
  *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
+ *     <li>A RouteMatch of the route that handled this request. Note: Unless the parameter is
+ *     marked as {@link io.micronaut.core.annotation.Nullable}, the filter method will <b>not</b>
+ *     match for requests that do not match a route (e.g. static resources). This parameter is only
+ *     supported on the server.</li>
  * </ul>
  *
  * The return value may be:

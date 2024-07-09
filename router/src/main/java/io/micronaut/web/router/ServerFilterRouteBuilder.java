@@ -22,12 +22,19 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerContextPathProvider;
+import io.micronaut.http.filter.BaseFilterArgBinder;
 import io.micronaut.http.filter.BaseFilterProcessor;
+import io.micronaut.http.filter.FilterArgBinder;
+import io.micronaut.http.filter.FilterMethodBindingBuilder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -101,6 +108,22 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
                 if (metadata.methods() != null) {
                     route.methods(metadata.methods().toArray(new HttpMethod[0]));
                 }
+            }
+
+            @Override
+            protected @NonNull BaseFilterArgBinder prepareArgument(ExecutableMethod<?, ?> method, boolean isResponseFilter, FilterMethodBindingBuilder builder, Argument<?> argument) {
+                if (!argument.getAnnotationMetadata().hasStereotype(Bindable.class)) {
+                    if (argument.isAssignableFrom(ServerHttpRequest.class)) {
+                        return (FilterArgBinder) ctx -> (ServerHttpRequest<?>) ctx.request();
+                    }
+                    if (argument.isAssignableFrom(RouteMatch.class)) {
+                        if (!argument.isNullable()) {
+                            builder.addFilterCondition(ctx -> ctx.request().getAttribute(HttpAttributes.ROUTE_MATCH).isPresent());
+                        }
+                        return (FilterArgBinder) ctx -> ctx.request().getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+                    }
+                }
+                return super.prepareArgument(method, isResponseFilter, builder, argument);
             }
         };
     }

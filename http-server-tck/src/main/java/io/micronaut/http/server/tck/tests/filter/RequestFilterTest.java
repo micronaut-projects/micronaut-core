@@ -36,6 +36,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -376,6 +377,19 @@ public class RequestFilterTest {
             .run();
     }
 
+    @Test
+    public void requestFilterRouteMatch() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/route-match"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("java.lang.String")
+                    .build());
+            })
+            .run();
+    }
 
     @ServerFilter
     @Singleton
@@ -502,6 +516,11 @@ public class RequestFilterTest {
         public CompletionStage<MutableHttpResponse<String>> requestFilterCompletionResponse() {
             return CompletableFuture.completedStage(HttpResponse.ok("requestFilterCompletionResponse"));
         }
+
+        @RequestFilter("/request-filter/route-match")
+        public void requestFilterRouteMatch(MutableHttpRequest<?> request, RouteMatch<?> routeMatch) {
+            request.setAttribute("route-match-response", routeMatch.getRouteInfo().getReturnType().getType().getName());
+        }
     }
 
     @Controller
@@ -585,6 +604,11 @@ public class RequestFilterTest {
         @Post("/request-filter/binding")
         public String requestFilterBinding(@Header String contentType, @Body byte[] bytes) {
             return contentType + " " + new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        @Get("/request-filter/route-match")
+        public String requestFilterRouteMatch(HttpRequest<?> request) {
+            return request.getAttribute("route-match-response", String.class).orElse("none");
         }
     }
 }
