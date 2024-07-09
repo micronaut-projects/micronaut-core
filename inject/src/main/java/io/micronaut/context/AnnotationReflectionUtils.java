@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -225,13 +226,9 @@ public final class AnnotationReflectionUtils {
                 if (!method.getDeclaringClass().equals(annotationType)) {
                     continue;
                 }
-                try {
-                    Object value = method.invoke(annotation);
-                    if (value != null) {
-                        values.put(method.getName(), value);
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                Object value = ReflectionUtils.invokeMethod(annotation, method);
+                if (value != null) {
+                    values.put(method.getName(), value);
                 }
             }
             mutableAnnotationMetadata.addAnnotation(annotationType.getName(), values);
