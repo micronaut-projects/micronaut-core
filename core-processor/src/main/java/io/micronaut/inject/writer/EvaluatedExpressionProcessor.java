@@ -16,9 +16,11 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
@@ -35,12 +37,16 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
 
 /**
  * Internal utility class for writing annotation metadata with evaluated expressions.
  */
 @Internal
 public final class EvaluatedExpressionProcessor {
+    protected static final Type TYPE_BUILD_TIME_INIT = Type.getType(BuildTimeInit.class);
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final VisitorContext visitorContext;
@@ -128,5 +134,19 @@ public final class EvaluatedExpressionProcessor {
 
     public boolean hasEvaluatedExpressions() {
         return !this.evaluatedExpressions.isEmpty();
+    }
+
+    public void registerExpressionForBuildTimeInit(ClassWriter classWriter) {
+        String[] expressionClassNames = getEvaluatedExpressions()
+            .stream().map(ExpressionWithContext::expressionClassName).toArray(String[]::new);
+        if (ArrayUtils.isNotEmpty(expressionClassNames)) {
+            AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_BUILD_TIME_INIT.getDescriptor(), true);
+            AnnotationVisitor av = annotationVisitor.visitArray("value");
+            for (String expressionClassName : expressionClassNames) {
+                av.visit("ignored", expressionClassName);
+            }
+            av.visitEnd();
+            annotationVisitor.visitEnd();
+        }
     }
 }

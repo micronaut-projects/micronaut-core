@@ -15,20 +15,19 @@
  */
 package io.micronaut.core.io.service;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.util.ArrayUtils;
-import org.graalvm.nativeimage.ImageSingletons;
-import org.graalvm.nativeimage.hosted.Feature;
-import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
-import org.graalvm.nativeimage.hosted.RuntimeReflection;
-
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -47,8 +46,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-
-import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -57,7 +58,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @since 3.5.0
  */
 @SuppressWarnings("unused")
-final class ServiceLoaderFeature implements Feature {
+class ServiceLoaderFeature implements Feature {
 
     @Override
     @SuppressWarnings("java:S1119")
@@ -76,7 +77,15 @@ final class ServiceLoaderFeature implements Feature {
                         if (GraalReflectionConfigurer.class.isAssignableFrom(c)) {
                             continue;
                         } else if (BeanInfo.class.isAssignableFrom(c)) {
-                            RuntimeClassInitialization.initializeAtBuildTime(c);
+                            BuildTimeInit buildInit = c.getAnnotation(BuildTimeInit.class);
+                            if (buildInit != null) {
+                                String[] classNames = buildInit.value();
+                                for (String className : classNames) {
+                                    Class<?> buildInitClass = access.findClassByName(className);
+                                    initializeAtBuildTime(buildInitClass);
+                                }
+                            }
+                            initializeAtBuildTime(c);
                             BeanInfo<?> beanInfo;
                             try {
                                 beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
@@ -99,7 +108,7 @@ final class ServiceLoaderFeature implements Feature {
                                     if (value.contains("condition")) {
                                         Object o = value.getValues().get("condition");
                                         if (o instanceof AnnotationClassValue<?> annotationClassValue) {
-                                            annotationClassValue.getType().ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+                                            annotationClassValue.getType().ifPresent(this::initializeAtBuildTime);
                                         }
                                     }
                                     for (String className : classNames) {
@@ -112,12 +121,12 @@ final class ServiceLoaderFeature implements Feature {
                             }
                         }
 
-                        RuntimeReflection.registerForReflectiveInstantiation(c);
-                        RuntimeReflection.register(c);
+                        registerForReflectiveInstantiation(c);
+                        registerRuntimeReflection(c);
                     }
                     final Class<?> exec = access.findClassByName(typeName + "$Exec");
                     if (exec != null) {
-                        RuntimeClassInitialization.initializeAtBuildTime(exec);
+                        initializeAtBuildTime(exec);
                     }
 
 
@@ -126,11 +135,66 @@ final class ServiceLoaderFeature implements Feature {
                 }
             }
         }
+        addImageSingleton(staticServiceDefinitions);
+    }
+
+    /**
+     * Register a class for reflective instantiation.
+     * @param c The class
+     */
+    protected void registerForReflectiveInstantiation(Class<?> c) {
+        RuntimeReflection.registerForReflectiveInstantiation(c);
+    }
+
+    /**
+     * Add an image singleton.
+     * @param staticServiceDefinitions The static definitions.
+     */
+    protected void addImageSingleton(StaticServiceDefinitions staticServiceDefinitions) {
         ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
     }
 
+    /**
+     * Register a class for runtime reflection.
+     * @param c The class
+     */
+    protected void registerRuntimeReflection(Class<?> c) {
+        RuntimeReflection.register(c);
+    }
+
+    /**
+     * Register a methods for runtime reflection.
+     * @param methods The methods
+     */
+    protected void registerRuntimeReflection(Method... methods) {
+        RuntimeReflection.register(methods);
+    }
+
+    /**
+     * Register a field for runtime reflection.
+     * @param fields The field
+     */
+    protected void registerRuntimeReflection(Field... fields) {
+        RuntimeReflection.register(fields);
+    }
+
+    /**
+     * Initialize a class at build time
+     * @param buildInitClass The class
+     */
+    protected void initializeAtBuildTime(@Nullable Class<?> buildInitClass) {
+        if (buildInitClass != null) {
+            RuntimeClassInitialization.initializeAtBuildTime(buildInitClass);
+        }
+    }
+
+    /**
+     * Build the static service definitions.
+     * @param access The access
+     * @return The definitions
+     */
     @NonNull
-    private StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
+    protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions(null);
         final String path = "META-INF/micronaut/";
         try {
@@ -190,9 +254,7 @@ final class ServiceLoaderFeature implements Feature {
     }
 
     private void configureForReflection(BeforeAnalysisAccess access) {
-        Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
-        SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
-                .collectAll(configurers);
+        Collection<GraalReflectionConfigurer> configurers = loadReflectionConfigurers(access);
 
         final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
             @Override
@@ -202,17 +264,19 @@ final class ServiceLoaderFeature implements Feature {
 
             @Override
             public void register(Class<?>... types) {
-                RuntimeReflection.register(types);
+                for (Class<?> type : types) {
+                    registerRuntimeReflection(type);
+                }
             }
 
             @Override
             public void register(Method... methods) {
-                RuntimeReflection.register(methods);
+                registerRuntimeReflection(methods);
             }
 
             @Override
             public void register(Field... fields) {
-                RuntimeReflection.register(fields);
+                registerRuntimeReflection(fields);
             }
 
             @Override
@@ -221,9 +285,17 @@ final class ServiceLoaderFeature implements Feature {
             }
         };
         for (GraalReflectionConfigurer configurer : configurers) {
-            RuntimeClassInitialization.initializeAtBuildTime(configurer.getClass());
+            initializeAtBuildTime(configurer.getClass());
             configurer.configure(context);
         }
+    }
+
+    @NonNull
+    protected Collection<GraalReflectionConfigurer> loadReflectionConfigurers(BeforeAnalysisAccess access) {
+        Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
+        SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
+                .collectAll(configurers);
+        return configurers;
     }
 }
 

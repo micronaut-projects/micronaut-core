@@ -632,6 +632,8 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, getOriginatingElement());
 
         annotateAsGeneratedAndService(classWriter, introspectionName);
+        // init expressions at build time
+        evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classWriter);
 
         buildStaticInit(classWriter, isEnum);
 
