@@ -45,6 +45,7 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+ReportExceptionStackTraces")
+            println("Java version of GraalVM: " + org.apache.tools.ant.util.JavaEnvUtils.getJavaVersion())
             if (org.apache.tools.ant.util.JavaEnvUtils.isAtLeastJavaVersion("21")) {
                 println("Enabling strict image heap!")
                 buildArgs.add("--strict-image-heap")
