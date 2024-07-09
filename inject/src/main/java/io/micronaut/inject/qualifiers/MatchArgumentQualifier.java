@@ -129,7 +129,9 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                 if (typeArgumentExtractor == null) {
                     if (bd instanceof BeanDefinition<?> beanDefinition) {
                         List<Argument<?>> typeArguments = beanDefinition.getTypeArguments(argument.getType());
-                        return typeArguments.get(finalI);
+                        if (finalI < typeArguments.size()) {
+                            return typeArguments.get(finalI);
+                        }
                     }
                     return null;
                 }
@@ -162,6 +164,9 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                 argumentTypeClass = ReflectionUtils.getWrapperType(argumentTypeClass);
             }
             Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
+            if (candidateArgument == null) {
+                continue;
+            }
             Class<?> candidateType = candidateArgument.getType();
             if (argumentTypeClass.equals(candidateType)) {
                 if (!matchesArgumentTypeParameters(argument, candidateArgument)) {
@@ -302,4 +307,8 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         }
     }
 
+    @Override
+    public String toString() {
+        return "Matches [" + argument.toString() + "] + " + superArgument;
+    }
 }
