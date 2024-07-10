@@ -54,7 +54,7 @@ public final class FormDataHttpContentProcessor {
     protected final long advertisedLength;
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();
-    protected final HttpServerConfiguration configuration;
+    protected final NettyHttpServerConfiguration configuration;
     private final InterfaceHttpPostRequestDecoder decoder;
     private final long partMaxSize;
 
@@ -79,7 +79,7 @@ public final class FormDataHttpContentProcessor {
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
-    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
+    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.advertisedLength = nettyHttpRequest.getContentLength();
         this.requestMaxSize = configuration.getMaxRequestSize();
@@ -90,9 +90,9 @@ public final class FormDataHttpContentProcessor {
         // prevent the decoders from immediately parsing the content
         HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
         } else {
-            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
+            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
         }
         this.partMaxSize = multipart.getMaxFileSize();
     }
@@ -157,6 +157,10 @@ public final class FormDataHttpContentProcessor {
                     } else {
                         throw e;
                     }
+                } catch (HttpPostRequestDecoder.TooManyFormFieldsException e) {
+                    throw new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
+                } catch (HttpPostRequestDecoder.TooLongFormFieldException e) {
+                    throw new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
                 } finally {
                     httpContent.release();
                 }

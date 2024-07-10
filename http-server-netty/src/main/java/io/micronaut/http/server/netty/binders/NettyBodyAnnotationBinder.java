@@ -37,12 +37,12 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
@@ -56,11 +56,11 @@ import java.util.Set;
 
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
-    final HttpServerConfiguration httpServerConfiguration;
+    final NettyHttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
     NettyBodyAnnotationBinder(ConversionService conversionService,
-                                     HttpServerConfiguration httpServerConfiguration,
+                              NettyHttpServerConfiguration httpServerConfiguration,
                                      MessageBodyHandlerRegistry bodyHandlerRegistry) {
         super(conversionService);
         this.httpServerConfiguration = httpServerConfiguration;
