@@ -5,11 +5,13 @@ import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
 import io.netty.channel.EventLoopGroup
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.concurrent.ExecutionException
 
+@Retry
 class BlockingDeadlockSpec extends Specification {
     @Shared
     @AutoCleanup

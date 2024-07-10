@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.writer;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
+
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.AbstractBeanDefinitionBeanConstructor;
 import io.micronaut.context.AbstractExecutableMethod;
@@ -126,14 +129,6 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.signature.SignatureVisitor;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
@@ -161,9 +156,13 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
-import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.signature.SignatureVisitor;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -1107,6 +1106,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
 
         annotateAsGeneratedAndService(classWriter, BeanDefinitionReference.class.getName());
+
+        // init expressions at build time
+        evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classWriter);
 
         if (buildMethodVisitor == null) {
             throw new IllegalStateException("At least one call to visitBeanDefinitionConstructor() is required");

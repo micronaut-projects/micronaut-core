@@ -3,10 +3,6 @@ plugins {
     id "org.graalvm.buildtools.native"
 }
 
-repositories {
-    mavenCentral()
-}
-
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }

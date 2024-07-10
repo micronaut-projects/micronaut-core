@@ -12,10 +12,6 @@ micronautBuild {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     api libs.managed.kotlin.stdlib
     api libs.managed.kotlin.reflect
