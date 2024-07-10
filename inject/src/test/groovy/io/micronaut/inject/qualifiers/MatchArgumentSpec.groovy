@@ -92,7 +92,7 @@ class MatchArgumentSpec extends Specification {
     void "test match serialize Collection String argument"() {
         when:
             def beanDefinitions = context.getBeanDefinitions(MySerializer,
-                    MatchArgumentQualifier.ofLowerTypes(MySerializer, Argument.of(Collection, [Argument.of(String)] as Argument[]))
+                    MatchArgumentQualifier.contravariant(MySerializer, Argument.of(Collection, [Argument.of(String)] as Argument[]))
             )
 
         then:
@@ -105,7 +105,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.covariant(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -117,7 +117,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.covariant(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -129,7 +129,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.covariant(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -141,7 +141,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.covariant(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -153,7 +153,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.covariant(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -163,7 +163,7 @@ class MatchArgumentSpec extends Specification {
     void "test finding higher types type object finding all instances"() {
         def item = Argument.OBJECT_ARGUMENT
         when:
-            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.ofHigherTypes(MyReader, item))
+            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.covariant(MyReader, item))
             def beanAllDefinitions = context.getBeanDefinitions(Argument.of(MyReader))
 
         then:
@@ -177,7 +177,7 @@ class MatchArgumentSpec extends Specification {
             ApplicationContext context = ApplicationContext.run(["MatchArgumentSpec.enableObjectReader": "true"])
             def item = Argument.OBJECT_ARGUMENT
         when:
-            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.ofHigherTypes(MyReader, item))
+            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.covariant(MyReader, item))
 
         then:
             beanDefinitions.size() == 1
@@ -188,7 +188,7 @@ class MatchArgumentSpec extends Specification {
     void "test generic higher types reader"() {
         when:
             def stringReaders = context.getBeanDefinitions(MyReader2,
-                    MatchArgumentQualifier.ofHigherTypes(MyReader2, Argument.of(MyType3)))
+                    MatchArgumentQualifier.covariant(MyReader2, Argument.of(MyType3)))
 
         then:
             stringReaders.size() == 1

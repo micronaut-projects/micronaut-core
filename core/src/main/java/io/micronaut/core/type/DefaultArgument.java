@@ -249,9 +249,6 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder(getType().getSimpleName());
-        if (this.name != null) {
-            builder.append(" ").append(getName());
-        }
         if (typeParameterArray != null && typeParameterArray.length > 0) {
             builder.append("<");
             for (int i = 0, typeParameterArrayLength = typeParameterArray.length; i < typeParameterArrayLength; i++) {
@@ -262,6 +259,9 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
                 }
             }
             builder.append(">");
+        }
+        if (this.name != null) {
+            builder.append(" ").append(getName());
         }
         return builder.toString();
     }

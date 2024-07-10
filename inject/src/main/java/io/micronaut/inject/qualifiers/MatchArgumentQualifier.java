@@ -45,11 +45,11 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(MatchArgumentQualifier.class);
     private final Argument<?> argument;
-    private final Argument<?> superArgument;
+    private final Argument<?> covariantArgument;
 
-    private MatchArgumentQualifier(Argument<?> argument, Argument<?> superArgument) {
+    private MatchArgumentQualifier(Argument<?> argument, Argument<?> covariantArgument) {
         this.argument = argument;
-        this.superArgument = superArgument;
+        this.covariantArgument = covariantArgument;
     }
 
     public static <T> MatchArgumentQualifier<T> ofArgument(Argument<?> argument) {
@@ -60,7 +60,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
     }
 
     /**
-     * Finds matches of a type with a generic of a higher kind types (types that extend the type or are equal to it).
+     * Finds matches of a type with a covariant generic type (types that extend the type or are equal to it).
      * The generic argument is assignable from the candidate generic type.
      * Use-cases are generic deserializers, readers.
      * Java example:
@@ -72,16 +72,16 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    public static <T> MatchArgumentQualifier<T> ofHigherTypes(Class<T> beanType, Argument<?> genericArgument) {
-        Argument<?> superArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
+    public static <T> MatchArgumentQualifier<T> covariant(Class<T> beanType, Argument<?> genericArgument) {
+        Argument<?> covariantArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
         return new MatchArgumentQualifier<>(
-            Argument.of(beanType, superArgument),
-            superArgument
+            Argument.of(beanType, covariantArgument),
+            covariantArgument
         );
     }
 
     /**
-     * Finds matches of a type with a generic of a lower kind types (types that is a super type or are equal to it).
+     * Finds matches of a type with a contravariant generic type (types that is a super type or are equal to it).
      * The candidate generic type is assignable from the generic argument.
      * Use-cases are generic serializers, writers.
      * Java example:
@@ -93,7 +93,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    public static <T> MatchArgumentQualifier<T> ofLowerTypes(Class<T> beanType, Argument<?> genericArgument) {
+    public static <T> MatchArgumentQualifier<T> contravariant(Class<T> beanType, Argument<?> genericArgument) {
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters())),
             null
@@ -280,7 +280,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         }
         if (argument.isTypeVariable()) {
             // Is compatible?
-            if (argument == superArgument) {
+            if (argument == covariantArgument) {
                 if (candidateArgument.isTypeVariable() && candidateType.isAssignableFrom(argumentType)) {
                     // Defined a type variable <T extends LowerType>
                     return true;

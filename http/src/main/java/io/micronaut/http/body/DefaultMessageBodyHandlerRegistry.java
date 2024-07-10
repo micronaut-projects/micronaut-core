@@ -75,7 +75,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 Qualifiers.byQualifiers(
                     // Filter by media types first before filtering by the type hierarchy
                     newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class),
-                    MatchArgumentQualifier.ofHigherTypes(MessageBodyReader.class, type)
+                    MatchArgumentQualifier.covariant(MessageBodyReader.class, type)
                 )
             ).stream()
             .filter(reader -> mediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
@@ -117,7 +117,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 Qualifiers.byQualifiers(
                     // Filter by media types first before filtering by the type hierarchy
                     newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class),
-                    MatchArgumentQualifier.ofLowerTypes(MessageBodyWriter.class, type)
+                    MatchArgumentQualifier.contravariant(MessageBodyWriter.class, type)
                 )
             ).stream()
             .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
@@ -140,7 +140,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         @Override
         public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
             if (type.getType() == MessageBodyWriter.class && candidate instanceof BeanDefinition<?> definition) {
-                List<Argument<?>> consumedType = definition.getTypeArguments(type.getType());
+                List<Argument<?>> consumedType = definition.getTypeArguments(MessageBodyWriter.class);
                 Argument<?>[] typeParameters = type.getTypeParameters();
                 if (ArrayUtils.isEmpty(typeParameters)) {
                     return false;
