@@ -71,10 +71,11 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         return beanLocator.getBeansOfType(
-                Argument.of(MessageBodyReader.class),
+                Argument.of(MessageBodyReader.class), // Select all readers and eliminate by the type later
                 Qualifiers.byQualifiers(
-                    MatchArgumentQualifier.ofSuperVariable(MessageBodyReader.class, type),
-                    newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class)
+                    // Filter by media types first before filtering by the type hierarchy
+                    newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class),
+                    MatchArgumentQualifier.ofHigherTypes(MessageBodyReader.class, type)
                 )
             ).stream()
             .filter(reader -> mediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
@@ -112,12 +113,11 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         return beanLocator.getBeansOfType(
-                // Do not put the type here since we are looking for writers that can process the type
-                //      but beanLocator will provide types that can be injected into the searched type
-                Argument.of(MessageBodyWriter.class),
+                Argument.of(MessageBodyWriter.class), // Select all writers and eliminate by the type later
                 Qualifiers.byQualifiers(
-                    MatchArgumentQualifier.ofExtendsVariable(MessageBodyWriter.class, type),
-                    newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class)
+                    // Filter by media types first before filtering by the type hierarchy
+                    newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class),
+                    MatchArgumentQualifier.ofLowerTypes(MessageBodyWriter.class, type)
                 )
             ).stream()
             .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))

@@ -1,6 +1,7 @@
 package io.micronaut.inject.qualifiers
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
@@ -91,7 +92,7 @@ class MatchArgumentSpec extends Specification {
     void "test match serialize Collection String argument"() {
         when:
             def beanDefinitions = context.getBeanDefinitions(MySerializer,
-                    MatchArgumentQualifier.ofExtendsVariable(MySerializer, Argument.of(Collection, [Argument.of(String)] as Argument[]))
+                    MatchArgumentQualifier.ofLowerTypes(MySerializer, Argument.of(Collection, [Argument.of(String)] as Argument[]))
             )
 
         then:
@@ -104,7 +105,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofSuperVariable(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -116,7 +117,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofSuperVariable(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -128,7 +129,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofSuperVariable(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -140,7 +141,7 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofSuperVariable(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
@@ -152,11 +153,46 @@ class MatchArgumentSpec extends Specification {
         given:
             def argument = Argument.of(MyDeserializer, [item] as Argument[])
         when:
-            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofSuperVariable(MyDeserializer, item))
+            def beanDefinitions = context.getBeanDefinitions(argument, MatchArgumentQualifier.ofHigherTypes(MyDeserializer, item))
 
         then:
             beanDefinitions.size() == 1
             beanDefinitions[0].getBeanType() == EnumDeserializer
+    }
+
+    void "test finding higher types type object finding all instances"() {
+        def item = Argument.OBJECT_ARGUMENT
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.ofHigherTypes(MyReader, item))
+            def beanAllDefinitions = context.getBeanDefinitions(Argument.of(MyReader))
+
+        then:
+            // The list reader is eliminated because array list is higher
+            beanDefinitions.size() + 1 == beanAllDefinitions.size()
+            beanDefinitions.size() == 3
+    }
+
+    void "test finding higher types type object finding all instances - object reader is a direct match and eliminating everything else"() {
+        given:
+            ApplicationContext context = ApplicationContext.run(["MatchArgumentSpec.enableObjectReader": "true"])
+            def item = Argument.OBJECT_ARGUMENT
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyReader, MatchArgumentQualifier.ofHigherTypes(MyReader, item))
+
+        then:
+            beanDefinitions.size() == 1
+        cleanup:
+            context.close()
+    }
+
+    void "test generic higher types reader"() {
+        when:
+            def stringReaders = context.getBeanDefinitions(MyReader2,
+                    MatchArgumentQualifier.ofHigherTypes(MyReader2, Argument.of(MyType3)))
+
+        then:
+            stringReaders.size() == 1
+            stringReaders[0].getBeanType() == MyType2AndHigherReader
     }
 
     interface MySerializer<E> {}
@@ -220,6 +256,47 @@ class MatchArgumentSpec extends Specification {
     static interface MyInterface {}
 
     static enum MyEnum implements MyInterface {}
+
+    interface MyReader<E> {}
+
+    @Requires(property = "MatchArgumentSpec.enableObjectReader", value = "true")
+    @Singleton
+    static class ObjectMyReader implements MyReader<Object> {}
+
+    @Singleton
+    static class StringMyReader implements MyReader<CharSequence> {}
+
+    @Singleton
+    static class ListMyReader<T extends List<T>> implements MyReader<T> {}
+
+    @Singleton
+    static class ArrayListMyReader<T extends ArrayList<T>> implements MyReader<T> {}
+
+    @Singleton
+    static class EnumMyReader implements MyReader<MyEnum> {}
+
+    static class MyType1 implements MyInterface {
+
+    }
+
+    static class MyType2 implements MyInterface {
+
+    }
+
+    static class MyType3 extends MyType2 {
+
+    }
+    static interface MyInterface2 extends MyInterface {
+
+    }
+
+    interface MyReader2<E> {}
+
+    @Singleton
+    static class MyType2AndHigherReader<T extends MyType2> implements MyReader2<T> {}
+
+    @Singleton
+    static class NumberReader<T extends Number> implements MyReader2<T> {}
 
 }
 
