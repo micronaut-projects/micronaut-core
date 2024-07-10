@@ -59,10 +59,9 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
      * @param codecConfigurations The codec configurations
      * @param rawHandlers         The handlers for raw types
      */
-    DefaultMessageBodyHandlerRegistry(
-        BeanContext beanLocator,
-        List<CodecConfiguration> codecConfigurations,
-        List<RawMessageBodyHandler<?>> rawHandlers) {
+    DefaultMessageBodyHandlerRegistry(BeanContext beanLocator,
+                                      List<CodecConfiguration> codecConfigurations,
+                                      List<RawMessageBodyHandler<?>> rawHandlers) {
         super(rawHandlers);
         this.beanLocator = beanLocator;
         this.codecConfigurations = codecConfigurations;
@@ -71,13 +70,15 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @SuppressWarnings({"unchecked"})
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
-        return beanLocator.findBean(
-            Argument.of(MessageBodyReader.class),
-            Qualifiers.byQualifiers(
-                MatchArgumentQualifier.ofExtendsVariable(MessageBodyReader.class, type),
-                newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class)
-            )
-        ).orElse(null);
+        return beanLocator.getBeansOfType(
+                Argument.of(MessageBodyReader.class),
+                Qualifiers.byQualifiers(
+                    MatchArgumentQualifier.ofSuperVariable(MessageBodyReader.class, type),
+                    newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class)
+                )
+            ).stream()
+            .filter(reader -> mediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
+            .findFirst().orElse(null);
     }
 
     @NonNull
@@ -110,15 +111,17 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @SuppressWarnings({"unchecked"})
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
-        return beanLocator.findBean(
-            // Do not put the type here since we are looking for writers that can process the type
-            //      but beanLocator will provide types that can be injected into the searched type
-            Argument.of(MessageBodyWriter.class),
-            Qualifiers.byQualifiers(
-                MatchArgumentQualifier.ofSuperVariable(MessageBodyWriter.class, type),
-                newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class)
-            )
-        ).orElse(null);
+        return beanLocator.getBeansOfType(
+                // Do not put the type here since we are looking for writers that can process the type
+                //      but beanLocator will provide types that can be injected into the searched type
+                Argument.of(MessageBodyWriter.class),
+                Qualifiers.byQualifiers(
+                    MatchArgumentQualifier.ofExtendsVariable(MessageBodyWriter.class, type),
+                    newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class)
+                )
+            ).stream()
+            .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
+            .findFirst().orElse(null);
     }
 
     private static final class MediaTypeQualifier<T> extends FilteringQualifier<T> {

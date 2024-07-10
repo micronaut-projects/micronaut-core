@@ -119,7 +119,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
         if (messageBodyWriter == null) {
             MessageBodyWriter<T> writer = rawHandler(type, true);
-            if (writer == null && type.getType() != Object.class && !type.isVoid()) {
+            if (writer == null && type.getType() != Object.class) {
                 writer = findWriterImpl(type, mediaType);
             }
             if (writer != null) {
