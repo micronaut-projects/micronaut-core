@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -48,28 +49,33 @@ import java.util.Map;
 @Internal
 public final class AnnotationReflectionUtils {
 
-    AnnotationReflectionUtils() {}
+    private AnnotationReflectionUtils() {
+    }
 
     /**
      * Find implementation as an argument with types and annotations.
      *
-     * @param implementationType The implementation class of the interface
-     * @param implementedType    The implementedType type - interface or an abstract class
+     * @param runtimeGenericType The implementation class of the interface
+     * @param rawSuperType       The implementedType type - interface or an abstract class
      * @return The argument of the interface with types and annotations
      * @since 4.6
      */
     @Nullable
-    public static Argument<?> findImplementationAsArgument(@NonNull Class<?> implementationType,
-                                                           @NonNull Class<?> implementedType) {
-        return findImplemented(implementationType, implementedType, Map.of());
+    public static <T> Argument<T> resolveGenericToArgument(@NonNull Class<?> runtimeGenericType,
+                                                           @NonNull Class<T> rawSuperType) {
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively finding a generic argument of '{}' from the implementation '{}'",
+                rawSuperType, runtimeGenericType);
+        }
+        return findImplemented(runtimeGenericType, rawSuperType, Map.of());
     }
 
     @Nullable
-    private static Argument<?> findResolvedImplementation(Class<?> implementationType,
-                                                          Class<?> implementedType, // Interface or an abstract class
-                                                          AnnotatedType annotatedType,
-                                                          Map<String, AnnotatedType> resolvedVariables) {
-        Argument<?> argument = argumentOf(annotatedType, implementedType, resolvedVariables);
+    private static <T> Argument<T> findResolvedImplementation(Class<?> implementationType,
+                                                              Class<T> implementedType, // Interface or an abstract class
+                                                              AnnotatedType annotatedType,
+                                                              Map<String, AnnotatedType> resolvedVariables) {
+        Argument<T> argument = (Argument<T>) argumentOf(annotatedType, implementedType, resolvedVariables);
         if (argument != null) {
             if (implementationType.getAnnotations().length > 0) {
                 // Append implementation annotations if any
@@ -82,9 +88,9 @@ public final class AnnotationReflectionUtils {
         return argument;
     }
 
-    private static Argument<?> findImplemented(Class<?> implementationType,
-                                               Class<?> implementedType,
-                                               Map<String, AnnotatedType> resolvedVariables) {
+    private static <T> Argument<T> findImplemented(Class<?> implementationType,
+                                                   Class<T> implementedType,
+                                                   Map<String, AnnotatedType> resolvedVariables) {
         if (!implementedType.isAssignableFrom(implementationType)) {
             return null;
         }
@@ -92,7 +98,7 @@ public final class AnnotationReflectionUtils {
         Class<?> superClass = implementationType.getSuperclass();
         if (superClass != null && !Object.class.equals(superClass)) {
             AnnotatedType annotatedSuperclass = implementationType.getAnnotatedSuperclass();
-            Argument<?> resolvedImplementation;
+            Argument<T> resolvedImplementation;
             if (implementedType.equals(superClass)) {
                 resolvedImplementation = findResolvedImplementation(implementationType, implementedType, annotatedSuperclass, resolvedVariables);
             } else {
@@ -107,7 +113,7 @@ public final class AnnotationReflectionUtils {
         for (int i = 0; i < annotatedInterfaces.length; i++) {
             AnnotatedType annotatedInterface = annotatedInterfaces[i];
             Class<?> classFromType = getClassFromType(annotatedInterface.getType());
-            Argument<?> resolvedImplementation;
+            Argument<T> resolvedImplementation;
             if (implementedType.equals(classFromType)) {
                 resolvedImplementation = findResolvedImplementation(implementationType, implementedType, annotatedInterface, resolvedVariables);
             } else {

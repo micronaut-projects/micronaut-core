@@ -21,7 +21,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             }
 
         when:
-            def argument = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), Consumer)
+            def argument = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
 
         then:
             argument.type == Consumer
@@ -37,7 +37,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             }
 
         when:
-            def argument = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), Consumer)
+            def argument = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
 
         then:
             argument.type == Consumer
@@ -52,7 +52,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             }
 
         when:
-            def argumentAbstractConsumer = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), AbstractConsumer)
+            def argumentAbstractConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
 
         then:
             argumentAbstractConsumer.type == AbstractConsumer
@@ -61,7 +61,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
 
         when:
-            def argumentConsumer = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), Consumer)
+            def argumentConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
 
         then:
             argumentConsumer.type == Consumer
@@ -76,7 +76,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             }
 
         when:
-            def argumentConsumer = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), Consumer)
+            def argumentConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
         then:
             argumentConsumer.type == Consumer
             argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeAnnotation"]
@@ -84,7 +84,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
 
         when:
-            def argumentAbstractConsumer = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), AbstractConsumer)
+            def argumentAbstractConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
         then:
             argumentAbstractConsumer.type == AbstractConsumer
             argumentAbstractConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeAnnotation"]
@@ -92,7 +92,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
 
         when:
-            def argumentAbstractConsumer2 = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), AbstractConsumer2)
+            def argumentAbstractConsumer2 = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer2)
         then:
             argumentAbstractConsumer2.type == AbstractConsumer2
             argumentAbstractConsumer2.annotationMetadata.annotationNames.isEmpty()
@@ -110,7 +110,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             }
 
         when:
-            def argument = AnnotationReflectionUtils.findImplementationAsArgument(consumer.getClass(), BiFunction)
+            def argument = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), BiFunction)
 
         then:
             argument.type == BiFunction
