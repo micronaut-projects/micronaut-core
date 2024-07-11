@@ -34,7 +34,9 @@ import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.cookie.ServerCookieEncoder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
@@ -50,6 +52,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -265,6 +268,16 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             cookie(cookie);
         }
         return this;
+    }
+
+    @Override
+    public Cookies getCookies() {
+        return new NettyCookies(nettyHeaders, conversionService);
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name) {
+        return getCookies().findCookie(name);
     }
 
     @Override

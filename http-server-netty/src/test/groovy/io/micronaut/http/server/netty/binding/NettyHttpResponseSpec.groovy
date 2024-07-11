@@ -62,6 +62,9 @@ class NettyHttpResponseSpec extends Specification {
         expect:
         response.status == HttpStatus."$status"
         response.headers.get(header) == value
+        response.getCookies().size() == 1
+        response.getCookies().get("foo").value == "bar"
+        response.getCookie("foo").get().value == "bar"
 
         where:
         status        | header                 | value
