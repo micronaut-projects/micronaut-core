@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -63,16 +64,20 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * Finds matches of a type with a covariant generic type (types that extend the type or are equal to it).
      * The generic argument is assignable from the candidate generic type.
      * Use-cases are generic deserializers, readers.
+     *
+     * <pre>
      * Java example:
-     * MyReader[ArrayList[String]] candidate = ...;
-     * MyReader[? extends List[String]] aMatch = candidate;
+     * {@code MyReader<ArrayList<String>> candidate = ...; }
+     * {@code MyReader<? extends List<String>> aMatch = candidate; }
+     * </pre>
      *
      * @param beanType        The type of the beans
      * @param genericArgument The generic argument of the bean type
      * @param <T>             The bean type
      * @return The qualifier
      */
-    public static <T> MatchArgumentQualifier<T> covariant(Class<T> beanType, Argument<?> genericArgument) {
+    @NonNull
+    public static <T> MatchArgumentQualifier<T> covariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
         Argument<?> covariantArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, covariantArgument),
@@ -84,16 +89,20 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * Finds matches of a type with a contravariant generic type (types that is a super type or are equal to it).
      * The candidate generic type is assignable from the generic argument.
      * Use-cases are generic serializers, writers.
+     *
+     * <pre>
      * Java example:
-     * MyWriter[String]  candidate = ...;
-     * MyWriter[? super CharSequence] aMatch = candidate;
+     * {@code MyWriter<String> candidate = ...; }
+     * {@code MyWriter<? super CharSequence> aMatch = candidate; }
+     * </pre>
      *
      * @param beanType        The type of the beans
      * @param genericArgument The generic argument of the bean type
      * @param <T>             The bean type
      * @return The qualifier
      */
-    public static <T> MatchArgumentQualifier<T> contravariant(Class<T> beanType, Argument<?> genericArgument) {
+    @NonNull
+    public static <T> MatchArgumentQualifier<T> contravariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters())),
             null
