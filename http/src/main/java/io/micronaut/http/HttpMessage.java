@@ -23,7 +23,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.http.util.HttpUtil;
 
 import java.nio.charset.Charset;
@@ -124,7 +126,10 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      */
     default @NonNull Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
-            .map(Locale::new);
+            .map(text -> {
+                String part = HttpHeadersUtil.splitAcceptHeader(text);
+                return part == null ? Locale.getDefault() : StringUtils.parseLocale(part);
+            });
     }
 
     /**

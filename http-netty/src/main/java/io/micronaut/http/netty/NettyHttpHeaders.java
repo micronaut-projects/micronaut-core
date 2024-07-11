@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -411,7 +412,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             return Optional.empty();
         }
         String part = HttpHeadersUtil.splitAcceptHeader(text);
-        return Optional.ofNullable(part == null ? Locale.getDefault() : Locale.forLanguageTag(part));
+        return Optional.ofNullable(part == null ? Locale.getDefault() : StringUtils.parseLocale(part));
     }
 
     @Override

@@ -128,6 +128,7 @@ class NettyHttpRequestSpec extends Specification {
 
         where:
         method | uri        | headers                                                                         | content | locale
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'fr_CA']                                        | null    | 'fr_CA'
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'de-CH']                                        | null    | 'de_CH'
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'en-US,en;q=0.5']                               | null    | 'en_US'
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5'] | null    | 'fr_CH'

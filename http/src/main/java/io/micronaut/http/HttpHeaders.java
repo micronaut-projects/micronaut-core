@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.util.HttpHeadersUtil;
 import jakarta.annotation.Nullable;
 
@@ -767,7 +768,7 @@ public interface HttpHeaders extends Headers {
         return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
             .map(text -> {
                 String part = HttpHeadersUtil.splitAcceptHeader(text);
-                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+                return part == null ? Locale.getDefault() : StringUtils.parseLocale(part);
             });
     }
 

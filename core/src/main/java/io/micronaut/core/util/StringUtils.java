@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -175,17 +176,17 @@ public final class StringUtils {
      * @since 2.3.0
      */
     @Nullable
-    public static Locale parseLocale(String localeValue) {
+    public static Locale parseLocale(@NonNull String localeValue) {
         String[] tokens = tokenizeToStringArray(localeValue, "_ ", false, false);
         if (tokens.length == 1) {
             validateLocalePart(localeValue);
             Locale resolved = Locale.forLanguageTag(localeValue);
-            if (resolved.getLanguage().length() > 0) {
+            if (!resolved.getLanguage().isEmpty()) {
                 return resolved;
             }
         }
-        String language = (tokens.length > 0 ? tokens[0] : "");
-        String country = (tokens.length > 1 ? tokens[1] : "");
+        String language = tokens.length > 0 ? tokens[0] : "";
+        String country = ((tokens.length > 1) ? tokens[1] : "");
         validateLocalePart(language);
         validateLocalePart(country);
 
@@ -206,7 +207,7 @@ public final class StringUtils {
             country = "";
         }
 
-        return (language.length() > 0 ? new Locale(language, country, variant) : null);
+        return language.isEmpty() ? null : new Locale(language, country, variant);
     }
 
     /**
