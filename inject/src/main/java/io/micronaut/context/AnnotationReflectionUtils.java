@@ -26,19 +26,25 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedArrayType;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.AnnotatedType;
+import java.lang.reflect.AnnotatedWildcardType;
+import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * The annotation reflection utils.
@@ -67,155 +73,109 @@ public final class AnnotationReflectionUtils {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively finding a generic argument of '{}' from the implementation '{}'",
                 rawSuperType, runtimeGenericType);
         }
-        return findImplemented(runtimeGenericType, rawSuperType, Map.of());
-    }
 
-    @Nullable
-    private static <T> Argument<T> findResolvedImplementation(Class<?> implementationType,
-                                                              Class<T> implementedType, // Interface or an abstract class
-                                                              AnnotatedType annotatedType,
-                                                              Map<String, AnnotatedType> resolvedVariables) {
-        Argument<T> argument = (Argument<T>) argumentOf(annotatedType, implementedType, resolvedVariables);
-        if (argument != null) {
-            if (implementationType.getAnnotations().length > 0) {
-                // Append implementation annotations if any
-                argument = Argument.of(
-                    argument.getType(),
-                    new AnnotationMetadataHierarchy(argument.getAnnotationMetadata(), annotationMetadataOf(implementationType)),
-                    argument.getTypeParameters());
-            }
+        AnnotatedType st = findAnnotatedSupertype(new SimpleAnnotatedType(runtimeGenericType), rawSuperType);
+        if (st == null) {
+            return null;
         }
-        return argument;
+        //noinspection unchecked
+        return (Argument<T>) toArgument(st);
     }
 
-    private static <T> Argument<T> findImplemented(Class<?> implementationType,
-                                                   Class<T> implementedType,
-                                                   Map<String, AnnotatedType> resolvedVariables) {
-        if (!implementedType.isAssignableFrom(implementationType)) {
+    /**
+     * Find the {@link AnnotatedType} in {@code subType}'s type hierarchy that has the raw type
+     * {@code superType}. For example, for a {@code class A extends AbstractList<@Nullable String>},
+     * {@code findAnnotatedSupertype(A, Collection.class)} would return
+     * {@code Collection<@Nullable String>}.
+     * <p>
+     * Note that this can return special {@link AnnotatedType} instances like
+     * {@link LazySubstitutingType} or {@link MergedAnnotatedType}.
+     *
+     * @param subType   The type that should have its type hierarchy analyzed
+     * @param superType The supertype that we want to get the type information for
+     * @return The annotated generic supertype, with the same raw type as {@code superType}
+     */
+    @Nullable
+    private static AnnotatedType findAnnotatedSupertype(AnnotatedType subType, Class<?> superType) {
+        Class<?> raw = getRawType(subType.getType());
+        if (superType == raw) {
+            return subType;
+        } else if (!superType.isAssignableFrom(raw)) {
             return null;
         }
 
-        Class<?> superClass = implementationType.getSuperclass();
-        if (superClass != null && !Object.class.equals(superClass)) {
-            AnnotatedType annotatedSuperclass = implementationType.getAnnotatedSuperclass();
-            Argument<T> resolvedImplementation;
-            if (implementedType.equals(superClass)) {
-                resolvedImplementation = findResolvedImplementation(implementationType, implementedType, annotatedSuperclass, resolvedVariables);
-            } else {
-                resolvedImplementation = findImplemented(superClass, implementedType, resolvedVariables(annotatedSuperclass, superClass));
-            }
-            if (resolvedImplementation != null) {
-                return resolvedImplementation;
-            }
+        Map<TypeVariable<?>, AnnotatedType> substitutions = new HashMap<>();
+        collectTypeSubstitutions(subType, substitutions);
+
+        Stream<AnnotatedType> supertypes = getSupertypes(raw);
+        if (!substitutions.isEmpty()) {
+            supertypes = supertypes.map(t -> new LazySubstitutingType(t, substitutions));
         }
-        Class<?>[] interfaces = implementationType.getInterfaces();
-        AnnotatedType[] annotatedInterfaces = implementationType.getAnnotatedInterfaces();
-        for (int i = 0; i < annotatedInterfaces.length; i++) {
-            AnnotatedType annotatedInterface = annotatedInterfaces[i];
-            Class<?> classFromType = getClassFromType(annotatedInterface.getType());
-            Argument<T> resolvedImplementation;
-            if (implementedType.equals(classFromType)) {
-                resolvedImplementation = findResolvedImplementation(implementationType, implementedType, annotatedInterface, resolvedVariables);
-            } else {
-                resolvedImplementation = findImplemented(interfaces[i], implementedType, resolvedVariables(annotatedInterface, interfaces[0]));
-            }
-            if (resolvedImplementation != null) {
-                return resolvedImplementation;
-            }
+        List<AnnotatedType> candidates = supertypes
+            .map(at -> findAnnotatedSupertype(at, superType))
+            .filter(Objects::nonNull)
+            .toList();
+        if (candidates.isEmpty()) {
+            return null;
+        } else if (candidates.size() == 1) {
+            return candidates.get(0);
+        } else {
+            return new MergedAnnotatedType(candidates.get(0), candidates);
         }
-        return null;
     }
 
-    private static Class<?> getClassFromType(Type type) {
-        if (type instanceof Class<?> classType) {
-            return classType;
+    /**
+     * Collect the necessary type substitutions into the {@code substitutions} map. For example,
+     * if {@code type} is {@code Map<String, List<Integer>>}, then the collected substitutions
+     * would be {@code K -> String, V -> List<Integer>} (both K and V come from {@link Map}).
+     *
+     * @param type          The type to get the substitutions from. This only makes sense to be
+     *                      some form of {@link ParameterizedType}
+     * @param substitutions The output map
+     */
+    private static void collectTypeSubstitutions(AnnotatedType type, Map<TypeVariable<?>, AnnotatedType> substitutions) {
+        if (type instanceof AnnotatedParameterizedType apt) {
+            TypeVariable<? extends Class<?>>[] variables = getRawType(type.getType()).getTypeParameters();
+            AnnotatedType[] args = apt.getAnnotatedActualTypeArguments();
+            if (variables.length == args.length) {
+                for (int i = 0; i < args.length; i++) {
+                    substitutions.put(variables[i], args[i]);
+                }
+            }
+            if (apt.getAnnotatedOwnerType() instanceof AnnotatedParameterizedType owner) {
+                collectTypeSubstitutions(owner, substitutions);
+            }
+        } else if (type instanceof LazySubstitutingType lst) {
+            Map<TypeVariable<?>, AnnotatedType> intermediate = new HashMap<>();
+            collectTypeSubstitutions(lst.actual, intermediate);
+            intermediate.replaceAll((k, v) -> new LazySubstitutingType(v, lst.substitutions));
+            substitutions.putAll(intermediate);
+        } else if (type instanceof MergedAnnotatedType mat) {
+            collectTypeSubstitutions(mat.actual, substitutions);
+        } else {
+            collectTypeSubstitutions(type.getType(), substitutions);
         }
-        if (type instanceof ParameterizedType parameterizedType) {
-            return getClassFromType(parameterizedType.getRawType());
-        }
-        if (type instanceof GenericArrayType) {
-            return Object[].class;
-        }
-        if (type instanceof WildcardType wildcardType) {
-            return getClassFromType(wildcardType.getUpperBounds()[0]);
-        }
-        throw new IllegalArgumentException("Unknown type: " + type);
     }
 
-    private static Map<String, AnnotatedType> resolvedVariables(AnnotatedType annotatedType, Class<?> type) {
-        if (annotatedType instanceof AnnotatedParameterizedType parameterizedType) {
-            AnnotatedType[] actualTypeArguments = parameterizedType.getAnnotatedActualTypeArguments();
-            TypeVariable<? extends Class<?>>[] typeParameters = type.getTypeParameters();
-            if (actualTypeArguments.length != typeParameters.length) {
-                return Map.of();
-            }
-            Map<String, AnnotatedType> resolvedVariables = new LinkedHashMap<>();
-            for (int i = 0; i < actualTypeArguments.length; i++) {
-                AnnotatedType actualTypeArgument = actualTypeArguments[i];
-                if (actualTypeArgument.getType() instanceof TypeVariable<?>) {
-                    // Avoid unresolved type variables
-                    continue;
+    /**
+     * Collect the necessary type substitutions into the {@code substitutions} map. For example,
+     * if {@code type} is {@code Map<String, List<Integer>>}, then the collected substitutions
+     * would be {@code K -> String, V -> List<Integer>} (both K and V come from {@link Map}).
+     *
+     * @param type          The type to get the substitutions from. This only makes sense to be
+     *                      some form of {@link ParameterizedType}
+     * @param substitutions The output map
+     */
+    private static void collectTypeSubstitutions(Type type, Map<TypeVariable<?>, AnnotatedType> substitutions) {
+        if (type instanceof ParameterizedType pt) {
+            TypeVariable<? extends Class<?>>[] variables = getRawType(pt.getRawType()).getTypeParameters();
+            Type[] args = pt.getActualTypeArguments();
+            if (variables.length == args.length) {
+                for (int i = 0; i < args.length; i++) {
+                    substitutions.put(variables[i], new SimpleAnnotatedType(args[i]));
                 }
-                resolvedVariables.put(
-                    typeParameters[i].getName(),
-                    actualTypeArgument
-                );
-            }
-            return resolvedVariables;
-        }
-        return Map.of();
-    }
-
-    @Nullable
-    private static Argument<?> argumentOf(@NonNull AnnotatedType type,
-                                          @NonNull Class<?> interfaceType,
-                                          @NonNull Map<String, AnnotatedType> resolvedVariables) {
-        if (type.getType() instanceof TypeVariable<?> typeVariable) {
-            type = resolvedVariables.get(typeVariable.getName());
-            if (type == null) {
-                // Unresolved type variable
-                return null;
             }
         }
-        Class<?> resolvedType = getClassFromType(type.getType());
-        if (type instanceof AnnotatedParameterizedType annotatedParameterizedType) {
-            AnnotatedType[] annotatedActualTypeArguments = annotatedParameterizedType.getAnnotatedActualTypeArguments();
-            TypeVariable<? extends Class<?>>[] typeParameters = interfaceType.getTypeParameters();
-            if (annotatedActualTypeArguments.length != typeParameters.length) {
-                throw new IllegalArgumentException("Annotated parameters must have the same number of type parameters");
-            }
-            List<Argument<?>> list = new ArrayList<>();
-            for (int i = 0; i < annotatedActualTypeArguments.length; i++) {
-                TypeVariable<? extends Class<?>> typeVariable = typeParameters[i];
-                Class<?> variableBaseType = null;
-                AnnotatedType resolvedVariable = resolvedVariables.get(typeVariable.getName());
-                if (resolvedVariable == null) {
-                    resolvedVariable = annotatedActualTypeArguments[i];
-                    TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
-                    variableBaseType = getClassFromType(typeParameter.getBounds()[0]);
-                }
-                if (resolvedVariable instanceof TypeVariable<?>) {
-                    // Found unresolved type variable
-                    return null;
-                }
-                Argument<?> argument = argumentOf(resolvedVariable, variableBaseType, resolvedVariables);
-                if (argument == null) {
-                    return null;
-                }
-                list.add(Argument.ofTypeVariable(
-                    argument.getType(),
-                    typeVariable.getName(),
-                    argument.getAnnotationMetadata(),
-                    argument.getTypeParameters()
-                ));
-            }
-            return Argument.of(
-                resolvedType,
-                annotationMetadataOf(type),
-                list.toArray(new Argument<?>[0])
-            );
-        }
-        return Argument.of(resolvedType, annotationMetadataOf(type));
     }
 
     private static AnnotationMetadata annotationMetadataOf(AnnotatedElement annotatedElement) {
@@ -242,4 +202,253 @@ public final class AnnotationReflectionUtils {
         return mutableAnnotationMetadata;
     }
 
+    /**
+     * Convert the given annotated type to an {@link Argument}.
+     *
+     * @param annotatedType The type to convert
+     * @return The converted argument
+     */
+    private static Argument<?> toArgument(AnnotatedType annotatedType) {
+        return toArgument(null, annotatedType, Map.of());
+    }
+
+    /**
+     * Convert the given annotated type to an {@link Argument}.
+     *
+     * @param name          The name of the returned {@link Argument}, or {@code null}
+     * @param annotatedType The type to convert
+     * @param substitutions Type variables to replace
+     * @return The converted argument
+     */
+    private static Argument<?> toArgument(@Nullable String name, AnnotatedType annotatedType, Map<TypeVariable<?>, AnnotatedType> substitutions) {
+        if (annotatedType instanceof AnnotatedParameterizedType apt) {
+            Class<?> rawType = getRawType(apt.getType());
+            TypeVariable<? extends Class<?>>[] variables = rawType.getTypeParameters();
+            Argument<?>[] typeArgs = new Argument[apt.getAnnotatedActualTypeArguments().length];
+            for (int i = 0; i < typeArgs.length; i++) {
+                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, apt.getAnnotatedActualTypeArguments()[i], substitutions);
+            }
+            return Argument.of(getRawType(apt.getType()), name, annotationMetadataOf(apt), typeArgs);
+        } else if (annotatedType instanceof AnnotatedArrayType aat) {
+            Argument<?> component = toArgument(null, aat.getAnnotatedGenericComponentType(), substitutions);
+            AnnotationMetadata componentAnnotations = component.getAnnotationMetadata();
+            AnnotationMetadata ourAnnotations = annotationMetadataOf(aat);
+            AnnotationMetadata combined = combine(componentAnnotations, ourAnnotations);
+            return Argument.of(
+                Array.newInstance(component.getType(), 0).getClass(),
+                name,
+                combined
+            );
+        } else if (annotatedType instanceof AnnotatedWildcardType awt) {
+            Argument<?> upper = toArgument(null, awt.getAnnotatedUpperBounds()[0], substitutions);
+            return Argument.of(upper.getType(), name, combine(upper.getAnnotationMetadata(), annotationMetadataOf(annotatedType)), upper.getTypeParameters());
+        } else if (annotatedType instanceof LazySubstitutingType lst) {
+            Map<TypeVariable<?>, AnnotatedType> newSubstitutions;
+            if (substitutions.isEmpty()) {
+                newSubstitutions = lst.substitutions;
+            } else {
+                newSubstitutions = new HashMap<>();
+                newSubstitutions.putAll(substitutions);
+                newSubstitutions.putAll(lst.substitutions);
+            }
+            return toArgument(name, lst.actual, newSubstitutions);
+        } else if (annotatedType instanceof MergedAnnotatedType mat) {
+            Argument<?> argument = toArgument(null, mat.actual, substitutions);
+            return Argument.of(
+                argument.getType(),
+                name,
+                combine(argument.getAnnotationMetadata(), annotationMetadataOf(mat)),
+                argument.getTypeParameters()
+            );
+        } else {
+            Argument<?> simple = toArgument(null, annotatedType.getType(), substitutions);
+            AnnotationMetadata annotations = annotationMetadataOf(annotatedType);
+            return Argument.of(simple.getType(), name, combine(annotations, simple.getAnnotationMetadata()), simple.getTypeParameters());
+        }
+    }
+
+    /**
+     * Convert the given non-annotated type to an {@link Argument}.
+     *
+     * @param name          The name of the returned {@link Argument}, or {@code null}
+     * @param type          The type to convert
+     * @param substitutions Type variables to replace
+     * @return The converted argument
+     */
+    private static Argument<?> toArgument(@Nullable String name, Type type, Map<TypeVariable<?>, AnnotatedType> substitutions) {
+        if (type instanceof ParameterizedType pt) {
+            Class<?> rawType = getRawType(pt.getRawType());
+            TypeVariable<? extends Class<?>>[] variables = rawType.getTypeParameters();
+            Argument<?>[] typeArgs = new Argument[pt.getActualTypeArguments().length];
+            for (int i = 0; i < typeArgs.length; i++) {
+                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, pt.getActualTypeArguments()[i], substitutions);
+            }
+            return Argument.of(rawType, typeArgs);
+        } else if (type instanceof GenericArrayType gat) {
+            Argument<?> component = toArgument(null, gat.getGenericComponentType(), substitutions);
+            return Argument.of(
+                Array.newInstance(component.getType(), 0).getClass(),
+                name,
+                component.getAnnotationMetadata()
+            );
+        } else if (type instanceof WildcardType wt) {
+            return toArgument(name, wt.getUpperBounds()[0], substitutions);
+        } else if (type instanceof Class<?> cl) {
+            return Argument.of(cl, name);
+        } else if (type instanceof TypeVariable<?> tv) {
+            AnnotatedType sub = substitutions.get(tv);
+            if (sub == null) {
+                return toArgument(name, tv.getAnnotatedBounds()[0], Map.of());
+            } else {
+                return toArgument(name, sub, Map.of());
+            }
+        } else {
+            throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
+        }
+    }
+
+    private static AnnotationMetadata combine(AnnotationMetadata left, AnnotationMetadata right) {
+        if (left.isEmpty()) {
+            return right;
+        } else if (right.isEmpty()) {
+            return left;
+        } else {
+            return new AnnotationMetadataHierarchy(true, left, right);
+        }
+    }
+
+    /**
+     * Get all annotated supertypes of a class or interface.
+     *
+     * @param cl The class
+     * @return A stream of supertypes
+     */
+    private static Stream<AnnotatedType> getSupertypes(Class<?> cl) {
+        Stream<AnnotatedType> itf = Stream.of(cl.getAnnotatedInterfaces());
+        if (cl.isInterface()) {
+            return itf;
+        }
+        return Stream.concat(Stream.of(cl.getAnnotatedSuperclass()), itf);
+    }
+
+    /**
+     * Get the raw type of a given complex type.
+     *
+     * @param type The complex type
+     * @return The raw type
+     */
+    private static Class<?> getRawType(Type type) {
+        if (type instanceof Class<?> cl) {
+            return cl;
+        } else if (type instanceof ParameterizedType ptype) {
+            return getRawType(ptype.getRawType());
+        } else if (type instanceof TypeVariable<?> tv) {
+            return getRawType(tv.getBounds()[0]);
+        } else if (type instanceof WildcardType wt) {
+            return getRawType(wt.getUpperBounds()[0]);
+        } else if (type instanceof GenericArrayType gat) {
+            Class<?> rawComponentType = getRawType(gat.getGenericComponentType());
+            return Array.newInstance(rawComponentType, 0).getClass();
+        } else {
+            throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
+        }
+    }
+
+    /**
+     * Wrapper around a {@link AnnotatedType} to signals that certain {@link TypeVariable}s should
+     * be substituted lazily. For example, if {@code actual} is {@code List<T>} and
+     * {@code substitutions} is {@code T -> @Ann1 String}, users should treat this type as
+     * {@code List<@Ann1 String>}.
+     *
+     * @param actual        The type to delegate to
+     * @param substitutions Substitutions to apply to the type
+     */
+    private record LazySubstitutingType(AnnotatedType actual,
+                                        Map<TypeVariable<?>, AnnotatedType> substitutions) implements AnnotatedType {
+        @Override
+        public Type getType() {
+            return actual.getType();
+        }
+
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return actual.getAnnotation(annotationClass);
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return actual.getAnnotations();
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return actual.getDeclaredAnnotations();
+        }
+    }
+
+    /**
+     * Simple, annotation-less {@link AnnotatedType} implementation.
+     *
+     * @param actual The type
+     */
+    private record SimpleAnnotatedType(Type actual) implements AnnotatedType {
+        @Override
+        public Type getType() {
+            return actual;
+        }
+
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return null;
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return new Annotation[0];
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return new Annotation[0];
+        }
+    }
+
+    /**
+     * This record represents an {@link AnnotatedType} that merges the annotations of multiple
+     * different types. e.g. when {@code class A implements @Ann1 I {}},
+     * {@code class B extends A implements @Ann2 I {}}, this record is used to create a type
+     * {@code @Ann1 @Ann2 I} that represents the annotations of both {@code implements I} clauses.
+     *
+     * @param actual            The type to delegate to for {@link #getType()}
+     * @param annotationSources Elements to take annotations from
+     */
+    private record MergedAnnotatedType(AnnotatedType actual,
+                                       List<AnnotatedType> annotationSources) implements AnnotatedType {
+        @Override
+        public Type getType() {
+            return actual.getType();
+        }
+
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return annotationSources.stream()
+                .map(s -> s.getAnnotation(annotationClass))
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return annotationSources.stream()
+                .flatMap(s -> Arrays.stream(s.getAnnotations()))
+                .toArray(Annotation[]::new);
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return annotationSources.stream()
+                .flatMap(s -> Arrays.stream(s.getDeclaredAnnotations()))
+                .toArray(Annotation[]::new);
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package io.micronaut.context
 
 import io.micronaut.core.annotation.Nullable
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.lang.annotation.ElementType
@@ -65,7 +66,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
 
         then:
             argumentConsumer.type == Consumer
-            argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeAnnotation"]
+            argumentConsumer.annotationMetadata.annotationNames.isEmpty()
             argumentConsumer.getTypeVariable("T").get().type == String
             argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
     }
@@ -79,7 +80,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             def argumentConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
         then:
             argumentConsumer.type == Consumer
-            argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeAnnotation"]
+            argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeUseAnnotation"]
             argumentConsumer.getTypeVariable("T").get().type == String
             argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
 
@@ -87,7 +88,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             def argumentAbstractConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
         then:
             argumentAbstractConsumer.type == AbstractConsumer
-            argumentAbstractConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeAnnotation"]
+            argumentAbstractConsumer.annotationMetadata.annotationNames.isEmpty()
             argumentAbstractConsumer.getTypeVariable("T").get().type == String
             argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
 
@@ -123,17 +124,57 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argument.getTypeVariable("R").get().annotationMetadata.annotationNames.isEmpty()
     }
 
+    @PendingFeature // doesn't work with groovy for some reason
+    void "test array annotations"() {
+        given:
+        Consumer<String[]> consumer = new Consumer<@T1 String @T2 []>() {
+            @Override
+            void accept(String[] s) {
+            }
+        }
+
+        when:
+        def argument = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+        argument.type == Consumer
+        argument.annotationMetadata.annotationNames.isEmpty()
+        argument.getTypeVariable("T").get().type == String[]
+        argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.context.T1", "io.micronaut.context.T2"]
+    }
+
+    void "test indirect"() {
+        given:
+        Consumer<String> consumer = new AbstractConsumer3<@T3 String>() {
+            @Override
+            void accept(String s) {
+            }
+        }
+
+        when:
+        def argument = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+        argument.type == Consumer
+        argument.annotationMetadata.annotationNames.isEmpty()
+        argument.getTypeVariable("T").get().type == String
+        argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.context.T3"]
+    }
 }
 
-@MyTypeAnnotation
 abstract class AbstractConsumer<T> implements Consumer<T> {
     @Override
     void accept(T s) {
     }
 }
 
-@MyTypeAnnotation
-abstract class AbstractConsumer2<T> extends AbstractConsumer<T> implements Consumer<T> {
+abstract class AbstractConsumer2<T> extends AbstractConsumer<T> implements @MyTypeUseAnnotation Consumer<T> {
+    @Override
+    void accept(T s) {
+    }
+}
+
+abstract class AbstractConsumer3<T> extends AbstractConsumer<T> {
     @Override
     void accept(T s) {
     }
@@ -144,7 +185,17 @@ abstract class AbstractConsumer2<T> extends AbstractConsumer<T> implements Consu
 @interface MyTypeUseAnnotation {
 }
 
-@Target(ElementType.TYPE)
+@Target(ElementType.TYPE_USE)
 @Retention(RetentionPolicy.RUNTIME)
-@interface MyTypeAnnotation {
+@interface T1 {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface T2 {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface T3 {
 }
