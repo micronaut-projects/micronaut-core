@@ -90,6 +90,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
         updateCookies();
         return this;
     }
+
     @Override
     public MutableHttpRequest<B> uri(URI uri) {
         this.uri = uri;
