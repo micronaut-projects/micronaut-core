@@ -2,6 +2,8 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.HttpRequest
@@ -64,6 +66,37 @@ class ResponseBodySpec extends Specification {
             buffer.release()
         then:
             response.getBody(String).get() == "Hello"
+    }
+
+    def "get a ByteBuffer"() {
+        when:
+            def response = httpClient.toBlocking().exchange(HttpRequest.GET("/response-body/string"))
+        then:
+            response.getContentType().isEmpty()
+            response.getBody(ByteBuffer).isPresent()
+    }
+
+    def "get a ByteBuffer 2"() {
+        when:
+            def response = httpClient.toBlocking().exchange(HttpRequest.GET("/response-body/string"))
+        then:
+            response.getContentType().isEmpty()
+        when:
+            def buffer = response.getBody(ByteBuf).get()
+            buffer.release()
+        then:
+            response.getBody(ByteBuffer).isPresent()
+    }
+
+    def "get a ByteBuffer 3"() {
+        when:
+            def response = httpClient.toBlocking().exchange(HttpRequest.GET("/response-body/string"))
+        then:
+            response.getContentType().isEmpty()
+        when:
+            def buffer = response.getBody(ByteBuf).get()
+        then:
+            ConversionService.SHARED.convert(buffer, ByteBuffer).isPresent()
     }
 
     @Requires(property = 'spec.name', value = 'ResponseBodySpec')
