@@ -41,6 +41,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -95,35 +96,41 @@ public class IOUtils {
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
         List<Closeable> toClose = new ArrayList<>();
         try {
-            Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
-            if (myPath != null) {
-                Path finalMyPath = myPath;
-                // use this method instead of Files#walk to eliminate the Stream overhead
-                Files.walkFileTree(myPath, Collections.emptySet(), 1, new FileVisitor<>() {
-                    @Override
-                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFile(Path currentPath, BasicFileAttributes attrs) throws IOException {
-                        if (currentPath.equals(finalMyPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+            if("jrt".equals(uri.getScheme())) {
+                FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of());
+                Files.list(fs.getPath(uri.getPath())).forEach(consumer);
+            }
+            else {
+                Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
+                if (myPath != null) {
+                    Path finalMyPath = myPath;
+                    // use this method instead of Files#walk to eliminate the Stream overhead
+                    Files.walkFileTree(myPath, Collections.emptySet(), 1, new FileVisitor<>() {
+                        @Override
+                        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                             return FileVisitResult.CONTINUE;
                         }
-                        consumer.accept(currentPath);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
+    
+                        @Override
+                        public FileVisitResult visitFile(Path currentPath, BasicFileAttributes attrs) throws IOException {
+                            if (currentPath.equals(finalMyPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+                                return FileVisitResult.CONTINUE;
+                            }
+                            consumer.accept(currentPath);
+                            return FileVisitResult.CONTINUE;
+                        }
+    
+                        @Override
+                        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                            return FileVisitResult.CONTINUE;
+                        }
+    
+                        @Override
+                        public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+                }
             }
         } catch (IOException e) {
             // ignore, can't do anything here and can't log because class used in compiler
@@ -163,7 +170,7 @@ public class IOUtils {
                 // now, add the !/ at the end again so that loadNestedJarUri can handle it:
                 jarUri += "!/";
                 return loadNestedJarUriFunction.apply(toClose, jarUri).resolve(path);
-            } else if ("file".equals(scheme)) {
+            } else if ("file".equals(scheme) || "jrt".equals(scheme)) {
                 return Paths.get(uri).resolve(path);
             } else {
                 // graal resource: case

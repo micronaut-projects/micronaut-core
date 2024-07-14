@@ -348,6 +348,19 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                 }
                             }
                         }
+                    } else if("jrt".equals(uri.getScheme())) {
+                        FileSystem fileSystem = null;
+                        try {
+                            fileSystem = FileSystems.getFileSystem(URI.create("jrt:/"));
+                        } catch (FileSystemNotFoundException e) {
+                            //no-op
+                        }
+                        if (fileSystem == null || !fileSystem.isOpen()) {
+                            fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                        }
+
+                        pathObject = fileSystem.getPath(path);
+                        return pathObject == null || Files.isDirectory(pathObject);
                     } else if (uri.getScheme().equals("file")) {
                         pathObject = Paths.get(uri);
                         return pathObject == null || Files.isDirectory(pathObject);

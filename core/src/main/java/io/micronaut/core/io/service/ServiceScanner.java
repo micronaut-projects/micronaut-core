@@ -27,6 +27,8 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -185,6 +187,20 @@ final class ServiceScanner<S> {
             URL url = micronautResources.nextElement();
             final URI uri = url.toURI();
             uniqueURIs.add(uri);
+        }
+
+        if(uniqueURIs.isEmpty()) {
+            FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of(), classLoader);
+            Path modulesPath = fs.getPath("modules");
+            Files.list(modulesPath)
+                .filter(p->!p.getFileName().toString().startsWith("jdk."))
+                .filter(p->!p.getFileName().toString().startsWith("java."))
+                .map(p -> p.resolve(path))
+                .filter(Files::exists)
+                .map(p -> modulesPath.resolve(p)) // otherwise it'll be jrt:/<module>/META-INF/micronaut/<service>
+                .map(Path::toUri)
+                .forEach(uniqueURIs::add);
+            // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>
         }
 
         for (URI uri : uniqueURIs) {
