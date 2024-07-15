@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -45,11 +46,11 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(MatchArgumentQualifier.class);
     private final Argument<?> argument;
-    private final Argument<?> superArgument;
+    private final Argument<?> covariantArgument;
 
-    private MatchArgumentQualifier(Argument<?> argument, Argument<?> superArgument) {
+    private MatchArgumentQualifier(Argument<?> argument, Argument<?> covariantArgument) {
         this.argument = argument;
-        this.superArgument = superArgument;
+        this.covariantArgument = covariantArgument;
     }
 
     public static <T> MatchArgumentQualifier<T> ofArgument(Argument<?> argument) {
@@ -59,17 +60,51 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         );
     }
 
-    public static <T> MatchArgumentQualifier<T> ofSuperVariable(Class<T> beanType, Argument<?> argument) {
-        Argument<?> superArgument = Argument.ofTypeVariable(argument.getType(), null, argument.getAnnotationMetadata(), argument.getTypeParameters());
+    /**
+     * Finds matches of a type with a covariant generic type (types that extend the type or are equal to it).
+     * The generic argument is assignable from the candidate generic type.
+     * Use-cases are generic deserializers, readers.
+     *
+     * <pre>
+     * Java example:
+     * {@code MyReader<ArrayList<String>> candidate = ...; }
+     * {@code MyReader<? extends List<String>> aMatch = candidate; }
+     * </pre>
+     *
+     * @param beanType        The type of the beans
+     * @param genericArgument The generic argument of the bean type
+     * @param <T>             The bean type
+     * @return The qualifier
+     */
+    @NonNull
+    public static <T> MatchArgumentQualifier<T> covariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
+        Argument<?> covariantArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
         return new MatchArgumentQualifier<>(
-            Argument.of(beanType, superArgument),
-            superArgument
+            Argument.of(beanType, covariantArgument),
+            covariantArgument
         );
     }
 
-    public static <T> MatchArgumentQualifier<T> ofExtendsVariable(Class<T> beanType, Argument<?> argument) {
+    /**
+     * Finds matches of a type with a contravariant generic type (types that is a super type or are equal to it).
+     * The candidate generic type is assignable from the generic argument.
+     * Use-cases are generic serializers, writers.
+     *
+     * <pre>
+     * Java example:
+     * {@code MyWriter<String> candidate = ...; }
+     * {@code MyWriter<? super CharSequence> aMatch = candidate; }
+     * </pre>
+     *
+     * @param beanType        The type of the beans
+     * @param genericArgument The generic argument of the bean type
+     * @param <T>             The bean type
+     * @return The qualifier
+     */
+    @NonNull
+    public static <T> MatchArgumentQualifier<T> contravariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
         return new MatchArgumentQualifier<>(
-            Argument.of(beanType, Argument.ofTypeVariable(argument.getType(), null, argument.getAnnotationMetadata(), argument.getTypeParameters())),
+            Argument.of(beanType, Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters())),
             null
         );
     }
@@ -129,7 +164,9 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                 if (typeArgumentExtractor == null) {
                     if (bd instanceof BeanDefinition<?> beanDefinition) {
                         List<Argument<?>> typeArguments = beanDefinition.getTypeArguments(argument.getType());
-                        return typeArguments.get(finalI);
+                        if (finalI < typeArguments.size()) {
+                            return typeArguments.get(finalI);
+                        }
                     }
                     return null;
                 }
@@ -152,8 +189,6 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         List<BT> selectedDirect = null;
         boolean directMatch = false;
         List<Map.Entry<Class<?>, List<BT>>> closestMatches = null;
-        boolean interfaceCandidatePresent = false;
-        boolean classCandidatePresent = false;
         candidatesForLoop:
         for (BT candidate : candidates) {
 
@@ -162,6 +197,9 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                 argumentTypeClass = ReflectionUtils.getWrapperType(argumentTypeClass);
             }
             Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
+            if (candidateArgument == null) {
+                continue;
+            }
             Class<?> candidateType = candidateArgument.getType();
             if (argumentTypeClass.equals(candidateType)) {
                 if (!matchesArgumentTypeParameters(argument, candidateArgument)) {
@@ -187,29 +225,8 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                 continue;
             }
 
-            boolean isClassCandidate = !candidateType.isInterface();
             if (closestMatches != null) {
-                if (isClassCandidate) {
-                    if (interfaceCandidatePresent) {
-                        // Eliminate any previous candidates that are interfaces
-                        closestMatches.removeIf(e -> {
-                            boolean anInterface = e.getKey().isInterface();
-                            if (anInterface) {
-                                if (LOG.isTraceEnabled()) {
-                                    for (BT bt : e.getValue()) {
-                                        reject(argument, bt);
-                                    }
-                                }
-                            }
-                            return anInterface;
-                        });
-                        interfaceCandidatePresent = false;
-                    }
-                    classCandidatePresent = true;
-                } else if (classCandidatePresent) {
-                    // Avoid adding an interface candidate when a class candidate exists
-                    continue;
-                }
+                // Compare the candidate with previous matches, possibly eliminating some of them
                 for (Iterator<Map.Entry<Class<?>, List<BT>>> iterator = closestMatches.iterator(); iterator.hasNext(); ) {
                     Map.Entry<Class<?>, List<BT>> e = iterator.next();
                     Class<?> closestMatch = e.getKey();
@@ -239,8 +256,6 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             } else {
                 closestMatches = new ArrayList<>();
             }
-            classCandidatePresent = isClassCandidate;
-            interfaceCandidatePresent = !isClassCandidate;
             ArrayList<BT> newSelected = new ArrayList<>();
             newSelected.add(candidate);
             closestMatches.add(new AbstractMap.SimpleEntry<>(candidateType, newSelected));
@@ -273,15 +288,14 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             return candidateType.isAssignableFrom(argumentType);
         }
         if (argument.isTypeVariable()) {
-            if (argument == superArgument) {
+            // Is compatible?
+            if (argument == covariantArgument) {
                 if (candidateArgument.isTypeVariable() && candidateType.isAssignableFrom(argumentType)) {
-                    // Defined a type variable
+                    // Defined a type variable <T extends LowerType>
                     return true;
                 }
-                // Is compatible?
                 return argumentType.isAssignableFrom(candidateType);
             } else {
-                // Is compatible?
                 return candidateType.isAssignableFrom(argumentType);
             }
         }
@@ -302,4 +316,8 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         }
     }
 
+    @Override
+    public String toString() {
+        return "Matches [" + argument.toString() + "]";
+    }
 }
