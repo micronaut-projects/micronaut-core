@@ -193,14 +193,14 @@ final class ServiceScanner<S> {
             FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of(), classLoader);
             Path modulesPath = fs.getPath("modules");
             Files.list(modulesPath)
-                .filter(p->!p.getFileName().toString().startsWith("jdk."))
-                .filter(p->!p.getFileName().toString().startsWith("java."))
+                .filter(p->!p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
+                .filter(p->!p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
                 .map(p -> p.resolve(path))
                 .filter(Files::exists)
-                .map(p -> modulesPath.resolve(p)) // otherwise it'll be jrt:/<module>/META-INF/micronaut/<service>
+                .map(modulesPath::resolve)
                 .map(Path::toUri)
                 .forEach(uniqueURIs::add);
-            // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>
+            // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
         }
 
         for (URI uri : uniqueURIs) {
