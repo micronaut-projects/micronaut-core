@@ -16,10 +16,13 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.IOReader;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.function.Consumer;
 
 /**
  * Delegate class for {@link ByteBuffer}.
@@ -164,8 +167,18 @@ public class DelegateByteBuffer<T> implements ByteBuffer<T> {
     }
 
     @Override
+    public <R> R read(IOReader<R> reader) throws IOException {
+        return delegate.read(reader);
+    }
+
+    @Override
     public OutputStream toOutputStream() {
         return delegate.toOutputStream();
+    }
+
+    @Override
+    public void write(Consumer<OutputStream> writer) {
+        delegate.write(writer);
     }
 
     @Override

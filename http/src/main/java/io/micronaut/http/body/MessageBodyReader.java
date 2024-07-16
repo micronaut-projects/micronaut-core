@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
@@ -67,16 +66,11 @@ public interface MessageBodyReader<T> {
         @Nullable MediaType mediaType,
         @NonNull Headers httpHeaders,
         @NonNull ByteBuffer<?> byteBuffer) throws CodecException {
-        T read;
-        try (InputStream inputStream = byteBuffer.toInputStream()) {
-            read = read(type, mediaType, httpHeaders, inputStream);
+        try {
+            return byteBuffer.read(inputStream -> read(type, mediaType, httpHeaders, inputStream));
         } catch (IOException e) {
             throw new CodecException("Error reading message body: " + e.getMessage(), e);
         }
-        if (byteBuffer instanceof ReferenceCounted rc) {
-            rc.release();
-        }
-        return read;
     }
 
     /**

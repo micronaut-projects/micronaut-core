@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
@@ -35,7 +34,11 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * A {@link MediaTypeCodec} for {@link JsonMapper} based implementations.
@@ -275,15 +278,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer(bytes);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        try {
-            OutputStream outputStream = buffer.toOutputStream();
-            encode(object, outputStream);
-        } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted counted) {
-                counted.release();
-            }
-            throw t;
-        }
+        buffer.write(outputStream -> encode(object, outputStream));
         return buffer;
     }
 
@@ -293,15 +288,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer(bytes);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        try {
-            OutputStream outputStream = buffer.toOutputStream();
-            encode(type, object, outputStream);
-            return buffer;
-        } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted counted) {
-                counted.release();
-            }
-            throw t;
-        }
+        buffer.write(outputStream -> encode(type, object, outputStream));
+        return buffer;
     }
 }

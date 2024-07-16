@@ -15,9 +15,13 @@
  */
 package io.micronaut.core.io.buffer;
 
+import io.micronaut.core.util.IOReader;
+
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.function.Consumer;
 
 /**
  * Interface to allow interfacing with different byte buffer implementations, primarily as an abstraction over Netty.
@@ -36,6 +40,7 @@ public interface ByteBuffer<T> {
     /**
      * Returns the number of readable bytes which is equal to
      * {@code (this.writerIndex - this.readerIndex)}.
+     *
      * @return bytes
      */
     int readableBytes();
@@ -43,6 +48,7 @@ public interface ByteBuffer<T> {
     /**
      * Returns the number of writable bytes which is equal to
      * {@code (this.capacity - this.writerIndex)}.
+     *
      * @return The bytes
      */
     int writableBytes();
@@ -51,6 +57,7 @@ public interface ByteBuffer<T> {
      * Returns the maximum allowed capacity of this buffer.  If a user attempts to increase the
      * capacity of this buffer beyond the maximum capacity using {@link #capacity(int)} or
      * {@link IllegalArgumentException}.
+     *
      * @return The max capacity
      */
     int maxCapacity();
@@ -60,6 +67,7 @@ public interface ByteBuffer<T> {
      * capacity, the content of this buffer is truncated.  If the {@code newCapacity} is greater
      * than the current capacity, the buffer is appended with unspecified data whose length is
      * {@code (newCapacity - currentCapacity)}.
+     *
      * @param capacity capacity
      * @return The bytebuffer
      */
@@ -67,12 +75,14 @@ public interface ByteBuffer<T> {
 
     /**
      * Returns the {@code readerIndex} of this buffer.
+     *
      * @return The index
      */
     int readerIndex();
 
     /**
      * Sets the {@code readerIndex} of this buffer.
+     *
      * @param readPosition readPosition
      * @return The buffer
      * @throws IndexOutOfBoundsException if the specified {@code readerIndex} is
@@ -83,6 +93,7 @@ public interface ByteBuffer<T> {
 
     /**
      * Returns the {@code writerIndex} of this buffer.
+     *
      * @return The index
      */
     int writerIndex();
@@ -91,16 +102,17 @@ public interface ByteBuffer<T> {
      * Sets the {@code writerIndex} of this buffer.
      *
      * @param position The position
+     * @return The index as buffer
      * @throws IndexOutOfBoundsException if the specified {@code writerIndex} is
      *                                   less than {@code this.readerIndex} or
      *                                   greater than {@code this.capacity}
-     * @return The index as buffer
      */
     ByteBuffer writerIndex(int position);
 
     /**
      * Gets a byte at the current {@code readerIndex} and increases
      * the {@code readerIndex} by {@code 1} in this buffer.
+     *
      * @return bytes
      * @throws IndexOutOfBoundsException if {@code this.readableBytes} is less than {@code 1}
      */
@@ -121,6 +133,7 @@ public interface ByteBuffer<T> {
      * Transfers this buffer's data to the specified destination starting at
      * the current {@code readerIndex} and increases the {@code readerIndex}
      * by the number of the transferred bytes (= {@code dst.length}).
+     *
      * @param destination destination
      * @return bytesBuffer
      * @throws IndexOutOfBoundsException if {@code dst.length} is greater than {@code this.readableBytes}
@@ -146,8 +159,9 @@ public interface ByteBuffer<T> {
      * Sets the specified byte at the current {@code writerIndex}
      * and increases the {@code writerIndex} by {@code 1} in this buffer.
      * The 24 high-order bits of the specified value are ignored.
-     * @return bytesBuffer
+     *
      * @param b The byte to write
+     * @return bytesBuffer
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 1}
      */
     ByteBuffer write(byte b);
@@ -240,9 +254,10 @@ public interface ByteBuffer<T> {
      * modify {@code readerIndex} or {@code writerIndex} of this buffer.  Please note that the
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer, and it adjusted its capacity.
-     * @return byteBuffer
+     *
      * @param index  The index
      * @param length The length
+     * @return byteBuffer
      * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
      *                                       that shares the content with itself
      */
@@ -256,6 +271,23 @@ public interface ByteBuffer<T> {
     InputStream toInputStream();
 
     /**
+     * Write the byte buffer as an output stream.
+     *
+     * @param reader The output stream consumer
+     * @since 4.6
+     */
+    default <R> R read(IOReader<R> reader) throws IOException {
+        try {
+            return reader.read(toInputStream());
+        } catch (Throwable t) {
+            if (this instanceof ReferenceCounted rc) {
+                rc.release();
+            }
+            throw t;
+        }
+    }
+
+    /**
      * Convert the {@link ByteBuffer} into an output stream.
      *
      * @return this buffer as an input stream
@@ -263,14 +295,33 @@ public interface ByteBuffer<T> {
     OutputStream toOutputStream();
 
     /**
+     * Write the byte buffer as an output stream.
+     *
+     * @param writer The output stream writer
+     * @since 4.6
+     */
+    default void write(Consumer<OutputStream> writer) {
+        try {
+            writer.accept(toOutputStream());
+        } catch (Throwable t) {
+            if (this instanceof ReferenceCounted rc) {
+                rc.release();
+            }
+            throw t;
+        }
+    }
+
+    /**
      * Create a copy of the underlying storage from {@code buf} into a byte array.
      * The copy will start at {@link ByteBuffer#readerIndex()} and copy {@link ByteBuffer#readableBytes()} bytes.
+     *
      * @return byte array
      */
     byte[] toByteArray();
 
     /**
      * To string.
+     *
      * @param charset converted charset
      * @return string
      */

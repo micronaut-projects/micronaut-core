@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -134,14 +133,7 @@ public interface MessageBodyWriter<T> {
         @NonNull MutableHeaders outgoingHeaders,
         @NonNull ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
         ByteBuffer<?> buffer = bufferFactory.buffer();
-        try {
-            writeTo(type, mediaType, object, outgoingHeaders, buffer.toOutputStream());
-        } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted rc) {
-                rc.release();
-            }
-            throw t;
-        }
+        buffer.write(os -> writeTo(type, mediaType, object, outgoingHeaders, os));
         return buffer;
     }
 }
