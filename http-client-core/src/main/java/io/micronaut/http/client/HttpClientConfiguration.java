@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -127,6 +128,8 @@ public abstract class HttpClientConfiguration {
 
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
+    private Duration requestTimeout = null;
+
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
     private Duration connectionPoolIdleTimeout = DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS == 0 ? null : Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
@@ -178,6 +181,12 @@ public abstract class HttpClientConfiguration {
 
     @Nullable
     private String addressResolverGroupName = null;
+
+    private Duration http2PingIntervalRead = null;
+
+    private Duration http2PingIntervalWrite = null;
+
+    private Duration http2PingIntervalIdle = null;
 
     /**
      * Default constructor.
@@ -413,12 +422,34 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * The request timeout for non-streaming requests. This is the maximum time until the response
+     * must be completely received. Defaults to one second more than read-timeout.
+     *
+     * @return The request timeout
+     */
+    @NextMajorVersion("Set a default that isn't just requestTimeout+1 in DefaultHttpClient")
+    public Duration getRequestTimeout() {
+        return requestTimeout;
+    }
+
+    /**
+     * The request timeout for non-streaming requests. This is the maximum time until the response
+     * must be completely received. Defaults to one second more than read-timeout.
+     *
+     * @param requestTimeout The request timeout
+     */
+    public void setRequestTimeout(Duration requestTimeout) {
+        this.requestTimeout = requestTimeout;
+    }
+
+    /**
+     * For WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
      * [available in the Netty HTTP client]
      *
      * @return The default amount of time to allow read operation connections  to remain idle
      */
+    @NextMajorVersion("Rename to websocket-idle-timeout")
     public Optional<Duration> getReadIdleTimeout() {
         return Optional.ofNullable(readIdleTimeout);
     }
@@ -498,7 +529,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_IDLE_TIMEOUT_MINUTES} minutes).
+     * For WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * idle timeout is applied.
      *
      * @param readIdleTimeout The read idle time
      */
@@ -831,6 +863,69 @@ public abstract class HttpClientConfiguration {
      */
     public void setAddressResolverGroupName(@Nullable String addressResolverGroupName) {
         this.addressResolverGroupName = addressResolverGroupName;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+     * should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @return The timeout when to send a ping frame
+     */
+    @Nullable
+    public Duration getHttp2PingIntervalRead() {
+        return http2PingIntervalRead;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+     * should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @param http2PingIntervalRead The timeout when to send a ping frame
+     */
+    public void setHttp2PingIntervalRead(@Nullable Duration http2PingIntervalRead) {
+        this.http2PingIntervalRead = http2PingIntervalRead;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+     * should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @return The timeout when to send a ping frame
+     */
+    @Nullable
+    public Duration getHttp2PingIntervalWrite() {
+        return http2PingIntervalWrite;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+     * should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @param http2PingIntervalWrite The timeout when to send a ping frame
+     */
+    public void setHttp2PingIntervalWrite(@Nullable Duration http2PingIntervalWrite) {
+        this.http2PingIntervalWrite = http2PingIntervalWrite;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+     * automated ping should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @return The timeout when to send a ping frame
+     */
+    @Nullable
+    public Duration getHttp2PingIntervalIdle() {
+        return http2PingIntervalIdle;
+    }
+
+    /**
+     * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+     * automated ping should be sent. This can be used to keep low-traffic connections alive.
+     *
+     * @param http2PingIntervalIdle The timeout when to send a ping frame
+     */
+    public void setHttp2PingIntervalIdle(@Nullable Duration http2PingIntervalIdle) {
+        this.http2PingIntervalIdle = http2PingIntervalIdle;
     }
 
     /**

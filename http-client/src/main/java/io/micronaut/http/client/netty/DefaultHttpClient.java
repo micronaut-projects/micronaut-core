@@ -1132,15 +1132,16 @@ public class DefaultHttpClient implements
             responsePublisher
         );
         Flux<io.micronaut.http.HttpResponse<?>> finalReactiveSequence = Flux.from(finalPublisher);
-        // apply timeout to flowable too in case a filter applied another policy
-        Optional<Duration> readTimeout = configuration.getReadTimeout();
-        if (readTimeout.isPresent()) {
-            // add an additional second, because generally the timeout should occur
-            // from the Netty request handling pipeline
-            final Duration rt = readTimeout.get();
-            if (!rt.isNegative()) {
-                Duration duration = rt.plus(Duration.ofSeconds(1));
-                finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
+        Duration requestTimeout = configuration.getRequestTimeout();
+        if (requestTimeout == null) {
+            // for compatibility
+            requestTimeout = configuration.getReadTimeout()
+                .filter(d -> !d.isNegative())
+                .map(d -> d.plusSeconds(1)).orElse(null);
+        }
+        if (requestTimeout != null) {
+            if (!requestTimeout.isNegative()) {
+                finalReactiveSequence = finalReactiveSequence.timeout(requestTimeout)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
                             return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
