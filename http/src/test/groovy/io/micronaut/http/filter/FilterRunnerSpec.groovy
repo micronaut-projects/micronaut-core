@@ -1,8 +1,7 @@
 package io.micronaut.http.filter
 
-
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
@@ -12,6 +11,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.bind.DefaultRequestBinderRegistry
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
 import io.micronaut.inject.ExecutableMethod
 import org.reactivestreams.Publisher
@@ -19,7 +19,6 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import java.lang.annotation.Annotation
 import java.lang.reflect.Method
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -660,23 +659,11 @@ class FilterRunnerSpec extends Specification {
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return new MockProcessor().prepareFilterMethod(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0))
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def before(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return new MockProcessor().prepareFilterMethod(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0))
-    }
-
-    private class MockProcessor extends BaseFilterProcessor<Annotation> {
-
-        MockProcessor() {
-            super(null, null)
-        }
-
-        @Override
-        protected void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata) {
-
-        }
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {

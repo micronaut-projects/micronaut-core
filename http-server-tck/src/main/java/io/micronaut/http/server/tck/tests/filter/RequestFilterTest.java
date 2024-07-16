@@ -391,6 +391,33 @@ public class RequestFilterTest {
             .run();
     }
 
+    @Test
+    public void requestFilterRouteMatchNullable() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/route-match-nullable"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("route-match-nullable")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterRouteMatchNonNull() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/route-match-nonnull"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.NOT_FOUND)
+                    .build());
+            })
+            .run();
+    }
+
     @ServerFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -520,6 +547,16 @@ public class RequestFilterTest {
         @RequestFilter("/request-filter/route-match")
         public void requestFilterRouteMatch(MutableHttpRequest<?> request, RouteMatch<?> routeMatch) {
             request.setAttribute("route-match-response", routeMatch.getRouteInfo().getReturnType().getType().getName());
+        }
+
+        @RequestFilter("/request-filter/route-match-nullable")
+        public HttpResponse<?> requestFilterRouteMatchNullable(MutableHttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
+            return HttpResponse.ok("route-match-nullable");
+        }
+
+        @RequestFilter("/request-filter/route-match-nonnull")
+        public HttpResponse<?> requestFilterRouteMatchNonNull(MutableHttpRequest<?> request, RouteMatch<?> routeMatch) {
+            return HttpResponse.ok("route-match-nonnull");
         }
     }
 

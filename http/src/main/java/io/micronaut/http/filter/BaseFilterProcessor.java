@@ -23,14 +23,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
@@ -88,90 +85,31 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
-                Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
-                if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
-                    if (annotation == Body.class) {
-                        return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
-                            if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
-                                return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
-                                    Argument<T> t = context.getArgument();
-                                    if (t.isAssignableFrom(ByteBuffer.class)) {
-                                        return () -> Optional.of((T) imm.toByteBuffer());
-                                    } else if (t.isAssignableFrom(byte[].class)) {
-                                        byte[] bytes = imm.toByteArray();
-                                        return () -> Optional.of((T) bytes);
-                                    } else if (t.isAssignableFrom(String.class)) {
-                                        String str = imm.toString(StandardCharsets.UTF_8);
-                                        return () -> Optional.of((T) str);
-                                    } else {
-                                        return ArgumentBinder.BindingResult.unsatisfied();
-                                    }
-                                });
-                            }
-                            return ExecutionFlow.just(ArgumentBinder.BindingResult.unsatisfied());
-                        });
-                    } else {
-                        return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
-                    }
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
+                        if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
+                            return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
+                                Argument<T> t = context.getArgument();
+                                if (t.isAssignableFrom(ByteBuffer.class)) {
+                                    return () -> Optional.of((T) imm.toByteBuffer());
+                                } else if (t.isAssignableFrom(byte[].class)) {
+                                    byte[] bytes = imm.toByteArray();
+                                    return () -> Optional.of((T) bytes);
+                                } else if (t.isAssignableFrom(String.class)) {
+                                    String str = imm.toString(StandardCharsets.UTF_8);
+                                    return () -> Optional.of((T) str);
+                                } else {
+                                    return ArgumentBinder.BindingResult.unsatisfied();
+                                }
+                            });
+                        }
+                        return ExecutionFlow.just(ArgumentBinder.BindingResult.unsatisfied());
+                    });
+                } else {
+                    return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
                 }
-                return Optional.empty();
             }
         };
-    }
-
-    <T> MethodFilter<T> prepareFilterMethod(T bean,
-                                            ExecutableMethod<T, ?> method,
-                                            boolean isResponseFilter,
-                                            FilterOrder order) throws IllegalArgumentException {
-        Argument<?>[] arguments = method.getArguments();
-        Argument<?> returnType = method.getReturnType().asArgument();
-
-        FilterMethodBindingBuilder builder = new FilterMethodBindingBuilder(arguments.length, isResponseFilter);
-        for (int i = 0; i < arguments.length; i++) {
-            BaseFilterArgBinder binder = prepareArgument(method, isResponseFilter, builder, arguments[i]);
-            if (binder instanceof FilterArgBinder fab) {
-                builder.fulfilled[i] = fab;
-            } else if (binder instanceof AsyncFilterArgBinder async) {
-                if (builder.asyncArgBinders == null) {
-                    builder.asyncArgBinders = new AsyncFilterArgBinder[arguments.length];
-                }
-                builder.asyncArgBinders[i] = async;
-            } else {
-                throw new AssertionError("Binder should be sealed?");
-            }
-        }
-        if (builder.skipOnError) {
-            builder.addFilterCondition(ctx -> ctx.failure() == null);
-        }
-        ConversionService conversionService = beanContext == null ? ConversionService.SHARED : beanContext.getConversionService();
-        MethodFilter.FilterReturnHandler returnHandler = MethodFilter.prepareReturnHandler(conversionService, returnType, isResponseFilter, builder.continuationCreator != null, false);
-        return new MethodFilter<>(
-            order,
-            bean,
-            method,
-            method instanceof UnsafeExecutable unsafeExecutable ? (UnsafeExecutable<T, ?>) unsafeExecutable : null,
-            isResponseFilter,
-            builder.fulfilled,
-            builder.asyncArgBinders,
-            builder.filterCondition,
-            builder.continuationCreator,
-            builder.filtersException,
-            returnHandler,
-            bean instanceof ConditionalFilter
-        );
-    }
-
-    /**
-     * Build a {@link BaseFilterArgBinder} for a filter method argument.
-     *
-     * @param method           The filter method
-     * @param isResponseFilter {@code true} iff this is a response filter
-     * @param builder          {@link FilterMethodBindingBuilder} for e.g. adding conditions for filter execution
-     * @param argument         The argument type
-     * @return The binder for this argument
-     */
-    protected @NonNull BaseFilterArgBinder prepareArgument(ExecutableMethod<?, ?> method, boolean isResponseFilter, FilterMethodBindingBuilder builder, Argument<?> argument) {
-        return MethodFilter.prepareArgument(method, isResponseFilter, argumentBinderRegistry, argument, builder);
     }
 
     @Override
@@ -195,12 +133,12 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             if (method.isAnnotationPresent(RequestFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, RequestFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> withAsync(combined, prepareFilterMethod(beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
+                addFilter(() -> withAsync(combined, MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry)), method, combined);
             }
             if (method.isAnnotationPresent(ResponseFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> withAsync(combined, prepareFilterMethod(beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
+                addFilter(() -> withAsync(combined, MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry)), method, combined);
             }
         }
     }
