@@ -38,11 +38,10 @@ public class RouteMatchUtils {
         Optional<RouteMatch> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
         if (routeMatchAttribute.isPresent()) {
             return routeMatchAttribute;
-        } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Route match attribute for request ({}) not found", request.getPath());
-            }
-            return Optional.empty();
         }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Route match attribute for request ({}) not found", request.getPath());
+        }
+        return Optional.empty();
     }
 }

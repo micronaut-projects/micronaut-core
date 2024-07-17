@@ -21,6 +21,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.ChannelOption
+import io.netty.channel.epoll.Epoll
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
@@ -56,7 +57,10 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.nio.channels.Channels
+import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -577,6 +581,99 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
+    @spock.lang.Requires({ os.linux })
+    def 'nio unix domain socket'() {
+        given:
+        def dir = Files.createTempDirectory("mn-core-AccessLogSpec")
+        def sock = dir.resolve("socket")
+
+        def ctx = ApplicationContext.run([
+                'spec.name': 'AccessLogSpec',
+                'micronaut.server.netty.listeners.main.family': 'UNIX',
+                'micronaut.server.netty.listeners.main.path': sock.toString(),
+                'micronaut.server.netty.access-logger.enabled': true,
+                'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.server.netty.access-logger.log-format': '%h %v %r',
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        def listAppender = new ListAppender<ILoggingEvent>()
+        listAppender.start()
+        ((Logger) LoggerFactory.getLogger('http-access-log')).addAppender(listAppender)
+
+        when:
+        def socket = SocketChannel.open(UnixDomainSocketAddress.of(sock))
+        def out = Channels.newOutputStream(socket)
+        def in_ = Channels.newInputStream(socket)
+
+        out.write("GET / HTTP/1.1\r\nhost: foo\r\nconnection: close\r\n\r\n".bytes)
+        out.flush()
+
+        in_.readAllBytes()
+
+        then:
+        listAppender.list[0].message == '- ' + sock.toString() + ' GET / HTTP/1.1'
+
+        cleanup:
+        socket.close()
+
+        server.close()
+        ctx.close()
+
+        Files.deleteIfExists(sock)
+        Files.deleteIfExists(dir)
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
+    @spock.lang.Requires({ os.linux && Epoll.isAvailable() })
+    def 'epoll unix domain socket'() {
+        given:
+        def dir = Files.createTempDirectory("mn-core-AccessLogSpec")
+        def sock = dir.resolve("socket")
+
+        def ctx = ApplicationContext.run([
+                'spec.name': 'AccessLogSpec',
+                'micronaut.netty.event-loops.default.prefer-native-transport': true,
+                'micronaut.netty.event-loops.parent.prefer-native-transport': true,
+                'micronaut.server.netty.listeners.main.family': 'UNIX',
+                'micronaut.server.netty.listeners.main.path': sock.toString(),
+                'micronaut.server.netty.access-logger.enabled': true,
+                'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.server.netty.access-logger.log-format': '%h %v %r',
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        def listAppender = new ListAppender<ILoggingEvent>()
+        listAppender.start()
+        ((Logger) LoggerFactory.getLogger('http-access-log')).addAppender(listAppender)
+
+        when:
+        def socket = SocketChannel.open(UnixDomainSocketAddress.of(sock))
+        def out = Channels.newOutputStream(socket)
+        def in_ = Channels.newInputStream(socket)
+
+        out.write("GET / HTTP/1.1\r\nhost: foo\r\nconnection: close\r\n\r\n".bytes)
+        out.flush()
+
+        in_.readAllBytes()
+        println "'" + listAppender.list[0].message + "'"
+
+        then:
+        listAppender.list[0].message == '- ' + sock.toString() + ' GET / HTTP/1.1'
+
+        cleanup:
+        socket.close()
+
+        server.close()
+        ctx.close()
+
+        Files.deleteIfExists(sock)
+        Files.deleteIfExists(dir)
     }
 
     @Requires(property = 'spec.name', value = 'AccessLogSpec')

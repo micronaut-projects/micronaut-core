@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -80,6 +81,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
     }
 
     @Override
+    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         return super.findStatus(status());
     }

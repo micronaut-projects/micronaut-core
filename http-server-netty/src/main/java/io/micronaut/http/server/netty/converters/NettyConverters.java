@@ -19,7 +19,6 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -182,24 +181,6 @@ public final class NettyConverters implements TypeConverterRegistrar {
      */
     public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, ArgumentConversionContext<T> context) {
         Optional<T> converted = service.convert(input, context);
-        postProcess(input, converted);
-        return converted;
-    }
-
-    /**
-     * This method converts a
-     * {@link io.netty.util.ReferenceCounted netty reference counted object} and transfers release
-     * ownership to the new object.
-     *
-     * @param service    The conversion service
-     * @param input      The object to convert
-     * @param targetType The type to convert to
-     * @param context    The context to convert with
-     * @param <T>        Target type
-     * @return The converted object
-     */
-    public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, Class<T> targetType, ConversionContext context) {
-        Optional<T> converted = service.convert(input, targetType, context);
         postProcess(input, converted);
         return converted;
     }

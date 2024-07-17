@@ -53,13 +53,13 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     @Inject
     public HyphenatedUriNamingStrategy(@Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         if (contextPath == null) {
-            contextPath = "";
+            contextPath = StringUtils.EMPTY_STRING;
         }
         this.contextPath = normalizeContextPath(contextPath);
     }
 
     @Override
-    public String resolveUri(Class type) {
+    public String resolveUri(Class<?> type) {
         return contextPath + '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
     }
 

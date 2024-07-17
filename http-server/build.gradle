@@ -2,10 +2,6 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     api project(":http")
     api project(":router")

@@ -80,6 +80,7 @@ import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.resolver.AddressResolverGroup;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -439,6 +440,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
         ConversionService conversionService = beanContext.getBean(ConversionService.class);
+        String addressResolverGroupName = configuration.getAddressResolverGroupName();
+        AddressResolverGroup<?> resolverGroup = addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName));
         return new DefaultHttpClient(
                 loadBalancer,
                 httpVersion,
@@ -462,7 +465,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext),
                 clientCustomizer,
                 clientId,
-                conversionService
+                conversionService,
+                resolverGroup
         );
     }
 

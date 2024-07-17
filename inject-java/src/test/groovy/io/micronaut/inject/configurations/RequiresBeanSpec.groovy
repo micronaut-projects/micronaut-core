@@ -84,7 +84,7 @@ class RequiresBeanSpec extends Specification {
         def list = e.message.readLines().toList()
         list[0] == 'No bean of type [io.micronaut.inject.configurations.requiresproperty.RequiresProperty] exists. '
         list[1] == '* [RequiresProperty] is disabled because it is within the package [io.micronaut.inject.configurations.requiresproperty] which is disabled due to bean requirements: '
-        list[2] == ' - Required property [data-source.url] with value [null] not present'
+        list[2] == ' - Required property [data-source.url] not present'
 
         cleanup:
         context.close()

@@ -426,7 +426,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The Cookie
      */
     default Optional<Cookie> getCookie(String name) {
-        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
+        return getCookies().findCookie(name);
     }
 
     /**

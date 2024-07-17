@@ -48,7 +48,7 @@ class BeansEndpointSpec extends Specification {
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
         result.disabled.find {
             it.type == 'io.micronaut.logging.PropertiesLoggingLevelsConfigurer'
-        }.reasons == ["Required property [logger] with value [null] not present"]
+        }.reasons == ["Required property [logger] not present"]
 
         cleanup:
         rxClient.close()

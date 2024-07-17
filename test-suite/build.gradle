@@ -19,10 +19,6 @@ micronautBuild {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor platform(libs.test.boms.micronaut.validation)
@@ -104,24 +100,10 @@ dependencies {
 
     testImplementation(libs.javax.persistence)
     testImplementation(libs.jakarta.persistence)
+
+    testCompileOnly projects.injectJavaHelper2
 }
-
-//tasks.withType(Test).configureEach {
-//    useJUnitPlatform()
-//
-//    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
-//    testLogging {
-//        showStandardStreams = true
-//    }
-//    beforeTest {
-//        System.out.println("STARTING: ${it.className}.$it.name")
-//        System.out.flush()
-//    }
-//    afterTest {
-//        System.out.println("FINISHED: ${it.className}.$it.name")
-//        System.out.flush()
-//    }
-//}
-
-//compileTestJava.options.fork = true
-//compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+test {
+    // Prevent scanning classes with missing classes
+    exclude '**/classnotfound/**'
+}

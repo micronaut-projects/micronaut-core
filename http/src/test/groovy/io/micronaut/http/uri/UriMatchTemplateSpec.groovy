@@ -81,19 +81,25 @@ class UriMatchTemplateSpec extends Specification {
         where:
         template                         | uri                        | matches | variables
         // raw unencoded paths
+        "/id/{id}.csv"                   |'/id/{id}'                  | false   | null
         "https://www.domain.com/{+path}" |'https://www.domain.com/abc'| true    | [path:'abc']
+        "https://www.domain.com/       " |'https://www.domain.com    '| false   | null
         "/books/{+path}"                 | '/books/1.xml'             | true    | [path: '1.xml']
         "/books/{+path}"                 | '/books/foo/1.xml'         | true    | [path: 'foo/1.xml']
         "/books/{+path}"                 | '/books/foo/bar/baz'       | true    | [path: 'foo/bar/baz']
         "/books/{+path}/test"            | '/books/foo/bar/test'      | true    | [path: 'foo/bar']
         "/books{/id}{.ext:?}"            | '/books/1.xml'             | true    | [id: '1', ext: 'xml']
         "/books{/id}{.ext:?}"            | '/books/1'                 | true    | [id: '1', ext: null]
+        "/books{/id:.*}{/chapter:.*}"    | '/books/1/ch22'            | true    | [id: '1/ch22', chapter:'']
+        "/books{/id:\\d+}{/chapter:.*}"  | '/books/1/ch22'            | true    | [id: '1', chapter:'ch22']
+"/books{/id:\\d+}{/chapter:.*}/file{.ext:?}" | '/books/1/ch22/file.xml' | true    | [id: '1', chapter:'ch22', ext: 'xml']
         "/books{/path:.*?}{.ext:?}"      | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']
         ""                               | ""                         | true    | [:]
         "/"                              | "/"                        | true    | [:]
         "/"                              | ""                         | true    | [:]
         "/books{/id}/authors{/authorId}" | "/books/1/authors/2"       | true    | [id: '1', authorId: '2']
         "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']
+        "/books/{+path}{.ext:xml}"       | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']
         "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.json'      | false   | null
         "/books/{id:\\d+}"               | '/books/test'              | false   | null
         "/books/{id:\\d+}"               | '/books/101'               | true    | [id: '101']
@@ -134,6 +140,7 @@ class UriMatchTemplateSpec extends Specification {
         "/books{?max,offset}"            | "/books?foo=bar"           | true    | [:] //query parameters are not considered for matching
         "/books{#hashtag}"               | "/books"                   | true    | [:]
         "/{?max,offset}"                 | "/"                        | true    | [:]
+        "/book{/id,chapter}"             | '/book/123/ch1'            | true    | [id:"123", chapter:"ch1"]
     }
 
     @Unroll

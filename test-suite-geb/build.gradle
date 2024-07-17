@@ -23,10 +23,6 @@ micronautBuild {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     testImplementation project(':http')
     testImplementation project(':http-server-netty')

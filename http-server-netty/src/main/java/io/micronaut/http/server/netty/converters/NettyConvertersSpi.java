@@ -27,8 +27,6 @@ import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
@@ -55,35 +53,6 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                 CharSequence.class,
                 NettyHttpServerConfiguration.NettyListenerConfiguration.Family.class,
                 new CharSequenceToEnumConverter<>()
-        );
-        conversionService.addConverter(
-                ByteBuf.class,
-                CharSequence.class,
-                (byteBuf, target, context) -> Optional.of(byteBuf.toString(context.getCharset()))
-        );
-
-        conversionService.addConverter(
-                ByteBuf.class,
-                String.class,
-                (byteBuf, target, context) -> Optional.of(byteBuf.toString(context.getCharset()))
-        );
-
-        conversionService.addConverter(
-                CompositeByteBuf.class,
-                CharSequence.class,
-                (object, targetType, context) -> Optional.of(object.toString(context.getCharset()))
-        );
-
-        conversionService.addConverter(
-                ByteBuf.class,
-                byte[].class,
-                (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object))
-        );
-
-        conversionService.addConverter(
-                byte[].class,
-                ByteBuf.class,
-                (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object))
         );
 
         conversionService.addConverter(

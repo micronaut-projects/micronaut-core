@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.type.Argument;
@@ -91,8 +92,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.annotationMetadata = annotationMetadata;
         this.returnType = returnType;
         this.bodyType = resolveBodyType(returnType);
-        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes)
-            .map(w -> w.createSpecific((Argument<R>) bodyType))
+        var argBodyType = (Argument<R>) bodyType;
+        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
+            .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
@@ -185,6 +187,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public Argument<?> getResponseBodyType() {
         return bodyType;
     }
@@ -297,6 +300,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         if (definedStatus != null) {
             return definedStatus;
@@ -328,6 +332,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

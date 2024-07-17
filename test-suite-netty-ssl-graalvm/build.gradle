@@ -5,10 +5,6 @@ plugins {
 
 description = "Test suite for Bouncy Castle self signed certificate in native image"
 
-repositories {
-    mavenCentral()
-}
-
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
