@@ -724,8 +724,8 @@ public final class RouteExecutor {
                 mutableResponse = forStatus(routeInfo, null)
                     .body(asyncBody);
             }
-            if (mutableResponse.body() == null) {
-                if (routeInfo.isVoid() || explicitResponse) {
+            if (mutableResponse.body() == null && !explicitResponse) {
+                if (routeInfo.isVoid()) {
                     return CompletableFuture.completedStage(voidResponse(routeInfo));
                 }
                 return CompletableFuture.completedStage(newNotFoundError(request));

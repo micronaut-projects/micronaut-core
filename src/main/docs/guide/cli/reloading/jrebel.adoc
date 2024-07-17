@@ -72,12 +72,10 @@ Configure the Micronaut Maven Plugin accordingly:
     <plugins>
       <!-- ... -->
       <plugin>
-        <groupId>io.micronaut.build</groupId>
+        <groupId>io.micronaut.maven</groupId>
         <artifactId>micronaut-maven-plugin</artifactId>
           <configuration>
-            <jvmArguments>
-              <jvmArgument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</jvmArgument>
-            </jvmArguments>
+            <jvmArguments>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</jvmArguments>
           </configuration>
       </plugin>
       <plugin>
