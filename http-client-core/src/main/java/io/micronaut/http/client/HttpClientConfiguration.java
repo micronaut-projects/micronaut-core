@@ -182,12 +182,6 @@ public abstract class HttpClientConfiguration {
     @Nullable
     private String addressResolverGroupName = null;
 
-    private Duration http2PingIntervalRead = null;
-
-    private Duration http2PingIntervalWrite = null;
-
-    private Duration http2PingIntervalIdle = null;
-
     /**
      * Default constructor.
      */
@@ -866,66 +860,14 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
-     * should be sent. This can be used to keep low-traffic connections alive.
+     * Obtains the HTTP/2 configuration.
      *
-     * @return The timeout when to send a ping frame
+     * @return The HTTP/2 configuration.
+     * @since 4.6.0
      */
     @Nullable
-    public Duration getHttp2PingIntervalRead() {
-        return http2PingIntervalRead;
-    }
-
-    /**
-     * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
-     * should be sent. This can be used to keep low-traffic connections alive.
-     *
-     * @param http2PingIntervalRead The timeout when to send a ping frame
-     */
-    public void setHttp2PingIntervalRead(@Nullable Duration http2PingIntervalRead) {
-        this.http2PingIntervalRead = http2PingIntervalRead;
-    }
-
-    /**
-     * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
-     * should be sent. This can be used to keep low-traffic connections alive.
-     *
-     * @return The timeout when to send a ping frame
-     */
-    @Nullable
-    public Duration getHttp2PingIntervalWrite() {
-        return http2PingIntervalWrite;
-    }
-
-    /**
-     * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
-     * should be sent. This can be used to keep low-traffic connections alive.
-     *
-     * @param http2PingIntervalWrite The timeout when to send a ping frame
-     */
-    public void setHttp2PingIntervalWrite(@Nullable Duration http2PingIntervalWrite) {
-        this.http2PingIntervalWrite = http2PingIntervalWrite;
-    }
-
-    /**
-     * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
-     * automated ping should be sent. This can be used to keep low-traffic connections alive.
-     *
-     * @return The timeout when to send a ping frame
-     */
-    @Nullable
-    public Duration getHttp2PingIntervalIdle() {
-        return http2PingIntervalIdle;
-    }
-
-    /**
-     * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
-     * automated ping should be sent. This can be used to keep low-traffic connections alive.
-     *
-     * @param http2PingIntervalIdle The timeout when to send a ping frame
-     */
-    public void setHttp2PingIntervalIdle(@Nullable Duration http2PingIntervalIdle) {
-        this.http2PingIntervalIdle = http2PingIntervalIdle;
+    public Http2Configuration getHttp2Configuration() {
+        return null;
     }
 
     /**
@@ -1131,6 +1073,82 @@ public abstract class HttpClientConfiguration {
          */
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    public static class Http2Configuration {
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "http2";
+
+        private Duration pingIntervalRead = null;
+
+        private Duration pingIntervalWrite = null;
+
+        private Duration pingIntervalIdle = null;
+
+        /**
+         * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalRead() {
+            return pingIntervalRead;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalRead The timeout when to send a ping frame
+         */
+        public void setPingIntervalRead(@Nullable Duration pingIntervalRead) {
+            this.pingIntervalRead = pingIntervalRead;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalWrite() {
+            return pingIntervalWrite;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalWrite The timeout when to send a ping frame
+         */
+        public void setPingIntervalWrite(@Nullable Duration pingIntervalWrite) {
+            this.pingIntervalWrite = pingIntervalWrite;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+         * automated ping should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalIdle() {
+            return pingIntervalIdle;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+         * automated ping should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalIdle The timeout when to send a ping frame
+         */
+        public void setPingIntervalIdle(@Nullable Duration pingIntervalIdle) {
+            this.pingIntervalIdle = pingIntervalIdle;
         }
     }
 

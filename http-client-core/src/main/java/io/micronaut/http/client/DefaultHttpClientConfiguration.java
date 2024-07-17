@@ -40,6 +40,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     public static final String PREFIX = "micronaut.http.client";
     private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
     private final DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration;
+    private final DefaultHttp2Configuration http2Configuration;
 
     /**
      * Default constructor.
@@ -47,31 +48,47 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     public DefaultHttpClientConfiguration() {
         this.connectionPoolConfiguration = new DefaultConnectionPoolConfiguration();
         this.webSocketCompressionConfiguration = new DefaultWebSocketCompressionConfiguration();
+        this.http2Configuration = new DefaultHttp2Configuration();
     }
 
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, ApplicationConfiguration)} instead.
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2Configuration, ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         this(connectionPoolConfiguration, new DefaultWebSocketCompressionConfiguration(), applicationConfiguration);
     }
 
+    /**
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param applicationConfiguration The application configuration
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2Configuration, ApplicationConfiguration)} instead.
+     */
+    @Deprecated(since = "4.6.0")
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
+                                          DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+                                          ApplicationConfiguration applicationConfiguration) {
+        this(connectionPoolConfiguration, webSocketCompressionConfiguration, new DefaultHttp2Configuration(), applicationConfiguration);
+    }
 
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param http2Configuration The HTTP/2 configuration
      * @param applicationConfiguration The application configuration
      */
     @Inject
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
                                           DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+                                          DefaultHttp2Configuration http2Configuration,
                                           ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.connectionPoolConfiguration = connectionPoolConfiguration;
         this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
+        this.http2Configuration = http2Configuration;
     }
 
     @Override
@@ -96,6 +113,11 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
         }
     }
 
+    @Override
+    public Http2Configuration getHttp2Configuration() {
+        return http2Configuration;
+    }
+
     /**
      * The default connection pool configuration.
      */
@@ -112,5 +134,14 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @BootstrapContextCompatible
     @Primary
     public static class DefaultWebSocketCompressionConfiguration extends WebSocketCompressionConfiguration {
+    }
+
+    /**
+     * The default HTTP/2 configuration.
+     */
+    @ConfigurationProperties(Http2Configuration.PREFIX)
+    @BootstrapContextCompatible
+    @Primary
+    public static class DefaultHttp2Configuration extends Http2Configuration {
     }
 }

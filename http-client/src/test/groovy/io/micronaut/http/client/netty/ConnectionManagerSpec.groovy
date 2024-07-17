@@ -1179,9 +1179,9 @@ class ConnectionManagerSpec extends Specification {
 
         where:
         prop                                              | ping
-        'micronaut.http.client.http2-ping-interval-read'  | true
-        'micronaut.http.client.http2-ping-interval-write' | false
-        'micronaut.http.client.http2-ping-interval-idle'  | false
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | false
+        'micronaut.http.client.http2.ping-interval-idle'  | false
     }
 
     def 'automated ping, no traffic'(String prop, boolean ping) {
@@ -1213,9 +1213,9 @@ class ConnectionManagerSpec extends Specification {
 
         where:
         prop                                              | ping
-        'micronaut.http.client.http2-ping-interval-read'  | true
-        'micronaut.http.client.http2-ping-interval-write' | true
-        'micronaut.http.client.http2-ping-interval-idle'  | true
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | true
+        'micronaut.http.client.http2.ping-interval-idle'  | true
     }
 
     void assertPoolConnections(DefaultHttpClient client, int count) {

@@ -1450,14 +1450,17 @@ public class ConnectionManager {
                         ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
 
-                long read = toNanos(configuration.getHttp2PingIntervalRead());
-                long write = toNanos(configuration.getHttp2PingIntervalWrite());
-                long idle = toNanos(configuration.getHttp2PingIntervalIdle());
-                if (read > 0 || write > 0 || idle > 0) {
-                    channel.pipeline().addAfter(
-                        ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                        ChannelPipelineCustomizer.HANDLER_HTTP2_PING_SENDER,
-                        new Http2PingSender(read, write, idle, TimeUnit.NANOSECONDS));
+                HttpClientConfiguration.Http2Configuration http2Configuration = configuration.getHttp2Configuration();
+                if (http2Configuration != null) {
+                    long read = toNanos(http2Configuration.getPingIntervalRead());
+                    long write = toNanos(http2Configuration.getPingIntervalWrite());
+                    long idle = toNanos(http2Configuration.getPingIntervalIdle());
+                    if (read > 0 || write > 0 || idle > 0) {
+                        channel.pipeline().addAfter(
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_PING_SENDER,
+                            new Http2PingSender(read, write, idle, TimeUnit.NANOSECONDS));
+                    }
                 }
             }
 
