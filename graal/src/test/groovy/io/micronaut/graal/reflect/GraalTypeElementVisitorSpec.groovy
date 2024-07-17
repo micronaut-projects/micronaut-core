@@ -228,7 +228,7 @@ class Test {
         config.getAnnotations("fields").first().stringValue("name").get() == 'name'
     }
 
-    void "test write reflect.json for @Inject on private fields or methods"() {
+    void "test write reflect config for @Inject on private fields or methods"() {
 
         given:
         GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
@@ -261,6 +261,37 @@ class Other {}
         config.getAnnotations("methods").first().stringValue("name").get() == 'setFoo'
         config.getAnnotations("fields").size() == 1
         config.getAnnotations("fields").first().stringValue("name").get() == 'name'
+    }
+
+    void "test write reflect config for @Inject on inherited inaccessible fields and methods"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import io.micronaut.graal.reflect.other.TestParent;
+
+@jakarta.inject.Singleton
+class Test extends TestParent {
+}
+
+class Other {}
+''')
+
+        when:
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+        config
+        config.stringValue("type").get() == 'io.micronaut.graal.reflect.other.TestParent'
+        config.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 2
+        config.getAnnotations("methods").get(0).stringValue("name").get() == 'packagePrivateMethod'
+        config.getAnnotations("methods").get(1).stringValue("name").get() == 'privateMethod'
+        config.getAnnotations("fields").size() == 2
+        config.getAnnotations("fields").get(0).stringValue("name").get() == 'packagePrivateField'
+        config.getAnnotations("fields").get(1).stringValue("name").get() == 'privateField'
     }
 
     void "test write reflect.json for @ReflectiveAccess with inheritance"() {
