@@ -13,6 +13,7 @@ graal-svm = "23.1.4"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
+htmlsanitycheck = "1.1.6"
 httpcomponents-client = "4.5.14"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
@@ -27,6 +28,7 @@ jsr107 = "1.1.1"
 jsr305 = "3.0.2"
 jakarta-el = "5.0.1"
 jakarta-el-impl = "5.0.0-M1"
+japicmp-gradle-plugin="0.4.3"
 jazzer = "0.22.1"
 jcache = "1.1.1"
 junit5 = "5.10.3"
@@ -35,6 +37,7 @@ logback = "1.5.6"
 logbook-netty = "2.16.0"
 log4j = "2.23.1"
 micronaut-aws = "4.5.0"
+micronaut-build-plugins="7.2.0"
 micronaut-groovy = "4.3.0"
 micronaut-session = "4.3.0"
 micronaut-sql = "5.3.0"
@@ -43,6 +46,7 @@ micronaut-validation = "4.6.1"
 micronaut-rxjava2 = "2.3.0"
 micronaut-rxjava3 = "3.3.0"
 micronaut-reactor = "3.3.0"
+native-gradle-plugin = "0.10.2"
 neo4j-java-driver = "5.17.0"
 selenium = "4.9.1"
 slf4j = "2.0.13"
@@ -51,6 +55,7 @@ spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
 testcontainers = "1.19.8"
+tomlj="1.1.1"
 vertx = "4.5.8"
 wiremock = "2.33.2"
 
@@ -184,6 +189,7 @@ h2 = { module = "com.h2database:h2", version.ref = "h2" }
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
+htmlsanitycheck = { module = "org.aim42:htmlSanityCheck", version.ref = "htmlsanitycheck"}
 
 jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
@@ -194,7 +200,7 @@ jakarta-el-impl = { module = "org.glassfish:jakarta.el", version.ref = "jakarta-
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
 jakarta-persistence = { module = "jakarta.persistence:jakarta.persistence-api", version.ref = "jakarta-persistence" }
-
+japicmp-gradle-plugin = { module = "me.champeau.gradle:japicmp-gradle-plugin", version.ref = "japicmp-gradle-plugin"}
 jcache = { module = "javax.cache:cache-api", version.ref = "jcache" }
 
 jetty-alpn-openjdk8-client = { module = "org.eclipse.jetty:jetty-alpn-openjdk8-client", version.ref = "jetty" }
@@ -225,6 +231,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
+micronaut-build-plugins = { module = "io.micronaut.build.internal:micronaut-gradle-plugins", version.ref="micronaut-build-plugins"}
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
@@ -236,6 +243,8 @@ micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", vers
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
 mysql-driver = { module = "mysql:mysql-connector-java" }
+
+native-gradle-plugin = { module = "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin", version.ref = "native-gradle-plugin"}
 
 neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-java-driver" }
 
@@ -257,6 +266,7 @@ spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = 
 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
+tomlj = { module = "org.tomlj:tomlj", version.ref="tomlj"}
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
 micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-brave" }
 
