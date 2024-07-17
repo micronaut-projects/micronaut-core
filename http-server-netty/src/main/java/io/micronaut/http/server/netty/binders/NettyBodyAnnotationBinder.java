@@ -23,6 +23,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
@@ -37,6 +38,8 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
@@ -119,7 +122,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
                 nhr.addRouteWaitsFor(buffered.flatMap(imm -> {
-                    try {
+                    try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate()) {
                         result = transform(nhr, context, imm);
                         return ExecutionFlow.just(null);
                     } catch (Throwable e) {

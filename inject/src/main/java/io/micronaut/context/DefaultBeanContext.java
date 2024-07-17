@@ -952,20 +952,20 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private static String resolveKey(BeanRegistration<?> reg) {
         BeanDefinition<?> definition = reg.beanDefinition;
-        BeanIdentifier identifier = reg.identifier;
-        if (definition instanceof NameResolver resolver) {
-            String name = resolver.resolveName().orElse(null);
+        if (definition instanceof NameResolver resolver && resolver.resolveName().isPresent()) {
+            return resolver.resolveName().get();
+        }
+        Qualifier<?> declaredQualifier = definition.getDeclaredQualifier();
+        if (declaredQualifier != null) {
+            String name = Qualifiers.findName(declaredQualifier);
             if (name != null) {
                 return name;
             }
         }
-        String name = identifier.getName();
-        if (name.equals(Primary.SIMPLE_NAME)) {
-            Class<?> candidateType = reg.beanDefinition.getBeanType();
-            String candidateSimpleName = candidateType.getSimpleName();
-            return NameUtils.decapitalize(candidateSimpleName);
-        }
-        return name;
+        // Must be the primary or a single bean
+        Class<?> candidateType = reg.beanDefinition.getBeanType();
+        String candidateSimpleName = candidateType.getSimpleName();
+        return NameUtils.decapitalize(candidateSimpleName);
     }
 
     /**
