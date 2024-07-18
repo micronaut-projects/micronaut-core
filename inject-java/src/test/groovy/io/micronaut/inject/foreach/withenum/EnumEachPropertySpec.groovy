@@ -9,8 +9,8 @@ class EnumEachPropertySpec extends Specification {
     void "test each property with enum keys"() {
         given:
         def ctx = ApplicationContext.run(
-                "config.summer.cities":"barcelona,atlanta,sydney",
-                "config.winter.cities": "albertville,lillehammer,nagano"
+                "enumconfig.summer.cities":"barcelona,atlanta,sydney",
+                "enumconfig.winter.cities": "albertville,lillehammer,nagano"
         )
 
         when:

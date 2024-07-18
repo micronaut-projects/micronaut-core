@@ -187,7 +187,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                     } else {
                         String name = findName(resolutionContext.getCurrentQualifier());
                         if (name != null) {
-                            Object value = isEnum ? context.getConversionService().convertRequired(name, type) : simpleName;
+                            Object value = isEnum ? context.getConversionService().convertRequired(name, type) : name;
                             fulfilled.put(argumentName, value);
                         }
                     }
@@ -202,7 +202,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                     if (argument.isProvider()) {
                         Argument<?> pt = argument.getFirstTypeVariable().orElse(null);
                         if (pt != null) {
-                            type = (Class<Object>) pt.getType();
+                            type = pt.getType();
                         }
                     }
 
