@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -86,33 +85,29 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
-                Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
-                if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
-                    if (annotation == Body.class) {
-                        return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
-                            if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
-                                return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
-                                    Argument<T> t = context.getArgument();
-                                    if (t.isAssignableFrom(ByteBuffer.class)) {
-                                        return () -> Optional.of((T) imm.toByteBuffer());
-                                    } else if (t.isAssignableFrom(byte[].class)) {
-                                        byte[] bytes = imm.toByteArray();
-                                        return () -> Optional.of((T) bytes);
-                                    } else if (t.isAssignableFrom(String.class)) {
-                                        String str = imm.toString(StandardCharsets.UTF_8);
-                                        return () -> Optional.of((T) str);
-                                    } else {
-                                        return ArgumentBinder.BindingResult.UNSATISFIED;
-                                    }
-                                });
-                            }
-                            return ExecutionFlow.just(ArgumentBinder.BindingResult.UNSATISFIED);
-                        });
-                    } else {
-                        return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
-                    }
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
+                        if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
+                            return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
+                                Argument<T> t = context.getArgument();
+                                if (t.isAssignableFrom(ByteBuffer.class)) {
+                                    return () -> Optional.of((T) imm.toByteBuffer());
+                                } else if (t.isAssignableFrom(byte[].class)) {
+                                    byte[] bytes = imm.toByteArray();
+                                    return () -> Optional.of((T) bytes);
+                                } else if (t.isAssignableFrom(String.class)) {
+                                    String str = imm.toString(StandardCharsets.UTF_8);
+                                    return () -> Optional.of((T) str);
+                                } else {
+                                    return ArgumentBinder.BindingResult.unsatisfied();
+                                }
+                            });
+                        }
+                        return ExecutionFlow.just(ArgumentBinder.BindingResult.unsatisfied());
+                    });
+                } else {
+                    return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
                 }
-                return Optional.empty();
             }
         };
     }

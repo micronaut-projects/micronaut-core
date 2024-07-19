@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -123,33 +122,7 @@ record MethodFilter<T>(FilterOrder order,
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
             AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-            if (annotationMetadata.hasStereotype(Bindable.class)) {
-                ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
-                if (argumentBinder != null) {
-                    if (argumentBinder instanceof BaseFilterProcessor.AsyncBodyBinder<Object> async) {
-                        if (isResponseFilter) {
-                            throw new IllegalArgumentException("Cannot bind @Body in response filter method [" + method.getDescription(true) + "]");
-                        }
-                        if (asyncArgBinders == null) {
-                            asyncArgBinders = new AsyncFilterArgBinder[arguments.length];
-                        }
-                        asyncArgBinders[i] = ctx -> {
-                            HttpRequest<?> request = ctx.request;
-                            ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
-                            return async.bindAsync(conversionContext, request).map(result -> convertResult(method, argument, result));
-                        };
-                    } else {
-                        fulfilled[i] = ctx -> {
-                            HttpRequest<?> request = ctx.request;
-                            ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
-                            ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
-                            return convertResult(method, argument, result);
-                        };
-                    }
-                } else {
-                    throw new IllegalArgumentException("Unsupported binding annotation in filter method [" + method.getDescription(true) + "]: " + annotationMetadata.getAnnotationNameByStereotype(Bindable.class).orElse(null));
-                }
-            } else if (argumentType.isAssignableFrom(HttpRequest.class)) {
+            if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
             } else if (argumentType.isAssignableFrom(ServerHttpRequest.class)) {
                 // todo: only permit for server
@@ -208,7 +181,34 @@ record MethodFilter<T>(FilterOrder order,
             } else if (argumentType == MutablePropagatedContext.class) {
                 fulfilled[i] = ctx -> ctx.mutablePropagatedContext;
             } else {
-                throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
+                ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
+                if (argumentBinder != null) {
+                    if (argumentBinder instanceof BaseFilterProcessor.AsyncBodyBinder<Object> async) {
+                        if (isResponseFilter) {
+                            throw new IllegalArgumentException("Cannot bind @Body in response filter method [" + method.getDescription(true) + "]");
+                        }
+                        if (asyncArgBinders == null) {
+                            asyncArgBinders = new AsyncFilterArgBinder[arguments.length];
+                        }
+                        asyncArgBinders[i] = ctx -> {
+                            HttpRequest<?> request = ctx.request;
+                            ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
+                            return async.bindAsync(conversionContext, request).map(result -> convertResult(method, argument, result));
+                        };
+                    } else {
+                        fulfilled[i] = ctx -> {
+                            HttpRequest<?> request = ctx.request;
+                            ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
+                            ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
+                            return convertResult(method, argument, result);
+                        };
+                        if (argumentBinder instanceof FilterArgumentBinderPredicate pred) {
+                            filterCondition = filterCondition.and(ctx -> pred.test(argument, ctx.mutablePropagatedContext, ctx.request, ctx.response, ctx.failure));
+                        }
+                    }
+                } else {
+                    throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
+                }
             }
         }
         if (skipOnError) {
@@ -234,8 +234,8 @@ record MethodFilter<T>(FilterOrder order,
     }
 
     private static <T> Object convertResult(@Nullable ExecutableMethod<T, ?> method, Argument<?> argument, ArgumentBinder.BindingResult<Object> result) {
-        if (result.isPresentAndSatisfied()) {
-            return result.get();
+        if (result.isPresentAndSatisfied() || (argument.isNullable() && result.isSatisfied())) {
+            return result.getValue().orElse(null);
         } else {
             List<ConversionError> conversionErrors = result.getConversionErrors();
             if (!conversionErrors.isEmpty()) {

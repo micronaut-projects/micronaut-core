@@ -38,6 +38,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;
@@ -57,7 +58,8 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         FilterContinuation.class,
         Optional.class,
         Throwable.class,
-        MutablePropagatedContext.class
+        MutablePropagatedContext.class,
+        RouteMatch.class
     );
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),
