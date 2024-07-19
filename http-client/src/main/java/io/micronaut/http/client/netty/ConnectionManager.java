@@ -1450,7 +1450,7 @@ public class ConnectionManager {
                         ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
 
-                HttpClientConfiguration.Http2Configuration http2Configuration = configuration.getHttp2Configuration();
+                HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
                 if (http2Configuration != null) {
                     long read = toNanos(http2Configuration.getPingIntervalRead());
                     long write = toNanos(http2Configuration.getPingIntervalWrite());

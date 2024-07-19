@@ -420,7 +420,9 @@ public abstract class HttpClientConfiguration {
      * must be completely received. Defaults to one second more than read-timeout.
      *
      * @return The request timeout
+     * @since 4.6.0
      */
+    @Nullable
     @NextMajorVersion("Set a default that isn't just requestTimeout+1 in DefaultHttpClient")
     public Duration getRequestTimeout() {
         return requestTimeout;
@@ -432,7 +434,7 @@ public abstract class HttpClientConfiguration {
      *
      * @param requestTimeout The request timeout
      */
-    public void setRequestTimeout(Duration requestTimeout) {
+    public void setRequestTimeout(@Nullable Duration requestTimeout) {
         this.requestTimeout = requestTimeout;
     }
 
@@ -866,7 +868,7 @@ public abstract class HttpClientConfiguration {
      * @since 4.6.0
      */
     @Nullable
-    public Http2Configuration getHttp2Configuration() {
+    public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
         return null;
     }
 
@@ -1076,7 +1078,12 @@ public abstract class HttpClientConfiguration {
         }
     }
 
-    public static class Http2Configuration {
+    /**
+     * HTTP/2-specific client configuration.
+     *
+     * @since 4.6.0
+     */
+    public static class Http2ClientConfiguration {
         /**
          * The prefix to use for configuration.
          */

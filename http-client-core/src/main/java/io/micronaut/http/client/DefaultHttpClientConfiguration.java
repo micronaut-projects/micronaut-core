@@ -40,7 +40,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     public static final String PREFIX = "micronaut.http.client";
     private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
     private final DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration;
-    private final DefaultHttp2Configuration http2Configuration;
+    private final DefaultHttp2ClientConfiguration http2Configuration;
 
     /**
      * Default constructor.
@@ -48,13 +48,13 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     public DefaultHttpClientConfiguration() {
         this.connectionPoolConfiguration = new DefaultConnectionPoolConfiguration();
         this.webSocketCompressionConfiguration = new DefaultWebSocketCompressionConfiguration();
-        this.http2Configuration = new DefaultHttp2Configuration();
+        this.http2Configuration = new DefaultHttp2ClientConfiguration();
     }
 
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2Configuration, ApplicationConfiguration)} instead.
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
@@ -65,13 +65,13 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2Configuration, ApplicationConfiguration)} instead.
+     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
                                           DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
                                           ApplicationConfiguration applicationConfiguration) {
-        this(connectionPoolConfiguration, webSocketCompressionConfiguration, new DefaultHttp2Configuration(), applicationConfiguration);
+        this(connectionPoolConfiguration, webSocketCompressionConfiguration, new DefaultHttp2ClientConfiguration(), applicationConfiguration);
     }
 
     /**
@@ -83,7 +83,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @Inject
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
                                           DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-                                          DefaultHttp2Configuration http2Configuration,
+                                          DefaultHttp2ClientConfiguration http2Configuration,
                                           ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.connectionPoolConfiguration = connectionPoolConfiguration;
@@ -114,7 +114,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     }
 
     @Override
-    public Http2Configuration getHttp2Configuration() {
+    public Http2ClientConfiguration getHttp2Configuration() {
         return http2Configuration;
     }
 
@@ -139,9 +139,9 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     /**
      * The default HTTP/2 configuration.
      */
-    @ConfigurationProperties(Http2Configuration.PREFIX)
+    @ConfigurationProperties(Http2ClientConfiguration.PREFIX)
     @BootstrapContextCompatible
     @Primary
-    public static class DefaultHttp2Configuration extends Http2Configuration {
+    public static class DefaultHttp2ClientConfiguration extends Http2ClientConfiguration {
     }
 }

@@ -70,7 +70,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
-    private final ServiceHttp2Configuration http2Configuration;
+    private final ServiceHttp2ClientConfiguration http2Configuration;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
@@ -101,7 +101,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
         }
         this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
-        this.http2Configuration = new ServiceHttp2Configuration();
+        this.http2Configuration = new ServiceHttp2ClientConfiguration();
     }
 
     /**
@@ -111,7 +111,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param connectionPoolConfiguration The connection pool configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2Configuration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public ServiceHttpClientConfiguration(
@@ -130,7 +130,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2Configuration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public ServiceHttpClientConfiguration(
@@ -139,7 +139,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
         @Nullable ServiceSslClientConfiguration sslConfiguration,
         HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2Configuration(), sslConfiguration, defaultHttpClientConfiguration);
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
     }
 
     /**
@@ -157,7 +157,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
             @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-            @Nullable ServiceHttp2Configuration http2Configuration,
+            @Nullable ServiceHttpClientConfiguration.ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
@@ -167,7 +167,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
         this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
         this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
-        this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2Configuration::new);
+        this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2ClientConfiguration::new);
     }
 
     /**
@@ -299,7 +299,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     @Override
-    public ServiceHttpClientConfiguration.ServiceHttp2Configuration getHttp2Configuration() {
+    public ServiceHttp2ClientConfiguration getHttp2Configuration() {
         return http2Configuration;
     }
 
@@ -321,7 +321,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * The service HTTP/2 configuration.
      */
     @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
-    public static class ServiceHttp2Configuration extends Http2Configuration {
+    public static class ServiceHttp2ClientConfiguration extends Http2ClientConfiguration {
     }
 
     /**
