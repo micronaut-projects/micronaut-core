@@ -60,7 +60,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     private final String basePath;
     private final URL baseURL;
     private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
-            .maximumWeightedCapacity(50).build();
+        .maximumWeightedCapacity(50).build();
     private final boolean missingPath;
     private final boolean checkBase;
 
@@ -100,7 +100,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param classLoader The class loader for loading resources
      * @param basePath    The path to look for resources under
      * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
-     * @param logEnabled flag to enable or disable logger
+     * @param logEnabled  flag to enable or disable logger
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase, boolean logEnabled) {
 
@@ -290,9 +290,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     /**
      * Need this method to ability disable Slf4J initizalization.
      *
-     * @param basePath The path to load resources
+     * @param basePath   The path to load resources
      * @param logEnabled flag to enable or disable logger
-     *
      * @return The resource loader
      */
     public ResourceLoader forBase(String basePath, boolean logEnabled) {
@@ -348,7 +347,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                 }
                             }
                         }
-                    } else if("jrt".equals(uri.getScheme())) {
+                    } else if ("jrt".equals(uri.getScheme())) {
                         FileSystem fileSystem = null;
                         try {
                             fileSystem = FileSystems.getFileSystem(URI.create("jrt:/"));

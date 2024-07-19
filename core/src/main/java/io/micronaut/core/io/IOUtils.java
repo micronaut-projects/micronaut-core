@@ -166,7 +166,7 @@ public class IOUtils {
                 return loadNestedJarUriFunction.apply(toClose, jarUri).resolve(path);
             } else if ("file".equals(scheme)) {
                 return Paths.get(uri).resolve(path);
-            } else if( "jrt".equals(scheme)) {
+            } else if ("jrt".equals(scheme)) {
                 FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of());
                 return fs.getPath(uri.getPath());
             } else {

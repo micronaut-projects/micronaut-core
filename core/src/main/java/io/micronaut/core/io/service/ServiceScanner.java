@@ -189,12 +189,12 @@ final class ServiceScanner<S> {
             uniqueURIs.add(uri);
         }
 
-        if(uniqueURIs.isEmpty()) {
+        if (uniqueURIs.isEmpty()) {
             FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of(), classLoader);
             Path modulesPath = fs.getPath("modules");
             Files.list(modulesPath)
-                .filter(p->!p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
-                .filter(p->!p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
+                .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
+                .filter(p -> !p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
                 .map(p -> p.resolve(path))
                 .filter(Files::exists)
                 .map(modulesPath::resolve)
