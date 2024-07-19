@@ -435,18 +435,25 @@ public final class RouteExecutor {
 
     private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext, HttpRequest<?> request, RouteInfo<?> routeInfo, Object body) {
         // performance optimization: check for common body types
-        //noinspection ConditionCoveredByFurtherCondition
-        if (!(body instanceof String) && !(body instanceof byte[]) && body instanceof HttpResponse<?> httpResponse) {
-            MutableHttpResponse<?> outgoingResponse = httpResponse.toMutableResponse();
-            final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (bodyArgument.isAsyncOrReactive()) {
-                return fromPublisher(
-                    processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo)
-                );
-            }
-            return ExecutionFlow.just(outgoingResponse);
+        boolean shortCircuit = body instanceof String || body instanceof byte[];
+
+        // this is a bit messy to avoid type pollution performance issues
+        MutableHttpResponse<?> outgoingResponse;
+        if (!shortCircuit && body instanceof MutableHttpResponse<?> mut) {
+            outgoingResponse = mut;
+        } else if (!shortCircuit && body instanceof HttpResponse<?> httpResponse) {
+            outgoingResponse = httpResponse.toMutableResponse();
+        } else {
+            return ExecutionFlow.just(forStatus(routeInfo, null).body(body));
         }
-        return ExecutionFlow.just(forStatus(routeInfo, null).body(body));
+
+        final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (bodyArgument.isAsyncOrReactive()) {
+            return fromPublisher(
+                processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo)
+            );
+        }
+        return ExecutionFlow.just(outgoingResponse);
     }
 
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {

@@ -478,7 +478,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 content.release();
             }
-            if (message instanceof LastHttpContent last) {
+            // exact class check to avoid interface instanceof
+            if (message.getClass() == DefaultLastHttpContent.class || message instanceof LastHttpContent) {
                 // we got the full message before readComplete
                 ByteBuf fullBody;
                 if (buffer.size() == 0) {

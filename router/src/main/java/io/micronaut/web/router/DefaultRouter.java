@@ -75,11 +75,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private Set<Integer> ports;
     private final List<FilterRoute> alwaysMatchesFilterRoutes = new ArrayList<>();
     private final List<FilterRoute> preconditionFilterRoutes = new ArrayList<>();
-    private final Supplier<List<GenericHttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
+    // ArrayList to avoid interface checkcast
+    private final Supplier<ArrayList<GenericHttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
         if (alwaysMatchesFilterRoutes.isEmpty()) {
-            return Collections.emptyList();
+            return new ArrayList<>(0);
         }
-        List<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
+        ArrayList<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
         for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
             httpFilters.add(filterRoute.getFilter());
         }
@@ -236,7 +237,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         String path = request.getPath();
         if (routes.size() == 1) {
-            return (UriRouteMatch) routes.iterator().next().tryMatch(path);
+            Object o = routes.iterator().next();
+            // avoid type pollution perf issues
+            UriRouteInfo next = o instanceof DefaultUrlRouteInfo def ? def : (UriRouteInfo<Object, Object>) o;
+            return (UriRouteMatch) next.tryMatch(path);
         }
         List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
         for (UriRouteInfo<Object, Object> route : routes) {
@@ -561,7 +565,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         if (preconditionFilterRoutes.isEmpty()) {
-            return alwaysMatchesHttpFilters.get();
+            // for perf, this needs to be placed in an ArrayList variable first
+            @SuppressWarnings("UnnecessaryLocalVariable")
+            ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
+            return always;
         }
         var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
