@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -24,6 +25,7 @@ import io.micronaut.core.annotation.NonNull;
  * @author graemerocher
  * @since 2.0.0
  */
+@NextMajorVersion("Move constants to a different class and delete this one")
 public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP_COMPRESSOR = "http-compressor";
     String HANDLER_HTTP_DECOMPRESSOR = "http-decompressor";
@@ -51,6 +53,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_MICRONAUT_HTTP_RESPONSE_FULL = "micronaut-http-response-full";
     String HANDLER_MICRONAUT_HTTP_RESPONSE = "micronaut-http-response";
     String HANDLER_HTTP2_CONNECTION = "http2-connection";
+    String HANDLER_HTTP2_PING_SENDER = "http2-ping-sender";
     String HANDLER_HTTP2_SETTINGS = "http2-settings";
     String HANDLER_HTTP2_UPGRADE_REQUEST = "http2-upgrade-request";
     String HANDLER_HTTP2_PROTOCOL_NEGOTIATOR = "http2-protocol-negotiator";

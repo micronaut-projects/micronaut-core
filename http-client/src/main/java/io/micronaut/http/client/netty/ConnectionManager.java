@@ -1155,7 +1155,7 @@ public class ConnectionManager {
             ScheduledFuture<?> ttlFuture;
             volatile boolean windDownConnection = false;
 
-            private ResettableReadTimeoutHandler readTimeoutHandler;
+            private ReadTimeoutHandler readTimeoutHandler;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
@@ -1167,7 +1167,7 @@ public class ConnectionManager {
              */
             private void resetReadTimeout() {
                 if (readTimeoutHandler != null) {
-                    readTimeoutHandler.resetReadTimeoutMn();
+                    readTimeoutHandler.resetReadTimeout();
                 }
             }
 
@@ -1182,7 +1182,7 @@ public class ConnectionManager {
                 // read timeout handles timeouts *during* a request
                 configuration.getReadTimeout()
                     .ifPresent(dur -> {
-                        ResettableReadTimeoutHandler readTimeoutHandler = new ResettableReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
+                        ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
                                 if (hasLiveRequests()) {
@@ -1451,6 +1451,27 @@ public class ConnectionManager {
                         ChannelPipelineCustomizer.HANDLER_SSL :
                         ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
+
+                HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
+                if (http2Configuration != null) {
+                    long read = toNanos(http2Configuration.getPingIntervalRead());
+                    long write = toNanos(http2Configuration.getPingIntervalWrite());
+                    long idle = toNanos(http2Configuration.getPingIntervalIdle());
+                    if (read > 0 || write > 0 || idle > 0) {
+                        channel.pipeline().addAfter(
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_PING_SENDER,
+                            new Http2PingSender(read, write, idle, TimeUnit.NANOSECONDS));
+                    }
+                }
+            }
+
+            private static long toNanos(@Nullable Duration timeout) {
+                if (timeout == null) {
+                    return 0;
+                }
+                long nanos = timeout.toNanos();
+                return nanos < 0 ? 0 : nanos;
             }
 
             @Override
