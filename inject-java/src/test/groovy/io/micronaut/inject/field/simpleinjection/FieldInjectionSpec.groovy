@@ -18,7 +18,6 @@ package io.micronaut.inject.field.simpleinjection
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 
 class FieldInjectionSpec extends AbstractTypeElementSpec {
 

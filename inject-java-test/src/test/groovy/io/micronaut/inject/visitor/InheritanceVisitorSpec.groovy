@@ -3,6 +3,7 @@ package io.micronaut.inject.visitor
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 
@@ -79,6 +80,7 @@ class Parent {
             this.allClassesVisitor = allClassesVisitor
         }
 
+        @NonNull
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new IntrospectedTypeElementVisitor(), allClassesVisitor]

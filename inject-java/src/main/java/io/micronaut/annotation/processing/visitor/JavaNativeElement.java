@@ -43,11 +43,13 @@ public sealed interface JavaNativeElement {
 
     /**
      * The class native element.
+     *
      * @param element The element
      * @param typeMirror The type mirror
      * @param owner The owner
      */
-    record Class(TypeElement element, @Nullable TypeMirror typeMirror, @Nullable JavaNativeElement owner) implements JavaNativeElement {
+    record Class(TypeElement element, @Nullable TypeMirror typeMirror,
+                 @Nullable JavaNativeElement owner) implements JavaNativeElement {
 
         Class(TypeElement element) {
             this(element, null, null);
@@ -61,6 +63,7 @@ public sealed interface JavaNativeElement {
 
     /**
      * The class native element.
+     *
      * @param element The element
      * @param typeVariable The type variable
      * @param owner The owner
@@ -72,6 +75,7 @@ public sealed interface JavaNativeElement {
 
     /**
      * The method native element.
+     *
      * @param element The element
      */
     record Method(ExecutableElement element) implements JavaNativeElement {
@@ -79,6 +83,7 @@ public sealed interface JavaNativeElement {
 
     /**
      * The variable native element.
+     *
      * @param element The element
      */
     record Variable(VariableElement element) implements JavaNativeElement {
@@ -86,6 +91,7 @@ public sealed interface JavaNativeElement {
 
     /**
      * The package native element.
+     *
      * @param element The element
      */
     record Package(PackageElement element) implements JavaNativeElement {

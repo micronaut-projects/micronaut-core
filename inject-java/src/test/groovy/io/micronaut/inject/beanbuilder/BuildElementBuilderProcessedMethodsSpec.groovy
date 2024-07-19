@@ -3,6 +3,7 @@ package io.micronaut.inject.beanbuilder
 import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
@@ -52,6 +53,7 @@ class Foo {
     }
 
     static class TestAddAssociatedScheduledVisitor implements TypeElementVisitor {
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING

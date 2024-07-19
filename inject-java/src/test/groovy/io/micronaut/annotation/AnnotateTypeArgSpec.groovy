@@ -2,6 +2,7 @@ package io.micronaut.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
@@ -118,6 +119,7 @@ class Outer3 {
 
     static class AnnotateTypeArgVisitor implements TypeElementVisitor<Object, Object> {
 
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING

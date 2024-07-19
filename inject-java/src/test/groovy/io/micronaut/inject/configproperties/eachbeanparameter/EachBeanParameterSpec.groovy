@@ -3,7 +3,6 @@ package io.micronaut.inject.configproperties.eachbeanparameter
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
-import io.micronaut.context.annotation.Primary
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.PrimaryQualifier
 import io.micronaut.inject.qualifiers.Qualifiers

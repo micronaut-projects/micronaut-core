@@ -104,16 +104,16 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     /**
      * The default constructor.
      *
-     * @param processingEnv     The processing environment
-     * @param messager          The messager
-     * @param elements          The elements
-     * @param annotationUtils   The annotation utils
-     * @param types             Type types
-     * @param modelUtils        The model utils
-     * @param genericUtils      The generic type utils
-     * @param filer             The filer
+     * @param processingEnv The processing environment
+     * @param messager The messager
+     * @param elements The elements
+     * @param annotationUtils The annotation utils
+     * @param types Type types
+     * @param modelUtils The model utils
+     * @param genericUtils The generic type utils
+     * @param filer The filer
      * @param visitorAttributes The attributes
-     * @param visitorKind       The visitor kind
+     * @param visitorKind The visitor kind
      * @deprecated No longer needed
      */
     @Deprecated(forRemoval = true, since = "4.3.0")
@@ -134,14 +134,14 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     /**
      * The default constructor.
      *
-     * @param processingEnv     The processing environment
-     * @param messager          The messager
-     * @param elements          The elements
-     * @param types             Type types
-     * @param modelUtils        The model utils
-     * @param filer             The filer
+     * @param processingEnv The processing environment
+     * @param messager The messager
+     * @param elements The elements
+     * @param types Type types
+     * @param modelUtils The model utils
+     * @param filer The filer
      * @param visitorAttributes The attributes
-     * @param visitorKind       The visitor kind
+     * @param visitorKind The visitor kind
      */
     public JavaVisitorContext(
         ProcessingEnvironment processingEnv,
@@ -226,7 +226,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             return Optional.ofNullable(typeElement)
                 .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
         } catch (RuntimeException e) {
-            // can throw exception on Eclipse JDT which is braindead
+            // can throw exception on Eclipse JDT which is brain dead
             return Optional.empty();
         }
     }
@@ -238,7 +238,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
         if (packageElement != null) {
-            List<ClassElement> classElements = new ArrayList<>();
+            var classElements = new ArrayList<ClassElement>();
 
             populateClassElements(stereotypes, packageElement, classElements);
             return classElements.toArray(ClassElement.ZERO_CLASS_ELEMENTS);
@@ -252,16 +252,19 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         return elementFactory;
     }
 
+    @NonNull
     @Override
     public JavaElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
         return elementAnnotationMetadataFactory;
     }
 
+    @NonNull
     @Override
     public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return expressionCompilationContextFactory;
     }
 
+    @NonNull
     @Override
     public JavaAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return annotationMetadataBuilder;
@@ -320,7 +323,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{originatingElement});
+        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 
     @Override
@@ -484,7 +487,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
-        boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
+        boolean includeAll = Arrays.equals(stereotypes, new String[] {"*"});
         for (Element enclosedElement : enclosedElements) {
             populateClassElements(stereotypes, includeAll, packageElement, enclosedElement, classElements);
         }
@@ -541,7 +544,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     @Internal
     public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
-        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        final var current = new ArrayList<>(beanDefinitionBuilders);
         beanDefinitionBuilders.clear();
         return current;
     }
