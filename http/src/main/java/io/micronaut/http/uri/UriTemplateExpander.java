@@ -148,8 +148,8 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
 
     private void appendKeyValues(UriTemplateParser.ExpressionType type, UriTemplateParser.Variable variable, String key, List<String> values) {
         appendOperator(type);
-        builder.append(key);
-        builder.append('=');
+        builder.append(key)
+                .append('=');
         appendValues(type, variable, values);
     }
 
@@ -170,8 +170,8 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
         if (type.isQueryPart()) {
             builder.append(variable.name());
             if (StringUtils.isNotEmpty(value) || type != UriTemplateParser.ExpressionType.PATH_STYLE_PARAMETER_EXPANSION) {
-                builder.append('=');
-                builder.append(encode(value, true));
+                builder.append('=')
+                        .append(encode(value, true));
             }
         } else {
             builder.append(type.isEncode() ? encode(value, false) : escape(value));

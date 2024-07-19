@@ -46,16 +46,16 @@ class DefaultUriBuilder implements UriBuilder {
     private static final String STRING_PATTERN_SCHEME = "([^:/?#]+):";
     private static final String STRING_PATTERN_USER_INFO = "([^@\\[/?#]*)";
     private static final String STRING_PATTERN_HOST_IPV4 = "[^\\[{/?#:]*";
-    private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
+    private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}:.]*[%\\p{Alnum}]*]";
     private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
-    private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
+    private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?})?)";
     private static final String STRING_PATTERN_PATH = "([^#?]*)";
     private static final String STRING_PATTERN_QUERY = "([^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
 
     // Regex patterns that matches URIs. See RFC 3986, appendix B
     private static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
-    private static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
+    private static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#?]*)(\\?([^#]*))?(#(.*))?$");
     private static final Pattern PATTERN_FULL_URI = Pattern.compile(
         "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
             ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
@@ -88,7 +88,7 @@ class DefaultUriBuilder implements UriBuilder {
         this.fragment = uri.getRawFragment();
         final String query = uri.getQuery();
         if (query != null) {
-            final Map parameters = new QueryStringDecoder(uri).parameters();
+            final Map parameters = QueryStringDecoder.decodeParams(uri);
             this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -96,7 +96,7 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     /**
-     * Constructor for charsequence.
+     * Constructor for char sequence.
      *
      * @param uri The URI
      */
@@ -132,7 +132,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.path = new StringBuilder(path);
                 }
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
+                    final Map parameters = QueryStringDecoder.decodeParams(uri.toString());
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -150,7 +150,7 @@ class DefaultUriBuilder implements UriBuilder {
 
                 this.path = new StringBuilder(path);
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
+                    final Map parameters = QueryStringDecoder.decodeParams(uri.toString());
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -264,7 +264,7 @@ class DefaultUriBuilder implements UriBuilder {
     @Override
     public UriBuilder replaceQueryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
-            List<String> strings = new ArrayList<>(values.length);
+            var strings = new ArrayList<String>(values.length);
             for (Object value : values) {
                 if (value != null) {
                     strings.add(value.toString());
@@ -300,7 +300,7 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String reconstructAsString(Map<String, ? super Object> values) {
-        StringBuilder builder = new StringBuilder();
+        var builder = new StringBuilder();
         String scheme = this.scheme;
         String host = this.host;
         if (StringUtils.isNotEmpty(scheme)) {
@@ -308,7 +308,7 @@ class DefaultUriBuilder implements UriBuilder {
                 scheme = UriTemplate.of(scheme).expand(values);
             }
             builder.append(scheme)
-                   .append(":");
+                   .append(':');
         }
 
         final boolean hasPort = port != -1;
@@ -324,8 +324,8 @@ class DefaultUriBuilder implements UriBuilder {
                 } else {
                     userInfo = expandOrEncode(userInfo, values);
                 }
-                builder.append(userInfo);
-                builder.append("@");
+                builder.append(userInfo)
+                        .append('@');
             }
 
             if (hasHost) {
@@ -334,7 +334,7 @@ class DefaultUriBuilder implements UriBuilder {
             }
 
             if (hasPort) {
-                builder.append(":").append(port);
+                builder.append(':').append(port);
             }
         } else {
             String authority = this.authority;
@@ -380,7 +380,7 @@ class DefaultUriBuilder implements UriBuilder {
 
     private String buildQueryParams(Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
+            var builder = new StringBuilder();
             final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
             while (nameIterator.hasNext()) {
                 Map.Entry<String, List<String>> entry = nameIterator.next();

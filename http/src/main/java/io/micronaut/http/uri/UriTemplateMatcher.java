@@ -190,7 +190,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     operatorPrefix = "(";
                     variablePattern = s + ")";
                 }
-                variableQuantifier = "";
+                variableQuantifier = StringUtils.EMPTY_STRING;
             }
         } else if (limit != null) {
             variableQuantifier = "{1," + limit + "})";
@@ -203,9 +203,9 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             case LABEL_EXPANSION:
             case PATH_SEGMENT_EXPANSION:
                 regexpBuilder
-                    .append("(")
+                    .append('(')
                     .append(operatorPrefix)
-                    .append("\\")
+                    .append('\\')
                     .append(type.getOperator())
                     .append(operatorQuantifier);
                 operatorAppended = true;
@@ -213,7 +213,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             case RESERVED_EXPANSION:
             case NONE:
                 if (!operatorAppended) {
-                    regexpBuilder.append("(").append(operatorPrefix);
+                    regexpBuilder.append('(').append(operatorPrefix);
                 }
                 if (variablePattern == null) {
                     if (type == UriTemplateParser.ExpressionType.RESERVED_EXPANSION) {
@@ -226,13 +226,13 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 regexpBuilder
                     .append(variablePattern)
                     .append(variableQuantifier)
-                    .append(")");
+                    .append(')');
                 break;
             default:
                 throw new IllegalStateException("Unsupported regexp expression type: " + type);
         }
         if (type == UriTemplateParser.ExpressionType.PATH_SEGMENT_EXPANSION || pattern != null && pattern.equals("?")) {
-            regexpBuilder.append("?");
+            regexpBuilder.append('?');
         }
     }
 
