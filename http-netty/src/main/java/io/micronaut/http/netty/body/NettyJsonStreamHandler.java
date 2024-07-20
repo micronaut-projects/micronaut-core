@@ -82,7 +82,7 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
 
     @Override
     public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
-        throw new UnsupportedOperationException("Reading from InputStram is not supported for json-stream");
+        throw new UnsupportedOperationException("Reading from InputStream is not supported for json-stream");
     }
 
     @Override

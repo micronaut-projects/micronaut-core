@@ -18,7 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
@@ -49,22 +48,13 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
         return registry.findWriter(type, mediaTypes).orElse(this);
     }
 
-    public MessageBodyWriter<Object> find(Argument<Object> type, MediaType mediaType, Object object) {
-        MessageBodyWriter<Object> specific = registry.findWriter(type, List.of(mediaType)).orElse(null);
-        if (specific != null && !(specific instanceof DynamicMessageBodyWriter)) {
-            return specific;
+    public <T> MessageBodyWriter<T> find(Argument<T> type, MediaType mediaType, T object) {
+        if (type.getType() == Object.class) {
+            type = Argument.of(object);
         }
-        Argument<?> dynamicType = Argument.of(object.getClass());
-        MessageBodyWriter<?> dynamicWriter = registry.findWriter(dynamicType, List.of(mediaType)).orElse(null);
+        MessageBodyWriter<T> dynamicWriter = registry.findWriter(type, List.of(mediaType)).orElse(null);
         if (dynamicWriter != null && !(dynamicWriter instanceof DynamicMessageBodyWriter)) {
-            //noinspection unchecked
-            return (MessageBodyWriter<Object>) dynamicWriter;
-        }
-        if (mediaType.equals(MediaType.TEXT_PLAIN_TYPE) && ClassUtils.isJavaBasicType(object.getClass())) {
-            // compatibility...
-            // this will fall back to RawStringHandler, which can handle Object.
-            //noinspection unchecked,OptionalGetWithoutIsPresent,rawtypes
-            return (MessageBodyWriter) registry.findWriter(Argument.STRING, List.of(MediaType.TEXT_PLAIN_TYPE)).get();
+            return dynamicWriter;
         }
         throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found for media type: " + mediaType);
     }

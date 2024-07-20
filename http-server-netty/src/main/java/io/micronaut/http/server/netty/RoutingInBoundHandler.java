@@ -344,21 +344,20 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     .findWriter(responseBodyType, Collections.singletonList(responseMediaType))
                     .orElse(null);
             }
-
-            Argument<Object> actualResponseType;
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
-                messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(responseMediaType));
-                actualResponseType = Argument.of((Class<Object>) body.getClass());
-            } else {
-                actualResponseType = responseBodyType;
+                responseBodyType = Argument.of(body);
+                messageBodyWriter = this.messageBodyHandlerRegistry
+                    .findWriter(responseBodyType, List.of(responseMediaType))
+                    .orElse(null);
             }
-            NettyBodyWriter<Object> closure = specialize(wrap(messageBodyWriter), actualResponseType, responseMediaType, body);
+            NettyBodyWriter<Object> closure = specialize(wrap(messageBodyWriter), responseBodyType, responseMediaType, body);
             closeConnectionIfError(response, nettyRequest, outboundAccess);
             if (closure.isBlocking()) {
                 MediaType finalResponseMediaType = responseMediaType;
-                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess, true));
+                Argument<Object> finalResponseBodyType = responseBodyType;
+                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, finalResponseBodyType, finalResponseMediaType, body, closure, outboundAccess, true));
             } else {
-                writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, responseMediaType, body, closure, outboundAccess, false);
+                writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, closure, outboundAccess, false);
             }
         } else {
             response.body(null);
@@ -387,14 +386,21 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 mediaType,
                 body, outboundAccess);
         } catch (CodecException e) {
-            final MutableHttpResponse<?> errorResponse = routeExecutor.createDefaultErrorResponse(nettyRequest, e);
-            MediaType t = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-            NettyBodyWriter<Object> dyn = wrap(new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(t)).find(Argument.OBJECT_ARGUMENT, t, errorResponse.body()));
-            if (onIoExecutor || !dyn.isBlocking()) {
-                dyn.writeTo(nettyRequest, (MutableHttpResponse<Object>) errorResponse, Argument.OBJECT_ARGUMENT, t, errorResponse.body(), outboundAccess);
-            } else {
-                ioExecutor.execute(() -> dyn.writeTo(nettyRequest, (MutableHttpResponse<Object>) errorResponse, Argument.OBJECT_ARGUMENT, t, errorResponse.body(), outboundAccess));
-            }
+            final MutableHttpResponse<Object> errorResponse = (MutableHttpResponse<Object>) routeExecutor.createDefaultErrorResponse(nettyRequest, e);
+            writeError(nettyRequest, outboundAccess, onIoExecutor, errorResponse);
+        }
+    }
+
+    private void writeError(NettyHttpRequest<?> nettyRequest, OutboundAccess outboundAccess, boolean onIoExecutor, MutableHttpResponse<Object> errorResponse) {
+        Object errorBody = errorResponse.body();
+        Argument<Object> type = Argument.of(errorBody);
+        MediaType errorContentType = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+        MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, List.of(errorContentType));
+        NettyBodyWriter<Object> nettyWriter = wrap(messageBodyWriter);
+        if (onIoExecutor || !nettyWriter.isBlocking()) {
+            nettyWriter.writeTo(nettyRequest, errorResponse, type, errorContentType, errorBody, outboundAccess);
+        } else {
+            ioExecutor.execute(() -> nettyWriter.writeTo(nettyRequest, errorResponse, type, errorContentType, errorBody, outboundAccess));
         }
     }
 
@@ -415,16 +421,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
             isJson = mediaType != null &&
                 mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
             MediaType finalMediaType = mediaType;
-            @SuppressWarnings("unchecked") Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
             httpContentPublisher = bodyPublisher.concatMap(message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
+                @SuppressWarnings("unchecked")
+                Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
+                    responseBodyType = Argument.of(message);
                     messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(finalMediaType));
                 }
                 return writeAsync(
                     messageBodyWriter,
-                    responseBodyType.isInstance(message) ? responseBodyType : (Argument<Object>) Argument.of(message.getClass()),
+                    responseBodyType,
                     finalMediaType,
                     message,
                     response.getHeaders(), byteBufferFactory);
@@ -433,7 +441,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType finalMediaType = mediaType;
             DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, mediaType == null ? List.of() : List.of(mediaType));
             httpContentPublisher = bodyPublisher
-                .concatMap(message -> writeAsync(dynamicWriter, Argument.OBJECT_ARGUMENT, finalMediaType, message, response.getHeaders(), byteBufferFactory))
+                .concatMap(message -> writeAsync(dynamicWriter, Argument.of(message), finalMediaType, message, response.getHeaders(), byteBufferFactory))
                 .map(byteBuffer -> new DefaultHttpContent((ByteBuf) byteBuffer.asNativeBuffer()));
         }
 
@@ -459,7 +467,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         @NonNull ByteBufferFactory<?, ?> bufferFactory
     ) {
         if (messageBodyWriter instanceof DynamicMessageBodyWriter dyn) {
-            messageBodyWriter = (MessageBodyWriter<T>) dyn.find((Argument<Object>) type, mediaType, object);
+            messageBodyWriter = dyn.find(type, mediaType, object);
         }
         if (messageBodyWriter.isBlocking()) {
             MessageBodyWriter<T> finalMessageBodyWriter = messageBodyWriter;
@@ -571,7 +579,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     <T> NettyBodyWriter<T> specialize(NettyBodyWriter<T> original, Argument<T> bodyType, MediaType mediaType, T body) {
         if (original instanceof CompatNettyWriteClosure<T> cnwc && cnwc.delegate instanceof DynamicMessageBodyWriter dyn) {
-            return (NettyBodyWriter<T>) wrap(dyn.find((Argument<Object>) bodyType, mediaType, body));
+            return wrap(dyn.find(bodyType, mediaType, body));
         } else {
             return original;
         }
@@ -595,8 +603,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MessageBodyWriter<T> actual = delegate;
             // special case DynamicWriter: if the actual writer is a NettyBodyWriter, delegate to it
             if (delegate instanceof DynamicMessageBodyWriter dyn) {
-                //noinspection unchecked
-                actual = (MessageBodyWriter<T>) dyn.find((Argument<Object>) type, mediaType, object);
+                actual = dyn.find(type, mediaType, object);
                 if (actual instanceof NettyBodyWriter<T> nbw) {
                     nbw.writeTo(request, outgoingResponse, type, mediaType, object, nettyContext);
                     return;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,61 +20,37 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.TextPlainBodyHandler;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.netty.NettyHttpHeaders;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.micronaut.json.body.JsonMessageHandler;
+import io.micronaut.json.body.RawJsonStringHandler;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * A JSON body should not be escaped or parsed as a JSON value.
+ *
+ * @author Denis Stepanov
+ * @since 4.6
+ */
 @Singleton
-@Replaces(TextPlainBodyHandler.class)
-@Produces(MediaType.TEXT_PLAIN)
-@Consumes(MediaType.TEXT_PLAIN)
+@Replaces(RawJsonStringHandler.class)
+@JsonMessageHandler.ProducesJson
+@JsonMessageHandler.ConsumesJson
 @Internal
-public final class NettyTextPlainHandler implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, NettyBodyWriter<CharSequence> {
+public final class NettyRawJsonStringWriter implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, NettyBodyWriter<CharSequence> {
     private final TextPlainBodyHandler defaultHandler = new TextPlainBodyHandler();
 
     @Override
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) throws CodecException {
-        writePlain(outgoingResponse, mediaType, object, nettyContext);
-    }
-
-    static void writePlain(MutableHttpResponse<?> outgoingResponse, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) {
-        MutableHttpHeaders headers = outgoingResponse.getHeaders();
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, headers)));
-        NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
-        io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
-        if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
-        nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, byteBuf.readableBytes());
-        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-            HttpVersion.HTTP_1_1,
-            HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
-            byteBuf,
-            nettyHeaders,
-            EmptyHttpHeaders.INSTANCE
-        );
-        nettyContext.writeFull(fullHttpResponse);
+        NettyTextPlainHandler.writePlain(outgoingResponse, mediaType, object, nettyContext);
     }
 
     @Override

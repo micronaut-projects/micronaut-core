@@ -52,6 +52,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -92,9 +93,11 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.ByteBufRawMessageBodyHandler;
+import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
+import io.micronaut.http.netty.body.NettyRawJsonStringWriter;
+import io.micronaut.http.netty.body.NettyTextPlainHandler;
 import io.micronaut.http.netty.body.NettyWritableBodyWriter;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.reactive.HotObservable;
@@ -1292,7 +1295,7 @@ public class DefaultHttpClient implements
             }
         }
 
-        HttpPostRequestEncoder postRequestEncoder = null;
+        HttpPostRequestEncoder postRequestEncoder;
         if (permitsBody) {
             Optional<?> body = request.getBody();
             boolean hasBody = body.isPresent();
@@ -1323,8 +1326,8 @@ public class DefaultHttpClient implements
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
-                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), byteBufferFactory);
+                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(value -> {
+                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.of(value), requestContentType, value, request.getHeaders(), byteBufferFactory);
                             return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
                         });
 
@@ -1340,7 +1343,7 @@ public class DefaultHttpClient implements
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
-                        ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
+                        ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.of(bodyValue), requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = (ByteBuf) buffer.asNativeBuffer();
                     }
                     if (bodyContent == null) {
@@ -1792,9 +1795,18 @@ public class DefaultHttpClient implements
 
     private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
-        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(applicationConfiguration, NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler(), new NettyWritableBodyWriter(applicationConfiguration));
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(
+            applicationConfiguration,
+            NettyByteBufferFactory.DEFAULT,
+            new NettyByteBufMessageBodyHandler(),
+            new NettyWritableBodyWriter(applicationConfiguration)
+        );
         JsonMapper mapper = JsonMapper.createDefault();
+        registry.add(MediaType.TEXT_PLAIN_TYPE, (MessageBodyWriter<?>) new NettyTextPlainHandler());
+        registry.add(MediaType.TEXT_PLAIN_TYPE, (MessageBodyReader<?>) new NettyTextPlainHandler());
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_TYPE, (MessageBodyWriter<?>) new NettyRawJsonStringWriter());
+        registry.add(MediaType.APPLICATION_JSON_TYPE, (MessageBodyReader<?>) new NettyRawJsonStringWriter());
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
         return registry;
     }

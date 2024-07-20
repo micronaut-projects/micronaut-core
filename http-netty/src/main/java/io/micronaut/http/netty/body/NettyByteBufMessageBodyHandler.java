@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -26,7 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.body.RawMessageBodyHandler;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.TypedMessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -38,8 +38,6 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Handler for netty {@link ByteBuf}.
@@ -51,8 +49,13 @@ import java.util.List;
 @Singleton
 @Experimental
 @BootstrapContextCompatible
-@Bean(typed = RawMessageBodyHandler.class)
-public final class ByteBufRawMessageBodyHandler implements RawMessageBodyHandler<ByteBuf> {
+public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHandler<ByteBuf>, ChunkedMessageBodyReader<ByteBuf> {
+
+    @Override
+    public Argument<ByteBuf> getType() {
+        return Argument.of(ByteBuf.class);
+    }
+
     @Override
     public Publisher<ByteBuf> readChunked(Argument<ByteBuf> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(bb -> (ByteBuf) bb.asNativeBuffer());
@@ -74,9 +77,8 @@ public final class ByteBufRawMessageBodyHandler implements RawMessageBodyHandler
 
     @Override
     public void writeTo(Argument<ByteBuf> type, MediaType mediaType, ByteBuf object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        try {
-            new ByteBufInputStream(object).transferTo(outputStream);
-            object.release();
+        try (ByteBufInputStream byteBufInputStream = new ByteBufInputStream(object)) {
+            byteBufInputStream.transferTo(outputStream);
         } catch (IOException e) {
             throw new CodecException("Failed to transfer byte buffer", e);
         }
@@ -87,8 +89,4 @@ public final class ByteBufRawMessageBodyHandler implements RawMessageBodyHandler
         return NettyByteBufferFactory.DEFAULT.wrap(object);
     }
 
-    @Override
-    public Collection<Class<ByteBuf>> getTypes() {
-        return List.of(ByteBuf.class);
-    }
 }

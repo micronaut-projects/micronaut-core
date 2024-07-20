@@ -15,49 +15,39 @@
  */
 package io.micronaut.http.body;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
 
 /**
- * Body writer for {@link CharSequence}s.
+ * The body writer that will call {@link Object#toString()} and write it as a string for content type {@value MediaType#TEXT_PLAIN}.
  *
- * @since 4.0.0
- * @author Graeme Rocher
+ * @since 4.6
+ * @author Denis Stepanov
  */
+@Produces(MediaType.TEXT_PLAIN)
+@Consumes(MediaType.TEXT_PLAIN)
 @Singleton
-@Internal
-final class CharSequenceBodyWriter implements TypedMessageBodyWriter<CharSequence> {
-
-    private final Charset defaultCharset;
-
-    CharSequenceBodyWriter(ApplicationConfiguration applicationConfiguration) {
-        this.defaultCharset = applicationConfiguration.getDefaultCharset();
-    }
+@Experimental
+final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
 
     @Override
-    public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (mediaType != null) {
-            outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, mediaType);
-        }
+    public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN);
         try {
-            outputStream.write(object.toString().getBytes(MessageBodyWriter.findCharset(mediaType, outgoingHeaders).orElse(defaultCharset)));
+            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, outgoingHeaders)));
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
     }
 
-    @Override
-    public Argument<CharSequence> getType() {
-        return Argument.of(CharSequence.class);
-    }
 }

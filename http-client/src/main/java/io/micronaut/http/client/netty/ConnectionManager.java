@@ -500,7 +500,7 @@ public class ConnectionManager {
                         }
                     }
                 }
-            } else if (configuration.getProxyAddress().isEmpty()){
+            } else if (configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }

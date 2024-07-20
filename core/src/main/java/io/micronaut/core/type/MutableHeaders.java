@@ -53,4 +53,19 @@ public interface MutableHeaders extends Headers {
         add(header, value);
         return this;
     }
+
+    /**
+     * Sets an HTTP header if missing.
+     *
+     * @param header The header
+     * @param value  The value
+     * @return This headers
+     * @since 4.6
+     */
+    default MutableHeaders setIfMissing(CharSequence header, CharSequence value) {
+        if (!contains(header.toString())) {
+            add(header, value);
+        }
+        return this;
+    }
 }
