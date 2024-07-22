@@ -30,10 +30,6 @@ import io.micronaut.management.endpoint.annotation.Write
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 class URIPatternEndpointSpec extends Specification {
 
     void "test read uri-pattern endpoint"() {
