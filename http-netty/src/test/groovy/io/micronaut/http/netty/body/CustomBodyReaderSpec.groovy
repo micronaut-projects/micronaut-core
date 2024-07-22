@@ -98,7 +98,6 @@ class CustomBodyReaderSpec extends Specification {
     @Consumes("my/string")
     static class MyStringTypeReader implements MessageBodyReader<String> {
 
-        @Override
 
         @Override
         String read(@NonNull Argument<String> type, @Nullable MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {
