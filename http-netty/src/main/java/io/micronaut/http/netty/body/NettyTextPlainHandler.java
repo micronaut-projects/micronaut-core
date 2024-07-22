@@ -60,7 +60,7 @@ public final class NettyTextPlainHandler implements MessageBodyWriter<CharSequen
 
     static void writePlain(MutableHttpResponse<?> outgoingResponse, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, headers)));
+        ByteBuf byteBuf = Unpooled.copiedBuffer(object.toString(), MessageBodyWriter.getCharset(mediaType, headers));
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
         if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
