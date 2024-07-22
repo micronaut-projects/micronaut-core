@@ -77,8 +77,10 @@ public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHan
 
     @Override
     public void writeTo(Argument<ByteBuf> type, MediaType mediaType, ByteBuf object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        try (ByteBufInputStream byteBufInputStream = new ByteBufInputStream(object)) {
-            byteBufInputStream.transferTo(outputStream);
+        try {
+            new ByteBufInputStream(object).transferTo(outputStream);
+            // ByteBufInputStream#close doesn't release properly
+            object.release();
         } catch (IOException e) {
             throw new CodecException("Failed to transfer byte buffer", e);
         }
