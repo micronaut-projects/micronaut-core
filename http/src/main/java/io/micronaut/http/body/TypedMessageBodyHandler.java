@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 
 /**
@@ -31,5 +32,6 @@ public interface TypedMessageBodyHandler<T> extends MessageBodyHandler<T>, Typed
     /**
      * @return The body type.
      */
+    @NonNull
     Argument<T> getType();
 }

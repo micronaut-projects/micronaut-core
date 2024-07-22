@@ -73,7 +73,7 @@ public interface MessageBodyHandlerRegistry {
     );
 
     /**
-     * Gets a writer for the type and annotation metadata at declaration point or fails.
+     * Gets a writer for the type and annotation metadata at declaration point or fails with {@link CodecException}.
      * @param type The type
      * @param mediaType The media type
      * @return A message body writer if it is existing.

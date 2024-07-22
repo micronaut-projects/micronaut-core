@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 @Experimental
-abstract class AbstractMessageBodyHandlerRegistry implements MessageBodyHandlerRegistry {
+abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyHandlerRegistry permits ContextlessMessageBodyHandlerRegistry, DefaultMessageBodyHandlerRegistry {
     private static final MessageBodyReader<Object> NO_READER = new NoReader();
     private static final MessageBodyWriter<Object> NO_WRITER = new NoWriter();
     private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentHashMap<>(10);
