@@ -75,11 +75,14 @@ abstract class AbstractMessageBodyHandlerRegistry implements MessageBodyHandlerR
 
     @SuppressWarnings({"unchecked"})
     @Override
-    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
-        HandlerKey<T> key = new HandlerKey<>(type, mediaType);
+    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaTypes) {
+        if (type.getType() == Object.class) {
+            return Optional.of((MessageBodyWriter<T>) new DynamicMessageBodyWriter(this, mediaTypes));
+        }
+        HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
         if (messageBodyWriter == null) {
-            MessageBodyWriter<T> writer = findWriterImpl(type, mediaType);
+            MessageBodyWriter<T> writer = findWriterImpl(type, mediaTypes);
             if (writer != null) {
                 writers.put(key, writer);
                 return Optional.of(writer);

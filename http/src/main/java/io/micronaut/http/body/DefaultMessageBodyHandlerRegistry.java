@@ -111,9 +111,6 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
     @SuppressWarnings({"unchecked"})
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
-        if (type.getType() == Object.class) {
-            return (MessageBodyWriter<T>) new DynamicMessageBodyWriter(this, mediaTypes);
-        }
         return beanLocator.getBeansOfType(
                 Argument.of(MessageBodyWriter.class), // Select all writers and eliminate by the type later
                 Qualifiers.byQualifiers(

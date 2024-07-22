@@ -428,7 +428,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
                     responseBodyType = Argument.of(message);
-                    messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(finalMediaType));
+                    messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType));
                 }
                 return writeAsync(
                     messageBodyWriter,
@@ -439,9 +439,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }).map(byteBuffer -> new DefaultHttpContent((ByteBuf) byteBuffer.asNativeBuffer()));
         } else {
             MediaType finalMediaType = mediaType;
-            DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, mediaType == null ? List.of() : List.of(mediaType));
             httpContentPublisher = bodyPublisher
-                .concatMap(message -> writeAsync(dynamicWriter, Argument.of(message), finalMediaType, message, response.getHeaders(), byteBufferFactory))
+                .concatMap(message -> {
+                    Argument<Object> type = Argument.of(message);
+                    MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
+                    return writeAsync(messageBodyWriter, type, finalMediaType, message, response.getHeaders(), byteBufferFactory);
+                })
                 .map(byteBuffer -> new DefaultHttpContent((ByteBuf) byteBuffer.asNativeBuffer()));
         }
 
