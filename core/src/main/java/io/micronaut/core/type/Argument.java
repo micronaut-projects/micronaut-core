@@ -225,6 +225,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return A new argument
      * @since 4.6
      */
+    @NonNull
     default Argument<T> withName(@Nullable String name) {
         return Argument.of(getType(), name, getAnnotationMetadata(), getTypeParameters());
     }
@@ -235,6 +236,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return A new argument
      * @since 4.6
      */
+    @NonNull
     default Argument<T> withAnnotationMetadata(@NonNull AnnotationMetadata annotationMetadata) {
         return Argument.of(getType(), getName(), annotationMetadata, getTypeParameters());
     }
