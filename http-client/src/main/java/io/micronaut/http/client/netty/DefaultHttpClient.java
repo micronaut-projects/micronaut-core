@@ -1325,7 +1325,7 @@ public class DefaultHttpClient implements
                         );
 
                         Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(value -> {
-                            Argument<Object> type = Argument.of(value);
+                            Argument<Object> type = Argument.instanceType(value);
                             ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
                                 .writeTo(type, requestContentType, value, request.getHeaders(), byteBufferFactory);
                             return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
@@ -1343,7 +1343,7 @@ public class DefaultHttpClient implements
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
-                        Argument<Object> type = Argument.of(bodyValue);
+                        Argument<Object> type = Argument.instanceType(bodyValue);
                         ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
                             .writeTo(type, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = (ByteBuf) buffer.asNativeBuffer();

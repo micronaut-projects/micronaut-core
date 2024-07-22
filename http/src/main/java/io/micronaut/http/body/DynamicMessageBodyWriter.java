@@ -48,9 +48,9 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
         return registry.findWriter(type, mediaTypes).orElse(this);
     }
 
-    public <T> MessageBodyWriter<T> find(Argument<T> type, MediaType mediaType, T object) {
+    private <T> MessageBodyWriter<T> find(Argument<T> type, MediaType mediaType, T object) {
         if (type.getType() == Object.class) {
-            type = Argument.of(object);
+            type = Argument.instanceType(object);
         }
         MessageBodyWriter<T> dynamicWriter = registry.findWriter(type, List.of(mediaType)).orElse(null);
         if (dynamicWriter != null && !(dynamicWriter instanceof DynamicMessageBodyWriter)) {
