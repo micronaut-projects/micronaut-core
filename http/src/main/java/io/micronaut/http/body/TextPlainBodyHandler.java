@@ -18,6 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -27,6 +28,8 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -44,7 +47,7 @@ import java.io.OutputStream;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Experimental
-public final class TextPlainBodyHandler implements MessageBodyWriter<CharSequence>, MessageBodyReader<String> {
+public final class TextPlainBodyHandler implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, ChunkedMessageBodyReader<String> {
 
     @Override
     public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
@@ -68,5 +71,16 @@ public final class TextPlainBodyHandler implements MessageBodyWriter<CharSequenc
     @Override
     public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return byteBuffer.toString(MessageBodyWriter.getCharset(mediaType, httpHeaders));
+    }
+
+    @Override
+    public Publisher<String> readChunked(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return Flux.from(input).map(byteBuffer -> {
+            String s = byteBuffer.toString(MessageBodyWriter.getCharset(mediaType, httpHeaders));
+            if (byteBuffer instanceof ReferenceCounted rc) {
+                rc.release();
+            }
+            return s;
+        });
     }
 }

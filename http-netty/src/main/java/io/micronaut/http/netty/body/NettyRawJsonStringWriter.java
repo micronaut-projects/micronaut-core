@@ -17,12 +17,14 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.TextPlainBodyHandler;
@@ -30,6 +32,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.micronaut.json.body.RawJsonStringHandler;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,7 +48,7 @@ import java.io.OutputStream;
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @Internal
-public final class NettyRawJsonStringWriter implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, NettyBodyWriter<CharSequence> {
+public final class NettyRawJsonStringWriter implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, NettyBodyWriter<CharSequence>, ChunkedMessageBodyReader<String> {
     private final TextPlainBodyHandler defaultHandler = new TextPlainBodyHandler();
 
     @Override
@@ -61,5 +64,10 @@ public final class NettyRawJsonStringWriter implements MessageBodyWriter<CharSeq
     @Override
     public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         return defaultHandler.read(type, mediaType, httpHeaders, inputStream);
+    }
+
+    @Override
+    public Publisher<? extends String> readChunked(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return defaultHandler.readChunked(type, mediaType, httpHeaders, input);
     }
 }
