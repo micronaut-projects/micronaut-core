@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
@@ -39,6 +40,11 @@ import java.io.OutputStream;
 @Singleton
 @Experimental
 final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
+
+    @Override
+    public boolean isWriteable(Argument<Object> type, MediaType mediaType) {
+        return ClassUtils.isJavaBasicType(type.getType());
+    }
 
     @Override
     public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {

@@ -21,6 +21,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -76,7 +77,7 @@ class ConsumesControllerSpec {
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/multiple", book)
                 .contentType(MediaType.APPLICATION_JSON)));
 
-        assertDoesNotThrow(() ->
+        assertThrows(CodecException.class, () ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/member", book)
                 .contentType(MediaType.TEXT_PLAIN)));
     }
