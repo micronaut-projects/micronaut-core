@@ -137,11 +137,11 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         }
 
         @Override
-        public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
-            List<BT> all = new ArrayList<>(candidates.size());
-            List<BT> matchesMediaType = new ArrayList<>(candidates.size());
-            List<BT> matchesAll = new ArrayList<>(candidates.size());
-            for (BT candidate : candidates) {
+        public <K extends BeanType<T>> Collection<K> filter(Class<T> beanType, Collection<K> candidates) {
+            List<K> all = new ArrayList<>(candidates.size());
+            List<K> matchesMediaType = new ArrayList<>(candidates.size());
+            List<K> matchesAll = new ArrayList<>(candidates.size());
+            for (K candidate : candidates) {
                 String[] applicableTypes = candidate.getAnnotationMetadata().stringValues(annotationType);
                 if (applicableTypes.length == 0) {
                     matchesAll.add(candidate);

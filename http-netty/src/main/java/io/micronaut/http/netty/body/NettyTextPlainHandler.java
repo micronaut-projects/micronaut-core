@@ -45,6 +45,12 @@ import jakarta.inject.Singleton;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * The Netty plain text handler.
+ *
+ * @author Denis Stepanov
+ * @since 4.6
+ */
 @Singleton
 @Replaces(TextPlainBodyHandler.class)
 @Produces(MediaType.TEXT_PLAIN)
