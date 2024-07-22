@@ -502,7 +502,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @since 4.6
      */
     @NonNull
-    static <T> Argument<T> instanceType(T instance) {
+    static <T> Argument<T> ofInstance(T instance) {
         return Argument.of((Class<T>) instance.getClass());
     }
 

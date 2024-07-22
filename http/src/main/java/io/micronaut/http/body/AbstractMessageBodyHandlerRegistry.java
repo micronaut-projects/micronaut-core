@@ -77,7 +77,7 @@ abstract class AbstractMessageBodyHandlerRegistry implements MessageBodyHandlerR
     @Override
     public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaTypes) {
         if (type.getType() == Object.class) {
-            return Optional.of((MessageBodyWriter<T>) new DynamicMessageBodyWriter(this, mediaTypes));
+            return Optional.empty();
         }
         HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);

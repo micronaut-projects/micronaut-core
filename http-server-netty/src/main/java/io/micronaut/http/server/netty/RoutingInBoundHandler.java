@@ -343,8 +343,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     .findWriter(responseBodyType, Collections.singletonList(responseMediaType))
                     .orElse(null);
             }
-            if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType) || messageBodyWriter instanceof DynamicMessageBodyWriter) {
-                responseBodyType = Argument.instanceType(body);
+            if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
+                responseBodyType = Argument.ofInstance(body);
                 messageBodyWriter = this.messageBodyHandlerRegistry
                     .findWriter(responseBodyType, List.of(responseMediaType))
                     .orElse(null);
@@ -392,7 +392,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void writeError(NettyHttpRequest<?> nettyRequest, OutboundAccess outboundAccess, boolean onIoExecutor, MutableHttpResponse<Object> errorResponse) {
         Object errorBody = errorResponse.body();
-        Argument<Object> type = Argument.instanceType(errorBody);
+        Argument<Object> type = Argument.ofInstance(errorBody);
         MediaType errorContentType = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
         MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, List.of(errorContentType));
         NettyBodyWriter<Object> nettyWriter = wrap(messageBodyWriter);
@@ -425,8 +425,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
 
-                if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType) || messageBodyWriter instanceof DynamicMessageBodyWriter ) {
-                    responseBodyType = Argument.instanceType(message);
+                if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
+                    responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType));
                 }
                 return writeAsync(
@@ -440,7 +440,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType finalMediaType = mediaType;
             httpContentPublisher = bodyPublisher
                 .concatMap(message -> {
-                    Argument<Object> type = Argument.instanceType(message);
+                    Argument<Object> type = Argument.ofInstance(message);
                     MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
                     return writeAsync(messageBodyWriter, type, finalMediaType, message, response.getHeaders(), byteBufferFactory);
                 })
