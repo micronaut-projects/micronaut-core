@@ -188,7 +188,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         }
 
         );
-        if (LOG.isTraceEnabled() && !result.isPresent()) {
+        if (LOG.isTraceEnabled() && result.isEmpty()) {
             LOG.trace("Unable to convert response body to target type {}", type.getType());
         }
         return result;
@@ -213,6 +213,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
             }
             return Optional.empty();
         }
+        // All content operation should call slice to prevent reading the buffer completely
         Optional<MediaType> contentType = getContentType();
         if (contentType.isPresent()) {
             Optional<MessageBodyReader<T>> reader = handlerRegistry.findReader(type, List.of(contentType.get()));
@@ -220,14 +221,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
                 MessageBodyReader<T> r = reader.get();
                 MediaType ct = contentType.get();
                 if (r.isReadable(type, ct)) {
-                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent)));
+                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
                 }
             }
         } else if (LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
-        return conversionService.convert(unpooledContent, ByteBuf.class, type);
+        return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
     @NonNull

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.codec.CodecException;
 
 import java.util.List;
 import java.util.Optional;
@@ -70,4 +71,19 @@ public interface MessageBodyHandlerRegistry {
         @NonNull Argument<T> type,
         @NonNull List<MediaType> mediaType
     );
+
+    /**
+     * Gets a writer for the type and annotation metadata at declaration point or fails with {@link CodecException}.
+     * @param type The type
+     * @param mediaType The media type
+     * @return A message body writer if it is existing.
+     * @param <T> The generic type
+     */
+    default <T> MessageBodyWriter<T> getWriter(
+        @NonNull Argument<T> type,
+        @NonNull List<MediaType> mediaType
+    ) {
+        return findWriter(type, mediaType)
+            .orElseThrow(() -> new CodecException("Cannot encode value of argument [" + type + "]. No possible encoders found for media type: " + mediaType));
+    }
 }

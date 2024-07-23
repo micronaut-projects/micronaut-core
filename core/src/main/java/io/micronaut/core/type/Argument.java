@@ -516,6 +516,19 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates a new argument for the type of the given instance.
+     *
+     * @param instance The argument instance
+     * @param <T>      The generic type
+     * @return The argument instance
+     * @since 4.6
+     */
+    @NonNull
+    static <T> Argument<T> ofInstance(@NonNull T instance) {
+        return Argument.of((Class<T>) instance.getClass());
+    }
+
+    /**
      * Creates a new argument for the given type and name.
      *
      * @param type           The type

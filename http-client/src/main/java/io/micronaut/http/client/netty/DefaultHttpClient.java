@@ -49,7 +49,6 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
-import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -92,7 +91,8 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.ByteBufRawMessageBodyHandler;
+import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
+import io.micronaut.http.netty.body.NettyCharSequenceBodyWriter;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.body.NettyWritableBodyWriter;
@@ -1292,7 +1292,7 @@ public class DefaultHttpClient implements
             }
         }
 
-        HttpPostRequestEncoder postRequestEncoder = null;
+        HttpPostRequestEncoder postRequestEncoder;
         if (permitsBody) {
             Optional<?> body = request.getBody();
             boolean hasBody = body.isPresent();
@@ -1315,7 +1315,6 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent;
                 if (hasBody) {
                     Object bodyValue = body.get();
-                    DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(handlerRegistry, List.of(requestContentType));
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1323,8 +1322,10 @@ public class DefaultHttpClient implements
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
-                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), byteBufferFactory);
+                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(value -> {
+                            Argument<Object> type = Argument.ofInstance(value);
+                            ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
+                                .writeTo(type, requestContentType, value, request.getHeaders(), byteBufferFactory);
                             return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
                         });
 
@@ -1340,7 +1341,9 @@ public class DefaultHttpClient implements
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
-                        ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
+                        Argument<Object> type = Argument.ofInstance(bodyValue);
+                        ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
+                            .writeTo(type, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = (ByteBuf) buffer.asNativeBuffer();
                     }
                     if (bodyContent == null) {
@@ -1792,9 +1795,15 @@ public class DefaultHttpClient implements
 
     private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
-        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(applicationConfiguration, NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler(), new NettyWritableBodyWriter(applicationConfiguration));
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(
+            applicationConfiguration,
+            NettyByteBufferFactory.DEFAULT,
+            new NettyByteBufMessageBodyHandler(),
+            new NettyWritableBodyWriter(applicationConfiguration)
+        );
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyCharSequenceBodyWriter());
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
         return registry;
     }

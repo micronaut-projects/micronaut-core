@@ -22,20 +22,20 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
+import jakarta.annotation.Nullable;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Handler for SSE events.
@@ -56,25 +56,29 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
     private static final List<MediaType> JSON_TYPE_LIST = List.of(MediaType.APPLICATION_JSON_TYPE);
 
-    private final Supplier<MessageBodyWriter<Object>> jsonWriter;
+    @Nullable
+    private final MessageBodyWriter<Object> specificBodyWriter;
+    private final MessageBodyHandlerRegistry registry;
 
+    @Inject
     TextStreamBodyWriter(MessageBodyHandlerRegistry registry) {
-        this(SupplierUtil.memoized(() -> registry.findWriter(Argument.OBJECT_ARGUMENT, JSON_TYPE_LIST).orElse(new DynamicMessageBodyWriter(registry, JSON_TYPE_LIST))));
+        this(registry, null);
     }
 
-    private TextStreamBodyWriter(Supplier<MessageBodyWriter<Object>> jsonWriter) {
-        this.jsonWriter = jsonWriter;
+    private TextStreamBodyWriter(MessageBodyHandlerRegistry registry, @Nullable MessageBodyWriter<Object> specificBodyWriter) {
+        this.registry = registry;
+        this.specificBodyWriter = specificBodyWriter;
     }
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new TextStreamBodyWriter<>(SupplierUtil.memoized(() -> jsonWriter.get().createSpecific(getBodyType(type))));
+        return new TextStreamBodyWriter<>(registry, registry.findWriter(getBodyType(type), JSON_TYPE_LIST).orElse(null));
     }
 
     @SuppressWarnings("unchecked")
     @NonNull
     private static Argument<Object> getBodyType(Argument<?> type) {
-        if (type.getType() == Event.class) {
+        if (type.getType().equals(Event.class)) {
             return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         } else {
             return (Argument<Object>) type;
@@ -83,13 +87,28 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     @Override
     public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        Event<?> event = object instanceof Event<?> e ? e : Event.of(object);
-
+        Argument<Object> bodyType = (Argument<Object>) type;
+        Event<?> event;
+        if (object instanceof Event<?> e) {
+            event = e;
+            bodyType = (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        } else {
+            event = Event.of(object);
+        }
         byte[] body;
-        if (event.getData() instanceof CharSequence s) {
+        Object data = event.getData();
+        if (data instanceof CharSequence s) {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
-            ByteBuffer buf = ((MessageBodyWriter) jsonWriter.get()).writeTo(getBodyType(type), MediaType.APPLICATION_JSON_TYPE, event.getData(), outgoingHeaders, bufferFactory);
+            MessageBodyWriter<Object> messageBodyWriter = specificBodyWriter;
+            if (messageBodyWriter == null) {
+                messageBodyWriter = registry.findWriter(bodyType, JSON_TYPE_LIST).orElse(null);
+                if (messageBodyWriter == null) {
+                    bodyType = Argument.ofInstance(data);
+                    messageBodyWriter = registry.getWriter(bodyType, JSON_TYPE_LIST);
+                }
+            }
+            ByteBuffer<?> buf = messageBodyWriter.writeTo(bodyType, MediaType.APPLICATION_JSON_TYPE, data, outgoingHeaders, bufferFactory);
             body = buf.toByteArray();
             if (buf instanceof ReferenceCounted rc) {
                 rc.release();
@@ -98,7 +117,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.TEXT_EVENT_STREAM_TYPE);
 
-        ByteBuffer eventData = bufferFactory.buffer(body.length + 10);
+        ByteBuffer<?> eventData = bufferFactory.buffer(body.length + 10);
         writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
         writeAttribute(eventData, ID_PREFIX, event.getId());
         writeAttribute(eventData, EVENT_PREFIX, event.getName());
@@ -142,7 +161,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
      * @param attribute The attribute
      * @param value     The value
      */
-    private static void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
+    private static void writeAttribute(ByteBuffer<?> eventData, byte[] attribute, String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)

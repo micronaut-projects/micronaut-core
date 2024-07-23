@@ -52,7 +52,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
     private final RoutingInBoundHandler rib;
     private final OutboundAccess outboundAccess;
-    private final boolean validateUrl;
 
     /**
      * Should only be used where netty-specific stuff is needed, such as reading the body or
@@ -63,7 +62,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
         this.rib = rib;
-        this.validateUrl = rib.serverConfiguration.isValidateUrl();
         this.outboundAccess = outboundAccess;
     }
 

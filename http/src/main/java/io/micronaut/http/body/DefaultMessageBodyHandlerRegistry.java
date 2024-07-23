@@ -20,13 +20,11 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.MatchArgumentQualifier;
@@ -35,6 +33,7 @@ import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -48,7 +47,7 @@ import java.util.Objects;
 @Experimental
 @Singleton
 @BootstrapContextCompatible
-public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandlerRegistry {
+public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBodyHandlerRegistry {
     private final BeanContext beanLocator;
     private final List<CodecConfiguration> codecConfigurations;
 
@@ -57,12 +56,9 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
      *
      * @param beanLocator         The bean locator.
      * @param codecConfigurations The codec configurations
-     * @param rawHandlers         The handlers for raw types
      */
     DefaultMessageBodyHandlerRegistry(BeanContext beanLocator,
-                                      List<CodecConfiguration> codecConfigurations,
-                                      List<RawMessageBodyHandler<?>> rawHandlers) {
-        super(rawHandlers);
+                                      List<CodecConfiguration> codecConfigurations) {
         this.beanLocator = beanLocator;
         this.codecConfigurations = codecConfigurations;
     }
@@ -79,11 +75,14 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 )
             ).stream()
             .filter(reader -> mediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
-            .findFirst().orElse(null);
+            .findFirst()
+            .orElse(null);
     }
 
     @NonNull
-    private <T, B> MediaTypeQualifier<B> newMediaTypeQualifier(Argument<T> type, List<MediaType> mediaTypes, Class<? extends Annotation> qualifierType) {
+    private <T, B> MediaTypeQualifier<B> newMediaTypeQualifier(Argument<T> type,
+                                                               List<MediaType> mediaTypes,
+                                                               Class<? extends Annotation> qualifierType) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return new MediaTypeQualifier<>(type, resolvedMediaTypes, qualifierType);
     }
@@ -138,29 +137,26 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         }
 
         @Override
-        public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-            if (type.getType() == MessageBodyWriter.class && candidate instanceof BeanDefinition<?> definition) {
-                List<Argument<?>> consumedType = definition.getTypeArguments(MessageBodyWriter.class);
-                Argument<?>[] typeParameters = type.getTypeParameters();
-                if (ArrayUtils.isEmpty(typeParameters)) {
-                    return false;
+        public <K extends BeanType<T>> Collection<K> filter(Class<T> beanType, Collection<K> candidates) {
+            List<K> all = new ArrayList<>(candidates.size());
+            List<K> matchesMediaType = new ArrayList<>(candidates.size());
+            List<K> matchesAll = new ArrayList<>(candidates.size());
+            for (K candidate : candidates) {
+                String[] applicableTypes = candidate.getAnnotationMetadata().stringValues(annotationType);
+                if (applicableTypes.length == 0) {
+                    matchesAll.add(candidate);
+                    continue;
                 }
-
-                Argument<?> requiredType = typeParameters[0];
-                if (consumedType.isEmpty() || isInvalidType(consumedType, requiredType)) {
-                    return false;
-                }
-            }
-            String[] applicableTypes = candidate.getAnnotationMetadata().stringValues(annotationType);
-            if (applicableTypes.length == 0) {
-                return true;
-            }
-            for (String mt : applicableTypes) {
-                if (mediaTypes.contains(new MediaType(mt))) {
-                    return true;
+                for (String mt : applicableTypes) {
+                    if (mediaTypes.contains(new MediaType(mt))) {
+                        matchesMediaType.add(candidate);
+                    }
                 }
             }
-            return false;
+            // Handlers with a media type defined should have a priority
+            all.addAll(matchesMediaType);
+            all.addAll(matchesAll);
+            return all;
         }
 
         private static boolean isInvalidType(List<Argument<?>> consumedType, Argument<?> requiredType) {
