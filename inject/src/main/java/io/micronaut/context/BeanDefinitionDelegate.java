@@ -81,7 +81,8 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public List<Argument<?>> getTypeArguments(String type) {
-        return typeArgumentsMap.getOrDefault(type, List.of());
+        List<Argument<?>> arguments = typeArgumentsMap.get(type);
+        return arguments == null ? getTarget().getTypeArguments(type) : arguments;
     }
 
     @Override
