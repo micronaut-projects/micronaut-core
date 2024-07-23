@@ -606,7 +606,7 @@ final class ConnectionManager {
                 if (readIdleTime.isPresent()) {
                     Duration duration = readIdleTime.get();
                     if (!duration.isNegative()) {
-                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(0, 0, duration.toMillis(), TimeUnit.MILLISECONDS));
                     }
                 }
 
@@ -1156,12 +1156,7 @@ final class ConnectionManager {
                         if (readIdleTime.isPresent()) {
                             Duration duration = readIdleTime.get();
                             if (!duration.isNegative()) {
-                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        TimeUnit.MILLISECONDS
-                                ));
+                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(0, 0, duration.toMillis(), TimeUnit.MILLISECONDS));
                             }
                         }
                     }
