@@ -451,13 +451,15 @@ internal open class KotlinClassElement(
                 )
             }
         }
+        val fields = ArrayList(getEnclosedElements(ElementQuery.ALL_FIELDS))
+        fields.removeIf { f -> allProperties.stream().anyMatch { p -> p.name == f.name }}
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
                 methods
             },
             {
-                emptyList()
+                fields
             },
             false,
             propertyNames,
