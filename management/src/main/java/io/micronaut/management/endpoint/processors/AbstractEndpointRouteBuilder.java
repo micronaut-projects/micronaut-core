@@ -49,7 +49,7 @@ import java.util.regex.Pattern;
 @Internal
 abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
-    private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
+    private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("[\\w-]+");
 
     private Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
