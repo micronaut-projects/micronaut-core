@@ -31,17 +31,21 @@ import java.nio.charset.Charset;
 /**
  * Body writer for {@link CharSequence}s.
  *
- * @since 4.0.0
  * @author Graeme Rocher
+ * @since 4.0.0
  */
 @Singleton
 @Internal
-final class CharSequenceBodyWriter implements TypedMessageBodyWriter<CharSequence> {
+public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<CharSequence> {
 
     private final Charset defaultCharset;
 
     CharSequenceBodyWriter(ApplicationConfiguration applicationConfiguration) {
-        this.defaultCharset = applicationConfiguration.getDefaultCharset();
+        this(applicationConfiguration.getDefaultCharset());
+    }
+
+    public CharSequenceBodyWriter(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset;
     }
 
     @Override

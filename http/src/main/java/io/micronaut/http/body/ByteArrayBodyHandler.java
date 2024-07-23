@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -42,6 +43,7 @@ import java.io.OutputStream;
  */
 @Singleton
 @BootstrapContextCompatible
+@Internal
 final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, ChunkedMessageBodyReader<byte[]> {
 
     @Override

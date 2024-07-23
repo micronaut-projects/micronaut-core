@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -43,6 +44,7 @@ import java.io.OutputStream;
 @Requires(bean = ByteBufferFactory.class)
 @Singleton
 @BootstrapContextCompatible
+@Internal
 final class ByteBufferBodyHandler implements TypedMessageBodyHandler<ByteBuffer<?>>, ChunkedMessageBodyReader<ByteBuffer<?>> {
 
     private final ByteBufferFactory<?, ?> byteBufferFactory;

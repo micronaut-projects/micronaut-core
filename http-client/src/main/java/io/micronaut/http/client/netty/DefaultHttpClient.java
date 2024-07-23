@@ -51,7 +51,6 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -93,10 +92,9 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
+import io.micronaut.http.netty.body.NettyCharSequenceBodyWriter;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
-import io.micronaut.http.netty.body.NettyRawJsonStringWriter;
-import io.micronaut.http.netty.body.NettyTextPlainHandler;
 import io.micronaut.http.netty.body.NettyWritableBodyWriter;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.reactive.HotObservable;
@@ -1804,11 +1802,8 @@ public class DefaultHttpClient implements
             new NettyWritableBodyWriter(applicationConfiguration)
         );
         JsonMapper mapper = JsonMapper.createDefault();
-        registry.add(MediaType.TEXT_PLAIN_TYPE, (MessageBodyWriter<?>) new NettyTextPlainHandler());
-        registry.add(MediaType.TEXT_PLAIN_TYPE, (MessageBodyReader<?>) new NettyTextPlainHandler());
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
-        registry.add(MediaType.APPLICATION_JSON_TYPE, (MessageBodyWriter<?>) new NettyRawJsonStringWriter());
-        registry.add(MediaType.APPLICATION_JSON_TYPE, (MessageBodyReader<?>) new NettyRawJsonStringWriter());
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyCharSequenceBodyWriter());
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
         return registry;
     }

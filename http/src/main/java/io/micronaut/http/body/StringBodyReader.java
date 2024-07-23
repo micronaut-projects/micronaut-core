@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -37,9 +38,10 @@ import java.nio.charset.Charset;
  * @author Denis Stepanov
  * @since 4.6
  */
+@Internal
 @Singleton
 @BootstrapContextCompatible
-final class StringBodyReader implements TypedMessageBodyReader<String>, ChunkedMessageBodyReader<String> {
+public final class StringBodyReader implements TypedMessageBodyReader<String>, ChunkedMessageBodyReader<String> {
     private final Charset defaultCharset;
 
     StringBodyReader(ApplicationConfiguration applicationConfiguration) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,14 @@ package io.micronaut.http.netty.body;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.MessageBodyWriter;
-import io.micronaut.http.body.TextPlainBodyHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
@@ -42,29 +38,23 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import jakarta.inject.Singleton;
 
-import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
- * The Netty plain text handler.
+ * A JSON body should not be escaped or parsed as a JSON value.
  *
  * @author Denis Stepanov
  * @since 4.6
  */
 @Singleton
-@Replaces(TextPlainBodyHandler.class)
-@Produces(MediaType.TEXT_PLAIN)
-@Consumes(MediaType.TEXT_PLAIN)
+@Replaces(CharSequenceBodyWriter.class)
 @Internal
-public final class NettyTextPlainHandler implements MessageBodyWriter<CharSequence>, MessageBodyReader<String>, NettyBodyWriter<CharSequence> {
-    private final TextPlainBodyHandler defaultHandler = new TextPlainBodyHandler();
+public final class NettyCharSequenceBodyWriter implements MessageBodyWriter<CharSequence>, NettyBodyWriter<CharSequence> {
+    private final CharSequenceBodyWriter defaultHandler = new CharSequenceBodyWriter(StandardCharsets.UTF_8);
 
     @Override
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) throws CodecException {
-        writePlain(outgoingResponse, mediaType, object, nettyContext);
-    }
-
-    static void writePlain(MutableHttpResponse<?> outgoingResponse, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
         ByteBuf byteBuf = Unpooled.copiedBuffer(object.toString(), MessageBodyWriter.getCharset(mediaType, headers));
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
@@ -88,8 +78,4 @@ public final class NettyTextPlainHandler implements MessageBodyWriter<CharSequen
         defaultHandler.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
     }
 
-    @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
-        return defaultHandler.read(type, mediaType, httpHeaders, inputStream);
-    }
 }

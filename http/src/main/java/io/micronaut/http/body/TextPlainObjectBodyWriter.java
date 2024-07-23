@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.body;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
@@ -38,7 +38,7 @@ import java.io.OutputStream;
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
-@Experimental
+@Internal
 final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
 
     @Override
