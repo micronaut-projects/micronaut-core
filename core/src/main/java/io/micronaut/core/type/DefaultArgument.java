@@ -188,6 +188,16 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
+    public Argument<T> withName(String name) {
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+    }
+
+    @Override
+    public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+    }
+
+    @Override
     public boolean isTypeVariable() {
         return isTypeVar;
     }

@@ -220,6 +220,28 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates a copy of this argument with a different name.
+     * @param name The new name
+     * @return A new argument
+     * @since 4.6
+     */
+    @NonNull
+    default Argument<T> withName(@Nullable String name) {
+        return Argument.of(getType(), name, getAnnotationMetadata(), getTypeParameters());
+    }
+
+    /**
+     * Creates a copy of this argument with a different annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @return A new argument
+     * @since 4.6
+     */
+    @NonNull
+    default Argument<T> withAnnotationMetadata(@NonNull AnnotationMetadata annotationMetadata) {
+        return Argument.of(getType(), getName(), annotationMetadata, getTypeParameters());
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments

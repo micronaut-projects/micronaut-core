@@ -40,6 +40,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -63,15 +64,25 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     @Nullable
     private final ConfigurationPath configurationPath;
 
+    private final Map<String, List<Argument<?>>> typeArgumentsMap;
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, @Nullable ConfigurationPath configurationPath) {
+    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier,
+                                   @Nullable ConfigurationPath configurationPath,
+                                   @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
         this.definition = definition;
         this.qualifier = qualifier;
         this.configurationPath = configurationPath;
+        this.typeArgumentsMap = typeArgumentsMap;
     }
 
     public Optional<ConfigurationPath> getConfigurationPath() {
         return Optional.ofNullable(configurationPath);
+    }
+
+    @Override
+    public List<Argument<?>> getTypeArguments(String type) {
+        List<Argument<?>> arguments = typeArgumentsMap.get(type);
+        return arguments == null ? getTarget().getTypeArguments(type) : arguments;
     }
 
     @Override
@@ -291,7 +302,45 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier) {
-        return create(definition, qualifier, null);
+        return create(definition, qualifier, null, Map.of());
+    }
+
+    /**
+     * @param definition       The bean definition type
+     * @param qualifier        The bean qualifier
+     * @param typeArgumentsMap The type arguments
+     * @param <T>              The type
+     * @return The new bean definition
+     * @since 4.6
+     */
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition,
+                                                Qualifier<T> qualifier,
+                                                @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+        return create(definition, qualifier, null, typeArgumentsMap);
+    }
+
+    /**
+     * @param definition       The bean definition type
+     * @param qualifier        The bean qualifier
+     * @param path             The configuration path.
+     * @param typeArgumentsMap The type arguments
+     * @param <T>              The type
+     * @return The new bean definition
+     */
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition,
+                                                Qualifier<T> qualifier,
+                                                ConfigurationPath path,
+                                                @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
+            if (definition instanceof ValidatedBeanDefinition) {
+                return new LifeCycleValidatingDelegate<>(definition, qualifier, path, typeArgumentsMap);
+            } else {
+                return new LifeCycleDelegate<>(definition, qualifier, path, typeArgumentsMap);
+            }
+        } else if (definition instanceof ValidatedBeanDefinition) {
+            return new ValidatingDelegate<>(definition, qualifier, path, typeArgumentsMap);
+        }
+        return new BeanDefinitionDelegate<>(definition, qualifier, path, typeArgumentsMap);
     }
 
     /**
@@ -301,17 +350,10 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T>        The type
      * @return The new bean definition
      */
-    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier, ConfigurationPath path) {
-        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
-            if (definition instanceof ValidatedBeanDefinition) {
-                return new LifeCycleValidatingDelegate<>(definition, qualifier, path);
-            } else {
-                return new LifeCycleDelegate<>(definition, qualifier, path);
-            }
-        } else if (definition instanceof ValidatedBeanDefinition) {
-            return new ValidatingDelegate<>(definition, qualifier, path);
-        }
-        return new BeanDefinitionDelegate<>(definition, qualifier, path);
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition,
+                                                Qualifier<T> qualifier,
+                                                ConfigurationPath path) {
+        return create(definition, qualifier, path, Map.of());
     }
 
     @Override
@@ -380,8 +422,8 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
-            super(definition, qualifier, path);
+        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+            super(definition, qualifier, path, typeArgumentsMap);
         }
     }
 
@@ -389,8 +431,8 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T> {
-        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
-            super(definition, qualifier, path);
+        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+            super(definition, qualifier, path, typeArgumentsMap);
         }
     }
 
@@ -398,8 +440,8 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class LifeCycleValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T>, ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
-            super(definition, qualifier, path);
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+            super(definition, qualifier, path, typeArgumentsMap);
         }
     }
 }
