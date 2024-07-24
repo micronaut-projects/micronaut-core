@@ -16,6 +16,8 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
@@ -24,6 +26,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +43,7 @@ import java.nio.charset.Charset;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Internal
-public final class TextPlainObjectBodyReader implements TypedMessageBodyReader<Object> {
+public final class TextPlainObjectBodyReader implements TypedMessageBodyReader<Object>, ChunkedMessageBodyReader<Object> {
 
     private final Charset defaultCharset;
 
@@ -60,10 +64,31 @@ public final class TextPlainObjectBodyReader implements TypedMessageBodyReader<O
     @Override
     public Object read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            return new String(inputStream.readAllBytes(), MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset));
+            return new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
         } catch (IOException e) {
             throw new CodecException("Failed to read InputStream", e);
         }
     }
 
+    @Override
+    public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        return read0(byteBuffer, getCharset(mediaType, httpHeaders));
+    }
+
+    private String read0(ByteBuffer<?> byteBuffer, Charset charset) {
+        String s = byteBuffer.toString(charset);
+        if (byteBuffer instanceof ReferenceCounted rc) {
+            rc.release();
+        }
+        return s;
+    }
+
+    @Override
+    public Publisher<?> readChunked(Argument<Object> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
+    }
+
+    private Charset getCharset(MediaType mediaType, Headers httpHeaders) {
+        return MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset);
+    }
 }
