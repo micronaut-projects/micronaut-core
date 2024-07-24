@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -34,7 +35,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 
 /**
- * The body reader that reads an object as string.
+ * The body reader that reads a text/plain string converting it into the argument type.
  *
  * @author Denis Stepanov
  * @since 4.6
@@ -43,49 +44,52 @@ import java.nio.charset.Charset;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Internal
-public final class TextPlainObjectBodyReader implements TypedMessageBodyReader<Object>, ChunkedMessageBodyReader<Object> {
+public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReader<T>, ChunkedMessageBodyReader<T> {
 
     private final Charset defaultCharset;
+    private final ConversionService conversionService;
 
-    TextPlainObjectBodyReader(ApplicationConfiguration applicationConfiguration) {
+    TextPlainObjectBodyReader(ApplicationConfiguration applicationConfiguration, ConversionService conversionService) {
         this.defaultCharset = applicationConfiguration.getDefaultCharset();
+        this.conversionService = conversionService;
     }
 
     @Override
-    public Argument<Object> getType() {
-        return Argument.OBJECT_ARGUMENT;
+    public Argument<T> getType() {
+        return (Argument<T>) Argument.OBJECT_ARGUMENT;
     }
 
     @Override
-    public boolean isReadable(Argument<Object> type, MediaType mediaType) {
-        return type.getType().equals(Object.class) && mediaType == MediaType.TEXT_PLAIN_TYPE;
+    public boolean isReadable(Argument<T> type, MediaType mediaType) {
+        return mediaType == MediaType.TEXT_PLAIN_TYPE;
     }
 
     @Override
-    public Object read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            return new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
+            String string = new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
+            return conversionService.convertRequired(string, type);
         } catch (IOException e) {
             throw new CodecException("Failed to read InputStream", e);
         }
     }
 
     @Override
-    public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        return read0(byteBuffer, getCharset(mediaType, httpHeaders));
+    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        return read0(type, byteBuffer, getCharset(mediaType, httpHeaders));
     }
 
-    private String read0(ByteBuffer<?> byteBuffer, Charset charset) {
-        String s = byteBuffer.toString(charset);
+    private T read0(Argument<T> type, ByteBuffer<?> byteBuffer, Charset charset) {
+        String string = byteBuffer.toString(charset);
         if (byteBuffer instanceof ReferenceCounted rc) {
             rc.release();
         }
-        return s;
+        return conversionService.convertRequired(string, type);
     }
 
     @Override
-    public Publisher<?> readChunked(Argument<Object> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
+    public Publisher<T> readChunked(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return Flux.from(input).map(byteBuffer -> read0(type, byteBuffer, getCharset(mediaType, httpHeaders)));
     }
 
     private Charset getCharset(MediaType mediaType, Headers httpHeaders) {

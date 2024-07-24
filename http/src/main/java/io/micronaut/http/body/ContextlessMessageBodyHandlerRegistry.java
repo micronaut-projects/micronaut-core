@@ -18,6 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -52,7 +53,6 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
         this.typedMessageBodyReaders.add(new StringBodyReader(applicationConfiguration));
         this.typedMessageBodyReaders.add(new ByteArrayBodyHandler());
         this.typedMessageBodyReaders.add(new ByteBufferBodyHandler(byteBufferFactory));
-        this.typedMessageBodyReaders.add(new TextPlainObjectBodyReader(applicationConfiguration));
         this.typedMessageBodyWriters = new ArrayList<>(3 + otherRawHandlers.length);
         this.typedMessageBodyWriters.add(new CharSequenceBodyWriter(applicationConfiguration));
         this.typedMessageBodyWriters.add(new ByteArrayBodyHandler());
@@ -61,6 +61,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
             this.typedMessageBodyReaders.add(otherRawHandler);
             this.typedMessageBodyWriters.add(otherRawHandler);
         }
+        add(MediaType.TEXT_PLAIN_TYPE, new TextPlainObjectBodyReader<>(applicationConfiguration, ConversionService.SHARED));
     }
 
     /**
@@ -97,8 +98,10 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyReader<?> messageBodyReader : typedMessageBodyReaders) {
-            if (messageBodyReader.getType().getType().isAssignableFrom(type.getType())) {
-                return (MessageBodyReader<T>) messageBodyReader;
+             MessageBodyReader<T> reader = (MessageBodyReader<T>) messageBodyReader;
+            if (messageBodyReader.getType().getType().isAssignableFrom(type.getType())
+                && mediaTypes.stream().anyMatch(mt -> reader.isReadable(type, mt))) {
+                return reader;
             }
         }
         for (MediaType mediaType : mediaTypes) {
@@ -114,7 +117,9 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyWriter<?> messageBodyReader : typedMessageBodyWriters) {
-            if (type.getType().isAssignableFrom(messageBodyReader.getType().getType())) {
+            MessageBodyWriter<T> writer = (MessageBodyWriter<T>) messageBodyReader;
+            if (type.getType().isAssignableFrom(messageBodyReader.getType().getType())
+                && mediaTypes.stream().anyMatch(mt -> writer.isWriteable(type, mt))) {
                 return (MessageBodyWriter<T>) messageBodyReader;
             }
         }
