@@ -265,6 +265,7 @@ public class RequestLifecycle {
 
         RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
         if (errorRoute != null) {
+            request.setAttribute(HttpAttributes.ROUTE_INFO, errorRoute);
             if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
                 routeExecutor.logException(cause);
             }

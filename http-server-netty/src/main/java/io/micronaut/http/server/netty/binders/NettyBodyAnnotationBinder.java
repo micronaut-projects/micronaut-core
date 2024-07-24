@@ -149,7 +149,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             reader = (MessageBodyReader<T>) routeInfo.getMessageBodyReader();
         }
         MediaType mediaType = nhr.getContentType().orElse(null);
-        if (mediaType != null && reader == null) {
+        if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
         if (reader != null && context.getArgument().getType().equals(Object.class)) {
