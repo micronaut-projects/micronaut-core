@@ -16,21 +16,21 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
+import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.InputStream;
+import java.nio.charset.Charset;
 
 /**
- * The body writer that will call {@link Object#toString()} and write it as a string for content type {@value MediaType#TEXT_PLAIN}.
+ * The body reader that reads an object as string.
  *
  * @author Denis Stepanov
  * @since 4.6
@@ -39,20 +39,30 @@ import java.io.OutputStream;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Internal
-final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
+public final class TextPlainObjectBodyReader implements TypedMessageBodyReader<Object> {
 
-    @Override
-    public boolean isWriteable(Argument<Object> type, MediaType mediaType) {
-        return ClassUtils.isJavaBasicType(type.getType());
+    private final Charset defaultCharset;
+
+    TextPlainObjectBodyReader(ApplicationConfiguration applicationConfiguration) {
+        this.defaultCharset = applicationConfiguration.getDefaultCharset();
     }
 
     @Override
-    public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN);
+    public Argument<Object> getType() {
+        return Argument.OBJECT_ARGUMENT;
+    }
+
+    @Override
+    public boolean isReadable(Argument<Object> type, MediaType mediaType) {
+        return type.getType().equals(Object.class) && mediaType == MediaType.TEXT_PLAIN_TYPE;
+    }
+
+    @Override
+    public Object read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, outgoingHeaders)));
+            return new String(inputStream.readAllBytes(), MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset));
         } catch (IOException e) {
-            throw new CodecException("Error writing body text: " + e.getMessage(), e);
+            throw new CodecException("Failed to read InputStream", e);
         }
     }
 

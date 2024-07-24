@@ -52,6 +52,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
         this.typedMessageBodyReaders.add(new StringBodyReader(applicationConfiguration));
         this.typedMessageBodyReaders.add(new ByteArrayBodyHandler());
         this.typedMessageBodyReaders.add(new ByteBufferBodyHandler(byteBufferFactory));
+        this.typedMessageBodyReaders.add(new TextPlainObjectBodyReader(applicationConfiguration));
         this.typedMessageBodyWriters = new ArrayList<>(3 + otherRawHandlers.length);
         this.typedMessageBodyWriters.add(new CharSequenceBodyWriter(applicationConfiguration));
         this.typedMessageBodyWriters.add(new ByteArrayBodyHandler());

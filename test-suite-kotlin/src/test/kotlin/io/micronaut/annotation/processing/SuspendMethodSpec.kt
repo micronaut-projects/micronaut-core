@@ -37,7 +37,7 @@ class SuspendMethodSpec {
         val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<Any>("/sync/any"),
-                String::class.java
+                Any::class.java
             )).blockFirst()
 
         assertEquals("sync any", res)
@@ -48,7 +48,7 @@ class SuspendMethodSpec {
         val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<String>("/sync/string"),
-                String::class.java
+                Any::class.java
             )).blockFirst()
 
         assertEquals("sync string", res)
@@ -60,7 +60,7 @@ class SuspendMethodSpec {
         val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<Any>("/async/any"),
-                String::class.java
+                Any::class.java
             )).blockFirst()
 
         assertEquals("async any", res)
@@ -71,7 +71,7 @@ class SuspendMethodSpec {
         val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<String>("/async/string"),
-                String::class.java
+                Any::class.java
             )).blockFirst()
 
         assertEquals("async string", res)
