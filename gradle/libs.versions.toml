@@ -58,6 +58,7 @@ testcontainers = "1.19.8"
 tomlj="1.1.1"
 vertx = "4.5.9"
 wiremock = "2.33.2"
+mimepull = "1.10.0"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -280,6 +281,7 @@ vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
 httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpcomponents-client" }
 httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.ref = "httpcomponents-client" }
+mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 

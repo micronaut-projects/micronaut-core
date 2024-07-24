@@ -103,6 +103,8 @@ dependencies {
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
     testImplementation project(":websocket")
+
+    testImplementation(libs.mimepull)
 }
 
 tasks.withType(Test).configureEach {
