@@ -32,8 +32,8 @@ import java.io.OutputStream;
 /**
  * The body writer that will call {@link Object#toString()} and write it as a string for content type {@value MediaType#TEXT_PLAIN}.
  *
- * @since 4.6
  * @author Denis Stepanov
+ * @since 4.6
  */
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
