@@ -80,7 +80,7 @@ managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.5.11"
 managed-snakeyaml = "2.2"
-managed-java-parser-core = "3.25.10"
+managed-java-parser-core = "3.26.1"
 managed-ksp = "1.9.25-1.0.20"
 micronaut-docs = "2.0.0"
 
