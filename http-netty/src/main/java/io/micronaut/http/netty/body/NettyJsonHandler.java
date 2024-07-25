@@ -144,7 +144,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new NettyJsonHandler<>((JsonMessageHandler<T>) jsonMessageHandler.createSpecific(type));
+        return new NettyJsonHandler<>(jsonMessageHandler.createSpecific(type));
     }
 
     @Override

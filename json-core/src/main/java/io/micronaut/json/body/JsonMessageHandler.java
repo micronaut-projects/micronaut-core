@@ -85,7 +85,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public MessageBodyWriter<T> createSpecific(Argument<T> type) {
+    public JsonMessageHandler<T> createSpecific(Argument<T> type) {
         return new JsonMessageHandler<>(jsonMapper.createSpecific(type));
     }
 
