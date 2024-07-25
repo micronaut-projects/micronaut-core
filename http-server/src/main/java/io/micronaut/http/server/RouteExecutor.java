@@ -192,9 +192,13 @@ public final class RouteExecutor {
     }
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
+        setRouteAttributes(request, (RouteMatch<?>) route);
+        request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRouteInfo().getUriMatchTemplate().toString());
+    }
+
+    static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
         request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
         request.setAttribute(HttpAttributes.ROUTE_INFO, route.getRouteInfo());
-        request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRouteInfo().getUriMatchTemplate().toString());
     }
 
     /**
@@ -347,7 +351,7 @@ public final class RouteExecutor {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
             }
-            httpRequest.setAttribute(HttpAttributes.ROUTE_INFO, errorRoute);
+            setRouteAttributes(httpRequest, errorRoute);
             requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(errorRoute, httpRequest);
         }
 
