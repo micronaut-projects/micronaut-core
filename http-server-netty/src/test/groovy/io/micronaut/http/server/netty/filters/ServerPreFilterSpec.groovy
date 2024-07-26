@@ -270,10 +270,18 @@ class ServerPreFilterSpec extends Specification {
     @ServerFilter("/changing/**")
     static class ChangingFilter {
 
+        @Order(1)
         @PreMatching
         @RequestFilter
-        MutableHttpRequest<?> preMatchingRequest(MutableHttpRequest<?> request) {
-            return request.uri(new URI(request.getUri().toString().replace("xyz", "abc")))
+        MutableHttpRequest<?> preMatchingRequest1(MutableHttpRequest<?> request) {
+            return request.uri(new URI(request.getUri().toString().replace("xyz", "HELLO")))
+        }
+
+        @Order(2)
+        @PreMatching
+        @RequestFilter
+        void preMatchingRequest2(MutableHttpRequest<?> request) {
+            request.uri(new URI(request.getUri().toString().replace("HELLO", "abc")))
         }
 
     }
