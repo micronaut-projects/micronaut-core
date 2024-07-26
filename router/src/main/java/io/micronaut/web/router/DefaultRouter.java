@@ -585,9 +585,29 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @NonNull
     @Override
     public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
-        return findFilters(request, (RouteMatch<?>) request.getAttribute(HttpAttributes.ROUTE_MATCH)
+        if (preconditionFilterRoutes.isEmpty()) {
+            // for perf, this needs to be placed in an ArrayList variable first
+            @SuppressWarnings("UnnecessaryLocalVariable")
+            ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
+            return always;
+        }
+        var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
+        httpFilters.addAll(alwaysMatchesHttpFilters.get());
+        var routeMatch = (RouteMatch) request.getAttribute(HttpAttributes.ROUTE_MATCH)
             .filter(o -> o instanceof RouteMatch)
-            .orElse(null));
+            .orElse(null);
+        HttpMethod method = request.getMethod();
+        String path = request.getPath();
+        for (FilterRoute filterRoute : preconditionFilterRoutes) {
+            if (routeMatch != null) {
+                if (!matchesFilterMatcher(filterRoute, routeMatch)) {
+                    continue;
+                }
+            }
+            filterRoute.match(method, path).ifPresent(httpFilters::add);
+        }
+        FilterRunner.sort(httpFilters);
+        return Collections.unmodifiableList(httpFilters);
     }
 
     @NonNull
