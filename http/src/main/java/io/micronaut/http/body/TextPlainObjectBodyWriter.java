@@ -39,7 +39,12 @@ import java.io.OutputStream;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Internal
-final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
+final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object> {
+
+    @Override
+    public Argument<Object> getType() {
+        return Argument.OBJECT_ARGUMENT;
+    }
 
     @Override
     public boolean isWriteable(Argument<Object> type, MediaType mediaType) {
