@@ -58,6 +58,7 @@ testcontainers = "1.19.8"
 tomlj="1.1.1"
 vertx = "4.5.8"
 wiremock = "2.33.2"
+zstdjni = "1.5.6-3"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -281,6 +282,8 @@ httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", versi
 httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.ref = "httpcomponents-client" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+zstdjni = { module = "com.github.luben:zstd-jni", version.ref = "zstdjni" }
 
 [bundles]
 asm = ["asm", "asm-commons"]
