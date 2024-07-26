@@ -20,7 +20,6 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -34,6 +33,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -142,24 +142,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
-        DefaultFilterRoute route = new BeanDefinitionFilterRoute(
-                pathPattern,
-                beanLocator,
-                beanDefinition
-        );
-        filterRoutes.add(route);
-        return route;
+    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> definition) {
+        FilterRoute fr = new DefaultFilterRoute(
+            pathPattern,
+            () -> GenericHttpFilter.createLegacyFilter(beanLocator.getBean(definition), new FilterOrder.Dynamic(definition.getOrder())),
+            definition,
+            false);
+        filterRoutes.add(fr);
+        return fr;
     }
 
-    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
-        FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
-            @NonNull
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return annotationMetadata;
-            }
-        };
+    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata, boolean isPreMatching) {
+        FilterRoute fr = new DefaultFilterRoute(internalFilter, annotationMetadata, isPreMatching);
         filterRoutes.add(fr);
         return fr;
     }

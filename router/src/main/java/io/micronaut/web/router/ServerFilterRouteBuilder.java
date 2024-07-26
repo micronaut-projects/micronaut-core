@@ -87,7 +87,7 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
 
             @Override
             protected void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata) {
-                applyMetadata(ServerFilterRouteBuilder.this.addFilter(factory, methodAnnotations), metadata);
+                applyMetadata(ServerFilterRouteBuilder.this.addFilter(factory, methodAnnotations, metadata.isPreMatching()), metadata);
             }
 
             private void applyMetadata(FilterRoute route, FilterMetadata metadata) {

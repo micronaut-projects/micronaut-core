@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -86,7 +87,7 @@ public class RequestLifecycle {
 
     /**
      * @param routeExecutor The route executor to use for route resolution
-     * @param request The request
+     * @param request       The request
      * @deprecated Will be removed after 4.3.0
      */
     @Deprecated(forRemoval = true, since = "4.3.0")
@@ -154,32 +155,7 @@ public class RequestLifecycle {
                     );
                 }
             }
-
-            UriRouteMatch<Object, Object> routeMatch = routeExecutor.findRouteMatch(request);
-            if (routeMatch == null) {
-                //Check if there is a file for the route before returning route not found
-                FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
-                if (fileCustomizableResponseType != null) {
-                    return runWithFilters(request, (filteredRequest, propagatedContext)
-                        -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
-                }
-                return onRouteMiss(request);
-            }
-
-            RouteExecutor.setRouteAttributes(request, routeMatch);
-
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
-            }
-            // all ok proceed to try and execute the route
-            if (routeMatch.getRouteInfo().isWebSocketRoute()) {
-                return onStatusError(
-                    request,
-                    HttpResponse.status(HttpStatus.BAD_REQUEST),
-                    "Not a WebSocket request");
-            }
-
-            return runWithFilters(request, (filteredRequest, propagatedContext) -> executeRoute(filteredRequest, propagatedContext, routeMatch));
+            return runServerFilters(request);
         } catch (Throwable t) {
             return onError(request, t);
         }
@@ -187,7 +163,7 @@ public class RequestLifecycle {
 
     private ExecutionFlow<HttpResponse<?>> executeRoute(HttpRequest<?> request,
                                                         PropagatedContext propagatedContext,
-                                                        RouteMatch<Object> routeMatch) {
+                                                        RouteMatch<?> routeMatch) {
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
         ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
@@ -340,7 +316,7 @@ public class RequestLifecycle {
     /**
      * Run the filters for this request, and then run the given flow.
      *
-     * @param request   The request
+     * @param request          The request
      * @param responseProvider Downstream flow, runs inside the filters
      * @return Execution flow that completes after the all the filters and the downstream flow
      */
@@ -361,6 +337,75 @@ public class RequestLifecycle {
                 }
             };
             return filterRunner.run(request);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    private ExecutionFlow<HttpResponse<?>> runServerFilters(HttpRequest<?> request) {
+        try {
+            PropagatedContext propagatedContext = PropagatedContext.get();
+            List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
+            FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, null) {
+
+                UriRouteMatch<Object, Object> routeMatch;
+
+                @Override
+                protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
+                    return routeExecutor.router.findFilters(request);
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> provideResponse(@NonNull HttpRequest<?> request, @NonNull PropagatedContext propagatedContext) {
+//                    RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
+                    if (this.routeMatch == null) {
+                        //Check if there is a file for the route before returning route not found
+                        FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
+                        if (fileCustomizableResponseType != null) {
+                            return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+                        }
+                        return onRouteMiss(request);
+                    }
+                    // all ok proceed to try and execute the route
+                    if (routeMatch.getRouteInfo().isWebSocketRoute()) {
+                        return onStatusError(
+                            request,
+                            HttpResponse.status(HttpStatus.BAD_REQUEST),
+                            "Not a WebSocket request");
+                    }
+                    return executeRoute(request, propagatedContext, routeMatch);
+                }
+
+                @Override
+                protected void doRouteMatch(HttpRequest<?> request) {
+                    // Store it a field because RouteExecutor#findRouteMatch in some cases stores and sets something different
+                    // This can be corrected after Cors / Options stuff migrated to pre-matching
+                    routeMatch = routeExecutor.findRouteMatch(request);
+                    if (routeMatch == null) {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Not matched route for request {} - {}", request.getMethodName(), request.getUri().getPath());
+                        }
+                        return;
+                    }
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
+                    }
+                    RouteExecutor.setRouteAttributes(request, routeMatch);
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+                    RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext)
+                        .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+                    return onErrorNoFilter(request, failure, propagatedContext);
+                }
+            };
+            return filterRunner.run(request, propagatedContext);
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
@@ -471,8 +516,8 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
         Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(defaultResponse.status(), request);
         if (statusRoute.isPresent()) {
-            return runWithFilters(request, (filteredRequest, propagatedContext)
-                -> executeRoute(filteredRequest, propagatedContext, statusRoute.get()));
+            RouteMatch<Object> routeMatch = statusRoute.get();
+            return executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch);
         }
         if (request.getMethod() != HttpMethod.HEAD) {
             defaultResponse = routeExecutor.errorResponseProcessor.processResponse(ErrorContext.builder(request)
@@ -482,8 +527,7 @@ public class RequestLifecycle {
                 defaultResponse = defaultResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
             }
         }
-        MutableHttpResponse<?> finalDefaultResponse = defaultResponse;
-        return runWithFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(finalDefaultResponse));
+        return ExecutionFlow.just(defaultResponse);
     }
 
     /**
@@ -505,7 +549,7 @@ public class RequestLifecycle {
      * missing and are {@link Optional}. They are satisfied with {@link Optional#empty()} later.
      *
      * @param routeMatch The route match to fulfill
-     * @param request The request
+     * @param request    The request
      * @return The fulfilled route match, after all necessary data is available
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
@@ -518,3 +562,6 @@ public class RequestLifecycle {
         }
     }
 }
+
+
+
