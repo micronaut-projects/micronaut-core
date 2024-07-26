@@ -1238,15 +1238,18 @@ public class DefaultHttpClient implements
 
         FilterRunner.sortReverse(filters);
 
-        FilterRunner runner = new FilterRunner(filters, (filteredRequest, propagatedContext) -> {
-            try {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    return ReactiveExecutionFlow.fromPublisher(responsePublisher);
+        FilterRunner runner = new FilterRunner(filters) {
+            @Override
+            protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
+                try {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                        return ReactiveExecutionFlow.fromPublisher(responsePublisher);
+                    }
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
                 }
-            } catch (Throwable e) {
-                return ExecutionFlow.error(e);
             }
-        });
+        };
         Mono<io.micronaut.http.HttpResponse<?>> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
         if (parentRequest != null) {
             responseMono = responseMono.contextWrite(c -> {

@@ -155,7 +155,7 @@ public class RequestLifecycle {
                     );
                 }
             }
-            return runServerFilters(request, this::executeRoute);
+            return runServerFilters(request);
         } catch (Throwable t) {
             return onError(request, t);
         }
@@ -342,17 +342,7 @@ public class RequestLifecycle {
         }
     }
 
-    /**
-     * Run the server filters for this request, and then run the given flow.
-     * Server filters include pre-matching filters and logic to resolve it.
-     *
-     * @param request          The request
-     * @param responseProvider The response provider
-     * @return Execution flow that completes after the all the filters and the downstream flow
-     * @since 4.6
-     */
-    protected final ExecutionFlow<HttpResponse<?>> runServerFilters(HttpRequest<?> request,
-                                                                    ResponseProvider responseProvider) {
+    private ExecutionFlow<HttpResponse<?>> runServerFilters(HttpRequest<?> request) {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
@@ -383,7 +373,7 @@ public class RequestLifecycle {
                             HttpResponse.status(HttpStatus.BAD_REQUEST),
                             "Not a WebSocket request");
                     }
-                    return responseProvider.provide(request, propagatedContext, routeMatch);
+                    return executeRoute(request, propagatedContext, routeMatch);
                 }
 
                 @Override
@@ -571,32 +561,7 @@ public class RequestLifecycle {
             return ExecutionFlow.error(e);
         }
     }
-
-    /**
-     * A simple response provider interface.
-     *
-     * @since 4.6
-     */
-    @FunctionalInterface
-    public interface ResponseProvider {
-
-        /**
-         * Provide the response.
-         *
-         * @param httpRequest       The request
-         * @param propagatedContext The propagated context
-         * @param routeMatch        The route match
-         * @return The response flow
-         */
-        @NonNull
-        ExecutionFlow<HttpResponse<?>> provide(@NonNull
-                                               HttpRequest<?> httpRequest,
-                                               @NonNull
-                                               PropagatedContext propagatedContext,
-                                               @NonNull
-                                               RouteMatch<?> routeMatch);
-
-    }
 }
+
 
 
