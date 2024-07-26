@@ -37,6 +37,7 @@ import java.nio.charset.Charset;
 /**
  * The body reader that reads a text/plain string converting it into the argument type.
  *
+ * @param <T> The body type
  * @author Denis Stepanov
  * @since 4.6
  */

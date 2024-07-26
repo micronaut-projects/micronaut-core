@@ -33,6 +33,7 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.FilterContinuation;
+import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
@@ -168,6 +169,9 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                         context.fail("Unsupported filter return type: " + returnType.getName(), element);
                     }
                 }
+            }
+            if (continuationCreator != null && element.hasStereotype(PreMatching.class)) {
+                context.fail("Pre-matching request filter methods don't support continuation", element);
             }
         } catch (IllegalArgumentException e) {
             context.fail(e.getMessage(), element);

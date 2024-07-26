@@ -180,6 +180,16 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request, RouteMatch<?> routeMatch) {
+        return router.findFilters(request, routeMatch);
+    }
+
+    @Override
+    public List<GenericHttpFilter> findPreMatchingFilters(HttpRequest<?> request) {
+        return router.findPreMatchingFilters(request);
+    }
+
+    @Override
     public <T, R> Optional<UriRouteMatch<T, R>> GET(@NonNull CharSequence uri) {
         return router.GET(uri);
     }

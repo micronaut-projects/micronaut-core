@@ -34,9 +34,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
@@ -53,7 +50,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -67,12 +63,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
-    private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
-        Body.class.getName(),
-        Header.class.getName(),
-        QueryValue.class.getName(),
-        CookieValue.class.getName()
-    );
     @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
@@ -190,7 +180,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             methodLevel.executeOn == null ? beanLevel.executeOn : methodLevel.executeOn,
             beanLevel.serviceId, // only present on bean level
             beanLevel.excludeServiceId, // only present on bean level
-            beanLevel.appendContextPath // Define if contextPath is appended
+            beanLevel.appendContextPath, // Define if contextPath is appended,
+            methodLevel.isPreMatching
         );
     }
 
@@ -234,7 +225,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
             ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
-            appendContextPath.orElse(null)
+            appendContextPath.orElse(null),
+            annotationMetadata.hasStereotype("io.micronaut.http.server.annotation.PreMatching")
         );
     }
 
@@ -246,7 +238,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId,
-        @Nullable Boolean appendContextPath
+        @Nullable Boolean appendContextPath,
+        boolean isPreMatching
     ) {
     }
 

@@ -117,4 +117,30 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
     }
+
+    def 'pre-matching do not support continuation'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+import io.micronaut.http.server.annotation.PreMatching;
+
+@ServerFilter
+class Foo {
+    @PreMatching
+    @RequestFilter
+    public void requestFilterContinuationBlocking(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("Pre-matching request filter methods don't support continuation")
+    }
 }
