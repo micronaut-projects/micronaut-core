@@ -297,4 +297,75 @@ class ServerPreFilterSpec extends Specification {
             return "abc"
         }
     }
+
+    def 'blocking pre-matching filter'() {
+        given:
+            def ctx = ApplicationContext.run(['spec.name': 'ServerPreFilterSpec'])
+            def server = ctx.getBean(EmbeddedServer)
+            server.start()
+            def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+            def filter = ctx.getBean(BlockingPreMatchingFilter)
+
+        when:
+            def response = client.exchange("/blocking-pre-matching-filter/index", String)
+        then:
+            response.body() == "foo"
+            filter.events == ['prematching /blocking-pre-matching-filter/index', 'request /blocking-pre-matching-filter/index', 'response /blocking-pre-matching-filter/index OK', 'after prematching /blocking-pre-matching-filter/index']
+
+        cleanup:
+            server.stop()
+            ctx.close()
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ServerPreFilterSpec")
+    @ServerFilter("/blocking-pre-matching-filter/**")
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    static class BlockingPreMatchingFilter {
+        def events = new ArrayList<String>()
+
+        @PreMatching
+        @RequestFilter
+        void preMatchingRequest(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
+            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent()) {
+                throw new IllegalStateException()
+            }
+            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent()) {
+                throw new IllegalStateException()
+            }
+            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isPresent()) {
+                throw new IllegalStateException()
+            }
+            events.add("prematching " + request.uri)
+            def response = continuation.proceed()
+            events.add("after prematching " + request.uri)
+            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isEmpty()) {
+                throw new IllegalStateException()
+            }
+            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isEmpty()) {
+                throw new IllegalStateException()
+            }
+            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isEmpty()) {
+                throw new IllegalStateException()
+            }
+        }
+
+        @RequestFilter
+        void request(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("request " + request.uri)
+            def response = continuation.proceed()
+            events.add("response " + request.uri + " " + response.status)
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ServerPreFilterSpec")
+    @Controller
+    static class BlockingPreMatchingCtrl {
+
+        @Get("/blocking-pre-matching-filter/index")
+        String blockingFilterIndex() {
+            return "foo"
+        }
+    }
 }

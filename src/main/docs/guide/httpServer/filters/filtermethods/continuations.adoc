@@ -8,5 +8,3 @@ snippet::io.micronaut.docs.server.filters.filtermethods.continuations.TraceFilte
 <4> The whole filter is executed on a worker thread to avoid blocking the event loop in the `proceed` call
 
 IMPORTANT: The call to `FilterContinuation.proceed` is blocking by default, so it should never be done on the event loop. Such filters should be run on a worker thread as described above. Alternatively, the continuation can also be declared to return a reactive type (`Publisher<HttpResponse<?>>`) to proceed in an asynchronous manner, similar to the old api:http.filter.FilterChain[] API.
-
-NOTE: Pre-matching request filters don't support continuation.
