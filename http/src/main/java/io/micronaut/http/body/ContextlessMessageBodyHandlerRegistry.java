@@ -62,6 +62,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
             this.typedMessageBodyWriters.add(otherRawHandler);
         }
         add(MediaType.TEXT_PLAIN_TYPE, new TextPlainObjectBodyReader<>(applicationConfiguration, ConversionService.SHARED));
+        add(MediaType.TEXT_PLAIN_TYPE, new TextPlainObjectBodyWriter());
     }
 
     /**
@@ -98,9 +99,10 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyReader<?> messageBodyReader : typedMessageBodyReaders) {
-             MessageBodyReader<T> reader = (MessageBodyReader<T>) messageBodyReader;
-            if (messageBodyReader.getType().getType().isAssignableFrom(type.getType())
-                && mediaTypes.stream().anyMatch(mt -> reader.isReadable(type, mt))) {
+            TypedMessageBodyReader<T> reader = (TypedMessageBodyReader<T>) messageBodyReader;
+            if (type.getType().isAssignableFrom(reader.getType().getType())
+                && (mediaTypes.isEmpty() && reader.isReadable(type, null))
+                || mediaTypes.stream().anyMatch(mt -> reader.isReadable(type, mt))) {
                 return reader;
             }
         }
@@ -117,9 +119,10 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyWriter<?> messageBodyReader : typedMessageBodyWriters) {
-            MessageBodyWriter<T> writer = (MessageBodyWriter<T>) messageBodyReader;
-            if (type.getType().isAssignableFrom(messageBodyReader.getType().getType())
-                && mediaTypes.stream().anyMatch(mt -> writer.isWriteable(type, mt))) {
+            TypedMessageBodyWriter<T> writer = (TypedMessageBodyWriter<T>) messageBodyReader;
+            if (messageBodyReader.getType().isAssignableFrom(type.getType())
+                && (mediaTypes.isEmpty() && writer.isWriteable(type, null)
+                || mediaTypes.stream().anyMatch(mt -> writer.isWriteable(type, mt)))) {
                 return (MessageBodyWriter<T>) messageBodyReader;
             }
         }
