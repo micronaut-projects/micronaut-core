@@ -253,6 +253,7 @@ public class FilterRunner {
     }
 
     private List<InternalHttpFilter> filterFilters(List<InternalHttpFilter> filters, HttpRequest<?> request) {
+        // 1 free spot for the RouteMatchResolverHttpFilter
         List<InternalHttpFilter> filtersToRun = new ArrayList<>(filters.size() + 1);
         for (InternalHttpFilter filter : filters) {
             if (filter.isEnabled(request)) {
