@@ -20,9 +20,9 @@ import io.micronaut.core.bind.ArgumentBinder;
 /**
  * Interface for binders that bind from {@link WebSocketState}.
  *
+ * @param <T> The type to bind to
  * @author graemerocher
  * @since 1.0
- * @param <T> The type to bind to
  */
 public interface WebSocketStateBinder<T> extends ArgumentBinder<T, WebSocketState> {
 }
