@@ -15,10 +15,9 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import org.reactivestreams.Publisher;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.reactivestreams.Publisher;
 
 /**
  * Used to retrieve and update logger information for the {@link LoggersEndpoint}.
@@ -55,5 +54,5 @@ public interface LoggersManager<T> {
      * @param level The log level to configure
      */
     void setLogLevel(ManagedLoggingSystem loggingSystem, @NotBlank String name,
-                             @NotNull io.micronaut.logging.LogLevel level);
+                     @NotNull io.micronaut.logging.LogLevel level);
 }

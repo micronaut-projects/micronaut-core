@@ -47,7 +47,7 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
     private final BeanDefinitionData<Map<String, Object>> beanDefinitionData;
 
     /**
-     * @param beanContext        The bean context
+     * @param beanContext The bean context
      * @param beanDefinitionData The {@link BeanDefinitionData}
      */
     DefaultBeanDefinitionDataCollector(BeanContext beanContext, BeanDefinitionData<Map<String, Object>> beanDefinitionData) {

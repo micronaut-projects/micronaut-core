@@ -36,9 +36,9 @@ public interface PropertiesInfoSource extends InfoSource {
      * <p>Extends {@link io.micronaut.management.endpoint.info.InfoEndpoint} to add a helper method for retrieving a
      * {@link PropertySource} from a properties file. </p>
      *
-     * @param path             The path to the properties file
-     * @param prefix           prefix for resolving the file (used if not included in {@code path})
-     * @param extension        file extension (used if not included in {@code path})
+     * @param path The path to the properties file
+     * @param prefix prefix for resolving the file (used if not included in {@code path})
+     * @param extension file extension (used if not included in {@code path})
      * @param resourceResolver Instance of {@link ResourceResolver} to resolve the file location
      * @return An {@link Optional} of {@link PropertySource} containing the values from the properties file
      */
