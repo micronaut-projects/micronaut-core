@@ -35,7 +35,7 @@ import java.util.List;
 
 /**
  * A codec for {@link MediaType#APPLICATION_JSON_STREAM}.
- *
+ * <p>
  * Note: will be replaced by {@link io.micronaut.json.codec.JsonStreamMediaTypeCodec} in the future, but that class is
  * currently experimental.
  *
@@ -53,9 +53,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     private final List<MediaType> additionalTypes;
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonStreamMediaTypeCodec(ObjectMapper objectMapper,
                                     ApplicationConfiguration applicationConfiguration,
@@ -69,9 +69,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     }
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     @Inject
     public JsonStreamMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
@@ -87,7 +87,7 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     @Override
     public Collection<MediaType> getMediaTypes() {
-        List<MediaType> mediaTypes = new ArrayList<>();
+        var mediaTypes = new ArrayList<MediaType>();
         mediaTypes.add(MediaType.APPLICATION_JSON_STREAM_TYPE);
         mediaTypes.addAll(additionalTypes);
         return mediaTypes;

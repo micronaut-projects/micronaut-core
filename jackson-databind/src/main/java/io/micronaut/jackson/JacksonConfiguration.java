@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
@@ -54,12 +53,12 @@ import java.util.TimeZone;
  */
 @ConfigurationProperties("jackson")
 @TypeHint(
-        value = {
-                PropertyNamingStrategies.UpperCamelCaseStrategy.class,
-                ArrayList.class,
-                LinkedHashMap.class,
-                HashSet.class
-        })
+    value = {
+        PropertyNamingStrategies.UpperCamelCaseStrategy.class,
+        ArrayList.class,
+        LinkedHashMap.class,
+        HashSet.class
+    })
 public class JacksonConfiguration implements JsonConfiguration {
 
     /**
@@ -96,6 +95,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
+     *
      * @return True if it should
      */
     @Experimental
@@ -124,6 +124,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets whether to scan for modules or not (defaults to true).
+     *
      * @param moduleScan True if module scan should be enabled
      */
     public void setModuleScan(boolean moduleScan) {
@@ -245,6 +246,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the default date format to use.
+     *
      * @param dateFormat The date format
      */
     public void setDateFormat(String dateFormat) {
@@ -253,6 +255,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the locale to use.
+     *
      * @param locale The locale
      */
     public void setLocale(Locale locale) {
@@ -261,6 +264,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the timezone to use.
+     *
      * @param timeZone The timezone
      */
     public void setTimeZone(TimeZone timeZone) {
@@ -269,6 +273,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the array size threshold for data binding. Default value ({@value #DEFAULT_ARRAYSIZETHRESHOLD}).
+     *
      * @param arraySizeThreshold The array size threshold
      */
     public void setArraySizeThreshold(int arraySizeThreshold) {
@@ -277,6 +282,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the serialization features to use.
+     *
      * @param serialization The serialization features.
      */
     public void setSerialization(Map<SerializationFeature, Boolean> serialization) {
@@ -287,6 +293,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the deserialization features to use.
+     *
      * @param deserialization The deserialiation features.
      */
     public void setDeserialization(Map<DeserializationFeature, Boolean> deserialization) {
@@ -297,6 +304,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the object mapper features to use.
+     *
      * @param mapper The object mapper features
      */
     public void setMapper(Map<MapperFeature, Boolean> mapper) {
@@ -307,6 +315,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the parser features to use.
+     *
      * @param parser The parser features
      */
     public void setParser(Map<JsonParser.Feature, Boolean> parser) {
@@ -317,6 +326,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the generator features to use.
+     *
      * @param generator The generator features
      */
     public void setGenerator(Map<JsonGenerator.Feature, Boolean> generator) {
@@ -327,6 +337,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Sets the factory features to use.
+     *
      * @param factory The generator features
      */
     public void setFactory(Map<JsonFactory.Feature, Boolean> factory) {
@@ -386,6 +397,7 @@ public class JacksonConfiguration implements JsonConfiguration {
 
     /**
      * Constructors a JavaType for the given argument and type factory.
+     *
      * @param type The type
      * @param typeFactory The type factory
      * @param <T> The generic type
@@ -399,18 +411,18 @@ public class JacksonConfiguration implements JsonConfiguration {
         final Class<T> rawType = type.getType();
         if (ArrayUtils.isNotEmpty(objects)) {
             final JavaType javaType = typeFactory.constructType(
-                    rawType
+                rawType
             );
             if (javaType.isCollectionLikeType()) {
                 return typeFactory.constructCollectionLikeType(
-                        rawType,
-                        objects[0]
+                    rawType,
+                    objects[0]
                 );
             } else if (javaType.isMapLikeType()) {
                 return typeFactory.constructMapLikeType(
-                        rawType,
-                        objects[0],
-                        objects[1]
+                    rawType,
+                    objects[0],
+                    objects[1]
                 );
             } else if (javaType.isReferenceType()) {
                 return typeFactory.constructReferenceType(rawType, objects[0]);
@@ -418,13 +430,13 @@ public class JacksonConfiguration implements JsonConfiguration {
             return typeFactory.constructParametricType(rawType, objects);
         } else {
             return typeFactory.constructType(
-                    rawType
+                rawType
             );
         }
     }
 
     private static JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {
-        List<JavaType> javaTypes = new ArrayList<>();
+        var javaTypes = new ArrayList<JavaType>();
         for (Argument<?> argument : typeVariables.values()) {
             if (argument.hasTypeVariables()) {
                 javaTypes.add(typeFactory.constructParametricType(argument.getType(), toJavaTypeArray(typeFactory, argument.getTypeVariables())));

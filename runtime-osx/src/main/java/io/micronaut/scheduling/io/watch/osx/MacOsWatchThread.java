@@ -52,13 +52,13 @@ public class MacOsWatchThread extends DefaultWatchThread {
      * Default constructor.
      *
      * @param eventPublisher The event publisher
-     * @param configuration  the configuration
-     * @param watchService   the watch service
+     * @param configuration the configuration
+     * @param watchService the watch service
      */
     public MacOsWatchThread(
-            ApplicationEventPublisher eventPublisher,
-            FileWatchConfiguration configuration,
-            WatchService watchService) {
+        ApplicationEventPublisher eventPublisher,
+        FileWatchConfiguration configuration,
+        WatchService watchService) {
         super(eventPublisher, configuration, watchService);
     }
 
@@ -66,10 +66,10 @@ public class MacOsWatchThread extends DefaultWatchThread {
     protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
         WatchablePath watchPath = new WatchablePath(dir);
         return watchPath.register(
-                getWatchService(),
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_DELETE,
-                StandardWatchEventKinds.ENTRY_MODIFY
+            getWatchService(),
+            StandardWatchEventKinds.ENTRY_CREATE,
+            StandardWatchEventKinds.ENTRY_DELETE,
+            StandardWatchEventKinds.ENTRY_MODIFY
         );
     }
 

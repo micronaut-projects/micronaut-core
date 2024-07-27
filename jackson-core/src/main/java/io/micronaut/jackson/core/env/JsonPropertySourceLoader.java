@@ -64,10 +64,9 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
     }
 
     /**
-     * @param input    The input stream
-     * @throws IOException If the input stream doesn't exist
-     *
+     * @param input The input stream
      * @return map representation of the json
+     * @throws IOException If the input stream doesn't exist
      */
     @SuppressWarnings("unchecked")
     protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
@@ -88,11 +87,11 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
         } else if (value.isBoolean()) {
             return value.getBooleanValue();
         } else if (value.isArray()) {
-            List<Object> unwrapped = new ArrayList<>();
+            var unwrapped = new ArrayList<>();
             value.values().forEach(v -> unwrapped.add(unwrap(v)));
             return unwrapped;
         } else if (value.isObject()) {
-            Map<String, Object> unwrapped = new LinkedHashMap<>();
+            var unwrapped = new LinkedHashMap<String, Object>();
             value.entries().forEach(e -> unwrapped.put(e.getKey(), unwrap(e.getValue())));
             return unwrapped;
         } else {
