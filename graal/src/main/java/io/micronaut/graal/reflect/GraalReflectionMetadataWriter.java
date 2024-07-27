@@ -58,20 +58,20 @@ final class GraalReflectionMetadataWriter extends AbstractAnnotationMetadataWrit
             outputStream.write(classWriter.toByteArray());
         }
         classWriterOutputVisitor.visitServiceDescriptor(
-                GraalReflectionConfigurer.class,
-                className,
-                getOriginatingElement()
+            GraalReflectionConfigurer.class,
+            className,
+            getOriginatingElement()
         );
     }
 
     private ClassWriter generateClassBytes() {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        var classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         startService(
-                classWriter,
-                getInternalName(GraalReflectionConfigurer.class.getName()),
-                classInternalName,
-                Type.getType(Object.class),
-                getInternalName(GraalReflectionConfigurer.class.getName())
+            classWriter,
+            getInternalName(GraalReflectionConfigurer.class.getName()),
+            classInternalName,
+            Type.getType(Object.class),
+            getInternalName(GraalReflectionConfigurer.class.getName())
         );
         writeAnnotationMetadataStaticInitializer(classWriter);
         writeConstructor(classWriter);
