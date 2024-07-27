@@ -25,6 +25,7 @@ public class FunctionException extends RuntimeException {
 
     /**
      * Constructor.
+     *
      * @param message message
      */
     public FunctionException(String message) {
@@ -33,6 +34,7 @@ public class FunctionException extends RuntimeException {
 
     /**
      * Constructor.
+     *
      * @param message message
      * @param cause cause of the exception
      */

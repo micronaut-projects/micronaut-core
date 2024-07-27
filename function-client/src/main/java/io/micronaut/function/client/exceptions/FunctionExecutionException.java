@@ -22,6 +22,7 @@ package io.micronaut.function.client.exceptions;
 public class FunctionExecutionException extends FunctionException {
     /**
      * Constructor.
+     *
      * @param message message
      */
     public FunctionExecutionException(String message) {
@@ -30,6 +31,7 @@ public class FunctionExecutionException extends FunctionException {
 
     /**
      * Constructor.
+     *
      * @param message message
      * @param cause cause of the exception
      */
