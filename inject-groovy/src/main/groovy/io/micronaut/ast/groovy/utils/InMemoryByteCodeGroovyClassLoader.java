@@ -80,8 +80,8 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
     }
 
     /**
-     * @param parent                    The parent {@link ClassLoader}
-     * @param config                    The {@link CompilerConfiguration}
+     * @param parent The parent {@link ClassLoader}
+     * @param config The {@link CompilerConfiguration}
      * @param useConfigurationClasspath Whether to use the configuration classpath
      */
     public InMemoryByteCodeGroovyClassLoader(ClassLoader parent, CompilerConfiguration config, boolean useConfigurationClasspath) {
@@ -110,6 +110,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
 
     /**
      * Adds one or many services that can be loaded via {@link java.util.ServiceLoader}.
+     *
      * @param name The name of the service
      * @param classes The classes
      * @throws MalformedURLException If the name is not valid

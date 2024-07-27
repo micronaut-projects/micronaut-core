@@ -56,10 +56,10 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
                           @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
                           @NonNull GroovyClassElement upperType) {
         super(
-                upperType.visitorContext,
-                upperType.getNativeType(),
+            upperType.visitorContext,
+            upperType.getNativeType(),
             annotationMetadataFactory,
-                upperType.getTypeArguments(),
+            upperType.getTypeArguments(),
             0
         );
         this.wildcardNativeElement = wildcardNativeElement;
@@ -145,12 +145,11 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         } else {
             if (element.isWildcard() || element.isGenericPlaceholder()) {
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to GroovyClassElement");
-            } else {
-                return (GroovyClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
-                    .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to GroovyClassElement, class was not found on the visitor context")))
-                    .withArrayDimensions(element.getArrayDimensions())
-                    .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
             }
+            return (GroovyClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
+                .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to GroovyClassElement, class was not found on the visitor context")))
+                .withArrayDimensions(element.getArrayDimensions())
+                .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
         }
     }
 }

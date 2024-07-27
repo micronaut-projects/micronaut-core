@@ -71,8 +71,8 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     /**
      * Default constructor.
      *
-     * @param visitorContext            The groovy visitor context
-     * @param nativeElement             The native element
+     * @param visitorContext The groovy visitor context
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
      */
     protected AbstractGroovyElement(GroovyVisitorContext visitorContext,
@@ -122,7 +122,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     }
 
     @Override
-    public GroovyNativeElement getNativeType() {
+    public @NonNull GroovyNativeElement getNativeType() {
         return nativeElement;
     }
 
@@ -290,21 +290,21 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             }
             boolean finalIsRawType = isRawType;
             bounds = classNodeBounds
-                    .stream()
-                    .map(classNode -> {
-                        if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
-                            classNode = classNode.redirect();
-                        }
-                        return classNode;
-                    })
-                    .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
-                    .map(classNode -> {
-                        // Strip declared type arguments and replace with an Object to prevent recursion
-                        boolean stripTypeArguments = alreadyVisitedPlaceholder;
+                .stream()
+                .map(classNode -> {
+                    if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
+                        classNode = classNode.redirect();
+                    }
+                    return classNode;
+                })
+                .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
+                .map(classNode -> {
+                    // Strip declared type arguments and replace with an Object to prevent recursion
+                    boolean stripTypeArguments = alreadyVisitedPlaceholder;
 
-                        return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
-                    })
-                    .toList();
+                    return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
+                })
+                .toList();
             if (bounds.isEmpty()) {
                 bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
             }
@@ -374,7 +374,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         }
         GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
         return new GroovyWildcardElement(
-                wildcardNativeElement, upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), elementAnnotationMetadataFactory, (GroovyClassElement) upperType
+            wildcardNativeElement, upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), elementAnnotationMetadataFactory, (GroovyClassElement) upperType
         );
     }
 

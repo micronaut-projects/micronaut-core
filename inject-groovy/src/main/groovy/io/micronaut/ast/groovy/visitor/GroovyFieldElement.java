@@ -51,9 +51,9 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     private ClassElement genericType;
 
     /**
-     * @param visitorContext            The visitor context
-     * @param owningType                The owningType
-     * @param fieldNode                 The {@link FieldNode}
+     * @param visitorContext The visitor context
+     * @param owningType The owningType
+     * @param fieldNode The {@link FieldNode}
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyFieldElement(GroovyVisitorContext visitorContext,
@@ -66,7 +66,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyFieldElement(visitorContext, owningType, fieldNode, elementAnnotationMetadataFactory);
     }
 
@@ -111,7 +111,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return fieldNode.getName();
     }
 
@@ -153,7 +153,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public Object getConstantValue() {
         if (fieldNode.hasInitialExpression()
-                && fieldNode.getInitialValueExpression() instanceof ConstantExpression constExpression) {
+            && fieldNode.getInitialValueExpression() instanceof ConstantExpression constExpression) {
             return constExpression.getValue();
         }
         return null;
@@ -169,7 +169,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
-    public ClassElement getGenericType() {
+    public @NonNull ClassElement getGenericType() {
         if (genericType == null) {
             genericType = newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
         }
