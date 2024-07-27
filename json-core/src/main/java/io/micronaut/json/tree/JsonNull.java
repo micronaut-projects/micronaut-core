@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 3.1
  */
 final class JsonNull extends JsonScalar {
+
     static final JsonNull INSTANCE = new JsonNull();
 
     private JsonNull() {

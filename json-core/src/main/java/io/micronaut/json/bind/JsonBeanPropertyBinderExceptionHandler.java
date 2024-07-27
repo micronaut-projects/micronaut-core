@@ -34,7 +34,7 @@ public interface JsonBeanPropertyBinderExceptionHandler {
      * Attempt to convert the given exception to a {@link ConversionErrorException}.
      *
      * @param object The object that was supposed to be updated, or {@code null}.
-     * @param e      The exception that occurred during mapping.
+     * @param e The exception that occurred during mapping.
      * @return The conversion error, or an empty value if default handling should be used.
      */
     Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e);
