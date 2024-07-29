@@ -743,7 +743,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
             environments.add(Environment.GAE);
             environments.add(Environment.GOOGLE_COMPUTE);
-            environments.add(Environment.CLOUD);
             deduceComputePlatform = false;
         }
 

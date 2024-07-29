@@ -38,11 +38,6 @@ import spock.util.environment.RestoreSystemProperties
 })
 class DefaultEnvironmentSpec extends Specification {
 
-    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
-    private static final String PCF_ENV = "VCAP_SERVICES";
-    private static final String HEROKU_DYNO = "DYNO";
-    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
-
     void "test environment system property resolve"() {
         given:
         System.setProperty("test.foo.bar", "10")
@@ -328,7 +323,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         when:
         System.setProperty("micronaut.environments", "system,property")
-        env = new DefaultEnvironment({ ["explicit"] })
+        env = new DefaultEnvironment({["explicit"]})
 
         then:
         env.activeNames.size() == 4
@@ -377,7 +372,7 @@ class DefaultEnvironmentSpec extends Specification {
 
     void "test add and remove property sources"() {
         given:
-        Environment env = new DefaultEnvironment({ ["test"] }).start()
+        Environment env = new DefaultEnvironment({["test"]}).start()
         PropertySource propertySource = PropertySource.of("test", [foo: 'bar'])
 
         when:
@@ -410,7 +405,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     void "test custom property source is not removed after refresh 2"() {
-        def env = new DefaultEnvironment({ ["test"] })
+        def env = new DefaultEnvironment({["test"]})
         env.addPropertySource(new MapPropertySource('static', [static: true]))
         env.start()
 
@@ -434,7 +429,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("config.prop", "system-property")
         Environment env = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
                 .execute(() -> {
-                    new DefaultEnvironment({ ["first", "second"] }).start()
+                    new DefaultEnvironment({["first", "second"]}).start()
                 })
 
         then: "System properties have highest precedence"
@@ -444,40 +439,40 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("config.prop")
         env = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
                 .execute(() -> {
-                    new DefaultEnvironment({ ["first", "second"] }).start()
+                    new DefaultEnvironment({["first", "second"]}).start()
                 })
 
         then: "Environment variables have next highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "env-var"
 
         when:
-        env = new DefaultEnvironment({ ["first", "second"] }).start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files last in the list have precedence over those first in the list"
         env.getRequiredProperty("config.prop", String.class) == "config-files2.yml"
 
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml")
-        env = new DefaultEnvironment({ ["first", "second"] }).start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files have precedence over application-*.* files"
         env.getRequiredProperty("config.prop", String.class) == "config-files.yml"
 
         when:
         System.clearProperty("micronaut.config.files")
-        env = new DefaultEnvironment({ ["first", "second"] }).start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Environments last in the list have precedence over those first in the list"
         env.getRequiredProperty("config.prop", String.class) == "application-second.yml"
 
         when:
-        env = new DefaultEnvironment({ ["first"] }).start()
+        env = new DefaultEnvironment({["first"]}).start()
 
         then: "Environments files have precedence over normal files"
         env.getRequiredProperty("config.prop", String.class) == "application-first.yml"
 
         when:
-        env = new DefaultEnvironment({ [] }).start()
+        env = new DefaultEnvironment({[]}).start()
 
         then: "Normal application files have the least precedence with config folder being last"
         env.getRequiredProperty("config.prop", String.class) == "application.yml"
@@ -486,102 +481,102 @@ class DefaultEnvironmentSpec extends Specification {
 
     void "test custom config locations"() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.builder()
-                .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
-                .build()
-                .start()
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .build()
+                    .start()
 
         then: "Normal application files have the least precedence with config folder being last"
-        applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application.yml"
-        applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
-        applicationContext.getRequiredProperty("custom-config-file", String.class) == "abc"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "abc"
         cleanup:
-        applicationContext.stop()
+            applicationContext.stop()
     }
 
     void "test custom config locations respect environment order"() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.builder()
-                .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
-                .environments("env1", "env2")
-                .build()
-                .start()
-
-        then: "Environment order establishes property value"
-        applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env2.yml"
-        applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
-        applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
-        cleanup:
-        applicationContext.stop()
-    }
-
-    void "test custom config locations respect environment order - reversed"() {
-        when:
-        ApplicationContext applicationContext = ApplicationContext.builder()
-                .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
-                .environments("env2", "env1")
-                .build()
-                .start()
-
-        then: "Environment order establishes property value"
-        applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env1.yml"
-        applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
-        applicationContext.getRequiredProperty("custom-config-file", String.class) == "env1"
-        cleanup:
-        applicationContext.stop()
-    }
-
-    void "test custom config locations - envrionment variables take precedence"() {
-        when:
-        ApplicationContext applicationContext = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "from-env").execute(() -> {
-            ApplicationContext.builder()
+            ApplicationContext applicationContext = ApplicationContext.builder()
                     .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
                     .environments("env1", "env2")
                     .build()
                     .start()
-        })
+
+        then: "Environment order establishes property value"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env2.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+        cleanup:
+            applicationContext.stop()
+    }
+
+    void "test custom config locations respect environment order - reversed"() {
+        when:
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .environments("env2", "env1")
+                    .build()
+                    .start()
+
+        then: "Environment order establishes property value"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env1.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env1"
+        cleanup:
+            applicationContext.stop()
+    }
+
+    void "test custom config locations - envrionment variables take precedence"() {
+        when:
+            ApplicationContext applicationContext = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "from-env").execute(() -> {
+                ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .environments("env1", "env2")
+                    .build()
+                    .start()
+            })
 
         then: "values passed as environment variables take precedence"
-        applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
-        applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
-        applicationContext.getRequiredProperty("config.prop", String.class) == "from-env"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "from-env"
 
         cleanup:
-        applicationContext.stop()
+            applicationContext.stop()
     }
 
     void "test custom config locations - system properties take precedence over env"() {
         when:
         ApplicationContext applicationContext = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "from-env").execute(() -> {
-            ApplicationContext.builder()
+                ApplicationContext.builder()
                     .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
                     .properties(["config.prop": "from-properties"])
                     .environments("env1", "env2")
                     .build()
                     .start()
-        })
+            })
 
         then: "values from properties take precedence"
-        applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
-        applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
-        applicationContext.getRequiredProperty("config.prop", String.class) == "from-properties"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "from-properties"
 
         cleanup:
-        applicationContext.stop()
+            applicationContext.stop()
     }
 
     void "test specified names have precedence, even if deduced"() {
         when:
-        Environment env = new DefaultEnvironment({ [] }).start()
+        Environment env = new DefaultEnvironment({[]}).start()
 
         then:
         env.activeNames == ["test"] as Set
 
         when:
         env = SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
-                .execute(() -> {
-                    new DefaultEnvironment({ [] }).start()
-                })
+        .execute(() -> {
+            new DefaultEnvironment({[]}).start()
+        })
 
         then: // env has priority over deduced
         env.activeNames == ["test", "first", "second", "third"] as Set
@@ -589,7 +584,7 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         env = SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
                 .execute(() -> {
-                    new DefaultEnvironment({ ["specified"] }).start()
+                    new DefaultEnvironment({["specified"]}).start()
                 })
 
         then: // specified has priority over env
@@ -598,7 +593,7 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         env = SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
                 .execute(() -> {
-                    new DefaultEnvironment({ ["second"] }).start()
+                    new DefaultEnvironment({["second"]}).start()
                 })
 
         then: // specified has priority over env, even if already set in env
@@ -724,8 +719,8 @@ class DefaultEnvironmentSpec extends Specification {
                 }
 
         expect:
-        env.propertySources.find { it.name == KubernetesEnvironmentPropertySource.NAME }
-        !env.propertySources.find { it.name == EnvironmentPropertySource.NAME }
+        env.propertySources.find {it.name == KubernetesEnvironmentPropertySource.NAME }
+        !env.propertySources.find {it.name == EnvironmentPropertySource.NAME }
         !env.getProperty("v1-service-xpto-service-host", String).isPresent()
     }
 
@@ -746,115 +741,8 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("micronaut.server.port", Integer).get() == 8081
     }
 
-    void "should deduce environment when environment is set to GOOGLE_APPENGINE_ENVIRONMENT"() {
-
-        when: 'an environment is specified through env var as GOOGLE_APPENGINE_ENVIRONMENT '
-        Environment env = SystemLambda.withEnvironmentVariable(GOOGLE_APPENGINE_ENVIRONMENT, "standard")
-                .execute(() -> {
-                    new DefaultEnvironment(new ApplicationContextConfiguration() {
-                        @Override
-                        List<String> getEnvironments() {
-                            return Arrays.asList()
-                        }
-
-                        @Override
-                        List<String> getDefaultEnvironments() {
-                            return ['default']
-                        }
-
-                        @Override
-                        Optional<Boolean> getDeduceEnvironments() {
-                            return Optional.of(true)
-                        }
-                    }).start()
-                })
-
-        then: 'the environment is deduced'
-        env.activeNames == ["test", Environment.GAE, Environment.GOOGLE_COMPUTE, Environment.CLOUD] as Set
-    }
-
-    void "should deduce environment when environment is set to PCF_ENV"() {
-
-        when: 'an environment is specified through env var as PCF_ENV '
-        Environment env = SystemLambda.withEnvironmentVariable(PCF_ENV, "{}")
-                .execute(() -> {
-                    new DefaultEnvironment(new ApplicationContextConfiguration() {
-                        @Override
-                        List<String> getEnvironments() {
-                            return Arrays.asList()
-                        }
-
-                        @Override
-                        List<String> getDefaultEnvironments() {
-                            return ['default']
-                        }
-
-                        @Override
-                        Optional<Boolean> getDeduceEnvironments() {
-                            return Optional.of(true)
-                        }
-                    }).start()
-                })
-
-        then: 'the environment is deduced'
-        env.activeNames == ["test", Environment.CLOUD_FOUNDRY, Environment.CLOUD] as Set
-    }
-
-    void "should deduce environment when environment is set to HEROKU_DYNO"() {
-
-        when: 'an environment is specified through env var as HEROKU_DYNO '
-        Environment env = SystemLambda.withEnvironmentVariable(HEROKU_DYNO, "web.1")
-                .execute(() -> {
-                    new DefaultEnvironment(new ApplicationContextConfiguration() {
-                        @Override
-                        List<String> getEnvironments() {
-                            return Arrays.asList()
-                        }
-
-                        @Override
-                        List<String> getDefaultEnvironments() {
-                            return ['default']
-                        }
-
-                        @Override
-                        Optional<Boolean> getDeduceEnvironments() {
-                            return Optional.of(true)
-                        }
-                    }).start()
-                })
-
-        then: 'the environment is deduced'
-        env.activeNames == ["test", Environment.HEROKU, Environment.CLOUD] as Set
-    }
-    void "should deduce environment when environment is set to K8S_ENV"() {
-
-        when: 'an environment is specified through env var as K8S_ENV '
-        Environment env = SystemLambda.withEnvironmentVariable(K8S_ENV, "x.x.x.x")
-                .execute(() -> {
-                    new DefaultEnvironment(new ApplicationContextConfiguration() {
-                        @Override
-                        List<String> getEnvironments() {
-                            return Arrays.asList()
-                        }
-
-                        @Override
-                        List<String> getDefaultEnvironments() {
-                            return ['default']
-                        }
-
-                        @Override
-                        Optional<Boolean> getDeduceEnvironments() {
-                            return Optional.of(true)
-                        }
-                    }).start()
-                })
-
-        then: 'the environment is deduced'
-        env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
-    }
-
     private static Environment startEnv(String files) {
-        new DefaultEnvironment({ ["test"] }) {
+        new DefaultEnvironment({["test"]}) {
             @Override
             protected String readPropertySourceListKeyFromEnvironment() {
                 files
