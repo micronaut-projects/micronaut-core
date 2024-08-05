@@ -20,7 +20,6 @@ import java.util.Objects;
 /**
  * Enumeration of close events. See https://tools.ietf.org/html/rfc6455#section-11.7.
  *
- *
  * @author graemerocher
  * @since 1.0
  */
@@ -139,7 +138,7 @@ public class CloseReason {
         }
         CloseReason that = (CloseReason) o;
         return code == that.code &&
-                Objects.equals(reason, that.reason);
+            Objects.equals(reason, that.reason);
     }
 
     @Override
@@ -150,8 +149,8 @@ public class CloseReason {
     @Override
     public String toString() {
         return "CloseReason{" +
-                "code=" + code +
-                ", reason='" + reason + '\'' +
-                '}';
+            "code=" + code +
+            ", reason='" + reason + '\'' +
+            '}';
     }
 }

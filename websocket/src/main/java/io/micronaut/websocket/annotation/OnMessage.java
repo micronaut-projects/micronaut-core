@@ -39,6 +39,7 @@ public @interface OnMessage {
 
     /**
      * The maximum size of a WebSocket payload.
+     *
      * @return The max size
      */
     int maxPayloadLength() default 65536;

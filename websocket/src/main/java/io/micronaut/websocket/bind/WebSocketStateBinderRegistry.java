@@ -50,7 +50,7 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
      * Default constructor.
      *
      * @param requestBinderRegistry The request binder registry
-     * @param conversionService     The conversionService
+     * @param conversionService The conversionService
      */
     public WebSocketStateBinderRegistry(RequestBinderRegistry requestBinderRegistry, ConversionService conversionService) {
         this.requestBinderRegistry = requestBinderRegistry;

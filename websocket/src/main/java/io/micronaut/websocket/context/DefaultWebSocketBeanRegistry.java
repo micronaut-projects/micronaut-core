@@ -23,7 +23,10 @@ import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.websocket.WebSocketPongMessage;
-import io.micronaut.websocket.annotation.*;
+import io.micronaut.websocket.annotation.OnClose;
+import io.micronaut.websocket.annotation.OnError;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketException;
 
 import java.lang.annotation.Annotation;
@@ -40,12 +43,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
+
     private final BeanContext beanContext;
     private final Class<? extends Annotation> stereotype;
     private final Map<Class<?>, WebSocketBean> webSocketBeanMap = new ConcurrentHashMap<>(3);
 
     /**
      * Default constructor.
+     *
      * @param beanContext The bean context
      * @param stereotype Stereotype to use for bean lookup
      */
@@ -74,24 +79,24 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
             for (ExecutableMethod<T, ?> method : executableMethods) {
                 if (method.isAnnotationPresent(OnOpen.class)) {
                     onOpen = ExecutionHandle.of(
-                            bean,
-                            method
+                        bean,
+                        method
                     );
                     continue;
                 }
 
                 if (method.isAnnotationPresent(OnClose.class)) {
                     onClose = ExecutionHandle.of(
-                            bean,
-                            method
+                        bean,
+                        method
                     );
                     continue;
                 }
 
                 if (method.isAnnotationPresent(OnError.class)) {
                     onError = ExecutionHandle.of(
-                            bean,
-                            method
+                        bean,
+                        method
                     );
                     continue;
                 }
@@ -99,13 +104,13 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
                 if (method.isAnnotationPresent(OnMessage.class)) {
                     if (Arrays.asList(method.getArgumentTypes()).contains(WebSocketPongMessage.class)) {
                         onPong = ExecutionHandle.of(
-                                bean,
-                                method
+                            bean,
+                            method
                         );
                     } else {
                         onMessage = ExecutionHandle.of(
-                                bean,
-                                method
+                            bean,
+                            method
                         );
                     }
                 }
@@ -124,8 +129,8 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
     /**
      * Default web socket impl.
      *
-     * @author graemerocher
      * @param <T>
+     * @author graemerocher
      */
     private static class DefaultWebSocketBean<T> implements WebSocketBean<T> {
         private final T bean;
