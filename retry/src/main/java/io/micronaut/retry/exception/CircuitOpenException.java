@@ -29,7 +29,7 @@ public class CircuitOpenException extends RetryException {
      * call to {@link #initCause}.
      *
      * @param message the detail message. The detail message is saved for
-     *                later retrieval by the {@link #getMessage()} method.
+     * later retrieval by the {@link #getMessage()} method.
      */
     public CircuitOpenException(String message) {
         super(message);
@@ -42,11 +42,11 @@ public class CircuitOpenException extends RetryException {
      * this the exception's detail message.
      *
      * @param message the detail message (which is saved for later retrieval
-     *                by the {@link #getMessage()} method).
-     * @param cause   the cause (which is saved for later retrieval by the
-     *                {@link #getCause()} method).  (A {@code null} value is
-     *                permitted, and indicates that the cause is nonexistent or
-     *                unknown.)
+     * by the {@link #getMessage()} method).
+     * @param cause the cause (which is saved for later retrieval by the
+     * {@link #getCause()} method).  (A {@code null} value is
+     * permitted, and indicates that the cause is nonexistent or
+     * unknown.)
      */
     public CircuitOpenException(String message, Throwable cause) {
         super(message, cause);
