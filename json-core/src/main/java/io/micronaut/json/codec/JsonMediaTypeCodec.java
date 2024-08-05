@@ -56,9 +56,9 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
     );
 
     /**
-     * @param jsonMapper                To read/write JSON
+     * @param jsonMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonMediaTypeCodec(JsonMapper jsonMapper,
                               ApplicationConfiguration applicationConfiguration,
@@ -67,9 +67,9 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
     }
 
     /**
-     * @param jsonCodec                To read/write JSON
+     * @param jsonCodec To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     @Inject
     public JsonMediaTypeCodec(BeanProvider<JsonMapper> jsonCodec,
