@@ -55,7 +55,7 @@ public class HealthMonitorTask {
 
     /**
      * @param currentHealthStatus The current health status
-     * @param healthIndicators    Health indicators
+     * @param healthIndicators Health indicators
      */
     @Inject
     public HealthMonitorTask(CurrentHealthStatus currentHealthStatus, List<HealthIndicator> healthIndicators) {
@@ -65,7 +65,7 @@ public class HealthMonitorTask {
 
     /**
      * @param currentHealthStatus The current health status
-     * @param healthIndicators    Health indicators
+     * @param healthIndicators Health indicators
      */
     public HealthMonitorTask(CurrentHealthStatus currentHealthStatus, HealthIndicator... healthIndicators) {
         this(currentHealthStatus, Arrays.asList(healthIndicators));

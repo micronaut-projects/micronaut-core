@@ -57,12 +57,12 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
         return Flux.from(discoveryClient.getServiceIds())
             .flatMap((Function<List<String>, Publisher<HealthResult>>) ids -> {
                 List<Flux<Map<String, List<ServiceInstance>>>> serviceMap = ids.stream()
-                        .map(id -> {
-                            Flux<List<ServiceInstance>> serviceList = Flux.from(discoveryClient.getInstances(id));
-                            return serviceList
-                                    .map(serviceInstances -> Collections.singletonMap(id, serviceInstances));
-                        })
-                        .collect(Collectors.toList());
+                    .map(id -> {
+                        Flux<List<ServiceInstance>> serviceList = Flux.from(discoveryClient.getInstances(id));
+                        return serviceList
+                            .map(serviceInstances -> Collections.singletonMap(id, serviceInstances));
+                    })
+                    .collect(Collectors.toList());
                 Flux<Map<String, List<ServiceInstance>>> mergedServiceMap = Flux.merge(serviceMap);
 
                 return mergedServiceMap.reduce(new LinkedHashMap<String, List<ServiceInstance>>(), (allServiceMap, service) -> {
@@ -72,17 +72,17 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                     HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.UP);
                     Stream<Map.Entry<String, List<ServiceInstance>>> entryStream = details.entrySet().stream();
                     Map<String, Object> value = entryStream.collect(
-                            Collectors.toMap(Map.Entry::getKey, entry ->
-                                    entry
-                                            .getValue()
-                                            .stream()
-                                            .map(ServiceInstance::getURI)
-                                            .collect(Collectors.toList())
-                            )
+                        Collectors.toMap(Map.Entry::getKey, entry ->
+                            entry
+                                .getValue()
+                                .stream()
+                                .map(ServiceInstance::getURI)
+                                .collect(Collectors.toList())
+                        )
                     );
 
                     builder.details(Collections.singletonMap(
-                            "services", value
+                        "services", value
                     ));
                     return builder.build();
                 }).flux();

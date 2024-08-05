@@ -37,7 +37,7 @@ public interface HealthAggregator<T extends HealthResult> {
     Publisher<T> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail);
 
     /**
-     * @param name    The name of the new health result
+     * @param name The name of the new health result
      * @param results The health results to aggregate.
      * @return An aggregated {@link HealthResult}.
      */

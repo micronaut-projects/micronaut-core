@@ -58,9 +58,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     private final EndpointDefaultConfiguration endpointDefaultConfiguration;
 
     /**
-     * @param applicationContext           The application context
-     * @param uriNamingStrategy            The URI naming strategy
-     * @param conversionService            The conversion service
+     * @param applicationContext The application context
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
@@ -81,8 +81,8 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * Register a route.
      *
      * @param method The {@link ExecutableMethod}
-     * @param id     The route id
-     * @param port   The port
+     * @param id The route id
+     * @param port The port
      */
     protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
@@ -109,7 +109,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     /**
      * @param beanDefinition The bean definition to process
-     * @param method         The executable method
+     * @param method The executable method
      */
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -146,7 +146,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     /**
      * @param method The {@link ExecutableMethod}
-     * @param id     The route id
+     * @param id The route id
      * @return An {@link UriTemplate}
      */
     protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
