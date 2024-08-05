@@ -34,7 +34,7 @@ public interface ConfigurationClient extends Described {
     String CONFIGURATION_PREFIX = "micronaut.config-client";
 
     /**
-     *  Whether the configuration client, responsible for reading configuration for configuration servers, is enabled.
+     * Whether the configuration client, responsible for reading configuration for configuration servers, is enabled.
      */
     String ENABLED = CONFIGURATION_PREFIX + ".enabled";
 

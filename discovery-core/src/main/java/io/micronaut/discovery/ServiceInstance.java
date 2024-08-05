@@ -157,7 +157,7 @@ public interface ServiceInstance {
     /**
      * Construct a new {@link ServiceInstance} for the given ID and URL.
      *
-     * @param id  The ID
+     * @param id The ID
      * @param url The URL
      * @return The instance
      */
@@ -173,7 +173,7 @@ public interface ServiceInstance {
     /**
      * Construct a new {@link ServiceInstance} for the given ID and URL.
      *
-     * @param id  The ID
+     * @param id The ID
      * @param uri The URI
      * @return The instance
      */
@@ -195,7 +195,7 @@ public interface ServiceInstance {
                 if (userInfo == null) {
                     return ServiceInstance.super.getMetadata();
                 } else {
-                    Map<String, String> metadata = new HashMap<>(1);
+                    var metadata = new HashMap<String, String>(1);
                     metadata.put(HttpHeaders.AUTHORIZATION_INFO, userInfo);
                     return ConvertibleValues.of(metadata);
                 }
@@ -206,7 +206,7 @@ public interface ServiceInstance {
     /**
      * Construct a new {@link ServiceInstance} for the given ID, host and port using the HTTP scheme.
      *
-     * @param id   The ID
+     * @param id The ID
      * @param host The host
      * @param port The port
      * @return The instance
@@ -228,7 +228,7 @@ public interface ServiceInstance {
     /**
      * A builder to builder a {@link ServiceInstance}.
      *
-     * @param id  The id
+     * @param id The id
      * @param uri The URI
      * @return The builder
      */
