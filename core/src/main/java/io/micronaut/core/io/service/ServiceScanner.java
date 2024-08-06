@@ -18,6 +18,9 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.IOUtils;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.ProviderNotFoundException;
+import java.util.stream.Stream;
 import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
@@ -190,17 +193,34 @@ final class ServiceScanner<S> {
         }
 
         if (uniqueURIs.isEmpty()) {
-            FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of(), classLoader);
-            Path modulesPath = fs.getPath("modules");
-            Files.list(modulesPath)
-                .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
-                .filter(p -> !p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
-                .map(p -> p.resolve(path))
-                .filter(Files::exists)
-                .map(modulesPath::resolve)
-                .map(Path::toUri)
-                .forEach(uniqueURIs::add);
-            // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
+            FileSystem fs = null;
+            try {
+                fs = FileSystems.getFileSystem(URI.create("jrt:/"));
+            } catch (FileSystemNotFoundException | ProviderNotFoundException e) {
+                //no-op
+            }
+            if (fs == null || !fs.isOpen()) {
+                try {
+                    fs = FileSystems.newFileSystem(URI.create("jrt:/"), Collections.emptyMap(), classLoader);
+                } catch (IOException | ProviderNotFoundException e) {
+                    // not available, probably running in Native Image.
+                }
+            }
+            if (fs != null) {
+                Path modulesPath = fs.getPath("modules");
+                try (Stream<Path> stream = Files.list(modulesPath)) {
+                    stream
+                        .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
+                        .filter(p -> !p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
+                        .map(p -> p.resolve(path))
+                        .filter(Files::exists)
+                        .map(modulesPath::resolve)
+                        .map(Path::toUri)
+                        .forEach(uniqueURIs::add);
+                }
+
+                // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
+            }
         }
 
         for (URI uri : uniqueURIs) {
