@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -239,8 +238,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processBeanFields(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
-            .onlyInstance()
-            .onlyInjected();
+            .onlyInstance();
 
         if (isImport) {
             // fields that are injected but not public and are imported need reflection
@@ -258,8 +256,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processBeanMethods(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
-            .onlyInstance()
-            .onlyInjected();
+            .onlyInstance();
 
         if (isImport) {
             final Predicate<Set<ElementModifier>> nonPublicOnly = elementModifiers ->
