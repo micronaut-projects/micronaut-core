@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 
 import java.util.concurrent.ThreadFactory;
@@ -52,7 +53,7 @@ class NamedThreadFactory implements ThreadFactory {
      * @return new thread
      */
     @Override
-    public Thread newThread(Runnable runnable) {
+    public Thread newThread(@NonNull Runnable runnable) {
         Thread newThread = new Thread(group, runnable, namePrefix + threadNumber.getAndIncrement(), 0);
         if (newThread.isDaemon()) {
             newThread.setDaemon(false);

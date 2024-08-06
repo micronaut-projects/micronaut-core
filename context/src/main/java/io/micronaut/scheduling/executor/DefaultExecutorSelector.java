@@ -51,6 +51,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     /**
      * Default constructor.
+     *
      * @param beanLocator The bean locator
      * @param ioExecutor The IO executor
      * @param blockingExecutor The blocking executor
@@ -75,8 +76,8 @@ public class DefaultExecutorSelector implements ExecutorSelector {
                 return Optional.of(executorService);
             } catch (NoSuchBeanException e) {
                 throw new SchedulerConfigurationException(
-                        method,
-                        "No executor configured for name: " + name
+                    method,
+                    "No executor configured for name: " + name
                 );
             }
         } else if (threadSelection == ThreadSelection.AUTO) {

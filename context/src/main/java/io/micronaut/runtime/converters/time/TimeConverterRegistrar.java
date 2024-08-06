@@ -60,23 +60,23 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @TypeHint(
-        value = {
-                Duration.class,
-                TemporalAmount.class,
-                Instant.class,
-                LocalDate.class,
-                LocalDateTime.class,
-                MonthDay.class,
-                OffsetDateTime.class,
-                OffsetTime.class,
-                Period.class,
-                Year.class,
-                YearMonth.class,
-                ZonedDateTime.class,
-                ZoneId.class,
-                ZoneOffset.class
-        },
-        accessType = TypeHint.AccessType.ALL_PUBLIC
+    value = {
+        Duration.class,
+        TemporalAmount.class,
+        Instant.class,
+        LocalDate.class,
+        LocalDateTime.class,
+        MonthDay.class,
+        OffsetDateTime.class,
+        OffsetTime.class,
+        Period.class,
+        Year.class,
+        YearMonth.class,
+        ZonedDateTime.class,
+        ZoneId.class,
+        ZoneOffset.class
+    },
+    accessType = TypeHint.AccessType.ALL_PUBLIC
 )
 @Internal
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
@@ -129,8 +129,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                     return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
                                 }
                                 context.reject(
-                                        value,
-                                        new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                    value,
+                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
                                 return Optional.empty();
                             }
                         }

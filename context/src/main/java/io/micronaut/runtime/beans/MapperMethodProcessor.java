@@ -31,8 +31,8 @@ import java.util.function.Supplier;
 /**
  * Triggers registering all bean mappers as type converters as well.
  *
- * @since 4.2.0
  * @author graemerocher
+ * @since 4.2.0
  */
 @Experimental
 @Internal
@@ -50,9 +50,9 @@ final class MapperMethodProcessor implements ExecutableMethodProcessor<Mapper> {
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         Class<?>[] argumentTypes = method.getArgumentTypes();
         if (method.hasDeclaredAnnotation(Mapper.class) && argumentTypes.length == 1) {
-            Class<Object> toType = (Class<Object>) method.getReturnType().getType();
-            Class<Object> fromType = (Class<Object>) argumentTypes[0];
-            ExecutableMethod<Object, Object> finalMethod = (ExecutableMethod<Object, Object>) method;
+            var toType = (Class<Object>) method.getReturnType().getType();
+            var fromType = (Class<Object>) argumentTypes[0];
+            var finalMethod = (ExecutableMethod<Object, Object>) method;
             Supplier<?> beanSupplier = SupplierUtil.memoized(() -> applicationContext.getBean(beanDefinition));
             mutableConversionService.addConverter(
                 fromType,

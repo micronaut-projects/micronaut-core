@@ -16,8 +16,8 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Nullable;
-
 import jakarta.validation.constraints.Min;
+
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
@@ -63,17 +63,20 @@ public interface ExecutorConfiguration {
     /**
      * @return The parallelism for {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING}
      */
-    @Min(1L) Integer getParallelism();
+    @Min(1L)
+    Integer getParallelism();
 
     /**
      * @return The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED}
      */
-    @Min(1L) Integer getNumberOfThreads();
+    @Min(1L)
+    Integer getNumberOfThreads();
 
     /**
      * @return The core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
      */
-    @Min(1L) Integer getCorePoolSize();
+    @Min(1L)
+    Integer getCorePoolSize();
 
     /**
      * @return Whether the pool should use virtual threads.

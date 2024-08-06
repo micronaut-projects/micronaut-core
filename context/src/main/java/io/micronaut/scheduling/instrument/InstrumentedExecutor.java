@@ -15,8 +15,8 @@
  */
 package io.micronaut.scheduling.instrument;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -33,6 +33,7 @@ public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
 
     /**
      * Unwrap instrumented executor if needed.
+     *
      * @param executor The executor
      * @return The unwrapped value or the original one
      * @since 4.0.0
@@ -46,6 +47,7 @@ public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
 
     /**
      * Unwrap instrumented executor if needed.
+     *
      * @param executor The executor
      * @return The unwrapped value or the original one
      * @since 4.0.0

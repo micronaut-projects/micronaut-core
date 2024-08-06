@@ -80,7 +80,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
             if (invocation == null) {
                 Argument<Object> toType = context.getReturnType().asArgument();
                 // should never be empty, validated at compile time
-                Argument<Object> fromType = (Argument<Object>) context.getArguments()[0];
+                var fromType = (Argument<Object>) context.getArguments()[0];
                 BeanIntrospection<Object> toIntrospection = BeanIntrospection.getIntrospection(toType.getType());
                 Class<Object> fromClass = fromType.getType();
                 boolean isMap = Map.class.isAssignableFrom(fromClass);
@@ -153,7 +153,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         Mapper.ConflictStrategy conflictStrategy,
         List<AnnotationValue<Mapper.Mapping>> annotations,
         boolean isMap) {
-        List<Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>> rootMappers = new ArrayList<>(5);
+        var rootMappers = new ArrayList<Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>>(5);
         for (AnnotationValue<Mapper.Mapping> annotation : annotations) {
             // a root mapping contains no object to bind to, so we assume we bind to the root
             if (!annotation.contains(Mapper.Mapping.MEMBER_TO) && annotation.contains(Mapper.Mapping.MEMBER_FROM)) {
@@ -166,7 +166,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                     if (evaluatedCondition != null) {
                         rootMappers.add(expressionEvaluationContext ->
                             (object, builder) -> {
-                                ExpressionEvaluationContext evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
+                                var evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
                                 if (ObjectUtils.coerceToBoolean(evaluatedCondition.evaluate(evaluationContext))) {
                                     Object v = evaluatedExpression.evaluate(evaluationContext);
                                     if (v != null) {
@@ -178,7 +178,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                     } else {
                         rootMappers.add((expressionEvaluationContext ->
                             (object, builder) -> {
-                                ExpressionEvaluationContext evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
+                                var evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
                                 Object v = evaluatedExpression.evaluate(evaluationContext);
                                 if (v != null) {
                                     mapAllFromValue(conflictStrategy, builder, v);
@@ -230,7 +230,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
             int i = builder.indexOf(property.getName());
             if (i > -1) {
                 @SuppressWarnings("unchecked")
-                Argument<Object> argument = (Argument<Object>) builder.getBuilderArguments()[i];
+                var argument = (Argument<Object>) builder.getBuilderArguments()[i];
                 Object propertyValue = property.get(object);
                 if (argument.isInstance(propertyValue)) {
                     builder.with(i, argument, propertyValue);
@@ -248,7 +248,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         Map<String, Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>> customMappers,
         @Nullable List<Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>> rootMappers,
         MethodInvocationContext<Object, Object> callContext) {
-        MapStrategy mapStrategy = new MapStrategy(conflictStrategy);
+        var mapStrategy = new MapStrategy(conflictStrategy);
         AnnotationMetadata callAnnotationMetadata = callContext.getAnnotationMetadata();
         if (callAnnotationMetadata instanceof EvaluatedAnnotationMetadata evaluatedAnnotationMetadata) {
             ConfigurableExpressionEvaluationContext evaluationContext = evaluatedAnnotationMetadata.getEvaluationContext();
@@ -276,7 +276,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         Mapper.ConflictStrategy conflictStrategy,
         List<AnnotationValue<Mapper.Mapping>> annotations,
         boolean isMap) {
-        Map<String, Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>> customMappers = new HashMap<>();
+        var customMappers = new HashMap<String, Function<Object, BiConsumer<Object, BeanIntrospection.Builder<Object>>>>();
         BeanIntrospection.Builder<Object> builderMeta = toIntrospection.builder();
         @NonNull Argument<?>[] builderArguments = builderMeta.getBuilderArguments();
         for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
@@ -390,7 +390,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         return invocation;
     }
 
-    private  <I, O> O map(I input, MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, BeanIntrospection<O> outputIntrospection) {
+    private <I, O> O map(I input, MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, BeanIntrospection<O> outputIntrospection) {
         boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
         Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();

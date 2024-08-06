@@ -53,6 +53,7 @@ final class ThreadLocalCustomScope extends AbstractConcurrentCustomScope<ThreadL
         return true;
     }
 
+    @NonNull
     @Override
     public ThreadLocalCustomScope start() {
         return this;

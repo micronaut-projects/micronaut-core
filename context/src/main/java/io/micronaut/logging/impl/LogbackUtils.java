@@ -46,8 +46,8 @@ public final class LogbackUtils {
     /**
      * Configures a Logger Context.
      *
-     * @param classLoader        Class Loader
-     * @param context            Logger Context
+     * @param classLoader Class Loader
+     * @param context Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
      */
     public static void configure(@NonNull ClassLoader classLoader,
@@ -60,12 +60,11 @@ public final class LogbackUtils {
                 return resource;
             }
             // Check file system
-            File file = new File(logbackXmlLocation);
+            var file = new File(logbackXmlLocation);
             if (file.exists()) {
                 try {
                     resource = file.toURI().toURL();
                 } catch (MalformedURLException e) {
-
                     throw new LoggingSystemException("Error creating URL for off-classpath resource", e);
                 }
             }
@@ -80,9 +79,9 @@ public final class LogbackUtils {
      * If not present it configures the context with the resource.
      * </p>
      *
-     * @param context            Logger Context
+     * @param context Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
-     * @param resourceSupplier   A resource for example logback.xml
+     * @param resourceSupplier A resource for example logback.xml
      */
     private static void configure(
         @NonNull LoggerContext context,
@@ -99,7 +98,7 @@ public final class LogbackUtils {
             URL resource = resourceSupplier.get();
             if (resource != null) {
                 try {
-                    DefaultJoranConfigurator defaultConfigurator = new DefaultJoranConfigurator();
+                    var defaultConfigurator = new DefaultJoranConfigurator();
                     defaultConfigurator.setContext(context);
                     defaultConfigurator.configureByResource(resource);
                 } catch (JoranException e) {

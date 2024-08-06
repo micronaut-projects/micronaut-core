@@ -15,8 +15,6 @@
  */
 package io.micronaut.runtime.context.scope;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.runtime.context.scope.refresh.RefreshInterceptor;
@@ -26,6 +24,8 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>A custom scope that allows target beans to be refreshed.</p>

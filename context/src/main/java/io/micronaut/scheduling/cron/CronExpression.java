@@ -151,9 +151,9 @@ public final class CronExpression {
         HOUR(0, 23, null),
         DAY_OF_MONTH(1, 31, null),
         MONTH(1, 12,
-                Arrays.asList("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")),
+            Arrays.asList("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")),
         DAY_OF_WEEK(1, 7,
-                Arrays.asList("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"));
+            Arrays.asList("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"));
 
         final int from, to;
         final List<String> names;
@@ -161,8 +161,8 @@ public final class CronExpression {
         /**
          * Create a new cron field with given value.
          *
-         * @param from  The minimum value
-         * @param to    The maximum value
+         * @param from The minimum value
+         * @param to The maximum value
          * @param names The name assigned to each unit
          */
         CronFieldType(int from, int to, List<String> names) {
@@ -233,7 +233,7 @@ public final class CronExpression {
      * millisecond. Be aware that the duration is specified in millis,
      * but in fact the limit is checked on a day-to-day basis.
      *
-     * @param afterTime        A date-time with a time-zone in the ISO-8601 calendar system
+     * @param afterTime A date-time with a time-zone in the ISO-8601 calendar system
      * @param durationInMillis The maximum duration in millis after a given time
      * @return The next time within given duration
      */
@@ -244,7 +244,7 @@ public final class CronExpression {
     /**
      * This will search for the next time within the given dateTimeBarrier.
      *
-     * @param afterTime       A date-time with a time-zone in the ISO-8601 calendar system
+     * @param afterTime A date-time with a time-zone in the ISO-8601 calendar system
      * @param dateTimeBarrier The upper limit or maximum date-time to check for next time
      * @return The next time within given barrier
      */
@@ -301,10 +301,10 @@ public final class CronExpression {
     }
 
     /**
-     * @since 3.1.0
      * Returns String expression.
      *
      * @return The underlying cron expression as string.
+     * @since 3.1.0
      */
     public String getExpression() {
         return expr;
@@ -332,18 +332,18 @@ public final class CronExpression {
      */
     abstract static class BasicField {
         private static final Pattern CRON_FIELD_REGEXP = Pattern
-                .compile("""
-                                (?:                                             # start of group 1
-                                   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)
-                                 | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol
-                                      (?:                                        # start of group 2
-                                         (?<mod>L|W)                             # modifier (L, W)
-                                       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)
-                                      )?                                         # end of group 2
-                                )                                              # end of group 1
-                                (?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)
-                                """,
-                        Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
+            .compile("""
+                    (?:                                             # start of group 1
+                       (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)
+                     | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol
+                          (?:                                        # start of group 2
+                             (?<mod>L|W)                             # modifier (L, W)
+                           | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)
+                          )?                                         # end of group 2
+                    )                                              # end of group 1
+                    (?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)
+                    """,
+                Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
 
         private static final int PART_INCREMENT = 999;
 
@@ -435,12 +435,12 @@ public final class CronExpression {
         private void validateRange(FieldPart part) {
             if ((part.from != null && part.from < fieldType.from) || (part.to != null && part.to > fieldType.to)) {
                 throw new IllegalArgumentException("Invalid interval [%s-%s], must be %s<=_<=%s".formatted(part.from, part.to, fieldType.from,
-                fieldType.to));
+                    fieldType.to));
             } else if (part.from != null && part.to != null && part.from > part.to) {
                 throw new IllegalArgumentException(
-                
-                "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s".formatted(
-                part.from, part.to, fieldType.from, fieldType.to));
+
+                    "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s".formatted(
+                        part.from, part.to, fieldType.from, fieldType.to));
             }
         }
 
@@ -451,7 +451,7 @@ public final class CronExpression {
          * @return The integer value of name from the names for cron-field type
          */
         protected Integer mapValue(String value) {
-            Integer idx;
+            int idx;
             if (fieldType.names != null) {
                 idx = fieldType.names.indexOf(value.toUpperCase(Locale.getDefault()));
                 if (idx >= 0) {
@@ -462,7 +462,7 @@ public final class CronExpression {
         }
 
         /**
-         * @param val  The value
+         * @param val The value
          * @param part Cron field part to match to
          * @return True/False if the value matches the field part
          */
@@ -557,9 +557,9 @@ public final class CronExpression {
 
         @Override
         protected void validatePart(FieldPart part) {
-            if (part.modifier != null && Arrays.asList("L", "?").indexOf(part.modifier) == -1) {
+            if (part.modifier != null && !Arrays.asList("L", "?").contains(part.modifier)) {
                 throw new IllegalArgumentException("Invalid modifier [%s]".formatted(part.modifier));
-            } else if (part.incrementModifier != null && Arrays.asList("/", "#").indexOf(part.incrementModifier) == -1) {
+            } else if (part.incrementModifier != null && !Arrays.asList("/", "#").contains(part.incrementModifier)) {
                 throw new IllegalArgumentException("Invalid increment modifier [%s]".formatted(part.incrementModifier));
             }
         }
@@ -613,7 +613,7 @@ public final class CronExpression {
 
         @Override
         protected void validatePart(FieldPart part) {
-            if (part.modifier != null && Arrays.asList("L", "W", "?").indexOf(part.modifier) == -1) {
+            if (part.modifier != null && !Arrays.asList("L", "W", "?").contains(part.modifier)) {
                 throw new IllegalArgumentException("Invalid modifier [%s]".formatted(part.modifier));
             } else if (part.incrementModifier != null && !"/".equals(part.incrementModifier)) {
                 throw new IllegalArgumentException("Invalid increment modifier [%s]".formatted(part.incrementModifier));

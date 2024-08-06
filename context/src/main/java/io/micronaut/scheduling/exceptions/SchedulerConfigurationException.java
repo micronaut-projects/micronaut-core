@@ -26,7 +26,7 @@ import io.micronaut.inject.MethodReference;
 public class SchedulerConfigurationException extends ConfigurationException {
 
     /**
-     * @param method  A compile time produced invocation of a method call
+     * @param method A compile time produced invocation of a method call
      * @param message The detailed message
      */
     public SchedulerConfigurationException(ExecutableMethod<?, ?> method, String message) {
@@ -34,7 +34,7 @@ public class SchedulerConfigurationException extends ConfigurationException {
     }
 
     /**
-     * @param method  A compile time produced invocation of a method call
+     * @param method A compile time produced invocation of a method call
      * @param message The detailed message
      */
     public SchedulerConfigurationException(MethodReference<?, ?> method, String message) {

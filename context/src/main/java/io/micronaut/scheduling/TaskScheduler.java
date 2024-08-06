@@ -17,6 +17,7 @@ package io.micronaut.scheduling;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;
@@ -33,14 +34,14 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron    The cron expression
+     * @param cron The cron expression
      * @param command the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                                         scheduled for execution
-     * @throws NullPointerException                            if command or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
      */
     ScheduledFuture<?> schedule(String cron, Runnable command);
 
@@ -48,15 +49,15 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron    The cron expression
+     * @param cron The cron expression
      * @param command The task to execute
-     * @param <V>     The type of the callable's result
+     * @param <V> The type of the callable's result
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
      */
     <V> ScheduledFuture<V> schedule(String cron, Callable<V> command);
 
@@ -64,15 +65,15 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron     The cron expression
+     * @param cron The cron expression
      * @param timezoneId The timezoneId to base the cron expression on. Defaults to system time zone
-     * @param command  the task to execute
+     * @param command the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                                         scheduled for execution
-     * @throws NullPointerException                            if command or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
      */
     default ScheduledFuture<?> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Runnable command) {
         return schedule(cron, timezoneId, () -> {
@@ -85,16 +86,16 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron     The cron expression
+     * @param cron The cron expression
      * @param timezoneId The time zone to base the cron expression on. Defaults to system time zone
-     * @param command  The task to execute
-     * @param <V>      The type of the callable's result
+     * @param command The task to execute
+     * @param <V> The type of the callable's result
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
      */
     default <V> ScheduledFuture<V> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Callable<V> command) {
         return schedule(cron, command);
@@ -104,14 +105,14 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param delay   the time from now to delay execution
+     * @param delay the time from now to delay execution
      * @param command the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
      */
     ScheduledFuture<?> schedule(Duration delay, Runnable command);
 
@@ -119,13 +120,13 @@ public interface TaskScheduler {
      * Creates and executes a ScheduledFuture that becomes enabled after the
      * given delay.
      *
-     * @param delay    The time from now to delay execution
+     * @param delay The time from now to delay execution
      * @param callable The function to execute
-     * @param <V>      The type of the callable's result
+     * @param <V> The type of the callable's result
      * @return a ScheduledFuture that can be used to extract result or cancel
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if callable or delay is null
+     * scheduled for execution
+     * @throws NullPointerException if callable or delay is null
      */
     <V> ScheduledFuture<V> schedule(Duration delay, Callable<V> callable);
 
@@ -143,15 +144,15 @@ public interface TaskScheduler {
      * may start late, but will not concurrently execute.
      *
      * @param initialDelay the time to delay first execution
-     * @param period       the period between successive executions
-     * @param command      the task to execute
+     * @param period the period between successive executions
+     * @param command the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task, and whose {@code get()} method will throw an
      * exception upon cancellation
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or period is null
-     * @throws IllegalArgumentException   if period less than or equal to zero
+     * scheduled for execution
+     * @throws NullPointerException if command or period is null
+     * @throws IllegalArgumentException if period less than or equal to zero
      */
     ScheduledFuture<?> scheduleAtFixedRate(@Nullable Duration initialDelay,
                                            Duration period,
@@ -167,16 +168,16 @@ public interface TaskScheduler {
      * termination of the executor.
      *
      * @param initialDelay the time to delay first execution
-     * @param delay        the delay between the termination of one
-     * @param command      the task to execute
-     *                     execution and the commencement of the next
+     * @param delay the delay between the termination of one
+     * @param command the task to execute
+     * execution and the commencement of the next
      * @return a ScheduledFuture representing pending completion of
      * the task, and whose {@code get()} method will throw an
      * exception upon cancellation
      * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or delay is null
-     * @throws IllegalArgumentException   if delay less than or equal to zero
+     * scheduled for execution
+     * @throws NullPointerException if command or delay is null
+     * @throws IllegalArgumentException if delay less than or equal to zero
      */
     ScheduledFuture<?> scheduleWithFixedDelay(@Nullable Duration initialDelay,
                                               Duration delay,

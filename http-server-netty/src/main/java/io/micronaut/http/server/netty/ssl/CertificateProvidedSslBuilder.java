@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.ssl;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
@@ -82,6 +83,7 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
         return Optional.ofNullable(keyStoreCache);
     }
 
+    @NonNull
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
         return CollectionUtils.setOf(

@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.instrument;
 
 import io.micronaut.core.annotation.NonNull;
+
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -32,21 +33,25 @@ public interface InstrumentedScheduledExecutorService extends InstrumentedExecut
     @Override
     ScheduledExecutorService getTarget();
 
+    @NonNull
     @Override
     default ScheduledFuture<?> schedule(@NonNull Runnable command, long delay, @NonNull TimeUnit unit) {
         return getTarget().schedule(instrument(command), delay, unit);
     }
 
+    @NonNull
     @Override
     default <V> ScheduledFuture<V> schedule(@NonNull Callable<V> callable, long delay, @NonNull TimeUnit unit) {
         return getTarget().schedule(instrument(callable), delay, unit);
     }
 
+    @NonNull
     @Override
     default ScheduledFuture<?> scheduleAtFixedRate(@NonNull Runnable command, long initialDelay, long period, @NonNull TimeUnit unit) {
         return getTarget().scheduleAtFixedRate(instrument(command), initialDelay, period, unit);
     }
 
+    @NonNull
     @Override
     default ScheduledFuture<?> scheduleWithFixedDelay(@NonNull Runnable command, long initialDelay, long delay, @NonNull TimeUnit unit) {
         return getTarget().scheduleWithFixedDelay(instrument(command), initialDelay, delay, unit);

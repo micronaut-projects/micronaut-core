@@ -41,7 +41,6 @@ public class ExecutorFactory {
     private final ThreadFactory threadFactory;
 
     /**
-     *
      * @param beanLocator The bean beanLocator
      * @param threadFactory The factory to create new threads
      * @since 2.0.1
@@ -83,38 +82,30 @@ public class ExecutorFactory {
     @Bean(preDestroy = "shutdown")
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration) {
         ExecutorType executorType = executorConfiguration.getType();
-        switch (executorType) {
-            case FIXED:
-                return Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), getThreadFactory(executorConfiguration));
-            case CACHED:
-                return Executors.newCachedThreadPool(getThreadFactory(executorConfiguration));
-            case SCHEDULED:
-                return Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
-            case WORK_STEALING:
-                return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
-            case THREAD_PER_TASK:
-                return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
-
-            default:
-                throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
-        }
+        return switch (executorType) {
+            case FIXED -> Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), getThreadFactory(executorConfiguration));
+            case CACHED -> Executors.newCachedThreadPool(getThreadFactory(executorConfiguration));
+            case SCHEDULED -> Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
+            case WORK_STEALING -> Executors.newWorkStealingPool(executorConfiguration.getParallelism());
+            case THREAD_PER_TASK -> LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+        };
     }
 
     private ThreadFactory getThreadFactory(ExecutorConfiguration executorConfiguration) {
         return executorConfiguration
-                .getThreadFactoryClass()
-                .flatMap(InstantiationUtils::tryInstantiate)
-                .map(ThreadFactory.class::cast)
-                .orElseGet(() -> {
-                    if (beanLocator != null) {
-                        if (executorConfiguration.getName() == null) {
-                            return beanLocator.getBean(ThreadFactory.class);
-                        }
-                        return beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(executorConfiguration.getName()));
-                    } else {
-                        throw new IllegalStateException("No bean factory configured");
+            .getThreadFactoryClass()
+            .flatMap(InstantiationUtils::tryInstantiate)
+            .map(ThreadFactory.class::cast)
+            .orElseGet(() -> {
+                if (beanLocator != null) {
+                    if (executorConfiguration.getName() == null) {
+                        return beanLocator.getBean(ThreadFactory.class);
                     }
-                });
+                    return beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(executorConfiguration.getName()));
+                } else {
+                    throw new IllegalStateException("No bean factory configured");
+                }
+            });
     }
 
 }

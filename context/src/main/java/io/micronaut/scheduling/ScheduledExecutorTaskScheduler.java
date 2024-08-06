@@ -15,8 +15,6 @@
  */
 package io.micronaut.scheduling;
 
-import static io.micronaut.core.util.ArgumentUtils.check;
-
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -32,6 +30,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import static io.micronaut.core.util.ArgumentUtils.check;
 
 /**
  * Simple abstraction over {@link ScheduledExecutorService}.
@@ -74,7 +74,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
         check("command", command).notNull();
 
         ZoneId zoneId;
-        if (timezoneId == null || timezoneId.equals("")) {
+        if (timezoneId == null || timezoneId.isEmpty()) {
             zoneId = ZoneId.systemDefault();
         } else {
             try {

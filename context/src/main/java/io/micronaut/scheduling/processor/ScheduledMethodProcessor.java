@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
-import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
@@ -83,7 +82,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private volatile boolean started = false;
 
     /**
-     * @param beanContext       The bean context for DI of beans annotated with @Inject
+     * @param beanContext The bean context for DI of beans annotated with @Inject
      * @param conversionService To convert one type to another
      * @param taskExceptionHandler The default task exception handler
      */
@@ -97,7 +96,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         if (beanContext instanceof ApplicationContext) {
-            ScheduledDefinition scheduledDefinition = new ScheduledDefinition(beanDefinition, method);
+            var scheduledDefinition = new ScheduledDefinition(beanDefinition, method);
             Runnable runnable = new ScheduleTaskRunnable(scheduledDefinition);
             // process may be called during or after scheduleTasks. we need to guard against that.
             if (scheduledMethods.putIfAbsent(scheduledDefinition, runnable) == null && started) {
@@ -108,6 +107,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     /**
      * On startup event listener that schedules the active tasks.
+     *
      * @param startupEvent The startup event.
      */
     @EventListener
@@ -147,7 +147,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
             Runnable task = () -> {
                 try {
-                    ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
+                    var binder = new DefaultExecutableBeanContextBinder();
                     BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
                     Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
@@ -226,7 +226,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @SuppressWarnings("unchecked")
     private TaskExceptionHandler<Object, Throwable> findHandler(Class<?> beanType, Throwable e) {
         return beanContext.findBean(Argument.of(TaskExceptionHandler.class, beanType, e.getClass()))
-                          .orElse(this.taskExceptionHandler);
+            .orElse(this.taskExceptionHandler);
     }
 
     @Override
@@ -246,7 +246,8 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     private record ScheduledDefinition(
         BeanDefinition<?> definition,
-        ExecutableMethod<?, ?> method) { }
+        ExecutableMethod<?, ?> method) {
+    }
 
     /**
      * This Runnable calls {@link #scheduleTask(ScheduledDefinition)} exactly once, even if invoked
