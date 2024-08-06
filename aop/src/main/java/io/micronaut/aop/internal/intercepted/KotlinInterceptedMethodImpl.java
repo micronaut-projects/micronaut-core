@@ -22,6 +22,7 @@ import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
@@ -110,7 +111,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
             );
         }
         @SuppressWarnings("unchecked")
-        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
+        var completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
@@ -131,7 +132,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
             );
         }
         @SuppressWarnings("unchecked")
-        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
+        var completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
@@ -154,7 +155,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     @Override
     public Object handleResult(Object result) {
         CompletionStage<?> completionStageResult;
-        if (result instanceof CompletionStage stage) {
+        if (result instanceof CompletionStage<?> stage) {
             completionStageResult = stage;
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
@@ -175,6 +176,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
         throw (E) exception;
     }
 
+    @NonNull
     @Override
     public CoroutineContext getCoroutineContext() {
         return continuation.getContext();
@@ -182,7 +184,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @SuppressWarnings("unchecked")
     @Override
-    public void updateCoroutineContext(CoroutineContext coroutineContext) {
+    public void updateCoroutineContext(@NonNull CoroutineContext coroutineContext) {
         continuation = new DelegatingContextContinuation((Continuation<Object>) continuation, coroutineContext);
     }
 }

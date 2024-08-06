@@ -49,7 +49,7 @@ public interface InterceptedMethod {
     /**
      * Creates a new instance of intercept method supporting intercepting different reactive invocations.
      *
-     * @param context           The {@link MethodInvocationContext}
+     * @param context The {@link MethodInvocationContext}
      * @param conversionService The conversion service
      * @return The {@link InterceptedMethod}
      */

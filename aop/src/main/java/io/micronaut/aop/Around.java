@@ -85,8 +85,8 @@ public @interface Around {
     /**
      * If true the proxy cache and reuse the target.
      *
-     * @since 3.1.0
      * @return True if the proxy target should be cacheable
+     * @since 3.1.0
      */
     boolean cacheableLazyTarget() default false;
 

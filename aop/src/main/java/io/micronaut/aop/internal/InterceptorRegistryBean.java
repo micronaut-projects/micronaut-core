@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.InstantiatableBeanDefinition;
@@ -47,10 +48,11 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
     }
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(@NonNull BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
     }
 
+    @NonNull
     @Override
     public Class<InterceptorRegistry> getBeanType() {
         return InterceptorRegistry.class;
@@ -86,11 +88,13 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
         return false;
     }
 
+    @NonNull
     @Override
-    public InterceptorRegistry instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+    public InterceptorRegistry instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException {
         return new DefaultInterceptorRegistry(context);
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return ANNOTATION_METADATA;
