@@ -16,8 +16,8 @@
 package io.micronaut.retry.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-
 import jakarta.validation.constraints.Digits;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -99,6 +99,7 @@ public @interface CircuitBreaker {
     /**
      * If {@code true} and the circuit is opened, it throws the original exception wrapped.
      * in a {@link io.micronaut.retry.exception.CircuitOpenException}
+     *
      * @return Whether to wrap the original exception in a {@link io.micronaut.retry.exception.CircuitOpenException}
      */
     boolean throwWrappedException() default false;

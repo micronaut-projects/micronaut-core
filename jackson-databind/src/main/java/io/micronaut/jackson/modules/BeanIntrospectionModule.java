@@ -168,6 +168,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
     /**
      * Find an introspection for the given class.
+     *
      * @param beanClass The bean class
      * @return The introspection
      */
@@ -403,8 +404,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                         LOG.debug("Updating {} properties with BeanIntrospection data for type: {}", properties.size(), beanClass);
                     }
 
-                    final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
-                    Map<String, BeanProperty<Object, Object>> named = new LinkedHashMap<>();
+                    final var newProperties = new ArrayList<>(properties);
+                    var named = new LinkedHashMap<String, BeanProperty<Object, Object>>();
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
                         if (!beanProperty.isWriteOnly()) {
                             named.put(getName(config, namingStrategy, beanProperty), beanProperty);
@@ -457,7 +458,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
 
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final UnsafeBeanInstantiationIntrospection<Object> introspection = (UnsafeBeanInstantiationIntrospection<Object>) findIntrospection(beanClass);
+            final var introspection = (UnsafeBeanInstantiationIntrospection<Object>) findIntrospection(beanClass);
             if (introspection == null) {
                 return builder;
             } else {
@@ -478,7 +479,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                     }
                 } else {
-                    Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
+                    var remainingProperties = new LinkedHashMap<String, BeanProperty<Object, Object>>();
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                         // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
                         // same name
@@ -526,6 +527,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 ValueInstantiator defaultInstantiator = builder.getValueInstantiator();
                 builder.setValueInstantiator(new StdValueInstantiator(config, typeFactory.constructType(beanClass)) {
                     SettableBeanProperty[] props;
+
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
 

@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  * <p>Default implementation of {@link HealthAggregator} that creates a {status: , description: (optional) , details: }
  * response. The top level object represents the most severe status found in the provided health results, or
  * {@link HealthStatus#UNKNOWN} if none found. All registered indicators have their own
- * {status: , description: (optional , details: } object, keyed by the name of the {@link HealthResult} defined inside
+ * {status: , description: (optional) , details: } object, keyed by the name of the {@link HealthResult} defined inside
  * the details of the top level object.
  * <p>
  * Example:
@@ -60,6 +60,7 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
 
     /**
      * Default constructor.
+     *
      * @param applicationConfiguration The application configuration.
      */
     public DefaultHealthAggregator(ApplicationConfiguration applicationConfiguration) {
@@ -133,7 +134,7 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
     }
 
     /**
-     * @param status  A {@link HealthStatus}
+     * @param status A {@link HealthStatus}
      * @param details The health status details
      * @param healthLevelOfDetail The {@link HealthLevelOfDetail}
      * @return A {@link Map} with the results from the health status
@@ -145,8 +146,8 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
         }
 
         return HealthResult.builder(
-                applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME),
-                status
+            applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME),
+            status
         ).details(details).build();
     }
 }

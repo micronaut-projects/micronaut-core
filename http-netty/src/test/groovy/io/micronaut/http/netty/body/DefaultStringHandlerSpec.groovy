@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.body.DefaultMessageBodyHandlerRegistry
 import io.micronaut.http.body.MessageBodyHandler
 import io.micronaut.http.body.StringBodyReader
+import io.micronaut.http.body.TextPlainObjectBodyReader
 import io.micronaut.http.codec.CodecException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -53,6 +54,24 @@ class DefaultStringHandlerSpec extends Specification {
                     MediaType.TEXT_CSS_TYPE,
                     MediaType.TEXT_PLAIN_TYPE
             ]
+    }
+
+    void "test object text plain writer"() {
+        when:
+            def writer = bodyHandlerRegistry.findWriter(Argument.OBJECT_ARGUMENT, List.of(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+            writer.isEmpty()
+
+    }
+
+    void "test object text plain reader"() {
+        when:
+            def reader = bodyHandlerRegistry.findReader(Argument.OBJECT_ARGUMENT, List.of(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+            reader.isPresent()
+            reader.get() instanceof TextPlainObjectBodyReader
     }
 
     @NextMajorVersion("Avoid writing / reading non textual content type")

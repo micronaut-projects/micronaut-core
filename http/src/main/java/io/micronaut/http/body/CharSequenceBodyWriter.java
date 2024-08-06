@@ -22,6 +22,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
@@ -40,6 +41,7 @@ public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<Char
 
     private final Charset defaultCharset;
 
+    @Inject
     CharSequenceBodyWriter(ApplicationConfiguration applicationConfiguration) {
         this(applicationConfiguration.getDefaultCharset());
     }

@@ -67,7 +67,6 @@ public class EndpointDefaultConfiguration {
     private String contextPath = DEFAULT_ENDPOINT_CONTEXT_PATH;
 
     /**
-     *
      * @return endpoints Base Path (defaults to: {@value #DEFAULT_ENDPOINT_BASE_PATH})
      */
     public String getPath() {
@@ -75,7 +74,6 @@ public class EndpointDefaultConfiguration {
     }
 
     /**
-     *
      * @return endpoints Context Path (defaults is null)
      */
     public @Nullable String getContextPath() {
@@ -116,6 +114,7 @@ public class EndpointDefaultConfiguration {
 
     /**
      * The endpoints base path. It must include a leading and trailing '/'. Default value ({@value #DEFAULT_ENDPOINT_BASE_PATH}).
+     *
      * @param path The path
      */
     public void setPath(String path) {
@@ -126,6 +125,7 @@ public class EndpointDefaultConfiguration {
 
     /**
      * The endpoints context path. Default value is null.
+     *
      * @param contextPath The Context Path
      */
     public void setContextPath(String contextPath) {
@@ -143,6 +143,7 @@ public class EndpointDefaultConfiguration {
 
     /**
      * Sets the port to expose endpoints via.
+     *
      * @param port The port
      */
     public void setPort(@Nullable Integer port) {

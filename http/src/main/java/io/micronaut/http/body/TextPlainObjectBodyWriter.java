@@ -32,14 +32,19 @@ import java.io.OutputStream;
 /**
  * The body writer that will call {@link Object#toString()} and write it as a string for content type {@value MediaType#TEXT_PLAIN}.
  *
- * @since 4.6
  * @author Denis Stepanov
+ * @since 4.6
  */
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Internal
-final class TextPlainObjectBodyWriter implements MessageBodyWriter<Object> {
+final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object> {
+
+    @Override
+    public Argument<Object> getType() {
+        return Argument.OBJECT_ARGUMENT;
+    }
 
     @Override
     public boolean isWriteable(Argument<Object> type, MediaType mediaType) {

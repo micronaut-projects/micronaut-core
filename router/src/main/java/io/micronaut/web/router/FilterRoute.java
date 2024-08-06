@@ -16,7 +16,9 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
@@ -32,6 +34,25 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface FilterRoute extends HttpFilterResolver.FilterEntry {
+
+    /**
+     * If it's a pre-matching filter, the one being executed before the route is resolved.
+     * @return true if pre-matching
+     * @since 4.6
+     */
+    default boolean isPreMatching() {
+        return false;
+    }
+
+    /**
+     * Returns the matching annotation. See {@link io.micronaut.http.annotation.FilterMatcher}.
+     * @return The matching annotation or null
+     * @since 4.6
+     */
+    @Nullable
+    default String findMatchingAnnotation() {
+        return getAnnotationMetadata().getAnnotationNameByStereotype(FilterMatcher.NAME).orElse(null);
+    }
 
     /**
      * @return The filter for this {@link FilterRoute}

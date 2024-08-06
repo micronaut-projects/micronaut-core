@@ -32,7 +32,7 @@ public class MessagingException extends RuntimeException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public MessagingException(String message, Throwable cause) {
         super(message, cause);

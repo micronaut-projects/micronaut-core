@@ -95,6 +95,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Should the IP address by used to register with the discovery server. Defaults to false.
+     *
      * @return True if the IP address should be used.
      */
     public boolean isPreferIpAddress() {
@@ -103,6 +104,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Sets whether the IP address by used to register with the discovery server. Defaults to false.
+     *
      * @param preferIpAddress True if the IP address should be used
      */
     public void setPreferIpAddress(boolean preferIpAddress) {
@@ -132,6 +134,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_FAILFAST}).
+     *
      * @param failFast Whether to fail server startup if registration fails
      */
     public void setFailFast(boolean failFast) {
@@ -147,6 +150,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_DEREGISTER}).
+     *
      * @param deregister Whether to deregister the service on shutdown
      */
     public void setDeregister(boolean deregister) {
@@ -163,6 +167,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled Whether service registration is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -178,6 +183,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_RETRY_COUNT}).
+     *
      * @param retryCount The retry count
      */
     public void setRetryCount(int retryCount) {
@@ -193,6 +199,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_RETRYDELAY_SECONDS} seconds).
+     *
      * @param retryDelay The retry delay
      */
     public void setRetryDelay(Duration retryDelay) {

@@ -30,7 +30,7 @@ import jakarta.inject.Singleton;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
- *
+ * <p>
  * Note: will be replaced by {@link io.micronaut.json.codec.JsonMediaTypeCodec} in the future, but that class is
  * currently experimental.
  *
@@ -47,9 +47,9 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
     public static final String CONFIGURATION_QUALIFIER = "json";
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonMediaTypeCodec(ObjectMapper objectMapper,
                               ApplicationConfiguration applicationConfiguration,
@@ -58,9 +58,9 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
     }
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     @Inject
     public JsonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,

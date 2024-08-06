@@ -28,8 +28,8 @@ import org.reactivestreams.Subscription;
  * first, this class makes sure any demand is stored until the upstream becomes available.
  *
  * @param <T> The forwarded type
- * @since 4.4.0
  * @author Jonas Konrad
+ * @since 4.4.0
  */
 @Internal
 public final class DelayedSubscriber<T> implements Processor<T, T>, Subscription {

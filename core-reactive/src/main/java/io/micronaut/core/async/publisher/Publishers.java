@@ -140,6 +140,7 @@ public class Publishers {
 
     /**
      * Registers an additional reactive type. Should be called during application static initialization.
+     *
      * @param type The type
      * @since 2.0
      */
@@ -151,6 +152,7 @@ public class Publishers {
 
     /**
      * Registers an additional reactive single type. Should be called during application static initialization.
+     *
      * @param type The type
      * @since 2.0
      */
@@ -163,6 +165,7 @@ public class Publishers {
 
     /**
      * Registers an additional reactive completable type. Should be called during application static initialization.
+     *
      * @param type The type
      * @since 2.0
      */
@@ -184,21 +187,21 @@ public class Publishers {
      * @return A list of known single types.
      */
     public static List<Class<?>> getKnownSingleTypes() {
-        return Collections.unmodifiableList(new ArrayList<>(SINGLE_TYPES));
+        return List.copyOf(SINGLE_TYPES);
     }
 
     /**
      * @return A list of known single types.
      */
     public static List<Class<?>> getKnownCompletableTypes() {
-        return Collections.unmodifiableList(new ArrayList<>(COMPLETABLE_TYPES));
+        return List.copyOf(COMPLETABLE_TYPES);
     }
 
     /**
      * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param futureSupplier The supplier of the {@link CompletableFuture}
-     * @param <T>            The type of the publisher
+     * @param <T> The type of the publisher
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> fromCompletableFuture(Supplier<CompletableFuture<T>> futureSupplier) {
@@ -209,7 +212,7 @@ public class Publishers {
      * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param future The {@link CompletableFuture}
-     * @param <T>  The type of the publisher
+     * @param <T> The type of the publisher
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> fromCompletableFuture(CompletableFuture<T> future) {
@@ -220,7 +223,7 @@ public class Publishers {
      * A {@link Publisher} that emits a fixed single value.
      *
      * @param value The value to emit
-     * @param <T>   The value type
+     * @param <T> The value type
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> just(T value) {
@@ -231,7 +234,7 @@ public class Publishers {
      * A {@link Publisher} that emits a fixed single value.
      *
      * @param error The error to emit
-     * @param <T>   The value type
+     * @param <T> The value type
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> just(Throwable error) {
@@ -241,7 +244,7 @@ public class Publishers {
     /**
      * A {@link Publisher} that completes without emitting any items.
      *
-     * @param <T>   The value type
+     * @param <T> The value type
      * @return The {@link Publisher}
      * @since 2.0.0
      */
@@ -253,13 +256,13 @@ public class Publishers {
      * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
-     * @param mapper    The mapper
-     * @param <T>       The generic type
-     * @param <R>       The result type
+     * @param mapper The mapper
+     * @param <T> The generic type
+     * @param <R> The result type
      * @return The mapped publisher
      */
     public static <T, R> Publisher<R> map(Publisher<T> publisher, Function<T, R> mapper) {
-        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -269,7 +272,7 @@ public class Publishers {
             protected void doOnNext(T message) {
                 try {
                     R result = Objects.requireNonNull(mapper.apply(message),
-                            "The mapper returned a null value.");
+                        "The mapper returned a null value.");
                     actual.onNext(result);
                 } catch (Throwable e) {
                     onError(e);
@@ -293,16 +296,16 @@ public class Publishers {
      * Map the result from a publisher using the given mapper or supply empty value.
      *
      * @param publisher The publisher
-     * @param mapOrSupplyEmpty    The mapOrSupplyEmpty
-     * @param <T>       The generic type
-     * @param <R>       The result type
-     * @since 2.5.0
+     * @param mapOrSupplyEmpty The mapOrSupplyEmpty
+     * @param <T> The generic type
+     * @param <R> The result type
      * @return The mapped publisher
+     * @since 2.5.0
      */
     public static <T, R> Publisher<R> mapOrSupplyEmpty(Publisher<T> publisher, MapOrSupplyEmpty<T, R> mapOrSupplyEmpty) {
-        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<>() {
 
-            AtomicBoolean resultPresent = new AtomicBoolean();
+            final AtomicBoolean resultPresent = new AtomicBoolean();
 
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -313,7 +316,7 @@ public class Publishers {
             protected void doOnNext(T message) {
                 try {
                     R result = Objects.requireNonNull(mapOrSupplyEmpty.map(message),
-                            "The mapper returned a null value.");
+                        "The mapper returned a null value.");
                     actual.onNext(result);
                     resultPresent.set(true);
                 } catch (Throwable e) {
@@ -341,12 +344,12 @@ public class Publishers {
      * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
-     * @param consumer  The mapper
-     * @param <T>       The generic type
+     * @param consumer The mapper
+     * @param <T> The generic type
      * @return The mapped publisher
      */
     public static <T> Publisher<T> then(Publisher<T> publisher, Consumer<T> consumer) {
-        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -378,12 +381,12 @@ public class Publishers {
      * Allow executing logic on completion of a Publisher.
      *
      * @param publisher The publisher
-     * @param future    The runnable
-     * @param <T>       The generic type
+     * @param future The runnable
+     * @param <T> The generic type
      * @return The mapped publisher
      */
     public static <T> Publisher<T> onComplete(Publisher<T> publisher, Supplier<CompletableFuture<Void>> future) {
-        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -474,9 +477,9 @@ public class Publishers {
     /**
      * Attempts to convert the publisher to the given type.
      *
-     * @param object        The object to convert
+     * @param object The object to convert
      * @param publisherType The publisher type
-     * @param <T>           The generic type
+     * @param <T> The generic type
      * @return The Resulting in publisher
      * @deprecated replaced by {@link #convertPublisher(ConversionService, Object, Class)}
      */
@@ -489,9 +492,9 @@ public class Publishers {
      * Attempts to convert the publisher to the given type.
      *
      * @param conversionService The conversion service
-     * @param object            The object to convert
-     * @param publisherType     The publisher type
-     * @param <T>               The generic type
+     * @param object The object to convert
+     * @param publisherType The publisher type
+     * @param <T> The generic type
      * @return The Resulting in publisher
      * @since 4.0.0
      */
@@ -504,13 +507,13 @@ public class Publishers {
         if (object instanceof CompletableFuture cf && !(object instanceof Publisher<?>)) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> cf);
             return conversionService.convert(futurePublisher, publisherType)
-                    .orElseThrow(() -> unconvertibleError(object, publisherType));
+                .orElseThrow(() -> unconvertibleError(object, publisherType));
         }
         if (object instanceof MicronautPublisher && MicronautPublisher.class.isAssignableFrom(publisherType)) {
             return (T) object;
         }
         return conversionService.convert(object, publisherType)
-                .orElseThrow(() -> unconvertibleError(object, publisherType));
+            .orElseThrow(() -> unconvertibleError(object, publisherType));
     }
 
     /**
@@ -562,14 +565,16 @@ public class Publishers {
          * @param result The next value.
          * @return The mapped value.
          */
-        @NonNull R map(@NonNull T result);
+        @NonNull
+        R map(@NonNull T result);
 
         /**
          * Supplies an empty value if there is no next value.
          *
          * @return The result.
          */
-        @NonNull R supplyEmpty();
+        @NonNull
+        R supplyEmpty();
 
     }
 

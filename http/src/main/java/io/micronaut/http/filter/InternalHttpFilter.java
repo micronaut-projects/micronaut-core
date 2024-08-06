@@ -32,14 +32,16 @@ import java.util.function.Function;
  * @since 4.2.0
  */
 @Internal
-sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, MethodFilter {
+sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, FilterRunner.RouteMatchResolverHttpFilter, MethodFilter {
 
     /**
      * Checks the filter is implementing {@link ConditionalFilter} and is enabled.
      * @param request The request
      * @return true if enabled
      */
-    boolean isEnabled(HttpRequest<?> request);
+    default boolean isEnabled(HttpRequest<?> request) {
+        return true;
+    }
 
     /**
      * If the filter supports filtering a request.
@@ -47,7 +49,9 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @return true if filters request
      * @since 4.2.0
      */
-    boolean isFiltersRequest();
+    default boolean isFiltersRequest() {
+        return false;
+    }
 
     /**
      * If the filter supports filtering a response.
@@ -55,7 +59,9 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @return true if filters request
      * @since 4.2.0
      */
-    boolean isFiltersResponse();
+    default boolean isFiltersResponse() {
+        return false;
+    }
 
     /**
      * If the filter with continuation.
@@ -63,7 +69,9 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @return true if the filter has continuation
      * @since 4.3.0
      */
-    boolean hasContinuation();
+    default boolean hasContinuation() {
+        return false;
+    }
 
     /**
      * Filter request.

@@ -63,6 +63,7 @@ public class HeartbeatConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_INTERVAL_SECONDS} seconds).
+     *
      * @param interval The interval to publish {@link HeartbeatEvent} instances
      */
     public void setInterval(Duration interval) {
@@ -79,6 +80,7 @@ public class HeartbeatConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled Enable the publish of {@link HeartbeatEvent} event instances
      */
     public void setEnabled(boolean enabled) {

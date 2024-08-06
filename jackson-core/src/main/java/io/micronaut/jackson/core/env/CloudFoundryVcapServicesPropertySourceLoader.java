@@ -91,7 +91,7 @@ public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropert
         if (vcapServices != null) {
             for (Object services : vcapServices.values()) {
                 @SuppressWarnings("unchecked")
-                List<Object> list = (List<Object>) services;
+                var list = (List<Object>) services;
                 for (Object object : list) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> service = (Map<String, Object>) object;

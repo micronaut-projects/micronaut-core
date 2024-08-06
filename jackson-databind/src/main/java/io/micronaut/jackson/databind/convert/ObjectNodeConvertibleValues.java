@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -35,7 +34,6 @@ import java.util.Set;
  * Simple facade over a Jackson {@link ObjectNode} to make it a {@link ConvertibleValues}.
  *
  * @param <V> The generic type for values
- *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -46,7 +44,7 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
     private final ConversionService conversionService;
 
     /**
-     * @param objectNode        The node that maps to JSON object structure
+     * @param objectNode The node that maps to JSON object structure
      * @param conversionService To convert the JSON node into given type
      */
     public ObjectNodeConvertibleValues(ObjectNode objectNode, ConversionService conversionService) {
@@ -62,7 +60,7 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     @Override
     public Collection<V> values() {
-        List<V> values = new ArrayList<>();
+        var values = new ArrayList<V>();
         for (JsonNode jsonNode : objectNode) {
             values.add((V) jsonNode);
         }

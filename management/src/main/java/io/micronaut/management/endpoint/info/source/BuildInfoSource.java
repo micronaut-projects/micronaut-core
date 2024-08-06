@@ -22,7 +22,6 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -49,7 +48,7 @@ public class BuildInfoSource implements PropertiesInfoSource {
     private final Supplier<Optional<PropertySource>> supplier;
 
     /**
-     * @param resourceResolver    A {@link ResourceResolver}
+     * @param resourceResolver A {@link ResourceResolver}
      * @param buildPropertiesPath The build properties path
      */
     public BuildInfoSource(

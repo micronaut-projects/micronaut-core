@@ -61,7 +61,7 @@ public interface JsonMapper {
      *
      * @param tree The input json data.
      * @param type The type to deserialize.
-     * @param <T>  Type variable of the return type.
+     * @param <T> Type variable of the return type.
      * @return The deserialized value.
      * @throws IOException IOException
      */
@@ -72,7 +72,7 @@ public interface JsonMapper {
      *
      * @param tree The input json data.
      * @param type The type to deserialize.
-     * @param <T>  Type variable of the return type.
+     * @param <T> Type variable of the return type.
      * @return The deserialized value.
      * @throws IOException IOException
      */
@@ -84,8 +84,8 @@ public interface JsonMapper {
      * Parse and map json from the given stream.
      *
      * @param inputStream The input data.
-     * @param type        The type to deserialize to.
-     * @param <T>         Type variable of the return type.
+     * @param type The type to deserialize to.
+     * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
      */
@@ -93,6 +93,7 @@ public interface JsonMapper {
 
     /**
      * Read a value from the given input stream for the given type.
+     *
      * @param inputStream The input stream
      * @param type The type
      * @param <T> The generic type
@@ -108,19 +109,19 @@ public interface JsonMapper {
      * Parse and map json from the given byte array.
      *
      * @param byteArray The input data.
-     * @param type      The type to deserialize to.
-     * @param <T>       Type variable of the return type.
+     * @param type The type to deserialize to.
+     * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
      */
-    <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException;
+    <T> T readValue(byte @NonNull [] byteArray, @NonNull Argument<T> type) throws IOException;
 
     /**
      * Parse and map json from the given byte buffer.
      *
      * @param byteBuffer The input data.
-     * @param type       The type to deserialize to.
-     * @param <T>        Type variable of the return type.
+     * @param type The type to deserialize to.
+     * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
      */
@@ -132,8 +133,8 @@ public interface JsonMapper {
      * Parse and map json from the given string.
      *
      * @param string The input data.
-     * @param type   The type to deserialize to.
-     * @param <T>    Type variable of the return type.
+     * @param type The type to deserialize to.
+     * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
      */
@@ -143,6 +144,7 @@ public interface JsonMapper {
 
     /**
      * Read a value from the byte array for the given type.
+     *
      * @param byteArray The byte array
      * @param type The type
      * @param <T> The generic type
@@ -150,13 +152,14 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default @Nullable <T> T readValue(@NonNull byte[] byteArray, @NonNull Class<T> type) throws IOException {
+    default @Nullable <T> T readValue(byte @NonNull [] byteArray, @NonNull Class<T> type) throws IOException {
         Objects.requireNonNull(type, "Type cannot be null");
         return readValue(byteArray, Argument.of(type));
     }
 
     /**
      * Read a value from the given string for the given type.
+     *
      * @param string The string
      * @param type The type
      * @param <T> The generic type
@@ -194,9 +197,9 @@ public interface JsonMapper {
     /**
      * Transform an object value to a json tree.
      *
-     * @param type  The object type
+     * @param type The object type
      * @param value The object value to transform.
-     * @param <T>   The type variable of the type.
+     * @param <T> The type variable of the type.
      * @return The json representation.
      * @throws IOException If there are any mapping exceptions (e.g. illegal values).
      */
@@ -207,7 +210,7 @@ public interface JsonMapper {
      * Write an object as json.
      *
      * @param outputStream The stream to write to.
-     * @param object       The object to serialize.
+     * @param object The object to serialize.
      * @throws IOException IOException
      */
     void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException;
@@ -216,9 +219,9 @@ public interface JsonMapper {
      * Write an object as json.
      *
      * @param outputStream The stream to write to.
-     * @param type         The object type
-     * @param object       The object to serialize.
-     * @param <T>  The generic type
+     * @param type The object type
+     * @param object The object to serialize.
+     * @param <T> The generic type
      * @throws IOException IOException
      */
     <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, @Nullable T object) throws IOException;
@@ -235,29 +238,30 @@ public interface JsonMapper {
     /**
      * Write an object as json.
      *
-     * @param type   The object type
+     * @param type The object type
      * @param object The object to serialize.
+     * @param <T> The generic type
      * @return The serialized encoded json.
-     * @param <T> The generidc type
      * @throws IOException IOException
      */
     <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
 
     /**
      * Write the given value as a string.
+     *
      * @param object The object
      * @return The string
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    @SuppressWarnings("unchecked")
-    default  @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
+    default @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
         Objects.requireNonNull(object, "Object cannot be null");
         return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
 
     /**
      * Write the given value as a string.
+     *
      * @param type The type, never {@code null}
      * @param object The object
      * @param <T> The generic type
@@ -265,12 +269,13 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object) throws IOException {
+    default @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object) throws IOException {
         return writeValueAsString(type, object, StandardCharsets.UTF_8);
     }
 
     /**
      * Write the given value as a string.
+     *
      * @param type The type, never {@code null}
      * @param object The object
      * @param charset The charset, never {@code null}
@@ -279,7 +284,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object, Charset charset) throws IOException {
+    default @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object, Charset charset) throws IOException {
         Objects.requireNonNull(charset, "Charset cannot be null");
         byte[] bytes = writeValueAsBytes(type, object);
         return new String(bytes, charset);
@@ -289,8 +294,8 @@ public interface JsonMapper {
      * Update an object from json data.
      *
      * @param value The object to update.
-     * @param tree  The json data to update from.
-     * @throws IOException                   If there are any mapping exceptions (e.g. illegal values).
+     * @param tree The json data to update from.
+     * @throws IOException If there are any mapping exceptions (e.g. illegal values).
      * @throws UnsupportedOperationException If this operation is not supported.
      */
     @Experimental
@@ -341,6 +346,7 @@ public interface JsonMapper {
 
     /**
      * Resolves the default {@link JsonMapper}.
+     *
      * @return The default {@link JsonMapper}
      * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
      * @since 4.0.0

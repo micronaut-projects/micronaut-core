@@ -106,6 +106,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
 
     /**
      * Called after {@link #doOnSubscribe(Subscription)} completes.
+     *
      * @param subscription subscription
      */
     protected void doAfterOnSubscribe(Subscription subscription) {
@@ -116,7 +117,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
      * Perform the actual subscription to the subscriber.
      *
      * @param subscription The subscription
-     * @param subscriber   The subscriber (never null)
+     * @param subscriber The subscriber (never null)
      */
     protected void doOnSubscribe(Subscription subscription, Subscriber<? super R> subscriber) {
         subscriber.onSubscribe(subscription);

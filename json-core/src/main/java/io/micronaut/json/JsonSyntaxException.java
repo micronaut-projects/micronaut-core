@@ -20,8 +20,8 @@ import java.io.IOException;
 /**
  * Exception thrown when there is a syntax error in JSON (e.g. mismatched braces).
  *
- * @since 4.0.0
  * @author Jonas Konrad
+ * @since 4.0.0
  */
 public final class JsonSyntaxException extends IOException {
     /**

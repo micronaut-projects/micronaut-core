@@ -58,6 +58,7 @@ testcontainers = "1.19.8"
 tomlj="1.1.1"
 vertx = "4.5.9"
 wiremock = "2.33.2"
+mimepull = "1.10.0"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -71,7 +72,7 @@ managed-jackson-databind = "2.17.0"
 managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.111.Final"
+managed-netty = "4.1.112.Final"
 managed-netty-iouring = "0.0.25.Final"
 managed-netty-http3 = "0.0.28.Final"
 managed-netty-tcnative = "2.0.65.Final"
@@ -80,7 +81,7 @@ managed-reactive-streams = "1.0.4"
 managed-reactor = "3.5.11"
 managed-snakeyaml = "2.2"
 managed-java-parser-core = "3.25.10"
-managed-ksp = "1.9.24-1.0.20"
+managed-ksp = "1.9.25-1.0.20"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -280,6 +281,7 @@ vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
 httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpcomponents-client" }
 httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.ref = "httpcomponents-client" }
+mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 

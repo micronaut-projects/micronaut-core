@@ -52,7 +52,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     @Override
     public Optional<byte[]> serialize(Object object) throws SerializationException {
         try {
-            return Optional.ofNullable(objectMapper.writeValueAsBytes(object));
+            return Optional.of(objectMapper.writeValueAsBytes(object));
         } catch (JsonProcessingException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }

@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 /**
  * This class merges the backpressure of two data streams. The bytes signaled to the
  * {@link #upstream} is always the <i>minimum</i> of the consumed bytes of the two downstreams.
- *
- * @implNote This is a bit tricky to implement without locking due to the concurrent nature of
+ * <p>
+ * Implementation notes: This is a bit tricky to implement without locking due to the concurrent nature of
  * {@link BufferConsumer.Upstream}. Let {@code l} and {@code r} be the total bytes consumed by the left and
  * right downstreams respectively. We have signalled already the consumption of
  * {@code min(l, r)} bytes upstream. The {@link AtomicLong} stores the difference {@code l-r}.
