@@ -67,7 +67,6 @@ public class ApplicationConfiguration {
 
     /**
      * Default value (UTF-8).
-     *
      * @param defaultCharset Set the default charset to use.
      */
     public void setDefaultCharset(Charset defaultCharset) {

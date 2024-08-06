@@ -34,9 +34,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>Additional thread pools can be configured with the {@code micronaut.executors} configuration.</p>
  *
- * @author graemerocher
  * @see io.micronaut.scheduling.executor.UserExecutorConfiguration
  * @see TaskExecutors
+ * @author graemerocher
  * @since 1.0
  */
 @Documented

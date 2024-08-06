@@ -64,8 +64,8 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
      * Default constructor.
      *
      * @param resolutionContext The resolution context
-     * @param environment The environment
-     * @param beanContext The bean locator
+     * @param environment       The environment
+     * @param beanContext       The bean locator
      */
     ConfigurationIntroductionAdvice(
         BeanResolutionContext resolutionContext,
@@ -125,7 +125,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {
             @SuppressWarnings("unchecked")
-            var firstArg = (Argument<Object>) argument.getFirstTypeVariable().orElse(null);
+            Argument<Object> firstArg = (Argument<Object>) argument.getFirstTypeVariable().orElse(null);
             if (firstArg != null) {
                 return environment.convertRequired(beanContext.getBeansOfType(firstArg, qualifier), argument);
             } else {
@@ -136,10 +136,10 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             if (v != null) {
                 return environment.convertRequired(v, returnType);
             } else {
-                return null;
+                return v;
             }
         } else {
-            try (var rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
+            try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
                 rc.setConfigurationPath(configurationPath);
                 return environment.convertRequired(
                     ((DefaultBeanContext) beanContext).getBean(rc, argument, qualifier),

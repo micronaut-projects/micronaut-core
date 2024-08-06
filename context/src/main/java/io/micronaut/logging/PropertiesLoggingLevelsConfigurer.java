@@ -60,7 +60,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     /**
      * Sets log level according to properties.
      *
-     * @param environment The environment
+     * @param environment   The environment
      * @param loggingSystems The logging systems
      */
     PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {

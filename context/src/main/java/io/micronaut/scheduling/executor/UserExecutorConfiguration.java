@@ -21,8 +21,8 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
-import jakarta.validation.constraints.Min;
 
+import jakarta.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
@@ -83,7 +83,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
         this.type = type == null ? ExecutorType.SCHEDULED : type;
         this.parallelism = parallelism == null ? AVAILABLE_PROCESSORS : parallelism;
         this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
-        this.virtual = virtual != null && virtual;
+        this.virtual = virtual == null ? false : virtual;
         this.threadFactoryClass = threadFactoryClass;
     }
 
@@ -228,8 +228,8 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * Construct a {@link UserExecutorConfiguration} for the given {@link io.micronaut.scheduling.executor.ExecutorType}.
      *
      * @param type The type
-     * @param num The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED} or the parallelism for
-     * {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING} or the core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
+     * @param num  The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED} or the parallelism for
+     *             {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING} or the core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
      * @return The configuration
      */
     public static UserExecutorConfiguration of(ExecutorType type, int num) {
@@ -254,9 +254,9 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     /**
      * Construct a {@link UserExecutorConfiguration} for the given {@link io.micronaut.scheduling.executor.ExecutorType}.
      *
-     * @param type The type
-     * @param num The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED} or the parallelism for
-     * {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING} or the core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
+     * @param type               The type
+     * @param num                The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED} or the parallelism for
+     *                           {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING} or the core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
      * @param threadFactoryClass The thread factory class
      * @return The configuration
      */

@@ -453,7 +453,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    @NonNull
     @Override
     public ApplicationContext getApplicationContext() {
         return applicationContext;
@@ -821,7 +820,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
     }
 
-    @NonNull
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
         return Set.of(HttpServerConfiguration.PREFIX, SslConfiguration.PREFIX);

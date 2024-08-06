@@ -60,8 +60,8 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Default constructor.
      *
-     * @param conversionService The conversion service
-     * @param beanLocator The bean constructor
+     * @param conversionService        The conversion service
+     * @param beanLocator              The bean constructor
      * @param scheduledExecutorService The scheduled executor service
      */
     AsyncInterceptor(ConversionService conversionService,
@@ -86,15 +86,15 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
             executorService = scheduledExecutorService.get().get();
         } else {
             executorService = scheduledExecutorServices.computeIfAbsent(executorServiceName, name ->
-                beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))
-                    .orElseThrow(() -> new TaskExecutionException("No ExecutorService named [" + name + "] configured in application context")));
+                    beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))
+                            .orElseThrow(() -> new TaskExecutionException("No ExecutorService named [" + name + "] configured in application context")));
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER -> {
                     return interceptedMethod.handleResult(
-                        interceptedMethod.interceptResultAsPublisher(executorService)
+                            interceptedMethod.interceptResultAsPublisher(executorService)
                     );
                 }
                 case COMPLETION_STAGE -> {

@@ -15,13 +15,13 @@
  */
 package io.micronaut.runtime.context.scope.refresh;
 
+import java.util.Map;
+import java.util.Set;
+
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
-
-import java.util.Map;
-import java.util.Set;
 
 /**
  * A convenience interface that can be implemented if a component needs to listen for {@link io.micronaut.runtime.context.scope.refresh.RefreshEvent} where the implementation is only interested in a limited set of configuration prefixes.
@@ -60,7 +60,6 @@ public interface RefreshEventListener extends ApplicationEventListener<RefreshEv
 
     /**
      * Returns the set of observed configuration prefixes that the event listener should listen for.
-     *
      * @return A set of prefixes
      */
     @NonNull

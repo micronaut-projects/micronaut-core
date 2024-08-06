@@ -35,8 +35,8 @@ public class FileWatchCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         List<String> paths = context
-            .getProperty(FileWatchConfiguration.PATHS, ConversionContext.LIST_OF_STRING)
-            .orElse(null);
+                .getProperty(FileWatchConfiguration.PATHS, ConversionContext.LIST_OF_STRING)
+                .orElse(null);
 
         if (CollectionUtils.isNotEmpty(paths)) {
 

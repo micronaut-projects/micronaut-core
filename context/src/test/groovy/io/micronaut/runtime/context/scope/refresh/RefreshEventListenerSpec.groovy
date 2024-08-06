@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.ApplicationEventPublisher
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.type.Argument
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
@@ -90,8 +89,6 @@ class RefreshEventListenerSpec extends Specification {
     @Singleton
     static class MyRefreshListener implements RefreshEventListener {
         RefreshEvent lastEvent
-
-        @NonNull
         @Override
         Set<String> getObservedConfigurationPrefixes() {
             ['foo.bar']

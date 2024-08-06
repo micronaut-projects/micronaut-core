@@ -16,17 +16,19 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * The default exception handler used if non-other is found. Simply logs the exception.
  *
  * @author graemerocher
  * @since 1.0
+ *
  */
 @Singleton
 @Primary
@@ -37,7 +39,7 @@ public class DefaultTaskExceptionHandler implements TaskExceptionHandler<Object,
     @Override
     public void handle(@Nullable Object bean, @NonNull Throwable throwable) {
         if (LOG.isErrorEnabled()) {
-            var message = new StringBuilder("Error invoking scheduled task ");
+            StringBuilder message = new StringBuilder("Error invoking scheduled task ");
             if (bean != null) {
                 message.append("for bean [").append(bean).append("] ");
             }

@@ -17,12 +17,11 @@ package io.micronaut.runtime.context.scope;
 
 import jakarta.inject.Scope;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A {@link io.micronaut.context.scope.CustomScope} that stores objects in thread local storage.

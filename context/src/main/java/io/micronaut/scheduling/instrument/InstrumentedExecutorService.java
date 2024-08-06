@@ -16,15 +16,9 @@
 package io.micronaut.scheduling.instrument;
 
 import io.micronaut.core.annotation.NonNull;
-
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 /**
@@ -60,7 +54,6 @@ public interface InstrumentedExecutorService extends ExecutorService, Instrument
         getTarget().shutdown();
     }
 
-    @NonNull
     @Override
     default List<Runnable> shutdownNow() {
         return getTarget().shutdownNow();
@@ -99,28 +92,28 @@ public interface InstrumentedExecutorService extends ExecutorService, Instrument
     @Override
     default @NonNull <T> List<Future<T>> invokeAll(@NonNull Collection<? extends Callable<T>> tasks) throws InterruptedException {
         return getTarget().invokeAll(
-            tasks.stream().map(this::instrument).collect(Collectors.toList())
+                tasks.stream().map(this::instrument).collect(Collectors.toList())
         );
     }
 
     @Override
     default @NonNull <T> List<Future<T>> invokeAll(@NonNull Collection<? extends Callable<T>> tasks, long timeout, @NonNull TimeUnit unit) throws InterruptedException {
         return getTarget().invokeAll(
-            tasks.stream().map(this::instrument).collect(Collectors.toList()), timeout, unit
+                tasks.stream().map(this::instrument).collect(Collectors.toList()), timeout, unit
         );
     }
 
     @Override
     default @NonNull <T> T invokeAny(@NonNull Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
         return getTarget().invokeAny(
-            tasks.stream().map(this::instrument).collect(Collectors.toList())
+                tasks.stream().map(this::instrument).collect(Collectors.toList())
         );
     }
 
     @Override
     default @NonNull <T> T invokeAny(@NonNull Collection<? extends Callable<T>> tasks, long timeout, @NonNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         return getTarget().invokeAny(
-            tasks.stream().map(this::instrument).collect(Collectors.toList()), timeout, unit
+                tasks.stream().map(this::instrument).collect(Collectors.toList()), timeout, unit
         );
     }
 }

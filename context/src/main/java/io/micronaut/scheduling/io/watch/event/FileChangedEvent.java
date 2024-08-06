@@ -16,9 +16,9 @@
 package io.micronaut.scheduling.io.watch.event;
 
 import io.micronaut.context.event.ApplicationEvent;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 
+import io.micronaut.core.annotation.NonNull;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 
@@ -26,8 +26,8 @@ import java.nio.file.WatchEvent;
  * Event fired when a file that is being watched changes.
  *
  * @author graemerocher
- * @see io.micronaut.scheduling.io.watch.FileWatchConfiguration
  * @since 1.1.0
+ * @see io.micronaut.scheduling.io.watch.FileWatchConfiguration
  */
 public class FileChangedEvent extends ApplicationEvent {
     private final Path path;
@@ -73,7 +73,6 @@ public class FileChangedEvent extends ApplicationEvent {
 
     /**
      * The watch event type.
-     *
      * @return The event type
      */
     public @NonNull WatchEventType getEventType() {
