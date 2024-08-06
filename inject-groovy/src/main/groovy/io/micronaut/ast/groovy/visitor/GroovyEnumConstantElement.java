@@ -39,9 +39,9 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     private final FieldNode variable;
 
     /**
-     * @param declaringEnum             The declaring enum
-     * @param visitorContext            The visitor context
-     * @param variable                  The {@link org.codehaus.groovy.ast.Variable}
+     * @param declaringEnum The declaring enum
+     * @param visitorContext The visitor context
+     * @param variable The {@link org.codehaus.groovy.ast.Variable}
      * @param annotationMetadataFactory The annotation medatada
      */
     GroovyEnumConstantElement(GroovyClassElement declaringEnum,
@@ -54,7 +54,7 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyEnumConstantElement(declaringEnum, visitorContext, variable, elementAnnotationMetadataFactory);
     }
 
@@ -85,11 +85,6 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    public boolean isAbstract() {
-        return false;
-    }
-
-    @Override
     public boolean isStatic() {
         return true;
     }
@@ -115,17 +110,12 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    public boolean isPrimitive() {
-        return false;
-    }
-
-    @Override
     public boolean isArray() {
         return false;
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return variable.getName();
     }
 

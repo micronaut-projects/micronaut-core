@@ -69,7 +69,9 @@ import java.util.Set;
  */
 @Internal
 public class GroovyVisitorContext implements VisitorContext {
+
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
+
     private final CompilationUnit compilationUnit;
     private final ClassWriterOutputVisitor outputVisitor;
     private final SourceUnit sourceUnit;
@@ -83,7 +85,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final GroovyAnnotationMetadataBuilder annotationMetadataBuilder;
 
     /**
-     * @param sourceUnit      The source unit
+     * @param sourceUnit The source unit
      * @param compilationUnit The compilation unit
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
@@ -91,9 +93,9 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     /**
-     * @param sourceUnit      The source unit
+     * @param sourceUnit The source unit
      * @param compilationUnit The compilation unit
-     * @param outputVisitor   The class writer output visitor
+     * @param outputVisitor The class writer output visitor
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit, ClassWriterOutputVisitor outputVisitor) {
         this.sourceUnit = sourceUnit;
@@ -178,8 +180,8 @@ public class GroovyVisitorContext implements VisitorContext {
             return ClassElement.ZERO_CLASS_ELEMENTS;
         }
 
-        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(compilationUnit.getClassLoader());
-        List<ClassElement> classElements = new ArrayList<>();
+        var scanner = new ClassPathAnnotationScanner(compilationUnit.getClassLoader());
+        var classElements = new ArrayList<ClassElement>();
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
@@ -202,18 +204,18 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+    public @NonNull ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return this.expressionCompilationContextFactory;
     }
 
     @Override
-    public GroovyAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
+    public @NonNull GroovyAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return annotationMetadataBuilder;
     }
 
     @Override
     public void info(String message, @Nullable Element element) {
-        StringBuilder msg = new StringBuilder("Note: ").append(message);
+        var msg = new StringBuilder("Note: ").append(message);
         if (element instanceof AbstractGroovyElement abstractGroovyElement) {
             ASTNode expr = abstractGroovyElement.getNativeType().annotatedNode();
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
@@ -320,6 +322,7 @@ public class GroovyVisitorContext implements VisitorContext {
     /**
      * Groovy options source are {@link System#getProperties()} based.
      * <p><b>All properties MUST start with {@link GroovyVisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
+     *
      * @return options {@link Map}
      */
     @Override
@@ -379,6 +382,7 @@ public class GroovyVisitorContext implements VisitorContext {
 
     /**
      * Adds a java bean definition builder.
+     *
      * @param groovyBeanDefinitionBuilder The groovy bean definition builder
      */
     @Internal

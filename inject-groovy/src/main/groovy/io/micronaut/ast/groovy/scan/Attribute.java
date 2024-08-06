@@ -15,8 +15,8 @@
  */
 package io.micronaut.ast.groovy.scan;
 
-import io.micronaut.core.annotation.Internal;
 import groovyjarjarasm.asm.Label;
+import io.micronaut.core.annotation.Internal;
 
 /**
  * A non-standard class, field, method or code attribute.
@@ -57,22 +57,22 @@ class Attribute {
      * corresponding to the {@code len} bytes starting at the given offset, in
      * the given class reader.
      *
-     * @param cr      the class that contains the attribute to be read.
-     * @param off     index of the first byte of the attribute's content in
-     *                {@link groovyjarjarasm.asm.ClassReader#b cr.b}. The 6 attribute header bytes,
-     *                containing the type and the length of the attribute, are not
-     *                taken into account here.
-     * @param len     the length of the attribute's content.
-     * @param buf     buffer to be used to call {@link groovyjarjarasm.asm.ClassReader#readUTF8
-     *                readUTF8}, {@link groovyjarjarasm.asm.ClassReader#readClass(int, char[]) readClass}
-     *                or {@link groovyjarjarasm.asm.ClassReader#readConst readConst}.
+     * @param cr the class that contains the attribute to be read.
+     * @param off index of the first byte of the attribute's content in
+     * {@link groovyjarjarasm.asm.ClassReader#b cr.b}. The 6 attribute header bytes,
+     * containing the type and the length of the attribute, are not
+     * taken into account here.
+     * @param len the length of the attribute's content.
+     * @param buf buffer to be used to call {@link groovyjarjarasm.asm.ClassReader#readUTF8
+     * readUTF8}, {@link groovyjarjarasm.asm.ClassReader#readClass(int, char[]) readClass}
+     * or {@link groovyjarjarasm.asm.ClassReader#readConst readConst}.
      * @param codeOff index of the first byte of code's attribute content in
-     *                {@link groovyjarjarasm.asm.ClassReader#b cr.b}, or -1 if the attribute to be read
-     *                is not a code attribute. The 6 attribute header bytes,
-     *                containing the type and the length of the attribute, are not
-     *                taken into account here.
-     * @param labels  the labels of the method's code, or {@code null} if the
-     *                attribute to be read is not a code attribute.
+     * {@link groovyjarjarasm.asm.ClassReader#b cr.b}, or -1 if the attribute to be read
+     * is not a code attribute. The 6 attribute header bytes,
+     * containing the type and the length of the attribute, are not
+     * taken into account here.
+     * @param labels the labels of the method's code, or {@code null} if the
+     * attribute to be read is not a code attribute.
      * @return a <i>new</i> {@link Attribute} object corresponding to the given
      * bytes.
      */

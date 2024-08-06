@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -57,11 +58,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     /**
      * Default constructor.
      *
-     * @param originatingElement               The originating element
-     * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @param metadataBuilder the metadata builder
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
-     * @param visitorContext                   the visitor context
+     * @param visitorContext the visitor context
      */
     GroovyBeanDefinitionBuilder(
         Element originatingElement,
@@ -78,7 +79,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
+    protected @NonNull AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
@@ -88,12 +89,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
-            public Element getProducingElement() {
+            public @NonNull Element getProducingElement() {
                 return producerField;
             }
 
             @Override
-            public ClassElement getDeclaringElement() {
+            public @NonNull ClassElement getDeclaringElement() {
                 return producerField.getDeclaringType();
             }
 
@@ -114,7 +115,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
+    protected @NonNull AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
@@ -126,12 +127,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             BeanParameterElement[] parameters;
 
             @Override
-            public Element getProducingElement() {
+            public @NonNull Element getProducingElement() {
                 return producerMethod;
             }
 
             @Override
-            public ClassElement getDeclaringElement() {
+            public @NonNull ClassElement getDeclaringElement() {
                 return producerMethod.getDeclaringType();
             }
 
@@ -171,7 +172,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+    protected <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue) {
         ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
         annotationBuilder.annotate(annotationMetadata, annotationValue);
@@ -207,7 +208,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
+    protected @NonNull BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
         AnnotationValue<?>[] interceptorTypes =
             InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
         return new AopProxyWriter(
@@ -219,8 +220,8 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
-        AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
+    protected @NonNull BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
+        var aopProxyWriter = (AopProxyWriter) aopWriter;
         return (bean, method) -> {
             AnnotationValue<?>[] newTypes =
                 InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
