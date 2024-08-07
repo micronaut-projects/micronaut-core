@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Builds a {@link RetryState} from {@link AnnotationMetadata}.
@@ -45,6 +46,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String EXCLUDES = "excludes";
     private static final String PREDICATE = "predicate";
     private static final String CAPTUREDEXCEPTION = "capturedException";
+    private static final String VALUE = "value";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -86,7 +88,10 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         if (predicateClass.equals(DefaultRetryPredicate.class)) {
             List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
             List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
-            return new DefaultRetryPredicate(includes, excludes);
+            List<Class<? extends Throwable>> values = resolveIncludes(retry, VALUE);
+            List<Class<? extends Throwable>> finalIncludes = Stream.concat(includes.stream(),values.stream()).toList();
+
+            return new DefaultRetryPredicate(finalIncludes, excludes);
         } else {
             return InstantiationUtils.instantiate(predicateClass);
         }
