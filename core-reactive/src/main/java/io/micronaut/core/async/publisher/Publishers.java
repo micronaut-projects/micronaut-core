@@ -524,7 +524,8 @@ public class Publishers {
      * @return The Resulting in publisher
      * @since 4.6.0
      */
-    public static <T> Publisher<T> convertToPublisher(ConversionService conversionService, Object object) {
+    @NonNull
+    public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @NonNull Object object) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;

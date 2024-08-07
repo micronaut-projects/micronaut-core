@@ -584,7 +584,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @return True if not-found should be returned on missing body
+     * @return True if not-found should be returned on missing body. False to return an empty body.
      * @since 4.6
      */
     public boolean isNotFoundOnMissingBody() {
@@ -592,7 +592,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param notFoundOnMissingBody True if no found should be returned on missing body
+     * @param notFoundOnMissingBody True if no found should be returned on missing body. False to return an empty body.
      * @since 4.6
      */
     public void setNotFoundOnMissingBody(boolean notFoundOnMissingBody) {
