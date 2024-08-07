@@ -71,7 +71,6 @@ public class NoBodyResponseTest {
                     .build()));
     }
 
-
     @Test
     void getPojo() throws IOException {
         asserts(SPEC_NAME,
@@ -110,7 +109,6 @@ public class NoBodyResponseTest {
                     .build()));
     }
 
-
     @Test
     void getPojoFuture() throws IOException {
         asserts(SPEC_NAME,
@@ -129,6 +127,7 @@ public class NoBodyResponseTest {
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
+
     @Test
     void getPojoFutureResponse() throws IOException {
         asserts(SPEC_NAME,
@@ -166,7 +165,6 @@ public class NoBodyResponseTest {
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
-
 
     @Test
     void getPojoPublisher() throws IOException {
