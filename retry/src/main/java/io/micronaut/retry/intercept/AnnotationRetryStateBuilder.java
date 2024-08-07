@@ -43,7 +43,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String INCLUDES = "includes";
     private static final String EXCLUDES = "excludes";
     private static final String PREDICATE = "predicate";
-    private static final String CAPTUREDEXCEPTION = "capturedException";
+    private static final String CAPTURED_EXCEPTION = "capturedException";
     private static final String VALUE = "value";
 
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
