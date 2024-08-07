@@ -28,7 +28,6 @@ import org.reactivestreams.Subscription;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -514,6 +513,27 @@ public class Publishers {
         }
         return conversionService.convert(object, publisherType)
             .orElseThrow(() -> unconvertibleError(object, publisherType));
+    }
+
+    /**
+     * Attempts to convert the publisher to the given type.
+     *
+     * @param conversionService The conversion service
+     * @param object The object to convert
+     * @param <T> The generic type
+     * @return The Resulting in publisher
+     * @since 4.6.0
+     */
+    public static <T> Publisher<T> convertToPublisher(ConversionService conversionService, Object object) {
+        Objects.requireNonNull(object, "Argument [object] cannot be null");
+        if (object instanceof Publisher<?> publisher) {
+            return (Publisher<T>) publisher;
+        }
+        if (object instanceof CompletableFuture cf) {
+            return Publishers.fromCompletableFuture(() -> cf);
+        }
+        return conversionService.convert(object, Publisher.class)
+            .orElseThrow(() -> unconvertibleError(object, Publisher.class));
     }
 
     /**

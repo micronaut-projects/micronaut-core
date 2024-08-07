@@ -461,7 +461,7 @@ record MethodFilter<T>(FilterOrder order,
                 }
                 Publisher<?> publisher = ReactivePropagation.propagate(
                     context.propagatedContext(),
-                    Publishers.convertPublisher(conversionService, returnValue, Publisher.class)
+                    Publishers.convertToPublisher(conversionService, returnValue)
                 );
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
                     return resultAwareContinuation.processResult(publisher);
