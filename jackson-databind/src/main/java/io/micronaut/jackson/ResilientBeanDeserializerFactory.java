@@ -51,7 +51,7 @@ final class ResilientBeanDeserializerFactory extends BeanDeserializerFactory {
             if (e.getMessage().startsWith("Failed to access RecordComponents of type ")) {
                 final DeserializationConfig config = ctxt.getConfig();
                 return new CreatorCollectionState(ctxt, beanDesc, config.getDefaultVisibilityChecker(beanDesc.getBeanClass(), beanDesc.getClassInfo()),
-                        new CreatorCollector(beanDesc, config), _findCreatorsFromProperties(ctxt, beanDesc)).creators.constructValueInstantiator(ctxt);
+                    new CreatorCollector(beanDesc, config), _findCreatorsFromProperties(ctxt, beanDesc)).creators.constructValueInstantiator(ctxt);
             }
             throw e;
         }

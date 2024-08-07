@@ -48,14 +48,14 @@ public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object
     @Override
     public Publisher<Map<String, Object>> aggregate(InfoSource[] sources) {
         return aggregateResults(sources)
-                .collectList()
-                .map((List<Map.Entry<Integer, PropertySource>> list) -> {
-            PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver();
-            list.stream()
-                .sorted((e1, e2) -> Integer.compare(e2.getKey(), e1.getKey()))
-                .forEach(entry -> resolver.addPropertySource(entry.getValue()));
-            return resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
-        }).flux();
+            .collectList()
+            .map((List<Map.Entry<Integer, PropertySource>> list) -> {
+                var resolver = new PropertySourcePropertyResolver();
+                list.stream()
+                    .sorted((e1, e2) -> Integer.compare(e2.getKey(), e1.getKey()))
+                    .forEach(entry -> resolver.addPropertySource(entry.getValue()));
+                return resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
+            }).flux();
     }
 
     /**
@@ -70,8 +70,8 @@ public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object
         for (int i = 0; i < sources.length; i++) {
             int index = i;
             Mono<Map.Entry<Integer, PropertySource>> single = Mono.from(sources[i].getSource())
-                    .defaultIfEmpty(new EmptyPropertySource())
-                    .map(source -> new AbstractMap.SimpleEntry<>(index, source));
+                .defaultIfEmpty(new EmptyPropertySource())
+                .map(source -> new AbstractMap.SimpleEntry<>(index, source));
             publishers.add(single.flux());
         }
         return Flux.merge(publishers);

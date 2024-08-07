@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -35,7 +36,10 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 
 /**
  * A {@link MediaTypeCodec} for {@link JsonMapper} based implementations.
@@ -57,10 +61,10 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     private volatile JsonMapper mapper;
 
     /**
-     * @param mapperProvider           To read/write JSON
+     * @param mapperProvider To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     * @param mediaType                Client request/response media type
+     * @param codecConfiguration The configuration for the codec
+     * @param mediaType Client request/response media type
      */
     public MapperMediaTypeCodec(BeanProvider<JsonMapper> mapperProvider,
                                 ApplicationConfiguration applicationConfiguration,
@@ -74,11 +78,11 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     /**
-     * @param mapperProvider           To read/write JSON
+     * @param mapperProvider To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     * @param mediaType                Client request/response media type
-     * @param additionalTypes          Additional Media Types
+     * @param codecConfiguration The configuration for the codec
+     * @param mediaType Client request/response media type
+     * @param additionalTypes Additional Media Types
      */
     public MapperMediaTypeCodec(BeanProvider<JsonMapper> mapperProvider,
                                 ApplicationConfiguration applicationConfiguration,
@@ -90,7 +94,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
         this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
 
-        Set<MediaType> mediaTypes = new HashSet<>();
+        var mediaTypes = new HashSet<MediaType>();
         if (codecConfiguration != null) {
             mediaTypes.addAll(codecConfiguration.getAdditionalTypes());
         }
@@ -101,10 +105,10 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     /**
-     * @param mapper                    To read/write JSON
+     * @param mapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     * @param mediaType                Client request/response media type
+     * @param codecConfiguration The configuration for the codec
+     * @param mediaType Client request/response media type
      */
     public MapperMediaTypeCodec(JsonMapper mapper,
                                 ApplicationConfiguration applicationConfiguration,
@@ -151,7 +155,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
 
     @Override
     public Collection<MediaType> getMediaTypes() {
-        List<MediaType> mediaTypes = new ArrayList<>();
+        var mediaTypes = new ArrayList<MediaType>();
         mediaTypes.add(mediaType);
         mediaTypes.addAll(additionalTypes);
         return mediaTypes;
@@ -176,7 +180,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
      *
      * @param type The type
      * @param node The Json Node
-     * @param <T>  The generic type
+     * @param <T> The generic type
      * @return The decoded object
      * @throws CodecException When object cannot be decoded
      */
@@ -235,7 +239,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> void encode(Argument<T> type, T object, OutputStream outputStream) throws CodecException {
+    public <T> void encode(@NonNull Argument<T> type, @NonNull T object, @NonNull OutputStream outputStream) throws CodecException {
         try {
             getJsonMapper().writeValue(outputStream, type, object);
         } catch (IOException e) {
@@ -257,7 +261,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> byte[] encode(Argument<T> type, T object) throws CodecException {
+    public <T> byte[] encode(@NonNull Argument<T> type, T object) throws CodecException {
         try {
             if (object instanceof byte[] bytes) {
                 return bytes;
@@ -288,7 +292,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T, B> ByteBuffer<B> encode(Argument<T> type, T object, ByteBufferFactory<?, B> allocator) throws CodecException {
+    public <T, B> @NonNull ByteBuffer<B> encode(@NonNull Argument<T> type, T object, @NonNull ByteBufferFactory<?, B> allocator) throws CodecException {
         if (object instanceof byte[] bytes) {
             return allocator.copiedBuffer(bytes);
         }

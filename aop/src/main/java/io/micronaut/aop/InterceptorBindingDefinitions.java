@@ -26,8 +26,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * Repeatable wrapper for {@link InterceptorBinding}.
  *
  * @author graemerocher
- * @since 2.4.0
  * @see InterceptorBinding
+ * @since 2.4.0
  */
 @Documented
 @Retention(RUNTIME)

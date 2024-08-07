@@ -86,16 +86,16 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     @Override
     public Set<String> getSupportedAnnotationNames() {
-        return CollectionUtils.setOf(
-                ReflectiveAccess.class.getName(),
-                TypeHint.class.getName(),
-                Import.class.getName(),
-                "javax.persistence.Entity",
-                "jakarta.persistence.Entity",
-                AnnotationUtil.INJECT,
-                Inject.class.getName(),
-                ReflectionConfig.class.getName(),
-                ReflectionConfig.ReflectionConfigList.class.getName()
+        return Set.of(
+            ReflectiveAccess.class.getName(),
+            TypeHint.class.getName(),
+            Import.class.getName(),
+            "javax.persistence.Entity",
+            "jakarta.persistence.Entity",
+            AnnotationUtil.INJECT,
+            Inject.class.getName(),
+            ReflectionConfig.class.getName(),
+            ReflectionConfig.ReflectionConfigList.class.getName()
         );
     }
 
@@ -117,9 +117,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             if (originatingElements.contains(element)) {
                 return;
             }
-            Map<String, ReflectionConfigData> reflectiveClasses = new LinkedHashMap<>();
-            final List<AnnotationValue<ReflectionConfig>> values = element.getAnnotationValuesByType(
-                    ReflectionConfig.class);
+            var reflectiveClasses = new LinkedHashMap<String, ReflectionConfigData>();
+            final List<AnnotationValue<ReflectionConfig>> values = element.getAnnotationValuesByType(ReflectionConfig.class);
             for (AnnotationValue<ReflectionConfig> value : values) {
                 value.stringValue("type").ifPresent(n -> {
                     final ReflectionConfigData data = resolveClassData(n, reflectiveClasses);
@@ -127,10 +126,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         Arrays.asList(value.enumValues("accessType", TypeHint.AccessType.class))
                     );
                     data.methods.addAll(
-                            value.getAnnotations("methods")
+                        value.getAnnotations("methods")
                     );
                     data.fields.addAll(
-                            value.getAnnotations("fields")
+                        value.getAnnotations("fields")
                     );
                 });
             }
@@ -142,9 +141,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             }
 
             element.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class)))
-                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+                .forEach(m -> processMethodElement(m, reflectiveClasses));
             element.getEnclosedElements(ElementQuery.ALL_FIELDS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class)))
-                    .forEach(m -> processFieldElement(m, reflectiveClasses));
+                .forEach(m -> processFieldElement(m, reflectiveClasses));
             if (!element.isInner()) {
                 // Inner classes aren't processed if there is no annotation
                 // We might trigger the visitor twice but the originatingElements check should avoid it
@@ -161,10 +160,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 }
                 processClasses(accessTypes, reflectiveClasses, introspectedClasses);
                 processClasses(accessTypes, reflectiveClasses, element.getValue(
-                                       TypeHint.class,
-                                       "typeNames",
-                                       String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                               )
+                        TypeHint.class,
+                        "typeNames",
+                        String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
+                    )
                 );
             }
 
@@ -174,11 +173,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     processBeanElement(reflectiveClasses, beanElement, true);
                 }
             } else if (element.hasStereotype(Bean.class) || element.hasStereotype(AnnotationUtil.SCOPE) || element.hasStereotype(
-                    AnnotationUtil.QUALIFIER)) {
+                AnnotationUtil.QUALIFIER)) {
                 processBeanElement(
-                        reflectiveClasses,
-                        element,
-                        false
+                    reflectiveClasses,
+                    element,
+                    false
                 );
                 MethodElement me = element.getPrimaryConstructor().orElse(null);
                 if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
@@ -198,24 +197,24 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             if (!reflectiveClasses.isEmpty()) {
                 originatingElements.add(element);
                 @SuppressWarnings("unchecked") final AnnotationValue<ReflectionConfig>[] annotationValues =
-                        reflectiveClasses.values().stream()
+                    reflectiveClasses.values().stream()
                         .map(ReflectionConfigData::build)
                         .toArray(AnnotationValue[]::new);
                 MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
                 final AnnotationValue<ReflectionConfig.ReflectionConfigList> av =
-                        AnnotationValue.builder(ReflectionConfig.ReflectionConfigList.class)
+                    AnnotationValue.builder(ReflectionConfig.ReflectionConfigList.class)
                         .values(annotationValues)
                         .build();
                 annotationMetadata.addAnnotation(
-                        av.getAnnotationName(),
-                        av.getValues(),
-                        RetentionPolicy.RUNTIME
+                    av.getAnnotationName(),
+                    av.getValues(),
+                    RetentionPolicy.RUNTIME
                 );
                 GraalReflectionMetadataWriter writer = new GraalReflectionMetadataWriter(
-                        element,
-                        annotationMetadata,
-                        context
+                    element,
+                    annotationMetadata,
+                    context
                 );
                 try {
                     writer.accept(context);
@@ -227,9 +226,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void processBeanElement(
-            Map<String, ReflectionConfigData> reflectiveClasses,
-            ClassElement beanElement,
-            boolean isImport) {
+        Map<String, ReflectionConfigData> reflectiveClasses,
+        ClassElement beanElement,
+        boolean isImport) {
         processBeanConstructor(reflectiveClasses, beanElement, isImport);
 
         processBeanMethods(reflectiveClasses, beanElement, isImport);
@@ -240,82 +239,82 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processBeanFields(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
-                .onlyInstance()
-                .onlyInjected();
+            .onlyInstance()
+            .onlyInjected();
 
         if (isImport) {
             // fields that are injected but not public and are imported need reflection
             beanElement
-                    .getEnclosedElements(reflectiveFieldQuery.modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC))))
-                    .forEach(e -> processFieldElement(e, reflectiveClasses));
+                .getEnclosedElements(reflectiveFieldQuery.modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC))))
+                .forEach(e -> processFieldElement(e, reflectiveClasses));
         } else {
             // fields that are injected and private need reflection
             beanElement
-                    .getEnclosedElements(reflectiveFieldQuery.filter(methodElement -> !methodElement.isAccessible(beanElement)))
-                    .forEach(e -> processFieldElement(e, reflectiveClasses));
+                .getEnclosedElements(reflectiveFieldQuery.filter(methodElement -> !methodElement.isAccessible(beanElement)))
+                .forEach(e -> processFieldElement(e, reflectiveClasses));
 
         }
     }
 
     private void processBeanMethods(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
-                .onlyInstance()
-                .onlyInjected();
+            .onlyInstance()
+            .onlyInjected();
 
         if (isImport) {
             final Predicate<Set<ElementModifier>> nonPublicOnly = elementModifiers ->
-                    !elementModifiers.contains(ElementModifier.PUBLIC);
+                !elementModifiers.contains(ElementModifier.PUBLIC);
             // methods that are injected but not public and are imported need reflection
             beanElement
-                    .getEnclosedElements(injectedMethodsThatNeedReflection
-                             .modifiers(nonPublicOnly))
-                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+                .getEnclosedElements(injectedMethodsThatNeedReflection
+                    .modifiers(nonPublicOnly))
+                .forEach(m -> processMethodElement(m, reflectiveClasses));
             beanElement.getEnclosedElements(
-                    ElementQuery
-                            .ALL_METHODS
-                            .onlyInstance()
-                            .modifiers(nonPublicOnly)
-                            .annotated(ann -> ann.hasAnnotation(Executable.class))
+                ElementQuery
+                    .ALL_METHODS
+                    .onlyInstance()
+                    .modifiers(nonPublicOnly)
+                    .annotated(ann -> ann.hasAnnotation(Executable.class))
             ).forEach(m -> processMethodElement(m, reflectiveClasses));
         } else {
             final Predicate<MethodElement> inaccessibleMethods = methodElement -> !methodElement.isAccessible(beanElement);
             beanElement
-                    .getEnclosedElements(injectedMethodsThatNeedReflection
-                                                 .filter(inaccessibleMethods))
-                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+                .getEnclosedElements(injectedMethodsThatNeedReflection
+                    .filter(inaccessibleMethods))
+                .forEach(m -> processMethodElement(m, reflectiveClasses));
             beanElement.getEnclosedElements(
-                    ElementQuery
-                            .ALL_METHODS
-                            .onlyInstance()
-                            .filter(inaccessibleMethods)
-                            .annotated(ann -> ann.hasAnnotation(Executable.class))
+                ElementQuery
+                    .ALL_METHODS
+                    .onlyInstance()
+                    .filter(inaccessibleMethods)
+                    .annotated(ann -> ann.hasAnnotation(Executable.class))
             ).forEach(m -> processMethodElement(m, reflectiveClasses));
         }
         // methods with explicit reflective access
         beanElement.getEnclosedElements(
-                ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class))
+            ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class))
         ).forEach(m -> processMethodElement(m, reflectiveClasses));
     }
 
     private void processBeanConstructor(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
         if (constructor != null &&
-                (constructor.hasAnnotation(ReflectiveAccess.class) ||
-                         (isImport && !constructor.isPublic()) ||
-                         (!isImport && constructor.isPrivate()))) {
+            (constructor.hasAnnotation(ReflectiveAccess.class) ||
+                (isImport && !constructor.isPublic()) ||
+                (!isImport && constructor.isPrivate()))) {
             processMethodElement(constructor, reflectiveClasses);
         }
     }
 
     private void addBean(String beanName, Map<String, ReflectionConfigData> reflectiveClasses) {
         resolveClassData(beanName, reflectiveClasses)
-                .accessTypes.addAll(
-                    Arrays.asList(
-                        TypeHint.AccessType.ALL_PUBLIC_METHODS,
-                        TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS,
-                        TypeHint.AccessType.ALL_DECLARED_FIELDS
-                    )
-                );
+            .accessTypes.addAll(
+                Arrays.asList(
+                    TypeHint.AccessType.ALL_PUBLIC_METHODS,
+                    TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS,
+                    TypeHint.AccessType.ALL_DECLARED_FIELDS
+                )
+            );
     }
 
     private void processFieldElement(FieldElement element,
@@ -323,8 +322,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         final ClassElement dt = element.getDeclaringType();
         final ReflectionConfigData data = resolveClassData(resolveName(dt).getName(), classes);
         data.fields.add(AnnotationValue.builder(ReflectionConfig.ReflectiveFieldConfig.class)
-                                .member("name", element.getName())
-                                .build()
+            .member("name", element.getName())
+            .build()
         );
     }
 
@@ -337,13 +336,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         final ClassElement declaringType = element.getDeclaringType();
         final ReflectionConfigData data = resolveClassData(declaringType.getName(), classes);
         final List<AnnotationClassValue<?>> params = Arrays.stream(element.getParameters())
-                .map(ParameterElement::getType)
-                .map(this::resolveName).collect(Collectors.toList());
+            .map(ParameterElement::getType)
+            .map(this::resolveName).collect(Collectors.toList());
         data.methods.add(
-                AnnotationValue.builder(ReflectionConfig.ReflectiveMethodConfig.class)
-                        .member("name", methodName)
-                        .member("parameterTypes", params.toArray(AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES))
-                        .build()
+            AnnotationValue.builder(ReflectionConfig.ReflectiveMethodConfig.class)
+                .member("name", methodName)
+                .member("parameterTypes", params.toArray(AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES))
+                .build()
         );
     }
 
@@ -358,7 +357,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
         for (String introspectedClass : introspectedClasses) {
             resolveClassData(introspectedClass, reflectiveClasses)
-                    .accessTypes.addAll(Arrays.asList(accessType));
+                .accessTypes.addAll(Arrays.asList(accessType));
         }
     }
 
@@ -379,8 +378,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
         AnnotationValue<ReflectionConfig> build() {
             final AnnotationValueBuilder<ReflectionConfig> builder = AnnotationValue.builder(ReflectionConfig.class)
-                    .member("type", type)
-                    .member("accessType", accessTypes.toArray(new TypeHint.AccessType[0]));
+                .member("type", type)
+                .member("accessType", accessTypes.toArray(new TypeHint.AccessType[0]));
             if (!methods.isEmpty()) {
                 builder.member("methods", methods.toArray(ZERO_ANNOTATION_VALUES));
             }
@@ -388,7 +387,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 builder.member("fields", fields.toArray(ZERO_ANNOTATION_VALUES));
             }
             return builder
-                    .build();
+                .build();
         }
     }
 }

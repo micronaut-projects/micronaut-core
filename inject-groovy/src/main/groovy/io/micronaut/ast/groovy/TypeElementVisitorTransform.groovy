@@ -43,6 +43,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
+
 /**
  * Executes type element visitors.
  *
@@ -67,7 +68,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         Map<String, LoadedVisitor> visitors = loadedVisitors.get()
         if (visitors == null) return
 
-        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
+        var visitorContext = new GroovyVisitorContext(source, compilationUnit)
 
         List<LoadedVisitor> sortedVisitors = new ArrayList<>(visitors.values())
         OrderUtil.reverseSort(sortedVisitors)
@@ -137,7 +138,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             if (visitor.matchesClass(targetClassElement)) {
                 visitor.getVisitor().visitClass(targetClassElement, visitorContext)
             }
-            GroovyClassElement classElement = targetClassElement as GroovyClassElement
+            def classElement = targetClassElement as GroovyClassElement
             def properties = classElement.getSyntheticBeanProperties()
             for (PropertyElement pn : (properties)) {
                 visitNativeProperty(pn)

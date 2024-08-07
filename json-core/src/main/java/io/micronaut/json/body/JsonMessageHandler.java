@@ -76,7 +76,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public boolean isReadable(Argument<T> type, MediaType mediaType) {
+    public boolean isReadable(@NonNull Argument<T> type, MediaType mediaType) {
         return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
     }
 
@@ -85,12 +85,12 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public JsonMessageHandler<T> createSpecific(Argument<T> type) {
+    public JsonMessageHandler<T> createSpecific(@NonNull Argument<T> type) {
         return new JsonMessageHandler<>(jsonMapper.createSpecific(type));
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public T read(@NonNull Argument<T> type, MediaType mediaType, @NonNull Headers httpHeaders, @NonNull ByteBuffer<?> byteBuffer) throws CodecException {
         T decoded;
         try {
             decoded = jsonMapper.readValue(byteBuffer, type);
@@ -104,7 +104,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(@NonNull Argument<T> type, MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {
         try {
             return jsonMapper.readValue(inputStream, type);
         } catch (IOException e) {
@@ -113,7 +113,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public boolean isWriteable(Argument<T> type, MediaType mediaType) {
+    public boolean isWriteable(@NonNull Argument<T> type, MediaType mediaType) {
         return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
     }
 
@@ -122,7 +122,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<T> type, @NonNull MediaType mediaType, T object, MutableHeaders outgoingHeaders, @NonNull OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
             if (type.getType() == Object.class && object instanceof CharSequence charSequence) {

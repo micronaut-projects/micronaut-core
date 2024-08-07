@@ -52,12 +52,14 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
 
     /**
      * Whether the session is open.
+     *
      * @return True if it is
      */
     boolean isOpen();
 
     /**
      * Whether the session is writable. It may not be writable, if the buffer is currently full
+     *
      * @return True if it is
      */
     boolean isWritable();
@@ -107,7 +109,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * Send the given message to the remote peer asynchronously.
      *
      * @param message The message
-     *  @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param mediaType The media type of the message. Used to look up an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
@@ -180,6 +182,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
 
     /**
      * The subprotocol if one is used.
+     *
      * @return The subprotocol
      */
     default Optional<String> getSubprotocol() {

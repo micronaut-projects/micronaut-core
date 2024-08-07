@@ -26,9 +26,9 @@ import io.micronaut.inject.InjectionPoint;
 /**
  * Interface for managing the construction and lifecycle of instances of reactive {@link WebSocketClient} clients.
  *
+ * @param <W> Web Socket Client
  * @author Sergio del Amo
  * @since 3.0.0
- * @param <W> Web Socket Client
  */
 public interface WebSocketClientRegistry<W extends WebSocketClient> {
 
@@ -36,9 +36,9 @@ public interface WebSocketClientRegistry<W extends WebSocketClient> {
      * Resolves a {@link WebSocketClient} for the given injection point.
      *
      * @param injectionPoint The injection point
-     * @param loadBalancer   The load balancer to use (Optional)
-     * @param configuration  The configuration (Optional)
-     * @param beanContext    The bean context to use
+     * @param loadBalancer The load balancer to use (Optional)
+     * @param configuration The configuration (Optional)
+     * @param beanContext The bean context to use
      * @return The Streaming HTTP Client
      */
     @NonNull

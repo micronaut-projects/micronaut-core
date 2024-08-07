@@ -50,6 +50,7 @@ public class EndpointsFilter implements Ordered {
 
     /**
      * Constructor.
+     *
      * @param endpointSensitivityProcessor The processor that resolves endpoint sensitivity
      */
     public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor) {

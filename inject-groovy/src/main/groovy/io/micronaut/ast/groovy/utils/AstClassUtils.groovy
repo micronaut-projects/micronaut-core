@@ -20,6 +20,7 @@ import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 
 import static org.codehaus.groovy.ast.ClassHelper.make
+
 /**
  * Utility methods for working with classes
  *

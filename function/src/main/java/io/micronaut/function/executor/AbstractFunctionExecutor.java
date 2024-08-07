@@ -21,7 +21,6 @@ package io.micronaut.function.executor;
  * @param <I> input
  * @param <O> output
  * @param <C> context
- *
  * @author Graeme Rocher
  * @since 1.0
  */

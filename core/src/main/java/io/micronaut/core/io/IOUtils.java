@@ -41,6 +41,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -165,6 +166,9 @@ public class IOUtils {
                 return loadNestedJarUriFunction.apply(toClose, jarUri).resolve(path);
             } else if ("file".equals(scheme)) {
                 return Paths.get(uri).resolve(path);
+            } else if ("jrt".equals(scheme)) {
+                FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of());
+                return fs.getPath(uri.getPath());
             } else {
                 // graal resource: case
                 return Paths.get(uri);

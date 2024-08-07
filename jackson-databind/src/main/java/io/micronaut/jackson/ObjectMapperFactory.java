@@ -110,6 +110,7 @@ public class ObjectMapperFactory {
 
     /**
      * Set additional serializers.
+     *
      * @param serializers The serializers
      * @since 4.0
      */
@@ -119,6 +120,7 @@ public class ObjectMapperFactory {
 
     /**
      * Set additional deserializers.
+     *
      * @param deserializers The deserializers
      * @since 4.0
      */
@@ -130,7 +132,7 @@ public class ObjectMapperFactory {
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
-     * @param jsonFactory          The JSON factory
+     * @param jsonFactory The JSON factory
      * @return The {@link ObjectMapper}
      */
     @Singleton
@@ -215,9 +217,9 @@ public class ObjectMapperFactory {
                 ));
         }
 
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
-        objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
+            .configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
         if (hasConfiguration) {
 

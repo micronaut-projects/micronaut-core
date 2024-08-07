@@ -79,7 +79,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER -> {
                     return interceptedMethod.handleResult(
-                            fallbackForReactiveType(context, interceptedMethod.interceptResultAsPublisher())
+                        fallbackForReactiveType(context, interceptedMethod.interceptResultAsPublisher())
                     );
                 }
                 case COMPLETION_STAGE -> {
@@ -147,7 +147,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
         if (beanDefinition != null) {
             ExecutableMethod<?, Object> fallBackMethod =
-                    beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
+                beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
             if (fallBackMethod != null) {
                 MethodExecutionHandle<?, Object> executionHandle = beanContext.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) fallBackMethod);
                 return Optional.of(executionHandle);
@@ -230,7 +230,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Resolves a fallback for the given execution context and exception.
      *
-     * @param context   The context
+     * @param context The context
      * @param exception The exception
      * @return Returns the fallback value or throws the original exception
      */

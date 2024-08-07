@@ -53,11 +53,11 @@ class CircuitBreakerRetry implements MutableRetryState {
     private volatile MutableRetryState childState;
 
     /**
-     * @param openTimeout       The circuit open timeout in millis
+     * @param openTimeout The circuit open timeout in millis
      * @param childStateBuilder The retry state builder
-     * @param method            A compile time produced invocation of a method call
-     * @param eventPublisher    To publish circuit events
-     * @param throwWrappedException     If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
+     * @param method A compile time produced invocation of a method call
+     * @param eventPublisher To publish circuit events
+     * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
     CircuitBreakerRetry(
         long openTimeout,

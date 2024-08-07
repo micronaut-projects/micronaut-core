@@ -53,6 +53,7 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
 
     /**
      * Default constructor.
+     *
      * @param applicationConfiguration The application configuration.
      */
     @Internal
@@ -78,6 +79,7 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
 
     /**
      * Event listener triggered when a service is ready.
+     *
      * @param event The event
      */
     @EventListener
@@ -87,6 +89,7 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
 
     /**
      * Event listener triggered when the server starts up.
+     *
      * @param event The event
      */
     @EventListener

@@ -25,8 +25,6 @@ import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -47,6 +45,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String PREDICATE = "predicate";
     private static final String CAPTUREDEXCEPTION = "capturedException";
     private static final String VALUE = "value";
+
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -63,7 +62,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     @Override
     public RetryState build() {
         AnnotationValue<Retryable> retry = annotationMetadata.findAnnotation(Retryable.class)
-                                                             .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
+            .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
         int attempts = retry.intValue(ATTEMPTS).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
         @SuppressWarnings("unchecked")
@@ -71,8 +70,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         RetryPredicate predicate = createPredicate(predicateClass, retry);
         @SuppressWarnings("unchecked")
         Class<? extends RuntimeException> capturedException = (Class<? extends RuntimeException>) retry
-                                            .classValue(CAPTUREDEXCEPTION)
-                                            .orElse(RuntimeException.class);
+            .classValue(CAPTURED_EXCEPTION)
+            .orElse(RuntimeException.class);
 
         return new SimpleRetry(
             attempts,
@@ -100,6 +99,6 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
         Class<?>[] values = retry.classValues(includes);
-        return (List) Collections.unmodifiableList(Arrays.asList(values));
+        return (List) List.of(values);
     }
 }

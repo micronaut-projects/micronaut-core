@@ -32,7 +32,7 @@ public class MessageAcknowledgementException extends MessageListenerException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public MessageAcknowledgementException(String message, Throwable cause) {
         super(message, cause);

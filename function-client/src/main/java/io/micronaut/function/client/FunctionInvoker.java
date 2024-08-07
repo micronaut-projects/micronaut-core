@@ -29,7 +29,7 @@ public interface FunctionInvoker<I, O> {
      * Invoke the given function definition for the given input and expected response type.
      *
      * @param definition The definition
-     * @param input      The input
+     * @param input The input
      * @param outputType The response type
      * @return The result
      */

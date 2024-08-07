@@ -58,17 +58,17 @@ class DefaultHealthResult implements HealthResult {
      */
     @JsonCreator
     DefaultHealthResult(
-            @JsonProperty("name") String name,
-            @JsonProperty("status") String status,
-            @JsonProperty("details") Map<String, Object> details) {
+        @JsonProperty("name") String name,
+        @JsonProperty("status") String status,
+        @JsonProperty("details") Map<String, Object> details) {
         this.name = name;
         switch (status) {
             case HealthStatus.NAME_DOWN:
                 this.healthStatus = HealthStatus.DOWN;
-            break;
+                break;
             case HealthStatus.NAME_UP:
                 this.healthStatus = HealthStatus.UP;
-            break;
+                break;
             default:
                 this.healthStatus = new HealthStatus(status);
         }

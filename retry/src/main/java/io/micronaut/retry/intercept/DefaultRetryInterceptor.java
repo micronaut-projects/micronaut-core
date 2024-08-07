@@ -73,8 +73,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * Construct a default retry method interceptor with the event publisher.
      *
      * @param conversionService The conversion service
-     * @param eventPublisher    The event publisher to publish retry events
-     * @param executorService   The executor service to use for completable futures
+     * @param eventPublisher The event publisher to publish retry events
+     * @param executorService The executor service to use for completable futures
      */
     public DefaultRetryInterceptor(ConversionService conversionService,
                                    ApplicationEventPublisher eventPublisher,
@@ -93,7 +93,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
-        if (!opt.isPresent()) {
+        if (opt.isEmpty()) {
             return context.proceed();
         }
 
@@ -101,19 +101,19 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
         MutableRetryState retryState;
         AnnotationRetryStateBuilder retryStateBuilder = new AnnotationRetryStateBuilder(
-                context
+            context
         );
 
         if (isCircuitBreaker) {
             long timeout = context
-                    .getValue(CircuitBreaker.class, "reset", Duration.class)
-                    .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
+                .getValue(CircuitBreaker.class, "reset", Duration.class)
+                .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
             boolean wrapException = context
-                    .getValue(CircuitBreaker.class, "throwWrappedException", Boolean.class)
-                    .orElse(false);
+                .getValue(CircuitBreaker.class, "throwWrappedException", Boolean.class)
+                .orElse(false);
             retryState = circuitContexts.computeIfAbsent(
-                    context.getExecutableMethod(),
-                    method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
+                context.getExecutableMethod(),
+                method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
             );
         } else {
             retryState = (MutableRetryState) retryStateBuilder.build();
@@ -131,8 +131,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 case PUBLISHER -> {
                     Flux<Object> reactiveSequence = Flux.from((Publisher<?>) result);
                     return interceptedMethod.handleResult(
-                            reactiveSequence.onErrorResume(retryFlowable(context, retryState, reactiveSequence))
-                                    .doOnNext(o -> retryState.close(null))
+                        reactiveSequence.onErrorResume(retryFlowable(context, retryState, reactiveSequence))
+                            .doOnNext(o -> retryState.close(null))
                     );
                 }
                 case COMPLETION_STAGE -> {

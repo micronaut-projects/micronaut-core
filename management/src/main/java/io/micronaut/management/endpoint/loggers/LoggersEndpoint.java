@@ -25,10 +25,10 @@ import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.endpoint.annotation.Sensitive;
 import io.micronaut.management.endpoint.annotation.Write;
+import jakarta.validation.constraints.NotBlank;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
-import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 /**
@@ -38,8 +38,8 @@ import java.util.Map;
  * @since 1.0
  */
 @Endpoint(id = LoggersEndpoint.NAME,
-        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE,
-        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED)
+    defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE,
+    defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED)
 public class LoggersEndpoint {
 
     /**
@@ -105,11 +105,11 @@ public class LoggersEndpoint {
                             @Nullable io.micronaut.logging.LogLevel configuredLevel) {
         try {
             loggersManager.setLogLevel(loggingSystem, name,
-                    configuredLevel != null ? configuredLevel : io.micronaut.logging.LogLevel.NOT_SPECIFIED);
+                configuredLevel != null ? configuredLevel : io.micronaut.logging.LogLevel.NOT_SPECIFIED);
         } catch (IllegalArgumentException ex) {
             throw new UnsatisfiedArgumentException(
-                    Argument.of(io.micronaut.logging.LogLevel.class, "configuredLevel"),
-                    "Invalid log level specified: " + configuredLevel
+                Argument.of(io.micronaut.logging.LogLevel.class, "configuredLevel"),
+                "Invalid log level specified: " + configuredLevel
             );
         }
     }
