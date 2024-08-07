@@ -56,7 +56,6 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
         this.configuration = configuration;
     }
 
-    @NonNull
     @Override
     public @NonNull ApplicationContext getApplicationContext() {
         return applicationContext;
