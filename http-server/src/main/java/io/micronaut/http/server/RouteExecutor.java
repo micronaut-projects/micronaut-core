@@ -428,8 +428,9 @@ public final class RouteExecutor {
     }
 
     private boolean isSingle(RouteInfo<?> finalRoute, Class<?> bodyClass) {
-        return finalRoute.isSpecifiedSingle() || (finalRoute.isSingleResult() &&
-            (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
+        return finalRoute.isSpecifiedSingle()
+            || (finalRoute.isSingleResult() && (finalRoute.isAsync() || finalRoute.isSuspended()))
+            || Publishers.isSingle(bodyClass);
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext,
