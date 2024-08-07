@@ -238,7 +238,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processBeanFields(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
-            .onlyInstance();
+            .onlyInstance()
+            .onlyInjected();
 
         if (isImport) {
             // fields that are injected but not public and are imported need reflection
@@ -256,7 +257,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processBeanMethods(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
-            .onlyInstance();
+            .onlyInstance()
+            .onlyInjected();
 
         if (isImport) {
             final Predicate<Set<ElementModifier>> nonPublicOnly = elementModifiers ->
