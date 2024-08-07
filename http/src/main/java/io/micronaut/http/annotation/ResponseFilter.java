@@ -18,7 +18,6 @@ package io.micronaut.http.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -77,7 +76,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Inherited
 @Executable
 @EntryPoint
-@Experimental
 public @interface ResponseFilter {
     /**
      * Pattern used to match all requests.
