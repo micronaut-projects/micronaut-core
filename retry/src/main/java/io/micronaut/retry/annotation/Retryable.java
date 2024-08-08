@@ -46,7 +46,7 @@ public @interface Retryable {
     /**
      * @return The exception types to include (defaults to all)
      */
-    @AliasFor(member="includes")
+    @AliasFor(member = "includes")
     Class<? extends Throwable>[] value() default {};
 
     /**
