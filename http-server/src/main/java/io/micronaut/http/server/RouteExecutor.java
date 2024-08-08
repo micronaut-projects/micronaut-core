@@ -438,7 +438,7 @@ public final class RouteExecutor {
                                                                         RouteInfo<?> routeInfo,
                                                                         @Nullable Object body) {
         // performance optimization: check for common body types
-        boolean shortCircuit = body instanceof String || body instanceof byte[] || body == null;
+        boolean shortCircuit = body instanceof String || body instanceof byte[];
 
         // this is a bit messy to avoid type pollution performance issues
         MutableHttpResponse<?> outgoingResponse;
