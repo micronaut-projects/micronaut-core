@@ -84,7 +84,6 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         if (predicateClass.equals(DefaultRetryPredicate.class)) {
             List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
             List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
-
             return new DefaultRetryPredicate(includes, excludes);
         } else {
             return InstantiationUtils.instantiate(predicateClass);
