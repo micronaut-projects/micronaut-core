@@ -44,7 +44,6 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String EXCLUDES = "excludes";
     private static final String PREDICATE = "predicate";
     private static final String CAPTURED_EXCEPTION = "capturedException";
-    private static final String VALUE = "value";
 
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
@@ -87,10 +86,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         if (predicateClass.equals(DefaultRetryPredicate.class)) {
             List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
             List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
-            List<Class<? extends Throwable>> values = resolveIncludes(retry, VALUE);
-            List<Class<? extends Throwable>> finalIncludes = Stream.concat(includes.stream(),values.stream()).toList();
 
-            return new DefaultRetryPredicate(finalIncludes, excludes);
+            return new DefaultRetryPredicate(includes, excludes);
         } else {
             return InstantiationUtils.instantiate(predicateClass);
         }
