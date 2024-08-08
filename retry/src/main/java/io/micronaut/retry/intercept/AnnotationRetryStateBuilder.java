@@ -26,7 +26,6 @@ import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * Builds a {@link RetryState} from {@link AnnotationMetadata}.
@@ -44,7 +43,6 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String EXCLUDES = "excludes";
     private static final String PREDICATE = "predicate";
     private static final String CAPTURED_EXCEPTION = "capturedException";
-
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
