@@ -74,10 +74,13 @@ public class HeadersTest {
     }
 
     interface API {
+
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
         String getOkAsJson();
+
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
         String getFooAsJson(@Header("Foo") String header1, @Header("fOo") String header2);
+
         @Get(value = "/bar2", produces = MediaType.APPLICATION_JSON)
         String getFooAsJson2(@Header(name = "Foo") String header1, @Header(name = "fOo") String header2);
     }
