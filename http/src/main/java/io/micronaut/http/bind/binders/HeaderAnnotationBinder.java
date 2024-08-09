@@ -47,7 +47,8 @@ public class HeaderAnnotationBinder<T> extends AbstractArgumentBinder<T> impleme
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getArgument().getName());
+        String parameterName = annotationMetadata.stringValue(Header.class)
+            .orElseGet(() -> annotationMetadata.stringValue(Header.class, "name").orElse(argument.getArgument().getName()));
         return doBind(argument, parameters, parameterName);
     }
 
