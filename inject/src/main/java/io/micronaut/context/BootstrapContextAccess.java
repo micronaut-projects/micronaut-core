@@ -16,6 +16,8 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Interface for accessing aspects of the main context from the bootstrap context.
@@ -24,6 +26,7 @@ import io.micronaut.core.annotation.Experimental;
  * @author Jonas Konrad
  */
 @Experimental
+@Internal
 public interface BootstrapContextAccess {
     /**
      * Get the {@link BeanDefinitionRegistry} of the main context. Note that when the bootstrap
@@ -32,5 +35,6 @@ public interface BootstrapContextAccess {
      *
      * @return The registry
      */
+    @NonNull
     BeanDefinitionRegistry getMainRegistry();
 }
