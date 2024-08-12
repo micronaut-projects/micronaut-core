@@ -15,13 +15,9 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.net.URISyntaxException;
@@ -35,35 +31,28 @@ import java.util.Optional;
  */
 @Singleton
 @Produces
-public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
+public class URISyntaxHandler extends ErrorExceptionHandler<URISyntaxException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public URISyntaxHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .error(new Error() {
-                    @Override
-                    public String getMessage() {
-                        return "Malformed URI";
-                    }
+    protected Error error(URISyntaxException exception) {
+        return new Error() {
+            @Override
+            public String getMessage() {
+                return "Malformed URI";
+            }
 
-                    @Override
-                    public Optional<String> getTitle() {
-                        return Optional.of("Malformed URI");
-                    }
-                })
-                .build(), HttpResponse.badRequest());
-
+            @Override
+            public Optional<String> getTitle() {
+                return Optional.of("Malformed URI");
+            }
+        };
     }
 }

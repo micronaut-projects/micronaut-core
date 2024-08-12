@@ -37,40 +37,28 @@ import java.util.Optional;
  */
 @Singleton
 @Produces
-public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRouteException, HttpResponse> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(UnsatisfiedRouteHandler.class);
-
-    private final ErrorResponseProcessor<?> responseProcessor;
+public class UnsatisfiedRouteHandler extends ErrorExceptionHandler<UnsatisfiedRouteException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public UnsatisfiedRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
-        }
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .error(new Error() {
-                    @Override
-                    public String getMessage() {
-                        return exception.getMessage();
-                    }
+    protected Error error(UnsatisfiedRouteException exception) {
+        return new Error() {
+            @Override
+            public String getMessage() {
+                return exception.getMessage();
+            }
 
-                    @Override
-                    public Optional<String> getPath() {
-                        return Optional.of('/' + exception.getArgument().getName());
-                    }
-                })
-                .build(), HttpResponse.badRequest());
-
+            @Override
+            public Optional<String> getPath() {
+                return Optional.of('/' + exception.getArgument().getName());
+            }
+        };
     }
 }
