@@ -154,7 +154,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
                 }
             }
             // Handlers with a media type defined should have a priority
-            all.sort(Comparator.comparing(this::findOrder).reversed());
+            all.sort(Comparator.comparingInt(this::findOrder).reversed());
             return all;
         }
 
