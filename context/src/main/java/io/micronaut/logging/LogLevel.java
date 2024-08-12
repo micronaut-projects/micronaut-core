@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Introspected;
 
 /**
  * Logging levels supported by a {@link LoggingSystem}
- * <p>
+ *
  * Typically, a logging system may permit the log level to be null, representing
  * an unspecified log level. For {@link LoggingSystem} and the loggers endpoint,
  * we prefer to return the NOT_SPECIFIED pseudo-level instead of null.

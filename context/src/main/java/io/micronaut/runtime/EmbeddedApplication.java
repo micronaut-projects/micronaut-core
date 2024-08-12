@@ -18,7 +18,6 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextLifeCycle;
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * <p>An {@link EmbeddedApplication} is a runnable application that starts and manages the {@link ApplicationContext}.</p>
@@ -30,8 +29,8 @@ import io.micronaut.core.annotation.NonNull;
  * may wish to use this interface instead</p>
  *
  * @param <T> EmbeddedApplication
- * @author Graeme Rocher
  * @see io.micronaut.runtime.server.EmbeddedServer
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface EmbeddedApplication<T extends EmbeddedApplication> extends ApplicationContextLifeCycle<T> {
@@ -40,7 +39,6 @@ public interface EmbeddedApplication<T extends EmbeddedApplication> extends Appl
     /**
      * @return The {@link ApplicationContext} for the server
      */
-    @NonNull
     @Override
     ApplicationContext getApplicationContext();
 

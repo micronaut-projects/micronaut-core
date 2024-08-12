@@ -16,15 +16,16 @@
 package io.micronaut.logging;
 
 import io.micronaut.core.annotation.Indexed;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 /**
  * Abstraction for a logging system.
  *
+ * @since 1.3.0
  * @author graemerocher
  * @author Denis Stepanov
- * @since 1.3.0
  */
 @Indexed(LoggingSystem.class)
 public interface LoggingSystem {
@@ -39,6 +40,7 @@ public interface LoggingSystem {
 
     /**
      * Refreshes Logging System with the goal of cleaning its internal caches.
+     *
      */
     default void refresh() {
 

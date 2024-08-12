@@ -44,7 +44,6 @@ public class FileWatchRestartListener implements ApplicationEventListener<FileCh
 
     /**
      * Default constructor.
-     *
      * @param embeddedApplication The embedded application
      */
     public FileWatchRestartListener(EmbeddedApplication<?> embeddedApplication) {
@@ -58,5 +57,10 @@ public class FileWatchRestartListener implements ApplicationEventListener<FileCh
             LOG.info("Shutting down server following file change.");
         }
         System.exit(0);
+    }
+
+    @Override
+    public boolean supports(FileChangedEvent event) {
+        return true;
     }
 }

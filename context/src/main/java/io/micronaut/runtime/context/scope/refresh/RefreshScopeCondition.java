@@ -32,7 +32,7 @@ import java.util.Set;
  */
 public class RefreshScopeCondition implements Condition {
 
-    private static final String[] DISABLED_ENVIRONMENTS = {Environment.FUNCTION, Environment.ANDROID};
+    private static final String[] DISABLED_ENVIRONMENTS = new String[]{Environment.FUNCTION, Environment.ANDROID};
 
     @Override
     public boolean matches(ConditionContext context) {

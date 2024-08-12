@@ -31,8 +31,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>Used to, for example, offload blocking I/O operations to specifically configured thread pool.</p>
  *
  * @author graemerocher
- * @see io.micronaut.scheduling.TaskExecutors#IO
  * @since 2.0
+ * @see io.micronaut.scheduling.TaskExecutors#IO
  */
 @Documented
 @Retention(RUNTIME)

@@ -18,8 +18,8 @@ package io.micronaut.scheduling.executor;
 /**
  * Enum the controls the ability to select threads in a Micronaut application.
  *
- * @author graemerocher
  * @since 1.3
+ * @author graemerocher
  */
 public enum ThreadSelection {
     /**

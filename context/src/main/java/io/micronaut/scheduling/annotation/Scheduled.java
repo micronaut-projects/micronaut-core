@@ -15,6 +15,8 @@
  */
 package io.micronaut.scheduling.annotation;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.scheduling.TaskExecutors;
@@ -24,8 +26,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * An annotation for scheduling a re-occurring task.

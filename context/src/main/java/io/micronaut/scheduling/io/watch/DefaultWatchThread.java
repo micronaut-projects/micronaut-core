@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
 import jakarta.annotation.PostConstruct;
@@ -29,20 +28,12 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.micronaut.core.annotation.NonNull;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.ClosedWatchServiceException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -69,7 +60,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     private final AtomicBoolean active = new AtomicBoolean(true);
     private final ApplicationEventPublisher eventPublisher;
     private final WatchService watchService;
-    private final Collection<WatchKey> watchKeys = new ConcurrentLinkedQueue<>();
+    private Collection<WatchKey> watchKeys = new ConcurrentLinkedQueue<>();
 
     /**
      * Default constructor.
@@ -79,9 +70,9 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      * @param watchService the watch service
      */
     protected DefaultWatchThread(
-        ApplicationEventPublisher eventPublisher,
-        FileWatchConfiguration configuration,
-        WatchService watchService) {
+            ApplicationEventPublisher eventPublisher,
+            FileWatchConfiguration configuration,
+            WatchService watchService) {
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.watchService = watchService;
@@ -92,7 +83,6 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
         return active.get();
     }
 
-    @NonNull
     @Override
     @PostConstruct
     public DefaultWatchThread start() {
@@ -127,8 +117,8 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
                                                 LOG.debug("File at path {} changed. Firing change event: {}", context, kind);
                                             }
                                             eventPublisher.publishEvent(new FileChangedEvent(
-                                                path,
-                                                kind
+                                                    path,
+                                                    kind
                                             ));
                                         }
                                     }
@@ -150,7 +140,6 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
         return this;
     }
 
-    @NonNull
     @Override
     public DefaultWatchThread stop() {
         active.set(false);
@@ -193,9 +182,9 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      */
     protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
         return dir.register(watchService,
-            StandardWatchEventKinds.ENTRY_CREATE,
-            StandardWatchEventKinds.ENTRY_DELETE,
-            StandardWatchEventKinds.ENTRY_MODIFY
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.ENTRY_MODIFY
         );
     }
 
@@ -204,10 +193,10 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     }
 
     private Path addWatchDirectory(Path p) throws IOException {
-        return Files.walkFileTree(p, new SimpleFileVisitor<>() {
+        return Files.walkFileTree(p, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                throws IOException {
+                    throws IOException {
 
                 if (!isValidDirectoryToMonitor(dir.toFile())) {
                     return FileVisitResult.SKIP_SUBTREE;

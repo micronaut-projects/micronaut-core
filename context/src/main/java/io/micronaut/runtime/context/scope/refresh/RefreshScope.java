@@ -26,7 +26,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -64,7 +63,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final BeanContext beanContext;
 
     /**
-     * @param beanContext The bean context to allow DI of beans annotated with @Inject
+     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
      */
     public RefreshScope(BeanContext beanContext) {
         this.beanContext = beanContext;
@@ -92,7 +91,6 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         return (T) created.bean();
     }
 
-    @NonNull
     @Override
     public RefreshScope stop() {
         disposeOfAllBeans();
@@ -149,10 +147,10 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             if (created.bean() == bean) {
                 //noinspection unchecked
                 return Optional.of(BeanRegistration.of(
-                    beanContext,
-                    created.id(),
-                    (BeanDefinition<T>) created.definition(),
-                    (T) created.bean()
+                        beanContext,
+                        created.id(),
+                        (BeanDefinition<T>) created.definition(),
+                        (T) created.bean()
                 ));
             }
         }
