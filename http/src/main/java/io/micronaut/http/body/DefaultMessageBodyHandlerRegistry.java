@@ -34,6 +34,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -139,24 +140,37 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         @Override
         public <K extends BeanType<T>> Collection<K> filter(Class<T> beanType, Collection<K> candidates) {
             List<K> all = new ArrayList<>(candidates.size());
-            List<K> matchesMediaType = new ArrayList<>(candidates.size());
-            List<K> matchesAll = new ArrayList<>(candidates.size());
             for (K candidate : candidates) {
                 String[] applicableTypes = candidate.getAnnotationMetadata().stringValues(annotationType);
                 if (applicableTypes.length == 0) {
-                    matchesAll.add(candidate);
+                    all.add(candidate);
                     continue;
                 }
                 for (String mt : applicableTypes) {
                     if (mediaTypes.contains(new MediaType(mt))) {
-                        matchesMediaType.add(candidate);
+                        all.add(candidate);
+                        break;
                     }
                 }
             }
             // Handlers with a media type defined should have a priority
-            all.addAll(matchesMediaType);
-            all.addAll(matchesAll);
+            all.sort(Comparator.comparingInt(this::findOrder).reversed());
             return all;
+        }
+
+        private int findOrder(BeanType<?> beanType) {
+            int order = 0;
+            String[] applicableTypes = beanType.getAnnotationMetadata().stringValues(annotationType);
+            int size = mediaTypes.size();
+            for (String mt : applicableTypes) {
+                int index = mediaTypes.indexOf(new MediaType(mt));
+                if (index == -1) {
+                    continue;
+                }
+                int compareValue = size - index; // First value should have the priority
+                order = Integer.max(order, compareValue);
+            }
+            return order;
         }
 
         private static boolean isInvalidType(List<Argument<?>> consumedType, Argument<?> requiredType) {
