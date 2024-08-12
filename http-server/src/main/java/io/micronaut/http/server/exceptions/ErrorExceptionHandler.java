@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,43 +17,44 @@ package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
- * Default handler for {@link ContentLengthExceededException} errors.
+ * An abstract class to handle exceptions with an {@link Error} and responding a Bad Request HTTP Response via the {@link ErrorResponseProcessor} API.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @param <T> The throwable
+ * @author Sergio del Amo
+ * @since 4.6.0
  */
-@Singleton
-@Produces
-public class ContentLengthExceededHandler implements ExceptionHandler<ContentLengthExceededException, HttpResponse> {
+public abstract class ErrorExceptionHandler<T extends Throwable> implements ExceptionHandler<T, HttpResponse<?>> {
+    private static final Logger LOG = LoggerFactory.getLogger(ErrorExceptionHandler.class);
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
     /**
      * Constructor.
+     *
      * @param responseProcessor Error Response Processor
      */
-    @Inject
-    public ContentLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
+    protected ErrorExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, ContentLengthExceededException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
+    public HttpResponse<?> handle(HttpRequest request, T exception) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
+        }
         return responseProcessor.processResponse(ErrorContext.builder(request)
                 .cause(exception)
-                .errorMessage(exception.getMessage())
-                .build(), response);
+                .error(error(exception))
+                .build(), HttpResponse.badRequest());
     }
-}
 
+    protected abstract Error error(T exception);
+}

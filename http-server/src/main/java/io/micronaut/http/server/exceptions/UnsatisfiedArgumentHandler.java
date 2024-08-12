@@ -37,35 +37,27 @@ import java.util.Optional;
 
 @Singleton
 @Produces
-public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
-
+public class UnsatisfiedArgumentHandler extends ErrorExceptionHandler<UnsatisfiedArgumentException> {
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public UnsatisfiedArgumentHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .error(new Error() {
-                    @Override
-                    public String getMessage() {
-                        return exception.getMessage();
-                    }
+    protected Error error(UnsatisfiedArgumentException exception) {
+        return new Error() {
+            @Override
+            public String getMessage() {
+                return exception.getMessage();
+            }
 
-                    @Override
-                    public Optional<String> getPath() {
-                        return Optional.of('/' + exception.getArgument().getName());
-                    }
-                })
-                .build(), response);
+            @Override
+            public Optional<String> getPath() {
+                return Optional.of('/' + exception.getArgument().getName());
+            }
+        };
     }
 }

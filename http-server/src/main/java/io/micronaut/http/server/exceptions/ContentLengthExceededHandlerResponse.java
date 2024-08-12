@@ -15,44 +15,35 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import jakarta.inject.Singleton;
 
-import java.net.URISyntaxException;
-import java.util.Optional;
-
 /**
- * Handles exception of type {@link URISyntaxException}.
+ * Default handler for {@link ContentLengthExceededException} errors.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 @Singleton
 @Produces
-public class URISyntaxHandler extends ErrorExceptionHandler<URISyntaxException> {
+public class ContentLengthExceededHandlerResponse extends ErrorResponseProcessorExceptionHandler<ContentLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    public URISyntaxHandler(ErrorResponseProcessor<?> responseProcessor) {
+    public ContentLengthExceededHandlerResponse(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 
     @Override
-    protected Error error(URISyntaxException exception) {
-        return new Error() {
-            @Override
-            public String getMessage() {
-                return "Malformed URI";
-            }
-
-            @Override
-            public Optional<String> getTitle() {
-                return Optional.of("Malformed URI");
-            }
-        };
+    protected MutableHttpResponse<?> createResponse(ContentLengthExceededException exception) {
+        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
     }
 }
+
