@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.type.Argument
@@ -64,6 +65,8 @@ import java.time.Instant
  * @since 1.0
  */
 class ErrorSpec extends AbstractMicronautSpec {
+
+    static final String SPEC = "ErrorSpec"
 
     void "test 500 server error"() {
         given:
@@ -338,6 +341,7 @@ X-Long-Header: $longString\r
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors')
     static class ErrorController {
 
@@ -391,6 +395,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/loop')
     static class ErrorLoopController {
 
@@ -405,6 +410,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/loop/handler')
     static class ErrorLoopHandlerController {
 
@@ -414,6 +420,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/injection')
     static class ErrorInjectionController {
 
@@ -430,6 +437,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/encoding-error/handled')
     static class ErrorEncodingHandlerController {
         @Get
@@ -443,6 +451,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/encoding-error/handled/loop')
     static class ErrorEncodingHandlerLoopController {
         @Get
@@ -456,6 +465,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/media-type')
     static class MediaTypeErrorController {
         @Get
@@ -464,6 +474,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Singleton
     @Produces("my/mediatype")
     static class ThrowingWriter implements MessageBodyWriter<Instant> {
@@ -473,6 +484,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Produces(value = MediaType.TEXT_HTML)
     @Singleton
     static class ContentTypeExceptionHandler implements ExceptionHandler<ContentTypeExceptionHandlerException, HttpResponse<String>> {
@@ -487,6 +499,7 @@ X-Long-Header: $longString\r
 
     static class LoopingException extends RuntimeException {}
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Singleton
     static class LoopingExceptionHandler implements ExceptionHandler<LoopingException, String> {
         @Override
