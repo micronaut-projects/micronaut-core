@@ -42,7 +42,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target(ElementType.TYPE)
 @Bean
 @DefaultScope(Singleton.class)
-@Experimental
 public @interface ServerFilter {
     /**
      * Pattern used to match all requests.
