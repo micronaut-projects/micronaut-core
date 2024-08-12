@@ -16,32 +16,34 @@
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import jakarta.inject.Singleton;
 
 /**
- * Handles exceptions of type {@link DuplicateRouteException}.
+ * Default handler for {@link ContentLengthExceededException} errors.
  *
- * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
 @Produces
-public class DuplicateRouteHandler extends ErrorResponseProcessorExceptionHandler<DuplicateRouteException> {
+public class ContentLengthExceededHandlerResponse extends ErrorResponseProcessorExceptionHandler<ContentLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    public DuplicateRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
+    public ContentLengthExceededHandlerResponse(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 
     @Override
-    protected MutableHttpResponse<?> createResponse(DuplicateRouteException exception) {
-        return HttpResponse.badRequest();
+    protected MutableHttpResponse<?> createResponse(ContentLengthExceededException exception) {
+        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
     }
 }
+

@@ -15,45 +15,35 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
- * Default handler for {@link ContentLengthExceededException} errors.
+ * Default handler for {@link BufferLengthExceededHandlerResponse} errors.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author Jonas Konrad
+ * @since 4.5.0
  */
 @Singleton
 @Produces
-public class ContentLengthExceededHandler implements ExceptionHandler<ContentLengthExceededException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
+public class BufferLengthExceededHandlerResponse extends ErrorResponseProcessorExceptionHandler<BufferLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
-    public ContentLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+    public BufferLengthExceededHandlerResponse(ErrorResponseProcessor<?> responseProcessor) {
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, ContentLengthExceededException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .errorMessage(exception.getMessage())
-                .build(), response);
+    protected MutableHttpResponse<?> createResponse(BufferLengthExceededException exception) {
+        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
     }
 }
 
