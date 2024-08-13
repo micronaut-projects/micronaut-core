@@ -18,11 +18,14 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.body.BufferConsumer;
+import io.micronaut.http.server.netty.body.NettyBodyAdapter;
+import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -32,6 +35,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -40,15 +45,12 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Common handler implementation for multiplexed HTTP versions (HTTP/2 and HTTP/3).
@@ -86,13 +88,13 @@ abstract class MultiplexedServerHandler {
         private HttpRequest request;
 
         private List<ByteBuf> bufferedContent;
+        private BufferConsumer.Upstream writerUpstream;
         private InputStreamer streamer;
 
         private Object attachment;
 
         private boolean requestAccepted;
         private boolean responseDone;
-        private BlockingWriter blockingWriter;
         private Compressor.Session compressionSession;
 
         /**
@@ -227,8 +229,9 @@ abstract class MultiplexedServerHandler {
                 return false;
             }
             responseDone = true;
-            if (blockingWriter != null) {
-                blockingWriter.discard();
+            if (writerUpstream != null) {
+                writerUpstream.allowDiscard();
+                writerUpstream.disregardBackpressure();
             }
             if (compressionSession != null) {
                 compressionSession.discard();
@@ -240,6 +243,85 @@ abstract class MultiplexedServerHandler {
         @Override
         public final @NonNull ByteBufAllocator alloc() {
             return ctx.alloc();
+        }
+
+        @Override
+        public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
+            if (responseDone) {
+                // early check
+                throw new IllegalStateException("Response already written");
+            }
+            if (!ctx.executor().inEventLoop()) {
+                ctx.executor().execute(() -> write(response, body));
+                return;
+            }
+
+            NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
+            if (nbb instanceof AvailableNettyByteBody available) {
+                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE));
+            } else {
+                prepareCompression(response, false);
+
+                writeHeaders(response, false, ctx.voidPromise());
+
+                StreamingNettyByteBody snbb = (StreamingNettyByteBody) nbb;
+                var consumer = new BufferConsumer() {
+                    Upstream upstream;
+                    final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
+
+                    @Override
+                    public void add(ByteBuf buf) {
+                        if (flow.executeNow(() -> add0(buf))) {
+                            add0(buf);
+                        }
+                    }
+
+                    private void add0(ByteBuf buf) {
+                        int n = buf.readableBytes();
+                        writeData(buf, false, ctx.newPromise()
+                            .addListener((ChannelFutureListener) future -> {
+                                if (future.isSuccess()) {
+                                    upstream.onBytesConsumed(n);
+                                } else {
+                                    logStreamWriteFailure(future.cause());
+                                    upstream.allowDiscard();
+                                }
+                            }));
+                        flush();
+                    }
+
+                    @Override
+                    public void complete() {
+                        if (flow.executeNow(this::complete0)) {
+                            complete0();
+                        }
+                    }
+
+                    private void complete0() {
+                        if (finish()) {
+                            writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
+                            flush();
+                        }
+                    }
+
+                    @Override
+                    public void error(Throwable e) {
+                        if (flow.executeNow(() -> error0(e))) {
+                            error0(e);
+                        }
+                    }
+
+                    private void error0(Throwable e) {
+                        if (!reset(e)) {
+                            LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", e);
+                        }
+                        finish();
+                        flush();
+                    }
+                };
+                writerUpstream = consumer.upstream = snbb.primary(consumer);
+                consumer.upstream.start();
+            }
         }
 
         @Override
@@ -279,88 +361,7 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public final void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content) {
-            if (responseDone) {
-                // early check
-                throw new IllegalStateException("Response already written");
-            }
-            if (!ctx.executor().inEventLoop()) {
-                ctx.executor().execute(() -> writeStreamed(response, content));
-                return;
-            }
-            prepareCompression(response, false);
-
-            writeHeaders(response, false, ctx.voidPromise());
-            content.subscribe(new Subscriber<>() {
-                final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
-                Subscription subscription;
-
-                @Override
-                public void onSubscribe(Subscription s) {
-                    subscription = s;
-                    s.request(1);
-                }
-
-                @Override
-                public void onNext(HttpContent httpContent) {
-                    if (flow.executeNow(() -> onNext0(httpContent))) {
-                        onNext0(httpContent);
-                    }
-                }
-
-                private void onNext0(HttpContent content) {
-                    writeData(content.content(), false, ctx.newPromise()
-                            .addListener((ChannelFutureListener) future -> {
-                                if (future.isSuccess()) {
-                                    subscription.request(1);
-                                } else {
-                                    logStreamWriteFailure(future.cause());
-                                    subscription.cancel();
-                                }
-                            }));
-                    flush();
-                }
-
-                @Override
-                public void onError(Throwable t) {
-                    if (flow.executeNow(() -> onError0(t))) {
-                        onError0(t);
-                    }
-                }
-
-                private void onError0(Throwable t) {
-                    EventLoop eventLoop = ctx.channel().eventLoop();
-                    if (!eventLoop.inEventLoop()) {
-                        eventLoop.execute(() -> onError(t));
-                        return;
-                    }
-
-                    if (!reset(t)) {
-                        LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
-                    }
-                    finish();
-                    flush();
-                }
-
-                @Override
-                public void onComplete() {
-                    if (flow.executeNow(this::onComplete0)) {
-                        onComplete0();
-                    }
-                }
-
-                private void onComplete0() {
-                    EventLoop eventLoop = ctx.channel().eventLoop();
-                    if (!eventLoop.inEventLoop()) {
-                        eventLoop.execute(this::onComplete);
-                        return;
-                    }
-
-                    if (finish()) {
-                        writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
-                        flush();
-                    }
-                }
-            });
+            write(response, NettyBodyAdapter.adapt(Flux.from(content).map(HttpContent::content), ctx.channel().eventLoop()));
         }
 
         private void logStreamWriteFailure(Throwable cause) {
@@ -371,69 +372,6 @@ abstract class MultiplexedServerHandler {
             } else {
                 LOG.debug("Stream shut down by client while sending data", cause);
             }
-        }
-
-        @Override
-        public final void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService) {
-            if (responseDone) {
-                // early check
-                throw new IllegalStateException("Response already written");
-            }
-            if (!ctx.executor().inEventLoop()) {
-                ctx.executor().execute(() -> writeStream(response, stream, executorService));
-                return;
-            }
-
-            prepareCompression(response, false);
-
-            blockingWriter = new BlockingWriter(ctx.alloc(), stream, executorService) {
-                int lastSuspend = 0;
-
-                @Override
-                protected void writeStart() {
-                    writeHeaders(response, false, ctx.voidPromise());
-                }
-
-                @Override
-                protected boolean writeData(ByteBuf buf) {
-                    ChannelPromise promise = ctx.newPromise();
-                    MultiplexedStream.this.writeData(buf, false, promise);
-                    flush();
-                    if (promise.isSuccess()) {
-                        return true;
-                    }
-                    int suspend = ++lastSuspend;
-                    promise.addListener((ChannelFutureListener) future -> {
-                        if (!ctx.executor().inEventLoop()) {
-                            throw new IllegalStateException("Should complete in event loop");
-                        }
-                        if (future.isSuccess()) {
-                            // make sure that there's not another queued write that will also call
-                            // writeSome when completed
-                            if (suspend == lastSuspend) {
-                                writeSome();
-                            }
-                        } else {
-                            logStreamWriteFailure(future.cause());
-                            discard();
-                        }
-                    });
-                    return false;
-                }
-
-                @Override
-                protected void writeLast() {
-                    MultiplexedStream.this.writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
-                    flush();
-                    finish();
-                }
-
-                @Override
-                protected void writeSomeAsync() {
-                    ctx.executor().execute(this::writeSome);
-                }
-            };
-            blockingWriter.writeSome();
         }
 
         @Override

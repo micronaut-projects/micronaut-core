@@ -1,8 +1,10 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
+import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.micronaut.http.server.netty.body.AvailableNettyByteBody
 import io.micronaut.http.server.netty.body.NettyByteBody
@@ -346,13 +348,13 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.writeStream(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new InputStream() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), InputStreamByteBody.create(new InputStream() {
                     @Override
                     int read() throws IOException {
                         read++
                         return 1
                     }
-                }, service)
+                }, OptionalLong.empty(), service, NettyByteBufferFactory.DEFAULT))
             }
 
             @Override
@@ -377,11 +379,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() instanceof Http2HeadersFrame
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            // floor(windowSize/CHUNK_SIZE) chunks successfully written
-            // 1 chunk waiting in the write future
-            // QUEUE_SIZE chunks in queue
-            // 1 chunk waiting in the reader thread
-            read == (BlockingWriter.QUEUE_SIZE + windowSize.intdiv(BlockingWriter.CHUNK_SIZE) + 2) * BlockingWriter.CHUNK_SIZE
+            // 8192 is ExtendedInputStream.CHUNK_SIZE
+            read == (windowSize.intdiv(8192) + 1) * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
@@ -390,7 +389,7 @@ class Http2ServerHandlerSpec extends Specification {
         // have to munch a number of bytes that is:
         // - not too close to a multiple of windowSize so that we aren't below the window update threshold
         // - not too small to be satisfied by the existing buffered chunks
-        int toConsume = (int) (BlockingWriter.CHUNK_SIZE * 1.6)
+        int toConsume = (int) (8192 * 5.5)
         while (toConsume > 0) {
             def n = Math.min(duplexHandler.received.readableBytes(), toConsume)
             duplexHandler.received.skipBytes(n)
@@ -401,9 +400,7 @@ class Http2ServerHandlerSpec extends Specification {
         then:"more chunks read from the input stream"
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            // two more chunks
-            read == BlockingWriter.CHUNK_SIZE * 2
-            println(duplexHandler.received.readableBytes())
+            read == 6 * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
