@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public abstract class ErrorExceptionHandler<T extends Throwable> implements ExceptionHandler<T, HttpResponse<?>> {
     private static final Logger LOG = LoggerFactory.getLogger(ErrorExceptionHandler.class);
 
-    private final ErrorResponseProcessor<?> responseProcessor;
+    protected final ErrorResponseProcessor<?> responseProcessor;
 
     /**
      * Constructor.
