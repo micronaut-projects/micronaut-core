@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -30,7 +31,7 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
  */
 public abstract class ErrorResponseProcessorExceptionHandler<T extends Throwable> implements ExceptionHandler<T, HttpResponse<?>> {
 
-    protected final ErrorResponseProcessor<?> responseProcessor;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     /**
      * Constructor.
@@ -49,5 +50,6 @@ public abstract class ErrorResponseProcessorExceptionHandler<T extends Throwable
                 .build(), createResponse(exception));
     }
 
+    @NonNull
     protected abstract MutableHttpResponse<?> createResponse(T exception);
 }

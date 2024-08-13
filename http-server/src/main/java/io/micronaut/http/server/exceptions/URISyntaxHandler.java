@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
@@ -42,6 +43,7 @@ public class URISyntaxHandler extends ErrorExceptionHandler<URISyntaxException> 
     }
 
     @Override
+    @NonNull
     protected Error error(URISyntaxException exception) {
         return new Error() {
             @Override
