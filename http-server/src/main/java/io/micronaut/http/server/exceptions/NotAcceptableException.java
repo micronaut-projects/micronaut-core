@@ -23,7 +23,7 @@ import java.util.Collection;
 
 /**
  * Exception thrown when none of the produceable content types matches any of the accepted types.
- *
+ * @author Sergio del Amo
  * @since 4.6.0
  */
 public class NotAcceptableException extends HttpStatusException {

@@ -19,6 +19,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 
 /**
+ * Exception thrown when the request uri is not found.
  * @author Sergio del Amo
  * @since 4.6.0
  */

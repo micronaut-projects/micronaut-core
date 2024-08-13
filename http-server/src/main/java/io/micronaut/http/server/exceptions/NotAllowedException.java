@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.Set;
 
 /**
+ * Exception thrown when the request HTTP Method is not allowed.
  * @author Sergio del Amo
  * @since 4.6.0
  */
