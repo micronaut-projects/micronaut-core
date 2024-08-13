@@ -73,6 +73,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Queue;
 
 /**
@@ -870,12 +871,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (nbb instanceof AvailableNettyByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE));
             } else {
-
-                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                if (canHaveBody(response.status())) {
-                    response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                } else {
+                OptionalLong expectedLength = body.expectedLength();
+                if (expectedLength.isPresent()) {
                     response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                    if (canHaveBody(response.status())) {
+                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, expectedLength.getAsLong());
+                    } else {
+                        response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                } else {
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    if (canHaveBody(response.status())) {
+                        response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                    } else {
+                        response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                    }
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);

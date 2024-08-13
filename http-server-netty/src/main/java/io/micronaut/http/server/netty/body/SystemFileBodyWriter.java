@@ -136,7 +136,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                 }
 
                 @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
-                nettyContext.write(finalResponse, InputStreamByteBody.create(stream, OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
+                nettyContext.write(finalResponse, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
             }
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
