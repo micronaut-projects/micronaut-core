@@ -13,7 +13,7 @@ class NotAllowedExceptionTest {
     void statusIsNotAllowed() {
         NotAllowedException ex = new NotAllowedException("PUT", URI.create("/foo"), Set.of("POST"));
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, ex.getStatus());
-        assertEquals("PUT", ex.getRequestMethodName());
+        assertEquals("PUT", ex.getRequestMethod());
         assertEquals(URI.create("/foo"), ex.getUri());
         assertEquals(Set.of("POST"), ex.getAllowedMethods());
         assertEquals("Method [PUT] not allowed for URI [/foo]. Allowed methods: [POST]", ex.getMessage());

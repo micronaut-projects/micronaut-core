@@ -540,6 +540,7 @@ public class RequestLifecycle {
      *
      * @param request   The request
      * @param cause     The declaringType
+     * @param declaringType  Declaring type
      * @param propagatedContext The propagated context
      * @return The computed response flow
      */

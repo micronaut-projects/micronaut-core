@@ -22,13 +22,19 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import java.util.Collection;
 
 /**
- * {@link HttpServerException} thrown when none of the produceable content types matches any of the accepted types.
+ * Exception thrown when none of the produceable content types matches any of the accepted types.
  *
  * @since 4.6.0
  */
 public class NotAcceptableException extends HttpStatusException {
     private final Collection<MediaType> acceptedTypes;
     private final Collection<MediaType> produceableContentTypes;
+
+    /**
+     *
+     * @param acceptedTypes Accepted types as signaled in the Request
+     * @param produceableContentTypes types that the server can produce
+     */
     public NotAcceptableException(Collection<MediaType> acceptedTypes,
                                   Collection<MediaType> produceableContentTypes) {
         super(HttpStatus.NOT_ACCEPTABLE, "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes);
@@ -36,10 +42,18 @@ public class NotAcceptableException extends HttpStatusException {
         this.produceableContentTypes = produceableContentTypes;
     }
 
+    /**
+     *
+     * @return Accepted types as signaled in the Request
+     */
     public Collection<MediaType> getAcceptedTypes() {
         return acceptedTypes;
     }
 
+    /**
+     *
+     * @return types that the server can produce
+     */
     public Collection<MediaType> getProduceableContentTypes() {
         return produceableContentTypes;
     }

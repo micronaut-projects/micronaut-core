@@ -26,25 +26,43 @@ import java.util.Set;
  * @since 4.6.0
  */
 public class NotAllowedException extends HttpStatusException {
-    private final String requestMethodName;
+    private final String requestMethod;
     private final URI uri;
     private final Set<String> allowedMethods;
 
-    public NotAllowedException(String requestMethodName, URI uri, Set<String> allowedMethods) {
-        super(HttpStatus.METHOD_NOT_ALLOWED, "Method [" + requestMethodName + "] not allowed for URI [" + uri + "]. Allowed methods: " + allowedMethods);
-        this.requestMethodName = requestMethodName;
+    /**
+     *
+     * @param requestMethod Request Method
+     * @param uri The URI
+     * @param allowedMethods Allowed methods for URI
+     */
+    public NotAllowedException(String requestMethod, URI uri, Set<String> allowedMethods) {
+        super(HttpStatus.METHOD_NOT_ALLOWED, "Method [" + requestMethod + "] not allowed for URI [" + uri + "]. Allowed methods: " + allowedMethods);
+        this.requestMethod = requestMethod;
         this.uri = uri;
         this.allowedMethods = allowedMethods;
     }
 
-    public String getRequestMethodName() {
-        return requestMethodName;
+    /**
+     *
+     * @return Request Method
+     */
+    public String getRequestMethod() {
+        return requestMethod;
     }
 
+    /**
+     *
+     * @return The URI
+     */
     public URI getUri() {
         return uri;
     }
 
+    /**
+     *
+     * @return Allowed methods for URI
+     */
     public Set<String> getAllowedMethods() {
         return allowedMethods;
     }

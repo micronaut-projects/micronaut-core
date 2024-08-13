@@ -31,13 +31,13 @@ import jakarta.inject.Singleton;
  */
 @Singleton
 @Produces
-public class ContentLengthExceededHandlerResponse extends ErrorResponseProcessorExceptionHandler<ContentLengthExceededException> {
+public class ContentLengthExceededHandler extends ErrorResponseProcessorExceptionHandler<ContentLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    public ContentLengthExceededHandlerResponse(ErrorResponseProcessor<?> responseProcessor) {
+    public ContentLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 

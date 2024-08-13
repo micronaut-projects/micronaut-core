@@ -21,20 +21,38 @@ import io.micronaut.http.exceptions.HttpStatusException;
 
 import java.util.Collection;
 
+/**
+ * Exception thrown when the requested Content-Type is not supported.
+ * @author Sergio del Amo
+ * @since 4.6.0
+ */
 public class UnsupportedMediaException extends HttpStatusException {
     private final MediaType contentType;
     private final Collection<MediaType> acceptableContentTypes;
 
+    /**
+     *
+     * @param contentType Requested Content Type
+     * @param acceptableContentTypes Acceptable content types
+     */
     public UnsupportedMediaException(MediaType contentType, Collection<MediaType> acceptableContentTypes) {
         super(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
         this.contentType = contentType;
         this.acceptableContentTypes = acceptableContentTypes;
     }
 
+    /**
+     *
+     * @return Requested Content Type
+     */
     public MediaType getContentType() {
         return contentType;
     }
 
+    /**
+     *
+     * @return Acceptable content types
+     */
     public Collection<MediaType> getAcceptableContentTypes() {
         return acceptableContentTypes;
     }

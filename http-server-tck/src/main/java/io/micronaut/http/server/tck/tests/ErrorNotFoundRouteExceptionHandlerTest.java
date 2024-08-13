@@ -16,7 +16,6 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;

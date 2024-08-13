@@ -25,7 +25,6 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.exceptions.HttpServerException;
 import io.micronaut.http.server.exceptions.NotAllowedException;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
