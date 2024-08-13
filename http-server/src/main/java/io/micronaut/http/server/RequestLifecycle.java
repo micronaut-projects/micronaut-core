@@ -598,7 +598,7 @@ public class RequestLifecycle {
     @NonNull
     private ExecutionFlow<HttpResponse<?>> onStatusError(
             @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
+            @NonNull HttpStatusException cause,
             @Nullable Class<?> declaringType,
             @NonNull PropagatedContext propagatedContext) {
         ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
