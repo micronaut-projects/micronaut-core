@@ -24,20 +24,20 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import jakarta.inject.Singleton;
 
 /**
- * Default handler for {@link BufferLengthExceededHandlerResponse} errors.
+ * Default handler for {@link BufferLengthExceededException} errors.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Singleton
 @Produces
-public class BufferLengthExceededHandlerResponse extends ErrorResponseProcessorExceptionHandler<BufferLengthExceededException> {
+public class BufferLengthExceededHandler extends ErrorResponseProcessorExceptionHandler<BufferLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    public BufferLengthExceededHandlerResponse(ErrorResponseProcessor<?> responseProcessor) {
+    public BufferLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 
