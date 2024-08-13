@@ -410,7 +410,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                                                ChannelHandlerContext context) {
         MediaType mediaType = response.getContentType().orElse(null);
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
-        Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(conversionService, body, Publisher.class));
+        Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
         Flux<HttpContent> httpContentPublisher;
         boolean isJson = false;
         if (routeInfo != null) {
