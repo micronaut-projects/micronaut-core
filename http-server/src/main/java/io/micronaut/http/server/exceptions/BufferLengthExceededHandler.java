@@ -15,43 +15,37 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import jakarta.inject.Singleton;
 
 /**
- * Default handler for {@link BufferLengthExceededHandler} errors.
+ * Default handler for {@link BufferLengthExceededException} errors.
  *
  * @author Jonas Konrad
  * @since 4.5.0
  */
 @Singleton
 @Produces
-public class BufferLengthExceededHandler implements ExceptionHandler<BufferLengthExceededException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
+public class BufferLengthExceededHandler extends ErrorResponseProcessorExceptionHandler<BufferLengthExceededException> {
 
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
     public BufferLengthExceededHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, BufferLengthExceededException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .errorMessage(exception.getMessage())
-                .build(), response);
+    @NonNull
+    protected MutableHttpResponse<?> createResponse(BufferLengthExceededException exception) {
+        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
     }
 }
 
