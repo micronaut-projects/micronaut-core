@@ -29,19 +29,17 @@ import java.util.Optional;
 /**
  * Handles exception of type {@link io.micronaut.http.exceptions.HttpStatusException}.
  *
- * @param <T> The exception type
- * @param <R> The response body
  * @author Iván López
  * @since 1.0
  */
 @Singleton
 @Produces
-public class HttpStatusHandler<T extends HttpStatusException, R> extends ErrorResponseProcessorExceptionHandler<T> {
+public class HttpStatusHandler extends ErrorResponseProcessorExceptionHandler<HttpStatusException> {
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    public HttpStatusHandler(ErrorResponseProcessor<R> responseProcessor) {
+    public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 

@@ -23,6 +23,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.HttpStatusHandler;
 import io.micronaut.http.server.exceptions.NotAllowedException;
+import io.micronaut.http.server.exceptions.NotAllowedExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
@@ -74,9 +75,9 @@ public class ErrorNotFoundRouteExceptionHandlerTest {
     @Produces(MediaType.TEXT_PLAIN)
     @Singleton
     @Primary
-    static class MyExceptionHandler<R> extends HttpStatusHandler<NotAllowedException, R> {
+    static class MyExceptionHandler extends NotAllowedExceptionHandler {
 
-        public MyExceptionHandler(ErrorResponseProcessor<R> responseProcessor) {
+        public MyExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
             super(responseProcessor);
         }
 
