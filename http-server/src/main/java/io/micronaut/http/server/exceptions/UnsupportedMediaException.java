@@ -27,15 +27,15 @@ import java.util.Collection;
  * @since 4.6.0
  */
 public class UnsupportedMediaException extends HttpStatusException {
-    private final MediaType contentType;
-    private final Collection<MediaType> acceptableContentTypes;
+    private final String contentType;
+    private final Collection<String> acceptableContentTypes;
 
     /**
      *
      * @param contentType Requested Content Type
      * @param acceptableContentTypes Acceptable content types
      */
-    public UnsupportedMediaException(MediaType contentType, Collection<MediaType> acceptableContentTypes) {
+    public UnsupportedMediaException(String contentType, Collection<String> acceptableContentTypes) {
         super(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
         this.contentType = contentType;
         this.acceptableContentTypes = acceptableContentTypes;
@@ -45,7 +45,7 @@ public class UnsupportedMediaException extends HttpStatusException {
      *
      * @return Requested Content Type
      */
-    public MediaType getContentType() {
+    public String getContentType() {
         return contentType;
     }
 
@@ -53,7 +53,7 @@ public class UnsupportedMediaException extends HttpStatusException {
      *
      * @return Acceptable content types
      */
-    public Collection<MediaType> getAcceptableContentTypes() {
+    public Collection<String> getAcceptableContentTypes() {
         return acceptableContentTypes;
     }
 }

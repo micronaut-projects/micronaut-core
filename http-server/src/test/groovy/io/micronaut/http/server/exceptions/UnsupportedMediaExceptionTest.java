@@ -12,10 +12,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class UnsupportedMediaExceptionTest {
     @Test
     void statusIsUnsupportedMediaType() {
-        UnsupportedMediaException ex = new UnsupportedMediaException(MediaType.TEXT_HTML_TYPE, List.of(MediaType.APPLICATION_JSON_TYPE));
+        UnsupportedMediaException ex = new UnsupportedMediaException(MediaType.TEXT_HTML, List.of(MediaType.APPLICATION_JSON));
         assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getStatus());
-        assertEquals(MediaType.TEXT_HTML_TYPE, ex.getContentType());
-        assertEquals(List.of(MediaType.APPLICATION_JSON_TYPE), ex.getAcceptableContentTypes());
+        assertEquals("text/html", ex.getContentType());
+        assertEquals(List.of("application/json"), ex.getAcceptableContentTypes());
         assertEquals("Content Type [text/html] not allowed. Allowed types: [application/json]", ex.getMessage());
     }
 }

@@ -12,10 +12,10 @@ class NotAcceptableExceptionTest {
 
     @Test
     void statusIsNotAcceptable() {
-        NotAcceptableException ex = new NotAcceptableException(List.of(MediaType.TEXT_HTML_TYPE), List.of(MediaType.APPLICATION_JSON_TYPE));
+        NotAcceptableException ex = new NotAcceptableException(List.of(MediaType.TEXT_HTML_TYPE.toString()), List.of(MediaType.APPLICATION_JSON_TYPE.toString()));
         assertEquals(HttpStatus.NOT_ACCEPTABLE, ex.getStatus());
         assertEquals("Specified Accept Types [text/html] not supported. Supported types: [application/json]", ex.getMessage());
-        assertEquals(List.of(MediaType.TEXT_HTML_TYPE), ex.getAcceptedTypes());
-        assertEquals(List.of(MediaType.APPLICATION_JSON_TYPE), ex.getProduceableContentTypes());
+        assertEquals(List.of("text/html"), ex.getAcceptedTypes());
+        assertEquals(List.of("application/json"), ex.getProduceableContentTypes());
     }
 }

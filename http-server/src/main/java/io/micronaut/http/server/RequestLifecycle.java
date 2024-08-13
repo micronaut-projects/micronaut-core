@@ -496,7 +496,7 @@ public class RequestLifecycle {
             }
             return onStatusError(
                 httpRequest,
-                new UnsupportedMediaException(contentType,  acceptableContentTypes),
+                new UnsupportedMediaException(contentType.toString(),  acceptableContentTypes.stream().map(MediaType::toString).toList()),
                 declaringType,
                 propagatedContext);
         }
@@ -508,7 +508,7 @@ public class RequestLifecycle {
             }
             return onStatusError(
                 httpRequest,
-                new NotAcceptableException(acceptedTypes, produceableContentTypes),
+                new NotAcceptableException(acceptedTypes.stream().map(MediaType::toString).toList(), produceableContentTypes.stream().map(MediaType::toString).toList()),
                 declaringType,
                 propagatedContext);
         }

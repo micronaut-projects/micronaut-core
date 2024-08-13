@@ -27,16 +27,16 @@ import java.util.Collection;
  * @since 4.6.0
  */
 public class NotAcceptableException extends HttpStatusException {
-    private final Collection<MediaType> acceptedTypes;
-    private final Collection<MediaType> produceableContentTypes;
+    private final Collection<String> acceptedTypes;
+    private final Collection<String> produceableContentTypes;
 
     /**
      *
      * @param acceptedTypes Accepted types as signaled in the Request
      * @param produceableContentTypes types that the server can produce
      */
-    public NotAcceptableException(Collection<MediaType> acceptedTypes,
-                                  Collection<MediaType> produceableContentTypes) {
+    public NotAcceptableException(Collection<String> acceptedTypes,
+                                  Collection<String> produceableContentTypes) {
         super(HttpStatus.NOT_ACCEPTABLE, "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes);
         this.acceptedTypes = acceptedTypes;
         this.produceableContentTypes = produceableContentTypes;
@@ -46,7 +46,7 @@ public class NotAcceptableException extends HttpStatusException {
      *
      * @return Accepted types as signaled in the Request
      */
-    public Collection<MediaType> getAcceptedTypes() {
+    public Collection<String> getAcceptedTypes() {
         return acceptedTypes;
     }
 
@@ -54,7 +54,7 @@ public class NotAcceptableException extends HttpStatusException {
      *
      * @return types that the server can produce
      */
-    public Collection<MediaType> getProduceableContentTypes() {
+    public Collection<String> getProduceableContentTypes() {
         return produceableContentTypes;
     }
 }
