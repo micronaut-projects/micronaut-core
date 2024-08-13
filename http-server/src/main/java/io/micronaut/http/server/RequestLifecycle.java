@@ -619,7 +619,7 @@ public class RequestLifecycle {
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithExceptionHandler(
             @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
+            @NonNull HttpStatusException cause,
             @NonNull PropagatedContext propagatedContext) {
         return routeExecutor.beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class))
                 .map(handlerDefinition -> handlerExceptionHandler(request, propagatedContext, handlerDefinition, cause))
@@ -629,7 +629,7 @@ public class RequestLifecycle {
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithErrorRoute(
             @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
+            @NonNull HttpStatusException cause,
             @Nullable Class<?> declaringType,
             @NonNull PropagatedContext propagatedContext) {
         if (declaringType == null) {
@@ -643,7 +643,7 @@ public class RequestLifecycle {
 
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(@NonNull HttpRequest<?> request,
-                                                                        HttpStatus status) {
+                                                                        @NonNull HttpStatus status) {
         return routeExecutor.router.findStatusRoute(status, request)
                 .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
                 .orElse(null);
