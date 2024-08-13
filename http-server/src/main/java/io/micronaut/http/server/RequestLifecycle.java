@@ -538,75 +538,6 @@ public class RequestLifecycle {
     /**
      * Build a status response. Calls any status routes, if available.
      *
-     * @param request   The request
-     * @param cause     The declaringType
-     * @param declaringType  Declaring type
-     * @param propagatedContext The propagated context
-     * @return The computed response flow
-     */
-    @NonNull
-    protected final ExecutionFlow<HttpResponse<?>> onStatusError(
-            @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
-            @Nullable Class<?> declaringType,
-            @NonNull PropagatedContext propagatedContext) {
-        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
-        if (flow != null) {
-            return flow;
-        }
-        flow  = executionFlowWithErrorRoute(request, cause, declaringType, propagatedContext);
-        if (flow != null) {
-            return flow;
-        }
-        flow  = executionFlowWithExceptionHandler(request, cause, propagatedContext);
-        if (flow != null) {
-            return flow;
-        }
-        throw new ConfigurationException("no exception handler or error route for " + cause.getClass().getName());
-    }
-
-    @Nullable
-    private ExecutionFlow<HttpResponse<?>> executionFlowWithExceptionHandler(
-            @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
-            @NonNull PropagatedContext propagatedContext) {
-        Optional<BeanDefinition<ExceptionHandler>> optionalDefinition = routeExecutor.beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
-        if (optionalDefinition.isPresent()) {
-            BeanDefinition<ExceptionHandler> handlerDefinition = optionalDefinition.get();
-            return handlerExceptionHandler(request, propagatedContext, handlerDefinition, cause);
-        }
-        return null;
-    }
-
-    @Nullable
-    private ExecutionFlow<HttpResponse<?>> executionFlowWithErrorRoute(
-            @NonNull HttpRequest<?> request,
-            @Nullable HttpStatusException cause,
-            @Nullable Class<?> declaringType,
-            @NonNull PropagatedContext propagatedContext) {
-        if (declaringType == null) {
-            declaringType = findDeclaringType(request);
-        }
-        RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
-        return errorRoute != null
-                ? handleErrorRoute(request, propagatedContext, errorRoute, cause)
-                : null;
-    }
-
-    @Nullable
-    private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(@NonNull HttpRequest<?> request,
-                                                                       HttpStatus status) {
-        Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(status, request);
-        if (statusRoute.isPresent()) {
-            RouteMatch<Object> routeMatch = statusRoute.get();
-            return executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch);
-        }
-        return null;
-    }
-
-    /**
-     * Build a status response. Calls any status routes, if available.
-     *
      * @param request         The request
      * @param defaultResponse The default response if there is no status route
      * @param message         The error message
@@ -659,6 +590,69 @@ public class RequestLifecycle {
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * Build a status response. Calls any status routes, if available.
+     *
+     * @param request   The request
+     * @param cause     The declaringType
+     * @param declaringType  Declaring type
+     * @param propagatedContext The propagated context
+     * @return The computed response flow
+     */
+    @NonNull
+    private ExecutionFlow<HttpResponse<?>> onStatusError(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @Nullable Class<?> declaringType,
+            @NonNull PropagatedContext propagatedContext) {
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        if (flow != null) {
+            return flow;
+        }
+        flow  = executionFlowWithErrorRoute(request, cause, declaringType, propagatedContext);
+        if (flow != null) {
+            return flow;
+        }
+        flow  = executionFlowWithExceptionHandler(request, cause, propagatedContext);
+        if (flow != null) {
+            return flow;
+        }
+        throw new ConfigurationException("no status route for status " + cause.getStatus() + " or exception handler or error route for " + cause.getClass().getName());
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithExceptionHandler(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @NonNull PropagatedContext propagatedContext) {
+        return routeExecutor.beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class))
+                .map(handlerDefinition -> handlerExceptionHandler(request, propagatedContext, handlerDefinition, cause))
+                .orElse(null);
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithErrorRoute(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @Nullable Class<?> declaringType,
+            @NonNull PropagatedContext propagatedContext) {
+        if (declaringType == null) {
+            declaringType = findDeclaringType(request);
+        }
+        RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
+        return errorRoute != null
+                ? handleErrorRoute(request, propagatedContext, errorRoute, cause)
+                : null;
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(@NonNull HttpRequest<?> request,
+                                                                        HttpStatus status) {
+        return routeExecutor.router.findStatusRoute(status, request)
+                .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
+                .orElse(null);
     }
 }
 
