@@ -543,14 +543,14 @@ public final class RouteExecutor {
         if (routeInfo.isImperative()) {
             outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
         } else {
-            if (routeInfo.isAsync()) {
+            if (routeInfo.isAsync() && body != null) {
                 outgoingResponse = CompletableFutureExecutionFlow.just(
                     fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
                 );
             } else {
                 // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
                 boolean isReactive = routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-                if (isReactive) {
+                if (isReactive && body != null) {
                     Publisher<Object> publisher = Publishers.convertToPublisher(conversionService, body);
                     outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                         ReactivePropagation.propagate(
