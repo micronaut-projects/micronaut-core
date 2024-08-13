@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -22,7 +23,6 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * An abstract class to handle exceptions with an {@link Error} and responding a Bad Request HTTP Response via the {@link ErrorResponseProcessor} API.
@@ -56,5 +56,6 @@ public abstract class ErrorExceptionHandler<T extends Throwable> implements Exce
                 .build(), HttpResponse.badRequest());
     }
 
+    @NonNull
     protected abstract Error error(T exception);
 }

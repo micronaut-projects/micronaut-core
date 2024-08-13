@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
@@ -41,6 +42,7 @@ public class DuplicateRouteHandler extends ErrorResponseProcessorExceptionHandle
     }
 
     @Override
+    @NonNull
     protected MutableHttpResponse<?> createResponse(DuplicateRouteException exception) {
         return HttpResponse.badRequest();
     }
