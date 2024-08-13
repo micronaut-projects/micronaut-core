@@ -284,7 +284,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 if (StringUtils.isNotEmpty(destroyMethodName)) {
                     final Optional<MethodElement> destroyMethod = producedType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyAccessible(classElement)
                         .onlyInstance()
-                        .named(destroyMethodName)
+                        .named(destroyMethodName) // Named filtering should avoid processing all method and fail on possible missing classes and compilation errors
                         .filter((e) -> !e.hasParameters()));
                     if (destroyMethod.isPresent()) {
                         MethodElement destroyMethodElement = destroyMethod.get();

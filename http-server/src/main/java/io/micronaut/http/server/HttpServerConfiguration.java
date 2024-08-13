@@ -155,6 +155,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
+    private boolean notFoundOnMissingBody = true;
 
     /**
      * Default constructor.
@@ -580,6 +581,22 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public boolean isValidateUrl() {
         return validateUrl;
+    }
+
+    /**
+     * @return True if not-found should be returned on missing body. False to return an empty body.
+     * @since 4.6
+     */
+    public boolean isNotFoundOnMissingBody() {
+        return notFoundOnMissingBody;
+    }
+
+    /**
+     * @param notFoundOnMissingBody True if no found should be returned on missing body. False to return an empty body.
+     * @since 4.6
+     */
+    public void setNotFoundOnMissingBody(boolean notFoundOnMissingBody) {
+        this.notFoundOnMissingBody = notFoundOnMissingBody;
     }
 
     /**
