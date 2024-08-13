@@ -35,7 +35,14 @@ public class NotAllowedException extends HttpStatusException {
         this.requestMethodName = requestMethodName;
         this.uri = uri;
         this.allowedMethods = allowedMethods;
+    }
 
+    public String getRequestMethodName() {
+        return requestMethodName;
+    }
+
+    public URI getUri() {
+        return uri;
     }
 
     public Set<String> getAllowedMethods() {
