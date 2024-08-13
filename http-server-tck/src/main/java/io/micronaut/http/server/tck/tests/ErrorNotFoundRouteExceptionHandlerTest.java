@@ -15,16 +15,16 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.HttpServerException;
+import io.micronaut.http.server.exceptions.HttpStatusHandler;
+import io.micronaut.http.server.exceptions.NotAllowedException;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -74,11 +74,16 @@ public class ErrorNotFoundRouteExceptionHandlerTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Produces(MediaType.TEXT_PLAIN)
     @Singleton
-    static class MyExceptionHandler implements ExceptionHandler<HttpServerException, String> {
+    @Primary
+    static class MyExceptionHandler<R> extends HttpStatusHandler<NotAllowedException, R> {
+
+        public MyExceptionHandler(ErrorResponseProcessor<R> responseProcessor) {
+            super(responseProcessor);
+        }
 
         @Override
-        public String handle(HttpRequest request, HttpServerException exception) {
-            return "IT'S FINE: " + exception.getMessage();
+        public HttpResponse<?> handle(HttpRequest request, NotAllowedException exception) {
+            return HttpResponse.ok("IT'S FINE: " + exception.getMessage());
         }
     }
 }

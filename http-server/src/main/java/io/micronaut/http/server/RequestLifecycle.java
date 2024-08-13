@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -32,10 +33,10 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.HttpServerException;
+import io.micronaut.http.server.exceptions.*;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
@@ -382,8 +383,7 @@ public class RequestLifecycle {
                     if (routeMatch.getRouteInfo().isWebSocketRoute()) {
                         return onStatusError(
                             request,
-                            HttpResponse.status(HttpStatus.BAD_REQUEST),
-                            "Not a WebSocket request",
+                            new NotWebSocketRequestException(),
                             routeMatch.getDeclaringType(),
                             propagatedContext);
                     }
@@ -427,8 +427,7 @@ public class RequestLifecycle {
 
     private ExecutionFlow<HttpResponse<?>> handleStatusException(HttpRequest<?> request,
                                                                  HttpResponse<?> response,
-                                                                 @Nullable
-                                                                 RouteMatch<?> routeMatch,
+                                                                 @Nullable RouteMatch<?> routeMatch,
                                                                  PropagatedContext propagatedContext) {
         if (response.code() < 400) {
             return ExecutionFlow.just(response);
@@ -497,8 +496,7 @@ public class RequestLifecycle {
             }
             return onStatusError(
                 httpRequest,
-                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes,
+                new UnsupportedMediaException(contentType,  acceptableContentTypes),
                 declaringType,
                 propagatedContext);
         }
@@ -510,8 +508,7 @@ public class RequestLifecycle {
             }
             return onStatusError(
                 httpRequest,
-                HttpResponse.status(HttpStatus.NOT_ACCEPTABLE),
-                "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes,
+                new NotAcceptableException(acceptedTypes, produceableContentTypes),
                 declaringType,
                 propagatedContext);
         }
@@ -519,19 +516,91 @@ public class RequestLifecycle {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Method not allowed for URI {} and method {}", httpRequest.getUri(), requestMethodName);
             }
+//            if (httpRequest.getMethod() == HttpMethod.OPTIONS) {
+//                return onStatusError(
+//                        httpRequest,
+//                        HttpResponse.notAllowedGeneric(allowedMethods),
+//                        "Method [" + requestMethodName + "] not allowed for URI [" + httpRequest.getUri() + "]. Allowed methods: " + allowedMethods);
+//            }
             return onStatusError(
                 httpRequest,
-                HttpResponse.notAllowedGeneric(allowedMethods),
-                "Method [" + requestMethodName + "] not allowed for URI [" + httpRequest.getUri() + "]. Allowed methods: " + allowedMethods,
+                new NotAllowedException(requestMethodName, httpRequest.getUri(), allowedMethods),
                 declaringType,
                 propagatedContext);
         }
         return onStatusError(
             httpRequest,
-            HttpResponse.status(HttpStatus.NOT_FOUND),
-            "Page Not Found",
+            new NotFoundException(),
             declaringType,
             propagatedContext);
+    }
+
+    /**
+     * Build a status response. Calls any status routes, if available.
+     *
+     * @param request   The request
+     * @param cause     The declaringType
+     * @param propagatedContext The propagated context
+     * @return The computed response flow
+     */
+    @NonNull
+    protected final ExecutionFlow<HttpResponse<?>> onStatusError(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @Nullable Class<?> declaringType,
+            @NonNull PropagatedContext propagatedContext) {
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        if (flow != null) {
+            return flow;
+        }
+        flow  = executionFlowWithErrorRoute(request, cause, declaringType, propagatedContext);
+        if (flow != null) {
+            return flow;
+        }
+        flow  = executionFlowWithExceptionHandler(request, cause, propagatedContext);
+        if (flow != null) {
+            return flow;
+        }
+        throw new ConfigurationException("no exception handler or error route for " + cause.getClass().getName());
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithExceptionHandler(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @NonNull PropagatedContext propagatedContext) {
+        Optional<BeanDefinition<ExceptionHandler>> optionalDefinition = routeExecutor.beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
+        if (optionalDefinition.isPresent()) {
+            BeanDefinition<ExceptionHandler> handlerDefinition = optionalDefinition.get();
+            return handlerExceptionHandler(request, propagatedContext, handlerDefinition, cause);
+        }
+        return null;
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithErrorRoute(
+            @NonNull HttpRequest<?> request,
+            @Nullable HttpStatusException cause,
+            @Nullable Class<?> declaringType,
+            @NonNull PropagatedContext propagatedContext) {
+        if (declaringType == null) {
+            declaringType = findDeclaringType(request);
+        }
+        RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
+        return errorRoute != null
+                ? handleErrorRoute(request, propagatedContext, errorRoute, cause)
+                : null;
+    }
+
+    @Nullable
+    private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(@NonNull HttpRequest<?> request,
+                                                                       HttpStatus status) {
+        Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(status, request);
+        if (statusRoute.isPresent()) {
+            RouteMatch<Object> routeMatch = statusRoute.get();
+            return executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch);
+        }
+        return null;
     }
 
     /**
@@ -543,42 +612,10 @@ public class RequestLifecycle {
      * @return The computed response flow
      */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
-        return onStatusError(request, defaultResponse, message, null, PropagatedContext.getOrEmpty());
-    }
 
-    /**
-     * Build a status response. Calls any status routes, if available.
-     *
-     * @param request           The request
-     * @param defaultResponse   The default response if there is no status route
-     * @param message           The error message
-     * @param declaringType     The declaringType
-     * @param propagatedContext The propagated context
-     * @return The computed response flow
-     */
-    @NonNull
-    protected final ExecutionFlow<HttpResponse<?>> onStatusError(@NonNull HttpRequest<?> request,
-                                                                 @NonNull MutableHttpResponse<?> defaultResponse,
-                                                                 @NonNull String message,
-                                                                 @Nullable Class<?> declaringType,
-                                                                 @NonNull PropagatedContext propagatedContext) {
-        Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(defaultResponse.status(), request);
-        if (statusRoute.isPresent()) {
-            RouteMatch<Object> routeMatch = statusRoute.get();
-            return executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch);
-        }
-        HttpServerException cause = new HttpServerException(message);
-        if (declaringType == null) {
-            declaringType = findDeclaringType(request);
-        }
-        RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
-        if (errorRoute != null) {
-            return handleErrorRoute(request, propagatedContext, errorRoute, cause);
-        }
-        Optional<BeanDefinition<ExceptionHandler>> optionalDefinition = routeExecutor.beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
-        if (optionalDefinition.isPresent()) {
-            BeanDefinition<ExceptionHandler> handlerDefinition = optionalDefinition.get();
-            return handlerExceptionHandler(request, propagatedContext, handlerDefinition, cause);
+        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus());
+        if (flow != null) {
+            return flow;
         }
         if (request.getMethod() != HttpMethod.HEAD) {
             defaultResponse = routeExecutor.errorResponseProcessor.processResponse(ErrorContext.builder(request)

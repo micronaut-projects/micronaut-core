@@ -30,27 +30,30 @@ import java.util.Optional;
 /**
  * Handles exception of type {@link io.micronaut.http.exceptions.HttpStatusException}.
  *
+ * @param <T> The exception type
+ * @param <R> The response body
  * @author Iván López
  * @since 1.0
  */
 @Singleton
 @Produces
-public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
-
+public class HttpStatusHandler<T extends HttpStatusException, R> extends ErrorResponseProcessorExceptionHandler<T> {
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
-    public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+    public HttpStatusHandler(ErrorResponseProcessor<R> responseProcessor) {
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, HttpStatusException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(exception.getStatus());
+    protected MutableHttpResponse<?> createResponse(HttpStatusException exception) {
+        return HttpResponse.status(exception.getStatus());
+    }
+
+    @Override
+    public HttpResponse<?> handle(HttpRequest request, HttpStatusException exception) {
+        MutableHttpResponse<?> response = createResponse(exception);
         Optional<Object> body = exception.getBody();
         if (body.isPresent()) {
             return response.body(body.get());

@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.exceptions.HttpServerException;
+import io.micronaut.http.server.exceptions.NotAllowedException;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -72,7 +73,7 @@ public class ErrorNotFoundRouteErrorRouteTest {
         @Error
         @Produces(io.micronaut.http.MediaType.TEXT_PLAIN)
         @Status(HttpStatus.OK)
-        String localHandler(HttpServerException throwable) {
+        String localHandler(NotAllowedException throwable) {
             return "IT'S FINE: " + throwable.getMessage();
         }
     }

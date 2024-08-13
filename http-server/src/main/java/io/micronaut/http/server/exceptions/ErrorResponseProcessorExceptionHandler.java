@@ -30,7 +30,7 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
  */
 public abstract class ErrorResponseProcessorExceptionHandler<T extends Throwable> implements ExceptionHandler<T, HttpResponse<?>> {
 
-    private final ErrorResponseProcessor<?> responseProcessor;
+    protected final ErrorResponseProcessor<?> responseProcessor;
 
     /**
      * Constructor.
