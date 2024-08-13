@@ -104,6 +104,9 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
     }
 
     private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
+        if (bytes.length == 0) {
+            return Optional.empty();
+        }
         final boolean isOptional = type.getType() == Optional.class;
         final Argument finalArgument = isOptional ? type.getFirstTypeVariable().orElse(type) : type;
 
