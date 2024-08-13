@@ -516,12 +516,6 @@ public class RequestLifecycle {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Method not allowed for URI {} and method {}", httpRequest.getUri(), requestMethodName);
             }
-//            if (httpRequest.getMethod() == HttpMethod.OPTIONS) {
-//                return onStatusError(
-//                        httpRequest,
-//                        HttpResponse.notAllowedGeneric(allowedMethods),
-//                        "Method [" + requestMethodName + "] not allowed for URI [" + httpRequest.getUri() + "]. Allowed methods: " + allowedMethods);
-//            }
             return onStatusError(
                 httpRequest,
                 new NotAllowedException(requestMethodName, httpRequest.getUri(), allowedMethods),
