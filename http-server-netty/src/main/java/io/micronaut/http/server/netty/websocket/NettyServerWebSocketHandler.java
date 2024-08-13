@@ -291,7 +291,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Publisher<?> actual = Publishers.convertPublisher(conversionService, result, Publisher.class);
+        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
         Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
                                                                                           () -> actual.subscribe(new Subscriber<Object>() {
               @Override

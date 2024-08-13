@@ -17,8 +17,6 @@ package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;
@@ -35,12 +33,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Experimental
 public final class BodyAssertion<T, E> {
-    private static final Logger LOG = LoggerFactory.getLogger(BodyAssertion.class);
 
     private final Class<T> bodyType;
     private final Class<E> errorType;
     private final T expected;
     private final BodyEvaluator<T> evaluator;
+
+    public static final BodyAssertion<?, ?> IS_MISSING = new BodyAssertion<>(Object.class, Object.class, null, new BodyEvaluator<>() {
+        @Override
+        public EvaluatorType type() {
+            return EvaluatorType.EQUAL;
+        }
+
+        @Override
+        public boolean test(Object o, Object o2) {
+            return o == null && o2 == null;
+        }
+
+        @Override
+        public String message(Object expected, Object actual) {
+            return "Body not expected. Got: " + actual;
+        }
+    });
 
     private BodyAssertion(Class<T> bodyType,
                           Class<E> errorType,

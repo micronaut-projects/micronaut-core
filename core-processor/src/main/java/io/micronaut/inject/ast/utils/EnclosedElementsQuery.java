@@ -179,19 +179,23 @@ public abstract class EnclosedElementsQuery<C, N> {
         if (result.isOnlyDeclared() || classElement.getSuperType().isEmpty() && classElement.getInterfaces().isEmpty()) {
             elements = getElements(nativeClassType, result, filter);
         } else {
-            // Let's try to load the unfiltered result and apply the filter
-            QueryResultKey queryWithoutPredicatesResultKey = new QueryResultKey(result.withoutPredicates(), classElement.getNativeType());
-            List<T> valuesWithoutPredicates = (List<T>) resultsCache.get(queryWithoutPredicatesResultKey);
-            if (valuesWithoutPredicates != null) {
-                return valuesWithoutPredicates.stream().filter(filter).toList();
-            }
-
-            elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result);
-            if (!queryWithoutPredicatesResultKey.equals(queryResultKey)) {
+            ElementQuery.Result<T> resultWithoutPredicates = result.withoutPredicates();
+            QueryResultKey queryWithoutPredicatesResultKey = new QueryResultKey(resultWithoutPredicates, classElement.getNativeType());
+            if (queryWithoutPredicatesResultKey.equals(queryResultKey)) {
+                // No predicates query
+                elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, result), result);
+            } else {
+                // Let's try to load the result without predicates and cache it, then apply predicates
+                List<T> valuesWithoutPredicates = (List<T>) resultsCache.get(queryWithoutPredicatesResultKey);
+                if (valuesWithoutPredicates != null) {
+                    return valuesWithoutPredicates.stream().filter(filter).toList();
+                }
+                elements = getAllElements(nativeClassType, (t1, t2) -> reduceElements(t1, t2, resultWithoutPredicates), resultWithoutPredicates);
                 // This collection is before predicates are applied, we can store it and reuse
                 resultsCache.put(queryWithoutPredicatesResultKey, new ArrayList<>(elements));
+                // The second filtered result
+                elements.removeIf(element -> !filter.test(element));
             }
-            elements.removeIf(element -> !filter.test(element));
         }
         resultsCache.put(queryResultKey, elements);
         adjustMapCapacity(resultsCache, MAX_RESULTS);

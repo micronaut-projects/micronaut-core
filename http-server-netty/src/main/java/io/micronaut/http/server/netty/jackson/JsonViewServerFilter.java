@@ -93,7 +93,7 @@ public class JsonViewServerFilter implements Ordered {
                     Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                     if (Publishers.isConvertibleToPublisher(body)) {
-                        Publisher<?> pub = Publishers.convertPublisher(conversionService, body, Publisher.class);
+                        Publisher<?> pub = Publishers.convertToPublisher(conversionService, body);
                         response.body(Flux.from(pub)
                             .map(o -> codec.encode((Argument) routeInfo.getResponseBodyType(), o))
                             .subscribeOn(Schedulers.fromExecutorService(executorService)));
