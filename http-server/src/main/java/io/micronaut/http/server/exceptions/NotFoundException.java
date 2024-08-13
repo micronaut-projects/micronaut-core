@@ -23,7 +23,7 @@ import io.micronaut.http.exceptions.HttpStatusException;
  * @author Sergio del Amo
  * @since 4.6.0
  */
-public class NotFoundException extends HttpStatusException {
+public final class NotFoundException extends HttpStatusException {
     public NotFoundException() {
         super(HttpStatus.NOT_FOUND, "Page Not Found");
     }

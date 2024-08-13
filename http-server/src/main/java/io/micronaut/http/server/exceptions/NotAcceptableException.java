@@ -26,7 +26,7 @@ import java.util.Collection;
  * @author Sergio del Amo
  * @since 4.6.0
  */
-public class NotAcceptableException extends HttpStatusException {
+public final class NotAcceptableException extends HttpStatusException {
     private final Collection<String> acceptedTypes;
     private final Collection<String> produceableContentTypes;
 

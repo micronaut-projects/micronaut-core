@@ -26,7 +26,7 @@ import java.util.Set;
  * @author Sergio del Amo
  * @since 4.6.0
  */
-public class NotAllowedException extends HttpStatusException {
+public final class NotAllowedException extends HttpStatusException {
     private final String requestMethod;
     private final URI uri;
     private final Set<String> allowedMethods;

@@ -22,7 +22,7 @@ import io.micronaut.http.exceptions.HttpStatusException;
  * @author Sergio del Amo
  * @since 4.6.0
  */
-public class NotWebSocketRequestException extends HttpStatusException {
+public final class NotWebSocketRequestException extends HttpStatusException {
     public NotWebSocketRequestException() {
         super(HttpStatus.BAD_REQUEST, "Not a WebSocket request");
     }

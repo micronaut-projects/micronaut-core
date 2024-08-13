@@ -26,7 +26,7 @@ import java.util.Collection;
  * @author Sergio del Amo
  * @since 4.6.0
  */
-public class UnsupportedMediaException extends HttpStatusException {
+public final class UnsupportedMediaException extends HttpStatusException {
     private final String contentType;
     private final Collection<String> acceptableContentTypes;
 
