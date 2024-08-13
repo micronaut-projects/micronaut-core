@@ -16,7 +16,6 @@
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.exceptions.HttpStatusException;
 
 import java.util.Collection;
