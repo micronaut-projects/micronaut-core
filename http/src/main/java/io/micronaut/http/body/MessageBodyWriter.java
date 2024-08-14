@@ -26,7 +26,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.codec.CodecException;
 
 import java.io.OutputStream;
@@ -156,6 +159,23 @@ public interface MessageBodyWriter<T> {
         T object,
         @NonNull MutableHeaders outgoingHeaders,
         @NonNull OutputStream outputStream) throws CodecException;
+
+    /**
+     * Writes an object to the given output stream.
+     *
+     * @param type            The type
+     * @param mediaType       The media type
+     * @param object          The object to write
+     * @throws CodecException If an error occurs decoding
+     */
+    default ServerHttpResponse<?> writeTo(
+        @NonNull HttpRequest<?> request,
+        @NonNull MutableHttpResponse<T> httpResponse,
+        @NonNull Argument<T> type,
+        @NonNull MediaType mediaType,
+        T object) throws CodecException {
+
+    }
 
     /**
      * Writes an object to the given stream.

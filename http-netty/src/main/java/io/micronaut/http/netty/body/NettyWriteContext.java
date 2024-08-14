@@ -18,7 +18,10 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.ServerHttpResponse;
+import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -46,6 +49,12 @@ public interface NettyWriteContext {
      * @param body     The response body
      */
     void write(@NonNull HttpResponse response, @NonNull ByteBody body);
+
+    @Deprecated // TODO
+    default void write(@NonNull ServerHttpResponse<?> response) {
+        NettyMutableHttpResponse<?> nhr = (NettyMutableHttpResponse<?>) ((ServerHttpResponseWrapper<?>) response).getDelegate();
+        write(nhr.toHttpResponse(), response.byteBody());
+    }
 
     /**
      * Write a full response.

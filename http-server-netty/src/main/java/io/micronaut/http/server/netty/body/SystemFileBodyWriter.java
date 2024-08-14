@@ -28,16 +28,16 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.ServerHttpResponse;
+import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.scheduling.TaskExecutors;
-import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import jakarta.inject.Named;
@@ -75,71 +75,68 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> outgoingResponse, Argument<SystemFile> type, MediaType mediaType, SystemFile object, NettyWriteContext nettyContext) throws CodecException {
-        writeTo(request, outgoingResponse, object, nettyContext);
-    }
-
-    @Override
     public void writeTo(Argument<SystemFile> type, MediaType mediaType, SystemFile file, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         throw new UnsupportedOperationException("Can only be used in a Netty context");
     }
 
+    @Override
+    public ServerHttpResponse<?> writeTo(HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
+        return writeTo(request, httpResponse, object);
+    }
+
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile, NettyWriteContext nettyContext) throws CodecException {
-        if (response instanceof NettyMutableHttpResponse<?> nettyResponse) {
-            if (!systemFile.getFile().canRead()) {
-                throw new MessageBodyException("Could not find file");
-            }
-            if (handleIfModifiedAndHeaders(request, response, systemFile, nettyResponse)) {
-                nettyContext.writeFull(notModified(response));
-            } else {
+        nettyContext.write(writeTo(request, response, systemFile));
+    }
 
-                // Parse the range headers (if any), and determine the position and content length
-                // Only `bytes` ranges are supported. Only single ranges are supported. Invalid ranges fall back to returning the full response.
-                // See https://httpwg.org/specs/rfc9110.html#field.range
-                long fileLength = systemFile.getLength();
-                long position = 0;
-                long contentLength = fileLength;
-                if (fileLength > -1) {
-                    String rangeHeader = request.getHeaders().get(HttpHeaders.RANGE);
-                    if (rangeHeader != null
-                        && request.getMethod() == HttpMethod.GET // A server MUST ignore a Range header field received with a request method that is unrecognized or for which range handling is not defined.
-                        && rangeHeader.startsWith(UNIT_BYTES) // An origin server MUST ignore a Range header field that contains a range unit it does not understand.
-                        && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
-                    ) {
-                        IntRange range = parseRangeHeader(rangeHeader, fileLength);
-                        if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
-                            && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
-                            && range.firstPos < fileLength
-                            && range.lastPos < fileLength
-                        ) {
-                            position = range.firstPos;
-                            contentLength = range.lastPos + 1 - range.firstPos;
-                            response.status(HttpStatus.PARTIAL_CONTENT);
-                            response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
-                        }
-                    }
-                    response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
-                    response.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
-                } else {
-                    response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                }
-
-                // Write the request data
-                final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-
-                File file = systemFile.getFile();
-                InputStream is;
-                try {
-                    is = new FileInputStream(file);
-                } catch (FileNotFoundException e) {
-                    throw new MessageBodyException("Could not find file", e);
-                }
-
-                @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
-                nettyContext.write(finalResponse, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
-            }
+    public ServerHttpResponse<?> writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
+        if (!systemFile.getFile().canRead()) {
+            throw new MessageBodyException("Could not find file");
+        }
+        if (handleIfModifiedAndHeaders(request, response, systemFile, response)) {
+            return notModified2(response);
         } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
+
+            // Parse the range headers (if any), and determine the position and content length
+            // Only `bytes` ranges are supported. Only single ranges are supported. Invalid ranges fall back to returning the full response.
+            // See https://httpwg.org/specs/rfc9110.html#field.range
+            long fileLength = systemFile.getLength();
+            long position = 0;
+            long contentLength = fileLength;
+            if (fileLength > -1) {
+                String rangeHeader = request.getHeaders().get(HttpHeaders.RANGE);
+                if (rangeHeader != null
+                    && request.getMethod() == HttpMethod.GET // A server MUST ignore a Range header field received with a request method that is unrecognized or for which range handling is not defined.
+                    && rangeHeader.startsWith(UNIT_BYTES) // An origin server MUST ignore a Range header field that contains a range unit it does not understand.
+                    && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
+                ) {
+                    IntRange range = parseRangeHeader(rangeHeader, fileLength);
+                    if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
+                        && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
+                        && range.firstPos < fileLength
+                        && range.lastPos < fileLength
+                    ) {
+                        position = range.firstPos;
+                        contentLength = range.lastPos + 1 - range.firstPos;
+                        response.status(HttpStatus.PARTIAL_CONTENT);
+                        response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
+                    }
+                }
+                response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
+                response.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
+            } else {
+                response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
+
+            File file = systemFile.getFile();
+            InputStream is;
+            try {
+                is = new FileInputStream(file);
+            } catch (FileNotFoundException e) {
+                throw new MessageBodyException("Could not find file", e);
+            }
+
+            @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
+            return ServerHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
         }
     }
 

@@ -46,11 +46,13 @@ public interface NettyBodyWriter<T> extends MessageBodyWriter<T> {
      * @throws CodecException If an error occurs decoding
      */
     @NonNull
-    void writeTo(
+    default void writeTo(
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> outgoingResponse,
         @NonNull Argument<T> type,
         @NonNull MediaType mediaType,
         @NonNull T object,
-        @NonNull NettyWriteContext nettyContext) throws CodecException;
+        @NonNull NettyWriteContext nettyContext) {
+        nettyContext.write(writeTo(request, outgoingResponse, type, mediaType, object));
+    }
 }

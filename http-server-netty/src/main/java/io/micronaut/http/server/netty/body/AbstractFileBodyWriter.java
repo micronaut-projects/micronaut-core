@@ -22,6 +22,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.ServerHttpResponse;
+import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -53,7 +55,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         });
     }
 
-    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, NettyMutableHttpResponse<?> nettyResponse) {
+    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, MutableHttpResponse<?> nettyResponse) {
         long lastModified = systemFile.getLastModified();
 
         // Cache Validation
@@ -122,5 +124,12 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
         return ((NettyMutableHttpResponse) response).toFullHttpResponse();
+    }
+
+    protected ServerHttpResponse<?> notModified2(MutableHttpResponse<?> originalResponse) {
+        MutableHttpResponse<Void> response = HttpResponse.notModified();
+        AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
+        setDateHeader(response);
+        return ServerHttpResponseWrapper.wrap(response, AvailableNettyByteBody.empty());
     }
 }

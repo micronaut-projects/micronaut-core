@@ -22,9 +22,9 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.body.NettyBodyWriter;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.types.files.SystemFile;
 import jakarta.inject.Singleton;
 
@@ -48,15 +48,10 @@ public final class FileBodyWriter implements NettyBodyWriter<File> {
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object, NettyWriteContext nettyContext) throws CodecException {
+    public ServerHttpResponse<?> writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
         SystemFile systemFile = new SystemFile(object);
         MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
-        systemFileBodyWriter.writeTo(
-            request,
-            newResponse,
-            systemFile,
-            nettyContext
-        );
+        return systemFileBodyWriter.writeTo(request, newResponse, systemFile);
     }
 
     @Override
