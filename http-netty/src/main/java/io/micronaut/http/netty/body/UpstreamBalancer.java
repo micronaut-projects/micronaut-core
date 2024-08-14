@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.ByteBody;
@@ -96,7 +96,7 @@ final class UpstreamBalancer {
     }
 
     /**
-     * Create a pair of {@link io.micronaut.http.server.netty.body.BufferConsumer.Upstream}
+     * Create a pair of {@link BufferConsumer.Upstream}
      * instances that delegates to the given {@code upstream} according to the semantics of the
      * given {@code mode}.
      */

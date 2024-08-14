@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
-import io.micronaut.http.server.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;

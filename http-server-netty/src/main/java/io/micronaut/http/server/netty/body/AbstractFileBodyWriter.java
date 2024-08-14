@@ -25,6 +25,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.netty.handler.codec.http.FullHttpResponse;
