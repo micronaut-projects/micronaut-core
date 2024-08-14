@@ -260,7 +260,7 @@ public final class RouteExecutor {
         return defaultResponseMediaType;
     }
 
-    private MutableHttpResponse<?> newNotFoundError(HttpRequest<?> request) {
+    private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
         MutableHttpResponse<?> response = errorResponseProcessor.processResponse(
             ErrorContext.builder(request)
                 .errorMessage("Page Not Found")
@@ -522,14 +522,11 @@ public final class RouteExecutor {
         MutableHttpResponse<?> response = null;
         if (body == null) {
             if (routeInfo.isVoid()) {
-                response = forStatus(routeInfo);
-                if (request.getMethod().permitsRequestBody()) {
-                    response.header(HttpHeaders.CONTENT_LENGTH, "0");
-                }
+                response = voidResponse(routeInfo);
             } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                response = newNotFoundError(request);
+                response = notFoundErrorResponse(request);
             } else {
-                response = forStatus(routeInfo);
+                response = noContentResponse(routeInfo);
             }
         } else if (body instanceof String) {
             // Micro-optimization for String values
@@ -618,7 +615,7 @@ public final class RouteExecutor {
                 });
             if (serverConfiguration.isNotFoundOnMissingBody()) {
                 responsePublisher = responsePublisher
-                    .switchIfEmpty(Mono.fromCallable(() -> newNotFoundError(request)));
+                    .switchIfEmpty(Mono.fromCallable(() -> notFoundErrorResponse(request)));
             }
             return ReactiveExecutionFlow.fromPublisher(responsePublisher);
         }
@@ -637,10 +634,12 @@ public final class RouteExecutor {
             // full response case
             Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
                 MutableHttpResponse<?> singleResponse;
-                if (isCompletable || routeInfo.isVoid() || !serverConfiguration.isNotFoundOnMissingBody()) {
+                if (isCompletable || routeInfo.isVoid()) {
                     singleResponse = voidResponse(routeInfo);
+                } else if (serverConfiguration.isNotFoundOnMissingBody()) {
+                    singleResponse = notFoundErrorResponse(request);
                 } else {
-                    singleResponse = newNotFoundError(request);
+                    singleResponse = noContentResponse(routeInfo);
                 }
                 return singleResponse;
             };
@@ -695,6 +694,11 @@ public final class RouteExecutor {
             .header(HttpHeaders.CONTENT_LENGTH, "0");
     }
 
+    private MutableHttpResponse<Object> noContentResponse(RouteInfo<?> routeInfo) {
+        return forStatus(routeInfo, HttpStatus.NO_CONTENT)
+            .header(HttpHeaders.CONTENT_LENGTH, "0");
+    }
+
     @NonNull
     private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(@NonNull HttpRequest<?> request,
                                                                         @NonNull CompletionStage<Object> completionStage,
@@ -705,9 +709,9 @@ public final class RouteExecutor {
                 if (optional.isPresent()) {
                     asyncBody = optional.get();
                 } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                    return CompletableFuture.completedStage(newNotFoundError(request));
+                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
                 } else {
-                    return CompletableFuture.completedStage(voidResponse(routeInfo));
+                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
                 }
             }
             boolean explicitResponse = false;
@@ -720,7 +724,7 @@ public final class RouteExecutor {
                     CompletionStage<Object> inner = (CompletionStage<Object>) mutableResponse.body();
                     return inner.thenApply(innerBody -> {
                         if (innerBody == null) {
-                            return newNotFoundError(request);
+                            return notFoundErrorResponse(request);
                         }
                         return mutableResponse.body(innerBody);
                     });
@@ -733,15 +737,18 @@ public final class RouteExecutor {
                     .body(asyncBody);
             }
             if (mutableResponse.body() == null && !explicitResponse) {
-                if (routeInfo.isVoid() || !serverConfiguration.isNotFoundOnMissingBody()) {
+                if (routeInfo.isVoid()) {
                     return CompletableFuture.completedStage(voidResponse(routeInfo));
+                } else if (serverConfiguration.isNotFoundOnMissingBody()) {
+                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
+                } else {
+                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
                 }
-                return CompletableFuture.completedStage(newNotFoundError(request));
             }
             return CompletableFuture.completedStage(mutableResponse);
         });
     }
-    
+
     private Mono<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
                                                               HttpRequest<?> request,
                                                               MutableHttpResponse<?> response,

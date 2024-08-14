@@ -85,7 +85,7 @@ public class NoBodyResponseTest {
             HttpRequest.GET("/response-no-body/get-pojo"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.NO_CONTENT)
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
@@ -123,7 +123,7 @@ public class NoBodyResponseTest {
             HttpRequest.GET("/response-no-body/get-pojo-future"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.NO_CONTENT)
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
@@ -180,7 +180,7 @@ public class NoBodyResponseTest {
             HttpRequest.GET("/response-no-body/get-pojo-publisher"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.NO_CONTENT)
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
@@ -241,7 +241,7 @@ public class NoBodyResponseTest {
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.NO_CONTENT)
                     .body(BodyAssertion.IS_MISSING)
                     .build()));
     }
