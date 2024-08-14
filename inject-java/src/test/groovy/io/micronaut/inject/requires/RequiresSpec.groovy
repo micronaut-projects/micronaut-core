@@ -384,6 +384,40 @@ class MyBean {
         context.close()
     }
 
+    void "test requires missing classes as string class name when class present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingClasses = "java.lang.String")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        !beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
+    void "test requires missing classes as class when class present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missing = String.class)
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        !beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
     void "test requires beans with no bean present"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
