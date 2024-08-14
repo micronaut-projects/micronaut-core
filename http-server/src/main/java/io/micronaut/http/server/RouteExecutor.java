@@ -427,12 +427,6 @@ public final class RouteExecutor {
             .publishOn(scheduler);
     }
 
-    private boolean isSingle(RouteInfo<?> finalRoute, Class<?> bodyClass) {
-        return finalRoute.isSpecifiedSingle()
-            || (finalRoute.isSingleResult() && (finalRoute.isAsync() || finalRoute.isSuspended()))
-            || Publishers.isSingle(bodyClass);
-    }
-
     private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext,
                                                                         HttpRequest<?> request,
                                                                         RouteInfo<?> routeInfo,
@@ -627,32 +621,20 @@ public final class RouteExecutor {
                                                                       HttpRequest<?> request,
                                                                       Publisher<Object> publisher,
                                                                       RouteInfo<?> routeInfo) {
-        Class<?> bodyClass = publisher.getClass();
-        boolean isSingle = isSingle(routeInfo, bodyClass);
-        boolean isCompletable = !isSingle && routeInfo.isVoid() && Publishers.isCompletable(bodyClass);
+        boolean isSingle = routeInfo.isSpecifiedSingle() || routeInfo.isSingleResult();
+        boolean isCompletable = !isSingle && routeInfo.isVoid() && routeInfo.isCompletable();
         if (isSingle || isCompletable) {
             // full response case
-            Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
-                MutableHttpResponse<?> singleResponse;
-                if (isCompletable || routeInfo.isVoid()) {
-                    singleResponse = voidResponse(routeInfo);
-                } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                    singleResponse = notFoundErrorResponse(request);
-                } else {
-                    singleResponse = noContentResponse(routeInfo);
-                }
-                return singleResponse;
-            };
             return Flux.from(publisher)
                 .flatMap(o -> {
-                    MutableHttpResponse<?> singleResponse;
                     if (o instanceof Optional<?> optional) {
                         if (optional.isPresent()) {
                             o = optional.get();
                         } else {
-                            return Flux.just(emptyResponse.get());
+                            return Mono.empty();
                         }
                     }
+                    MutableHttpResponse<?> singleResponse;
                     if (o instanceof HttpResponse<?> httpResponse) {
                         singleResponse = httpResponse.toMutableResponse();
                         final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
@@ -669,7 +651,17 @@ public final class RouteExecutor {
                     }
                     return Flux.just(singleResponse);
                 })
-                .switchIfEmpty(Mono.fromSupplier(emptyResponse))
+                .switchIfEmpty(Mono.fromSupplier(() -> {
+                    MutableHttpResponse<?> singleResponse;
+                    if (isCompletable || routeInfo.isVoid()) {
+                        singleResponse = voidResponse(routeInfo);
+                    } else if (serverConfiguration.isNotFoundOnMissingBody()) {
+                        singleResponse = notFoundErrorResponse(request);
+                    } else {
+                        singleResponse = noContentResponse(routeInfo);
+                    }
+                    return singleResponse;
+                }))
                 .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
         }
         // streaming case
