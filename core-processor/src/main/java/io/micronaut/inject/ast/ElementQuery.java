@@ -162,6 +162,9 @@ public interface ElementQuery<T extends Element> {
 
     /**
      * Allows filtering elements by name.
+     * This method will only process native elements passing the name predicate.
+     * NOTE: Use this method only if the other elements shouldn't be touched (missing compilation information etc.). This method will skip all elements reusable cache.
+     *
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
@@ -169,6 +172,9 @@ public interface ElementQuery<T extends Element> {
 
     /**
      * Allows filtering elements by name.
+     * This method will only process native elements passing the name predicate.
+     * NOTE: Use this method only if the other elements shouldn't be touched (missing compilation information etc.). This method will skip all elements reusable cache.
+     *
      * @param name The name to filter by
      * @return This query
      * @since 3.5.2

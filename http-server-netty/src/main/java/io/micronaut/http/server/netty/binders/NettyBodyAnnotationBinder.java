@@ -40,18 +40,23 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
+import io.micronaut.http.server.netty.FormRouteCompleter;
+import io.micronaut.http.server.netty.MicronautHttpData;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
-import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Internal
@@ -166,10 +171,34 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 buf.release();
             }
             processor.complete(data);
-            Optional<T> converted = new ImmediateMultiObjectBody(data)
-                .single(httpServerConfiguration.getDefaultCharset(), nhr.getChannelHandlerContext().alloc())
-                .convert(conversionService, context)
-                .map(o -> (T) o.claimForExternal());
+            boolean allFormData = true;
+            for (Object object : data) {
+                if (!(object instanceof MicronautHttpData<?>)) {
+                    allFormData = false;
+                    break;
+                }
+            }
+            Object intermediate;
+            if (allFormData) {
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                List<? extends MicronautHttpData<?>> formData = (List) data;
+                Map<String, Object> map = FormRouteCompleter.toMap(httpServerConfiguration.getDefaultCharset(), formData);
+                for (MicronautHttpData<?> datum : formData) {
+                    datum.release();
+                }
+                intermediate = map;
+            } else if (data.size() == 1) {
+                intermediate = data.get(0);
+                if (intermediate instanceof ByteBufHolder bbh) {
+                    intermediate = bbh.content();
+                }
+            } else {
+                intermediate = coerceToComposite(data, nhr.getChannelHandlerContext().alloc());
+            }
+            Optional<T> converted =
+                intermediate instanceof io.netty.util.ReferenceCounted rc ?
+                    NettyConverters.refCountAwareConvert(conversionService, rc, context) :
+                    conversionService.convert(intermediate, context);
             nhr.setLegacyBody(converted.orElse(null));
             return converted;
         }
@@ -179,12 +208,19 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             nhr.setLegacyBody(result);
             return Optional.ofNullable(result);
         }
-        //noinspection unchecked
-        Optional<T> converted = new ImmediateSingleObjectBody(imm.toByteBuffer().asNativeBuffer())
-            .convert(conversionService, context)
-            .map(o -> (T) o.claimForExternal());
+        ByteBuf byteBuf = AvailableNettyByteBody.toByteBuf(imm);
+        Optional<T> converted = conversionService.convert(byteBuf, ByteBuf.class, context.getArgument().getType(), context);
+        NettyConverters.postProcess(byteBuf, converted);
         nhr.setLegacyBody(converted.orElse(null));
         return converted;
+    }
+
+    private static CompositeByteBuf coerceToComposite(List<?> objects, ByteBufAllocator alloc) {
+        CompositeByteBuf composite = alloc.compositeBuffer();
+        for (Object object : objects) {
+            composite.addComponent(true, (ByteBuf) object);
+        }
+        return composite;
     }
 
     private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, MediaType mediaType, ByteBuffer<?> byteBuffer) {

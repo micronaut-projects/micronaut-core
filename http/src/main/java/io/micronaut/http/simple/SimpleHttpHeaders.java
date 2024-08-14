@@ -17,10 +17,16 @@ package io.micronaut.http.simple;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
+import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.MutableHttpHeaders;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Simple {@link MutableHttpHeaders} implementation.
@@ -30,7 +36,7 @@ import java.util.*;
  */
 public class SimpleHttpHeaders implements MutableHttpHeaders {
 
-    private final MutableConvertibleMultiValuesMap<String> headers = new MutableConvertibleMultiValuesMap<>();
+    private final CaseInsensitiveMutableHttpHeaders headers;
     private ConversionService conversionService;
 
     /**
@@ -40,6 +46,7 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
      * @param conversionService The conversion service
      */
     public SimpleHttpHeaders(Map<String, String> headers, ConversionService conversionService) {
+        this.headers = new CaseInsensitiveMutableHttpHeaders(conversionService);
         headers.forEach(this.headers::add);
         this.conversionService = conversionService;
     }
@@ -54,7 +61,6 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         Optional<String> value = headers.getFirst(name.toString());
         return value.flatMap(it -> conversionService.convert(it, conversionContext));
@@ -90,12 +96,13 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public MutableHttpHeaders remove(CharSequence header) {
-        headers.remove(header.toString());
+        headers.remove(header.toString().toLowerCase(Locale.ROOT));
         return this;
     }
 
     @Override
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
+        this.headers.setConversionService(conversionService);
     }
 }

@@ -389,11 +389,9 @@ internal open class KotlinClassElement(
         }
 
         val eq = ElementQuery.of(PropertyElement::class.java)
-            .named { n -> !propertyElementQuery.excludes.contains(n) }
-            .named { n ->
-                propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(
-                    n
-                )
+            .filter { el ->
+                !propertyElementQuery.excludes.contains(el.name)
+                        && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
             }
             .modifiers {
                 if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
@@ -451,13 +449,15 @@ internal open class KotlinClassElement(
                 )
             }
         }
+        val fields = ArrayList(getEnclosedElements(ElementQuery.ALL_FIELDS))
+        fields.removeIf { f -> allProperties.stream().anyMatch { p -> p.name == f.name }}
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
                 methods
             },
             {
-                emptyList()
+                fields
             },
             false,
             propertyNames,
@@ -820,14 +820,15 @@ internal open class KotlinClassElement(
                 FieldElement::class.java -> {
                     classNode.getDeclaredProperties()
                         .filter {
-                            it.hasBackingField &&
-                                    it.origin != Origin.SYNTHETIC
+                            it.hasBackingField && it.origin != Origin.SYNTHETIC
                         }
                         .toList()
                 }
 
                 PropertyElement::class.java -> {
-                    classNode.getDeclaredProperties().filter { !it.isJavaPackagePrivate() }.toList()
+                    classNode.getDeclaredProperties().filter {
+                        !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
+                    }.toList()
                 }
 
                 ConstructorElement::class.java -> {
@@ -886,23 +887,14 @@ internal open class KotlinClassElement(
                 }
 
                 is KSPropertyDeclaration -> {
-                    if (elementType == PropertyElement::class.java) {
-                        val prop = KotlinPropertyElement(
+                    return if (elementType == PropertyElement::class.java) {
+                        KotlinPropertyElement(
                             owningClass,
                             nativeType,
                             elementAnnotationMetadataFactory, visitorContext
                         )
-                        if (!prop.hasAnnotation(JvmField::class.java)) {
-                            return prop
-                        } else {
-                            return elementFactory.newFieldElement(
-                                owningClass,
-                                nativeType,
-                                elementAnnotationMetadataFactory
-                            )
-                        }
                     } else {
-                        return elementFactory.newFieldElement(
+                        elementFactory.newFieldElement(
                             owningClass,
                             nativeType,
                             elementAnnotationMetadataFactory

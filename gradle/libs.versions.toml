@@ -48,7 +48,7 @@ micronaut-rxjava3 = "3.4.0"
 micronaut-reactor = "3.4.1"
 native-gradle-plugin = "0.10.2"
 neo4j-java-driver = "5.17.0"
-selenium = "4.23.0"
+selenium = "4.23.1"
 slf4j = "2.0.16"
 smallrye = "6.4.0"
 spock = "2.3-groovy-4.0"
@@ -183,7 +183,7 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "graal-svm" }
+graal = { module = "org.graalvm.sdk:nativeimage", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }

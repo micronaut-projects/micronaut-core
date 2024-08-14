@@ -890,6 +890,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         @Override
         protected void startEnvironment() {
             registerSingleton(Environment.class, bootstrapEnvironment, null, false);
+            registerSingleton(BootstrapContextAccess.class, () -> DefaultApplicationContext.this, null, false);
         }
 
         @Override

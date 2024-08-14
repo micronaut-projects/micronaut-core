@@ -182,8 +182,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             if (builderMethod != null) {
                 MethodElement methodElement = element
                     .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()
-                        .named(builderMethod)
-                        .filter(m -> !m.getGenericReturnType().isVoid())
+                        .filter(m -> m.getName().equals(builderMethod) && !m.getGenericReturnType().isVoid())
                         .onlyAccessible(element))
                     .orElse(null);
                 if (methodElement != null) {
@@ -341,9 +340,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 ElementQuery<MethodElement> builderMethodQuery = ElementQuery.ALL_METHODS
                     .onlyAccessible(classToBuild)
                     .onlyInstance()
-                    .named(n -> Arrays.stream(writePrefixes).anyMatch(n::startsWith))
                     .filter(m ->
-                        builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
+                        Arrays.stream(writePrefixes).anyMatch(m.getName()::startsWith) &&
+                            builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
                     );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);

@@ -112,38 +112,4 @@ class StreamPairSpec extends Specification {
         noExceptionThrown()
     }
 
-    private class Data {
-        final byte[] data;
-
-        Data(int n) {
-            this.data = new byte[n]
-            ThreadLocalRandom.current().nextBytes(this.data)
-        }
-
-        InputStream input() {
-            return new InputStream() {
-                int i = 0
-
-                @Override
-                int read() throws IOException {
-                    if (i >= data.length) {
-                        return -1
-                    } else {
-                        return data[i++] & 0xff
-                    }
-                }
-            }
-        }
-
-        InputStream check(InputStream s) {
-            return new InputStream() {
-                int i = 0
-
-                @Override
-                int read() throws IOException {
-
-                }
-            }
-        }
-    }
 }
