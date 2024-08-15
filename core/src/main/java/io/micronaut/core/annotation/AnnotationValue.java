@@ -708,24 +708,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return annotationClassValues;
         }
         if (o instanceof String className) {
-            Optional<Class<?>> theClass = ClassUtils.forName(className, null);
-            if (theClass.isPresent()) {
-                return new AnnotationClassValue[]{new AnnotationClassValue(theClass.get())};
-            } else {
-                return new AnnotationClassValue[]{new AnnotationClassValue(className)};
-            }
+            return new AnnotationClassValue[] { getAnnotationClassValue(className) };
         }
         if (o instanceof String[] classNames) {
-            List<AnnotationClassValue<?>> annotationClassValues = new ArrayList<>(classNames.length);
-            for (String className : classNames) {
-                Optional<Class<?>> theClass = ClassUtils.forName(className, null);
-                if (theClass.isPresent()) {
-                    annotationClassValues.add(new AnnotationClassValue(theClass.get()));
-                } else {
-                    annotationClassValues.add(new AnnotationClassValue(className));
-                }
-            }
-            return annotationClassValues.toArray(new AnnotationClassValue[0]);
+            return Arrays.stream(classNames).map(AnnotationValue::getAnnotationClassValue).toArray(AnnotationClassValue[]::new);
         }
         return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
     }
@@ -1722,5 +1708,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return Optional.empty();
             }
         }
+    }
+
+    /**
+     * Creates {@link AnnotationClassValue} from the class name.
+     *
+     * @param className The class name
+     * @return AnnotationClassValue for given class name
+     */
+    private static AnnotationClassValue<?> getAnnotationClassValue(String className) {
+        Optional<Class<?>> theClass = ClassUtils.forName(className, null);
+        if (theClass.isPresent()) {
+            return new AnnotationClassValue(theClass.get());
+        }
+        return new AnnotationClassValue<>(className);
     }
 }
