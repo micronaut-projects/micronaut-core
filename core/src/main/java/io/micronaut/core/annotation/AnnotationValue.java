@@ -1719,7 +1719,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private static AnnotationClassValue<?> getAnnotationClassValue(String className) {
         Optional<Class<?>> theClass = ClassUtils.forName(className, null);
         if (theClass.isPresent()) {
-            return new AnnotationClassValue(theClass.get());
+            return new AnnotationClassValue<>(theClass.get());
         }
         return new AnnotationClassValue<>(className);
     }
