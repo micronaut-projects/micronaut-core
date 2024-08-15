@@ -730,6 +730,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return Optional.of(annotationClassValues[0]);
             }
         }
+        if (o instanceof String className) {
+            return Optional.of(getAnnotationClassValue(className));
+        }
+        if (o instanceof String[] classNames && classNames.length > 0) {
+            return Optional.of(getAnnotationClassValue(classNames[0]));
+        }
         return Optional.empty();
     }
 
