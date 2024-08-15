@@ -1,7 +1,7 @@
 The Micronaut framework can easily be set up within Visual Studio Code by installing the following two extensions:
 
-* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools[The Microsoft Extension Pack for Java]
-* https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Tools for Micronaut® framework]
+* https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[The Microsoft Extension Pack for Java]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools[Tools for Micronaut® framework]
 
 These extensions can be installed by clicking on the *Install* button in the banner of the pages linked above, or, by searching for the extensions within VS Code.
 
