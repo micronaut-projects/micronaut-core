@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Internal extensions of {@link ByteBody}.
  *
@@ -34,6 +36,11 @@ public interface InternalByteBody extends ByteBody {
      * @return A flow that completes when all bytes are available
      */
     @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
+
+    @Override
+    default CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
+        return bufferFlow().toCompletableFuture();
+    }
 
     static ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow(ByteBody body) {
         if (body instanceof InternalByteBody internal) {

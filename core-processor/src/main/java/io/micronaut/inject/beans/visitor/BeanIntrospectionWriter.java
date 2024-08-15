@@ -259,12 +259,13 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                     .onlyAccessible()
                     .onlyDeclared()
                     .onlyInstance()
-                    .named((n) -> n.startsWith(prefix) && n.equals(prefix + NameUtils.capitalize(name)))
                     .filter((methodElement -> {
                         ParameterElement[] parameters = methodElement.getParameters();
-                        return parameters.length == 1 &&
-                            methodElement.getGenericReturnType().getName().equals(classElement.getName()) &&
-                            type.getType().isAssignable(parameters[0].getType());
+                        String methodName = methodElement.getName();
+                        return methodName.startsWith(prefix) && methodName.equals(prefix + NameUtils.capitalize(name))
+                            && parameters.length == 1
+                            && methodElement.getGenericReturnType().getName().equals(classElement.getName())
+                            && type.getType().isAssignable(parameters[0].getType());
                     }));
                 MethodElement withMethod = classElement.getEnclosedElement(elementQuery).orElse(null);
                 if (withMethod != null) {

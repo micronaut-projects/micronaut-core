@@ -186,7 +186,7 @@ public final class NettyConverters implements TypeConverterRegistrar {
     }
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    private static <T> void postProcess(ReferenceCounted input, Optional<T> converted) {
+    public static <T> void postProcess(ReferenceCounted input, Optional<T> converted) {
         if (converted.isPresent()) {
             input.touch();
             T item = converted.get();

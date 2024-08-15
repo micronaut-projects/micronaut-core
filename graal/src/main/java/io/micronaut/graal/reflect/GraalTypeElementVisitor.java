@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -250,9 +249,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         } else {
             // fields that are injected and private need reflection
             beanElement
-                .getEnclosedElements(reflectiveFieldQuery.filter(methodElement -> !methodElement.isAccessible(beanElement)))
-                .forEach(e -> processFieldElement(e, reflectiveClasses));
-
+                    .getEnclosedElements(reflectiveFieldQuery.filter(methodElement -> !methodElement.isAccessible(beanElement)))
+                    .forEach(e -> processFieldElement(e, reflectiveClasses));
         }
     }
 
@@ -279,15 +277,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         } else {
             final Predicate<MethodElement> inaccessibleMethods = methodElement -> !methodElement.isAccessible(beanElement);
             beanElement
-                .getEnclosedElements(injectedMethodsThatNeedReflection
-                    .filter(inaccessibleMethods))
-                .forEach(m -> processMethodElement(m, reflectiveClasses));
+                    .getEnclosedElements(injectedMethodsThatNeedReflection.filter(inaccessibleMethods))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
             beanElement.getEnclosedElements(
-                ElementQuery
-                    .ALL_METHODS
-                    .onlyInstance()
-                    .filter(inaccessibleMethods)
-                    .annotated(ann -> ann.hasAnnotation(Executable.class))
+                    ElementQuery.ALL_METHODS
+                            .onlyInstance()
+                            .filter(inaccessibleMethods)
+                            .annotated(ann -> ann.hasAnnotation(Executable.class))
             ).forEach(m -> processMethodElement(m, reflectiveClasses));
         }
         // methods with explicit reflective access

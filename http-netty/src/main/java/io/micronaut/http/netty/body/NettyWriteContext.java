@@ -18,14 +18,12 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.body.ByteBody;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;
-
-import java.io.InputStream;
-import java.util.concurrent.ExecutorService;
 
 /**
  * This interface is used to write the different kinds of netty responses.
@@ -40,6 +38,14 @@ public interface NettyWriteContext {
      */
     @NonNull
     ByteBufAllocator alloc();
+
+    /**
+     * Write a response.
+     *
+     * @param response The response status, headers etc
+     * @param body     The response body
+     */
+    void write(@NonNull HttpResponse response, @NonNull ByteBody body);
 
     /**
      * Write a full response.
@@ -66,13 +72,4 @@ public interface NettyWriteContext {
      * @param content  The body
      */
     void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
-
-    /**
-     * Write a response with a body that is a blocking stream.
-     *
-     * @param response        The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param stream          The stream to read from
-     * @param executorService The executor for IO operations
-     */
-    void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService);
 }

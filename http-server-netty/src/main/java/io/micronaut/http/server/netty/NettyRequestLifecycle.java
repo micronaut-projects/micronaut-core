@@ -28,7 +28,6 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.NettyByteBody;
-import io.micronaut.http.server.netty.body.StreamingMultiObjectBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -147,7 +146,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             ByteBody rootBody = nettyRequest.byteBody();
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
-                new StreamingMultiObjectBody(HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(rootBody).map(DefaultHttpContent::new))).handleForm(formRouteCompleter);
+                HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(rootBody).map(DefaultHttpContent::new)).subscribe(formRouteCompleter);
                 nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);

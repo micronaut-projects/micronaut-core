@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -27,6 +28,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -48,6 +50,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
@@ -132,7 +135,8 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                     throw new MessageBodyException("Could not find file", e);
                 }
 
-                nettyContext.writeStream(finalResponse, new RangeInputStream(is, position, contentLength), ioExecutor);
+                @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
+                nettyContext.write(finalResponse, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
             }
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);

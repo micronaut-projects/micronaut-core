@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
@@ -365,6 +366,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         boolean reset(Throwable cause) {
             if (cause instanceof Http2Exception h2e) {
                 connectionHandler.encoder().writeRstStream(ctx, stream.id(), h2e.error().code(), ctx.voidPromise());
+                return true;
+            } else if (cause instanceof ByteBody.BodyDiscardedException) {
+                connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.CANCEL.code(), ctx.voidPromise());
                 return true;
             } else {
                 connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.INTERNAL_ERROR.code(), ctx.voidPromise());
