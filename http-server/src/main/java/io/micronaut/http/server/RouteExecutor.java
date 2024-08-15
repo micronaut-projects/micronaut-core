@@ -621,7 +621,7 @@ public final class RouteExecutor {
                                                                       HttpRequest<?> request,
                                                                       Publisher<Object> publisher,
                                                                       RouteInfo<?> routeInfo) {
-        boolean isSingle = routeInfo.isSpecifiedSingle() || routeInfo.isSingleResult();
+        boolean isSingle = routeInfo.isSpecifiedSingle() || routeInfo.isSingleResult() || Publishers.isSingle(publisher.getClass());
         boolean isCompletable = !isSingle && routeInfo.isVoid() && routeInfo.isCompletable();
         if (isSingle || isCompletable) {
             // full response case
