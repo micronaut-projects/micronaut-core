@@ -401,6 +401,23 @@ class MyBean {
         !beanDefinition.isEnabled(new DefaultBeanContext())
     }
 
+    void "test requires missing classes as string class names when classes not present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingClasses = {"org.hibernate.reactive.provider.ReactiveServiceRegistryBuilder"})
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
     void "test requires missing classes as class when class present"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
