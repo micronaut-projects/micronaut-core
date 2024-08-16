@@ -50,6 +50,18 @@ class AnnotationValueSpec extends Specification {
         expect:
         av.classValues().contains(AnnotationValueSpec)
         av.classValues().contains(Specification)
+        def annotationClassValues = av.annotationClassValues("value")
+        annotationClassValues.length == 2
+        annotationClassValues[0].type.present
+        annotationClassValues[0].type.get() == AnnotationValueSpec
+        annotationClassValues[1].type.present
+        annotationClassValues[1].type.get() == Specification
+
+        def optAnnotationClassValue = av.annotationClassValue("value")
+        optAnnotationClassValue.present
+        def annotationClassValue = optAnnotationClassValue.get()
+        annotationClassValue.type.present
+        annotationClassValue.type.get() == AnnotationValueSpec
     }
 
     void "test class value 2"() {
@@ -66,6 +78,43 @@ class AnnotationValueSpec extends Specification {
         av.classValue("value").get() == AnnotationValueSpec
         av.classValue("value", Specification).get() == AnnotationValueSpec
         !av.classValue("value", URL).isPresent()
+    }
+
+    void "test annotationClassValue"() {
+        when:
+        def av = AnnotationValue.builder("test.Foo")
+                .member("missing", new String[] { "java.lang.String", "java.lang.Integer" })
+                .build()
+        then:
+        def optValue = av.annotationClassValue("missing")
+        optValue.present
+        def value = optValue.get()
+        value.name == 'java.lang.String'
+        value.type.present
+        value.type.get() == String
+
+        when:
+        av = AnnotationValue.builder("test.Foo")
+                .member("required", "java.util.Random")
+                .build()
+        then:
+        def optSecondValue = av.annotationClassValue("required")
+        optSecondValue.present
+        def secondValue = optSecondValue.get()
+        secondValue.name == 'java.util.Random'
+        secondValue.type.present
+        secondValue.type.get() == Random
+
+        when:
+        av = AnnotationValue.builder("test.Foo")
+                .member("absent", "org.something.NonExisting")
+                .build()
+        then:
+        def optThirdValue = av.annotationClassValue("absent")
+        optThirdValue.present
+        def thirdValue = optThirdValue.get()
+        thirdValue.name == 'org.something.NonExisting'
+        !thirdValue.type.present
     }
 
     void "test INT value"() {
