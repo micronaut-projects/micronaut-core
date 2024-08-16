@@ -716,7 +716,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
                 this.isInterface && overriddenBy.isDefault());
 
-        if (!isVoidReturn) {
+        if (!isVoidReturn && !overriddenBy.isSuspend()) {
             ClassElement returnType = overriddenBy.getReturnType();
             pushCastToType(overriddenMethodGenerator, returnType);
         }
