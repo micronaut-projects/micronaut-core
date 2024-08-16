@@ -60,13 +60,12 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
     }
 
     /**
-     * @param input    The input stream
-     * @throws IOException If the input stream doesn't exist
-     *
+     * @param input The input stream
      * @return map representation of the json
+     * @throws IOException If the input stream doesn't exist
      */
     protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper(new JsonFactory());
+        var objectMapper = new ObjectMapper(new JsonFactory());
         TypeFactory factory = TypeFactory.defaultInstance();
         MapType mapType = factory.constructMapType(LinkedHashMap.class, String.class, Object.class);
 

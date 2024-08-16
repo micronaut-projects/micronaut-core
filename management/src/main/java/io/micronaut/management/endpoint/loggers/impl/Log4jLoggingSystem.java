@@ -49,10 +49,10 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
     @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLog4jLoggerContext()
-                .getLoggers()
-                .stream()
-                .map(Log4jLoggingSystem::toLoggerConfiguration)
-                .collect(toList());
+            .getLoggers()
+            .stream()
+            .map(Log4jLoggingSystem::toLoggerConfiguration)
+            .collect(toList());
     }
 
     @Override
@@ -95,9 +95,9 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
      */
     private static LoggerConfiguration toLoggerConfiguration(Logger logger) {
         return new LoggerConfiguration(
-                logger.getName(),
-                toMicronautLogLevel(logger.getLevel()),
-                toMicronautLogLevel(logger.getLevel())
+            logger.getName(),
+            toMicronautLogLevel(logger.getLevel()),
+            toMicronautLogLevel(logger.getLevel())
         );
     }
 

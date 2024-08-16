@@ -48,6 +48,7 @@ dependencies {
     testImplementation libs.junit.jupiter.api
     testImplementation libs.javax.annotation.api
     testImplementation libs.javax.inject
+    testImplementation libs.graal
     testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.jakarta.el.impl
     testRuntimeOnly libs.jakarta.el

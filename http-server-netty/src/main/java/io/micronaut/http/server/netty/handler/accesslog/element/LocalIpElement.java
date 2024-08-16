@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.netty.channel.socket.SocketChannel;
+import io.micronaut.core.annotation.NonNull;
 import io.netty.handler.codec.http.HttpHeaders;
 
 import java.util.Set;
@@ -47,8 +47,8 @@ final class LocalIpElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        return channel.localAddress().getAddress().getHostAddress();
+    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+        return metadata.localAddress().flatMap(ConnectionMetadata::getHostAddress).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 
     @Override

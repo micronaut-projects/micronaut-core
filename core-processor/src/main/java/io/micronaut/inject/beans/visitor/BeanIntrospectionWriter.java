@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
@@ -258,12 +259,13 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                     .onlyAccessible()
                     .onlyDeclared()
                     .onlyInstance()
-                    .named((n) -> n.startsWith(prefix) && n.equals(prefix + NameUtils.capitalize(name)))
                     .filter((methodElement -> {
                         ParameterElement[] parameters = methodElement.getParameters();
-                        return parameters.length == 1 &&
-                            methodElement.getGenericReturnType().getName().equals(classElement.getName()) &&
-                            type.getType().isAssignable(parameters[0].getType());
+                        String methodName = methodElement.getName();
+                        return methodName.startsWith(prefix) && methodName.equals(prefix + NameUtils.capitalize(name))
+                            && parameters.length == 1
+                            && methodElement.getGenericReturnType().getName().equals(classElement.getName())
+                            && type.getType().isAssignable(parameters[0].getType());
                     }));
                 MethodElement withMethod = classElement.getEnclosedElement(elementQuery).orElse(null);
                 if (withMethod != null) {
@@ -393,14 +395,14 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
         }
         if (isEnum) {
-            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class);
+            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class);
             classWriter.visitField(
                 ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ENUM_CONSTANTS_REFERENCES,
                 type.getDescriptor(),
                 null,
                 null
             );
-            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
+            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
                 pushEnumConstantReference(
                     classWriter,
                     staticInit,
@@ -579,11 +581,13 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private void pushEnumConstantReference(ClassWriter classWriter,
                                            GeneratorAdapter staticInit,
                                            EnumConstantElement enumConstantElement) {
-        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class));
+        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class));
         staticInit.dup();
-        // 1: value
-        staticInit.getStatic(getTypeReference(enumConstantElement.getOwningType()), enumConstantElement.getName(), getTypeReference(enumConstantElement.getOwningType()));
-        // 2: annotation metadata
+        // 1: push annotation class value
+        AnnotationMetadataWriter.invokeLoadClassValueMethod(introspectionType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue<>(enumConstantElement.getOwningType().getName()));
+        // 2: push enum name
+        staticInit.push(enumConstantElement.getName());
+        // 3: annotation metadata
         AnnotationMetadata annotationMetadata = enumConstantElement.getAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
@@ -593,8 +597,9 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
         invokeConstructor(
             staticInit,
-            AbstractEnumBeanIntrospectionAndReference.EnumConstantRef.class,
-            Enum.class,
+            AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class,
+            AnnotationClassValue.class,
+            String.class,
             AnnotationMetadata.class
         );
     }
@@ -628,6 +633,8 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, getOriginatingElement());
 
         annotateAsGeneratedAndService(classWriter, introspectionName);
+        // init expressions at build time
+        evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classWriter);
 
         buildStaticInit(classWriter, isEnum);
 
@@ -680,7 +687,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         if (isEnum) {
             constructorWriter.getStatic(introspectionType,
                 FIELD_ENUM_CONSTANTS_REFERENCES,
-                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class)
+                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class)
             );
             invokeConstructor(
                 constructorWriter,
@@ -691,7 +698,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                 Argument[].class,
                 AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
                 AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
-                AbstractEnumBeanIntrospectionAndReference.EnumConstantRef[].class
+                AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class
             );
         } else {
             invokeConstructor(

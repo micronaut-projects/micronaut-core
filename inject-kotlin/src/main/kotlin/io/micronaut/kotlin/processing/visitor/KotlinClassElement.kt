@@ -389,11 +389,9 @@ internal open class KotlinClassElement(
         }
 
         val eq = ElementQuery.of(PropertyElement::class.java)
-            .named { n -> !propertyElementQuery.excludes.contains(n) }
-            .named { n ->
-                propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(
-                    n
-                )
+            .filter { el ->
+                !propertyElementQuery.excludes.contains(el.name)
+                        && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
             }
             .modifiers {
                 if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
@@ -433,10 +431,13 @@ internal open class KotlinClassElement(
                     }
                 }
         }
-        val propertyNames = allProperties.map { it.name }.toSet()
-
+        val propertyNames = allProperties.map { it.name }.toMutableSet()
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
         val methods = ArrayList(getEnclosedElements(ElementQuery.ALL_METHODS))
+        if (isJavaRecord(nativeType.declaration)) {
+            propertyElementQuery.readPrefixes("")
+            propertyElementQuery.writePrefixes(emptyArray())
+        }
         allProperties.forEach { prop ->
             methods.removeIf { m ->
                 prop.name == NameUtils.getPropertyNameForGetter(
@@ -448,15 +449,18 @@ internal open class KotlinClassElement(
                 )
             }
         }
+        val fields = ArrayList(getEnclosedElements(ElementQuery.ALL_FIELDS))
+        fields.removeIf { f -> allProperties.stream().anyMatch { p -> p.name == f.name }}
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
                 methods
             },
             {
-                emptyList()
+                fields
             },
-            false, propertyNames,
+            false,
+            propertyNames,
             customReaderPropertyNameResolver,
             customWriterPropertyNameResolver,
             { value: AstBeanPropertiesUtils.BeanPropertyData ->
@@ -792,16 +796,23 @@ internal open class KotlinClassElement(
                 }
 
                 MethodElement::class.java -> {
-                    classNode.getDeclaredFunctions()
+                    val functions = if (isJavaRecord(classNode)) {
+                        classNode.getAllFunctions().filter {
+                            !listOf(
+                                "hashCode",
+                                "toString",
+                                "equals"
+                            ).contains(it.simpleName.asString())
+                        }
+                    } else {
+                        classNode.getDeclaredFunctions()
+                    }
+
+                    functions
                         .filter { func: KSFunctionDeclaration ->
                             !func.isConstructor() &&
                                     func.origin != Origin.SYNTHETIC &&
-                                    // this is a hack but no other way it seems
-                                    !listOf(
-                                        "hashCode",
-                                        "toString",
-                                        "equals"
-                                    ).contains(func.simpleName.asString()) && (includeAbstract || !func.isAbstract || !classNode.isAbstract())
+                                    (includeAbstract || !func.isAbstract || !classNode.isAbstract())
                         }
                         .toList()
                 }
@@ -809,14 +820,15 @@ internal open class KotlinClassElement(
                 FieldElement::class.java -> {
                     classNode.getDeclaredProperties()
                         .filter {
-                            it.hasBackingField &&
-                                    it.origin != Origin.SYNTHETIC
+                            it.hasBackingField && it.origin != Origin.SYNTHETIC
                         }
                         .toList()
                 }
 
                 PropertyElement::class.java -> {
-                    classNode.getDeclaredProperties().filter { !it.isJavaPackagePrivate() }.toList()
+                    classNode.getDeclaredProperties().filter {
+                        !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
+                    }.toList()
                 }
 
                 ConstructorElement::class.java -> {
@@ -841,7 +853,10 @@ internal open class KotlinClassElement(
             return t == builtIns.anyType ||
                     t == builtIns.nothingType ||
                     t == builtIns.unitType ||
-                    classNode.qualifiedName.toString() == Enum::class.java.name
+                    (classNode.qualifiedName != null && (
+                            classNode.qualifiedName!!.asString() == Enum::class.java.name ||
+                                    classNode.qualifiedName!!.asString() == Record::class.java.name
+                            ))
         }
 
         override fun isAbstractClass(classNode: KSClassDeclaration) = classNode.isAbstract()
@@ -872,23 +887,14 @@ internal open class KotlinClassElement(
                 }
 
                 is KSPropertyDeclaration -> {
-                    if (elementType == PropertyElement::class.java) {
-                        val prop = KotlinPropertyElement(
+                    return if (elementType == PropertyElement::class.java) {
+                        KotlinPropertyElement(
                             owningClass,
                             nativeType,
                             elementAnnotationMetadataFactory, visitorContext
                         )
-                        if (!prop.hasAnnotation(JvmField::class.java)) {
-                            return prop
-                        } else {
-                            return elementFactory.newFieldElement(
-                                owningClass,
-                                nativeType,
-                                elementAnnotationMetadataFactory
-                            )
-                        }
                     } else {
-                        return elementFactory.newFieldElement(
+                        elementFactory.newFieldElement(
                             owningClass,
                             nativeType,
                             elementAnnotationMetadataFactory
@@ -906,5 +912,8 @@ internal open class KotlinClassElement(
         }
     }
 
+    private fun isJavaRecord(classNode: KSClassDeclaration) =
+        classNode.origin == Origin.JAVA && classNode.superTypes.filter { Record::class.java.name == it.resolve().declaration.qualifiedName?.asString() }
+            .any()
 
 }

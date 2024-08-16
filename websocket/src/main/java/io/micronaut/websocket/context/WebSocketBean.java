@@ -31,6 +31,7 @@ public interface WebSocketBean<T> {
 
     /**
      * The bean definition.
+     *
      * @return The bean definition
      */
     BeanDefinition<T> getBeanDefinition();

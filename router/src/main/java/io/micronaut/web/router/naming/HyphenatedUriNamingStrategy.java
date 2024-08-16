@@ -15,8 +15,9 @@
  */
 package io.micronaut.web.router.naming;
 
-import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
@@ -24,6 +25,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
@@ -33,11 +35,32 @@ import jakarta.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Primary
 public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrategy {
+    private final String contextPath;
+
+    /**
+     * Constructor without context path.
+     */
+    public HyphenatedUriNamingStrategy() {
+        this(null);
+    }
+
+    /**
+     * Constructor with optional context path.
+     *
+     * @param contextPath The context path to prefix to all URIs
+     */
+    @Inject
+    public HyphenatedUriNamingStrategy(@Nullable @Value("${micronaut.server.context-path}") String contextPath) {
+        if (contextPath == null) {
+            contextPath = StringUtils.EMPTY_STRING;
+        }
+        this.contextPath = normalizeContextPath(contextPath);
+    }
+
     @Override
-    public String resolveUri(Class type) {
-        return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
+    public String resolveUri(Class<?> type) {
+        return contextPath + '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
     }
 
     @Override
@@ -45,17 +68,29 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
         String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                 beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
         );
-        return normalizeUri(uri);
+        return contextPath + normalizeUri(uri);
     }
 
     @Override
     public @NonNull String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
-            return "/";
+            return contextPath + "/";
         }
         if (property.charAt(0) != '/') {
-            return '/' + NameUtils.hyphenate(property, true);
+            return contextPath + '/' + NameUtils.hyphenate(property, true);
         }
-        return property;
+        return contextPath + property;
+    }
+
+    static String normalizeContextPath(String contextPath) {
+        if (StringUtils.isNotEmpty(contextPath)) {
+            if (contextPath.charAt(0) != '/') {
+                contextPath = '/' + contextPath;
+            }
+            if (contextPath.charAt(contextPath.length() - 1) == '/') {
+                contextPath = contextPath.substring(0, contextPath.length() - 1);
+            }
+        }
+        return contextPath;
     }
 }

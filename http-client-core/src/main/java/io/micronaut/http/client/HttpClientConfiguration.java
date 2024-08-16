@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -106,6 +107,12 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
+    /**
+     * The default value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final DnsResolutionMode DEFAULT_DNS_RESOLUTION_MODE = DnsResolutionMode.DEFAULT;
+
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -120,6 +127,8 @@ public abstract class HttpClientConfiguration {
     private Duration connectTtl;
 
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
+
+    private Duration requestTimeout = null;
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
@@ -167,6 +176,11 @@ public abstract class HttpClientConfiguration {
     private LogLevel logLevel;
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
+
+    private DnsResolutionMode dnsResolutionMode = DEFAULT_DNS_RESOLUTION_MODE;
+
+    @Nullable
+    private String addressResolverGroupName = null;
 
     /**
      * Default constructor.
@@ -402,12 +416,36 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * The request timeout for non-streaming requests. This is the maximum time until the response
+     * must be completely received. Defaults to one second more than read-timeout.
+     *
+     * @return The request timeout
+     * @since 4.6.0
+     */
+    @Nullable
+    @NextMajorVersion("Set a default that isn't just requestTimeout+1 in DefaultHttpClient")
+    public Duration getRequestTimeout() {
+        return requestTimeout;
+    }
+
+    /**
+     * The request timeout for non-streaming requests. This is the maximum time until the response
+     * must be completely received. Defaults to one second more than read-timeout.
+     *
+     * @param requestTimeout The request timeout
+     */
+    public void setRequestTimeout(@Nullable Duration requestTimeout) {
+        this.requestTimeout = requestTimeout;
+    }
+
+    /**
+     * For WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
      * [available in the Netty HTTP client]
      *
      * @return The default amount of time to allow read operation connections  to remain idle
      */
+    @NextMajorVersion("Rename to websocket-idle-timeout")
     public Optional<Duration> getReadIdleTimeout() {
         return Optional.ofNullable(readIdleTimeout);
     }
@@ -487,7 +525,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_IDLE_TIMEOUT_MINUTES} minutes).
+     * For WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * idle timeout is applied.
      *
      * @param readIdleTimeout The read idle time
      */
@@ -778,6 +817,62 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Configure how DNS records are resolved. Ignored if {@link #getAddressResolverGroupName()} is
+     * non-null. This option is specific to the netty client.
+     *
+     * @return The DNS resolution mode
+     * @since 4.6.0
+     */
+    @NonNull
+    public DnsResolutionMode getDnsResolutionMode() {
+        return dnsResolutionMode;
+    }
+
+    /**
+     * Configure how DNS records are resolved. Ignored if {@link #getAddressResolverGroupName()} is
+     * non-null. This option is specific to the netty client.
+     *
+     * @param dnsResolutionMode The DNS resolution mode
+     * @since 4.6.0
+     */
+    public void setDnsResolutionMode(@NonNull DnsResolutionMode dnsResolutionMode) {
+        this.dnsResolutionMode = dnsResolutionMode;
+    }
+
+    /**
+     * Name of a fixed netty AddressResolverGroup to use for this client, or {@code null} to
+     * instead use {@link #getDnsResolutionMode()}. This option is specific to the netty client.
+     *
+     * @return The bean name of the resolver group
+     * @since 4.6.0
+     */
+    public @Nullable String getAddressResolverGroupName() {
+        return addressResolverGroupName;
+    }
+
+    /**
+     * Name of a fixed netty AddressResolverGroup to use for this client, or {@code null} to
+     * instead use {@link #getDnsResolutionMode()}. This option is specific to the netty client.
+     *
+     * @param addressResolverGroupName The bean name of the resolver group
+     * @since 4.6.0
+     */
+    public void setAddressResolverGroupName(@Nullable String addressResolverGroupName) {
+        this.addressResolverGroupName = addressResolverGroupName;
+    }
+
+    /**
+     * Obtains the HTTP/2 configuration.
+     *
+     * @return The HTTP/2 configuration.
+     * @since 4.6.0
+     */
+    @Nullable
+    public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
+        return null;
+    }
+
+    /**
      * Configuration for the HTTP client connnection pool.
      */
     public static class ConnectionPoolConfiguration implements Toggleable {
@@ -981,5 +1076,107 @@ public abstract class HttpClientConfiguration {
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
         }
+    }
+
+    /**
+     * HTTP/2-specific client configuration.
+     *
+     * @since 4.6.0
+     */
+    public static class Http2ClientConfiguration {
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "http2";
+
+        private Duration pingIntervalRead = null;
+
+        private Duration pingIntervalWrite = null;
+
+        private Duration pingIntervalIdle = null;
+
+        /**
+         * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalRead() {
+            return pingIntervalRead;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalRead The timeout when to send a ping frame
+         */
+        public void setPingIntervalRead(@Nullable Duration pingIntervalRead) {
+            this.pingIntervalRead = pingIntervalRead;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalWrite() {
+            return pingIntervalWrite;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last outbound message to when an automated ping
+         * should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalWrite The timeout when to send a ping frame
+         */
+        public void setPingIntervalWrite(@Nullable Duration pingIntervalWrite) {
+            this.pingIntervalWrite = pingIntervalWrite;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+         * automated ping should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @return The timeout when to send a ping frame
+         */
+        @Nullable
+        public Duration getPingIntervalIdle() {
+            return pingIntervalIdle;
+        }
+
+        /**
+         * For HTTP/2 connections, the interval from the last message (inbound or outbound) to when an
+         * automated ping should be sent. This can be used to keep low-traffic connections alive.
+         *
+         * @param pingIntervalIdle The timeout when to send a ping frame
+         */
+        public void setPingIntervalIdle(@Nullable Duration pingIntervalIdle) {
+            this.pingIntervalIdle = pingIntervalIdle;
+        }
+    }
+
+    /**
+     * The DNS resolution mode.
+     *
+     * @since 4.6.0
+     */
+    public enum DnsResolutionMode {
+        /**
+         * Default netty resolution implementation. Addresses are resolved before connecting.
+         */
+        DEFAULT,
+        /**
+         * No-op resolution implementation. Addresses are resolved internally by the JDK during
+         * connection.
+         */
+        NOOP,
+        /**
+         * Pick a random resolved record for each connection.
+         */
+        ROUND_ROBIN,
     }
 }

@@ -36,19 +36,15 @@ import static java.lang.Boolean.FALSE;
 public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        final boolean hasDiscovery = context.getBeanContext().getBeanDefinitions(DiscoveryClient.class)
-                .stream()
-                .filter(bd -> !CompositeDiscoveryClient.class.isAssignableFrom(bd.getBeanType()))
-                .findFirst()
-                .isPresent();
+        final boolean hasDiscovery = context.getBeanContext().getBeanDefinitions(DiscoveryClient.class).stream()
+            .anyMatch(bd -> !CompositeDiscoveryClient.class.isAssignableFrom(bd.getBeanType()));
         if (hasDiscovery) {
             return true;
-        } else {
-            final Boolean enabled = context.getProperty(HeartbeatConfiguration.ENABLED, ConversionContext.BOOLEAN).orElse(FALSE);
-            if (!enabled) {
-                context.fail("Heartbeat not enabled since no Discovery client active");
-            }
-            return enabled;
         }
+        final Boolean enabled = context.getProperty(HeartbeatConfiguration.ENABLED, ConversionContext.BOOLEAN).orElse(FALSE);
+        if (!enabled) {
+            context.fail("Heartbeat not enabled since no Discovery client active");
+        }
+        return enabled;
     }
 }

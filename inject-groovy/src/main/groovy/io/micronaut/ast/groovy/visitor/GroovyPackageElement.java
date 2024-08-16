@@ -17,8 +17,8 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.PackageNode;
 
 /**
@@ -34,8 +34,8 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     /**
      * Default constructor.
      *
-     * @param visitorContext            The visitor context
-     * @param packageNode               The annotated node
+     * @param visitorContext The visitor context
+     * @param packageNode The annotated node
      * @param annotationMetadataFactory The annotation metadata
      */
     public GroovyPackageElement(GroovyVisitorContext visitorContext,
@@ -46,7 +46,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyPackageElement(visitorContext, packageNode, elementAnnotationMetadataFactory);
     }
 
@@ -61,7 +61,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     }
 
     @Override
-    public String getSimpleName() {
+    public @NonNull String getSimpleName() {
         String name = getName();
         int index = name.lastIndexOf(".");
         if (index > -1) {

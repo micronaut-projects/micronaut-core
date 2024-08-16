@@ -50,12 +50,14 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @return The bound {@link ArgumentValue} instances
      */
-    @NonNull Map<String, MutableArgumentValue<?>> getParameters();
+    @NonNull
+    Map<String, MutableArgumentValue<?>> getParameters();
 
     /**
      * @return The target object
      */
-    @NonNull T getTarget();
+    @NonNull
+    T getTarget();
 
     /**
      * Proceeds with the invocation. If this is the last interceptor in the chain then the final implementation method is invoked
@@ -63,7 +65,8 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return The return value of the method
      * @throws RuntimeException chain may throw RTE
      */
-    @Nullable R proceed() throws RuntimeException;
+    @Nullable
+    R proceed() throws RuntimeException;
 
     /**
      * Proceeds with the invocation using the given interceptor as a position to start from. Mainly useful for {@link Introduction} advise where you want to
@@ -73,7 +76,8 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return The return value of the method
      * @throws RuntimeException chain may throw RTE
      */
-    @Nullable R proceed(Interceptor from) throws RuntimeException;
+    @Nullable
+    R proceed(Interceptor from) throws RuntimeException;
 
     /**
      * @return An enum representing the kind of interception that is occurring.
@@ -84,12 +88,14 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
     }
 
     @SuppressWarnings("unchecked")
+    @NonNull
     @Override
     default Class<T> getDeclaringType() {
         return (Class<T>) getTarget().getClass();
     }
 
     @SuppressWarnings("unchecked")
+    @NonNull
     @Override
     default InvocationContext<T, R> setAttribute(@NonNull CharSequence name, Object value) {
         return (InvocationContext<T, R>) MutableAttributeHolder.super.setAttribute(name, value);
@@ -120,7 +126,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
         Map<String, Object> valueMap = CollectionUtils.newLinkedHashMap(arguments.length);
         for (int i = 0; i < parameterValues.length; i++) {
             Object parameterValue = parameterValues[i];
-            Argument arg = arguments[i];
+            Argument<?> arg = arguments[i];
             valueMap.put(arg.getName(), parameterValue);
         }
         return valueMap;

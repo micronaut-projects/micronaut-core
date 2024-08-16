@@ -29,9 +29,9 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 final class JavaAnnotationElement extends JavaClassElement implements AnnotationElement {
 
     /**
-     * @param nativeElement             The native element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaAnnotationElement(JavaNativeElement.Class nativeElement,
                           ElementAnnotationMetadataFactory annotationMetadataFactory,

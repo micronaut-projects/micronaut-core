@@ -73,7 +73,8 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
+    @NonNull
+    public <T, R> List<UriRouteMatch<T, R>> findAny(@NonNull HttpRequest<?> request) {
         return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
     }
 
@@ -158,7 +159,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
         return router.findStatusRoute(originatingClass, statusCode, request);
     }
 
@@ -176,6 +177,16 @@ public class FilteredRouter implements Router {
     @Override
     public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         return router.findFilters(request);
+    }
+
+    @Override
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request, RouteMatch<?> routeMatch) {
+        return router.findFilters(request, routeMatch);
+    }
+
+    @Override
+    public List<GenericHttpFilter> findPreMatchingFilters(HttpRequest<?> request) {
+        return router.findPreMatchingFilters(request);
     }
 
     @Override

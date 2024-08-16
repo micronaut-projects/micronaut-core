@@ -55,9 +55,6 @@ class AnnotationRouteBuilderSpec extends Specification {
         GET    | ''                      | []             | "welcome"
         GET    | '/person/show/1'        | []             | "Person 1"
         GET    | '/person/1/friend/Joe'  | []             | "Person 1 Friend Joe"
-
-
-
     }
 
     void "test local status and error routes are both resolved"() {

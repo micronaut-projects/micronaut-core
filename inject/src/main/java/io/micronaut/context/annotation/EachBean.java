@@ -17,12 +17,13 @@ package io.micronaut.context.annotation;
 
 import jakarta.inject.Singleton;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>This annotation allows driving the production of {@link Bean} definitions from presence of other bean definitions.
@@ -48,7 +49,7 @@ import java.lang.annotation.Target;
  *      }
  *   }
  * </code></pre>
- *
+ * <p>
  * {@link EachBean} requires that the parent bean has a {@link jakarta.inject.Named} qualifier, since the qualifier is inherited by each bean created by {@link EachBean}.
  *
  * @author Graeme Rocher
@@ -66,4 +67,39 @@ public @interface EachBean {
      * @return The bean type that this bean is driven by
      */
     Class<?> value();
+
+    /**
+     * Enable for a new bean definition to inherit the generics from the driven bean definitions.
+     *
+     * @return The remap configuration
+     * @since 4.6
+     */
+    RemapGeneric[] remapGenerics() default {};
+
+
+    /**
+     * The generics remapping configuration.
+     *
+     * @author Denis Stepanov
+     * @since 4.6
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface RemapGeneric {
+
+        /**
+         * @return The tape of which does these generics belong.
+         */
+        Class<?> type();
+
+        /**
+         * @return The name of the generic defined on the driven bean.
+         */
+        String name();
+
+        /**
+         * @return The name of the generic on the produced bean. If not specified the same name will be used.
+         */
+        String to() default "";
+
+    }
 }

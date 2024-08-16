@@ -373,15 +373,18 @@ abstract class AbstractJdkHttpClient {
 
         FilterRunner.sortReverse(filters);
 
-        FilterRunner runner = new FilterRunner(filters, (filteredRequest, propagatedContext) -> {
-            try {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
+        FilterRunner runner = new FilterRunner(filters) {
+            @Override
+            protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
+                try {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                        return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
+                    }
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
                 }
-            } catch (Throwable e) {
-                return ExecutionFlow.error(e);
             }
-        });
+        };
         return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
     }
 

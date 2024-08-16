@@ -28,6 +28,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -45,14 +46,17 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.qualifiers.EachBeanQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,7 +72,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
+public class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext {
 
     private final ClassPathResourceLoader resourceLoader;
     private final ApplicationContextConfiguration configuration;
@@ -129,6 +133,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
+    }
+
+    @Override
+    @Internal
+    final void configureContextInternal() {
+        super.configureContextInternal();
+        configuration.getContextConfigurer().ifPresent(configurer ->
+            configurer.configure(this)
+        );
     }
 
     @Override
@@ -530,13 +543,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                     BeanDefinition<T> candidate,
+                                                     BeanDefinition<T> originBeanDefinition,
                                                      Set<BeanDefinition<T>> transformedCandidates) {
-        Class dependentType = candidate.classValue(EachBean.class).orElse(null);
-        if (dependentType == null) {
-            transformedCandidates.add(candidate);
+        AnnotationValue<EachBean> annotationValue = originBeanDefinition.getAnnotation(EachBean.class);
+        if (annotationValue == null) {
+            transformedCandidates.add(originBeanDefinition);
             return;
         }
+        Class dependentType = annotationValue.getRequiredValue(Class.class);
+        List<AnnotationValue<Annotation>> remapGenerics = annotationValue.getAnnotations("remapGenerics");
 
         Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, null);
 
@@ -547,15 +562,35 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     dependentPath = delegate.getConfigurationPath().orElse(null);
                 }
                 if (dependentPath != null) {
-                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
+                    createAndAddDelegate(resolutionContext, originBeanDefinition, transformedCandidates, dependentPath);
                 } else {
                     Qualifier<?> qualifier = dependentCandidate.getDeclaredQualifier();
-                    if (qualifier == null && dependentCandidate.isPrimary()) {
-                        // Backwards compatibility, `getDeclaredQualifier` strips @Primary
-                        // This should be removed if @Primary is no longer qualifier
-                        qualifier = PrimaryQualifier.INSTANCE;
+                    if (qualifier == null) {
+                        if (dependentCandidate.isPrimary()) {
+                            // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                            // This should be removed if @Primary is no longer qualifier
+                            qualifier = PrimaryQualifier.INSTANCE;
+                        } else {
+                            // @EachBean needs to have something of qualifier to find its origin
+                            qualifier = new EachBeanQualifier<>(dependentCandidate);
+                        }
                     }
-                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
+                    Map<String, List<Argument<?>>> delegateTypeArguments = Map.of();
+                    if (remapGenerics != null) {
+                        Map<String, List<Argument<?>>> typeArguments = new LinkedHashMap<>();
+                        List<Argument<?>> dependentArguments = dependentCandidate.getTypeArguments(dependentType);
+                        for (AnnotationValue<Annotation> remapGeneric : remapGenerics) {
+                            Class<?> type = remapGeneric.getRequiredValue("type", Class.class);
+                            String name = remapGeneric.getRequiredValue("name", String.class);
+                            String to = remapGeneric.stringValue("to").orElse(name);
+                            dependentArguments.stream()
+                                .filter(argument -> argument.getName().equals(name))
+                                .findFirst()
+                                .ifPresent(argument -> typeArguments.computeIfAbsent(type.getName(), k -> new ArrayList<>()).add(argument.withName(to)));
+                        }
+                        delegateTypeArguments = typeArguments;
+                    }
+                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(originBeanDefinition, (Qualifier<T>) qualifier, delegateTypeArguments);
                     if (delegate.isEnabled(this, resolutionContext)) {
                         transformedCandidates.add((BeanDefinition<T>) delegate);
                     }
@@ -652,6 +687,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
+    }
+
+    @Override
+    protected <T> void destroyLifeCycleBean(LifeCycle<?> cycle, BeanDefinition<T> definition) {
+        if (cycle != environment) { // handle environment separately, see stop() method
+            super.destroyLifeCycleBean(cycle, definition);
+        }
     }
 
     /**
@@ -848,6 +890,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected void startEnvironment() {
             registerSingleton(Environment.class, bootstrapEnvironment, null, false);
+            registerSingleton(BootstrapContextAccess.class, () -> DefaultApplicationContext.this, null, false);
         }
 
         @Override

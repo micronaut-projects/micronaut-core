@@ -1,18 +1,8 @@
-import org.apache.tools.ant.taskdefs.condition.Os
-
-buildscript {
-    repositories {
-        maven { url "https://plugins.gradle.org/m2/" }
-    }
-    dependencies {
-        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
-    }
-}
-
 plugins {
     id "io.micronaut.build.internal.convention-test-library"
     id 'io.micronaut.build.internal.functional-test'
     id 'java-test-fixtures'
+    alias(libs.plugins.webdriver)
     id 'io.micronaut.build.internal.convention-geb-base'
 }
 
@@ -21,10 +11,6 @@ micronautBuild {
         usesMicronautTestJunit()
         usesMicronautTestSpock()
     }
-}
-
-repositories {
-    mavenCentral()
 }
 
 dependencies {

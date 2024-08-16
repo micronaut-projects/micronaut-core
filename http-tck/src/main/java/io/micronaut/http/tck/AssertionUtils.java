@@ -122,8 +122,7 @@ public final class AssertionUtils {
     private static <T, E> void assertBody(@NonNull HttpResponse<?> response,  @Nullable BodyAssertion<T, E> bodyAssertion) {
         if (bodyAssertion != null) {
             Optional<T> bodyOptional = response.getBody(bodyAssertion.getBodyType());
-            assertTrue(bodyOptional.isPresent());
-            bodyOptional.ifPresent(bodyAssertion::evaluate);
+            bodyAssertion.evaluate(bodyOptional.orElse(null));
         }
     }
 

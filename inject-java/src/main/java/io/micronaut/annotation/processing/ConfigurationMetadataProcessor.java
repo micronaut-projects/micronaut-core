@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
@@ -41,14 +42,14 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         return CollectionUtils.setOf(
-                ConfigurationReader.class.getName(),
-                ConfigurationProperties.class.getName(),
-                EachProperty.class.getName()
+            ConfigurationReader.class.getName(),
+            ConfigurationProperties.class.getName(),
+            EachProperty.class.getName()
         );
     }
 
     @Override
-    protected TypeElementVisitor.VisitorKind getVisitorKind() {
+    protected TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
         return TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 

@@ -16,6 +16,8 @@
 package io.micronaut.core.type;
 
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * Common interface for all mutable header types.
  *
@@ -48,9 +50,26 @@ public interface MutableHeaders extends Headers {
      * @return This headers
      * @since 1.3.3
      */
-    default MutableHeaders set(CharSequence header, CharSequence value) {
+    @NonNull
+    default MutableHeaders set(@NonNull CharSequence header, @NonNull CharSequence value) {
         remove(header);
         add(header, value);
+        return this;
+    }
+
+    /**
+     * Sets an HTTP header if missing.
+     *
+     * @param header The header
+     * @param value  The value
+     * @return This headers
+     * @since 4.6
+     */
+    @NonNull
+    default MutableHeaders setIfMissing(@NonNull CharSequence header, @NonNull CharSequence value) {
+        if (!contains(header.toString())) {
+            add(header, value);
+        }
         return this;
     }
 }

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.core.util.ArrayUtils;
@@ -22,14 +24,14 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,20 +46,20 @@ class DefaultUriBuilder implements UriBuilder {
     private static final String STRING_PATTERN_SCHEME = "([^:/?#]+):";
     private static final String STRING_PATTERN_USER_INFO = "([^@\\[/?#]*)";
     private static final String STRING_PATTERN_HOST_IPV4 = "[^\\[{/?#:]*";
-    private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
+    private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}:.]*[%\\p{Alnum}]*]";
     private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
-    private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
+    private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?})?)";
     private static final String STRING_PATTERN_PATH = "([^#?]*)";
     private static final String STRING_PATTERN_QUERY = "([^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
 
     // Regex patterns that matches URIs. See RFC 3986, appendix B
     private static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
-    private static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
+    private static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#?]*)(\\?([^#]*))?(#(.*))?$");
     private static final Pattern PATTERN_FULL_URI = Pattern.compile(
         "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
             ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
-    
+
     private String authority;
     private final MutableConvertibleMultiValues<String> queryParams;
     private String scheme;
@@ -86,7 +88,7 @@ class DefaultUriBuilder implements UriBuilder {
         this.fragment = uri.getRawFragment();
         final String query = uri.getQuery();
         if (query != null) {
-            final Map parameters = new QueryStringDecoder(uri).parameters();
+            final Map parameters = QueryStringDecoder.decodeParams(uri);
             this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -94,7 +96,7 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     /**
-     * Constructor for charsequence.
+     * Constructor for char sequence.
      *
      * @param uri The URI
      */
@@ -120,7 +122,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.host = host;
                 }
                 if (port != null) {
-                    this.port = Integer.valueOf(port);
+                    this.port = Integer.parseInt(port);
                 }
                 if (path != null) {
 
@@ -130,7 +132,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.path = new StringBuilder(path);
                 }
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
+                    final Map parameters = QueryStringDecoder.decodeParams(uri.toString());
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -148,7 +150,7 @@ class DefaultUriBuilder implements UriBuilder {
 
                 this.path = new StringBuilder(path);
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
+                    final Map parameters = QueryStringDecoder.decodeParams(uri.toString());
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -262,7 +264,7 @@ class DefaultUriBuilder implements UriBuilder {
     @Override
     public UriBuilder replaceQueryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
-            List<String> strings = new ArrayList<>(values.length);
+            var strings = new ArrayList<String>(values.length);
             for (Object value : values) {
                 if (value != null) {
                     strings.add(value.toString());
@@ -298,7 +300,7 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String reconstructAsString(Map<String, ? super Object> values) {
-        StringBuilder builder = new StringBuilder();
+        var builder = new StringBuilder();
         String scheme = this.scheme;
         String host = this.host;
         if (StringUtils.isNotEmpty(scheme)) {
@@ -306,7 +308,7 @@ class DefaultUriBuilder implements UriBuilder {
                 scheme = UriTemplate.of(scheme).expand(values);
             }
             builder.append(scheme)
-                   .append(":");
+                   .append(':');
         }
 
         final boolean hasPort = port != -1;
@@ -322,8 +324,8 @@ class DefaultUriBuilder implements UriBuilder {
                 } else {
                     userInfo = expandOrEncode(userInfo, values);
                 }
-                builder.append(userInfo);
-                builder.append("@");
+                builder.append(userInfo)
+                        .append('@');
             }
 
             if (hasHost) {
@@ -332,7 +334,7 @@ class DefaultUriBuilder implements UriBuilder {
             }
 
             if (hasPort) {
-                builder.append(":").append(port);
+                builder.append(':').append(port);
             }
         } else {
             String authority = this.authority;
@@ -345,7 +347,7 @@ class DefaultUriBuilder implements UriBuilder {
 
         StringBuilder path = this.path;
         if (StringUtils.isNotEmpty(path)) {
-            if (builder.length() > 0 && path.charAt(0) != '/') {
+            if (!builder.isEmpty() && path.charAt(0) != '/') {
                 builder.append('/');
             }
             String pathStr = path.toString();
@@ -378,7 +380,7 @@ class DefaultUriBuilder implements UriBuilder {
 
     private String buildQueryParams(Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
+            var builder = new StringBuilder();
             final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
             while (nameIterator.hasNext()) {
                 Map.Entry<String, List<String>> entry = nameIterator.next();
@@ -413,10 +415,6 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String encode(String userInfo) {
-        try {
-            return URLEncoder.encode(userInfo, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException("No available charset: " + e.getMessage());
-        }
+        return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
     }
 }

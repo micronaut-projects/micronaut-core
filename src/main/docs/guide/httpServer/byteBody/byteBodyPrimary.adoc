@@ -1,0 +1,16 @@
+`ByteBody` itself does not offer direct access to the data. To begin processing, there must be a _primary
+operation_ that converts the body into another form that can be used in the application programming model.
+
+A normal `ByteBody` has two groups of streaming primary operations. `toInputStream()` gives access to the body
+as a regular `InputStream`. The `toByteArrayPublisher()` and `toByteBufferPublisher()` methods return a reactive stream
+of byte arrays or `ByteBuffer`s.
+
+WARNING: `InputStream` is blocking API, and the netty event loop must never be blocked. If you wish to read from the
+body using an `InputStream`, take care to do so only on another thread, or to annotate your filter with
+`@ExecuteOn(TaskExecutors.BLOCKING)`.
+
+If you need full access to the body, the `buffer()` method returns a `CompletableFuture` that completes with an
+`AvailableByteBody` when the full body has been received. `AvailableByteBody` has a few more convenient
+primary operations: `toByteArray()`, `toByteBuffer()` and `toString(Charset)`.
+
+Buffering is limited to the number of bytes configured in the `micronaut.server.max-request-buffer-size` property.

@@ -37,7 +37,7 @@ import java.lang.annotation.Annotation;
 public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     /**
-     * @param beanContext       The application contect
+     * @param beanContext The application context
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration

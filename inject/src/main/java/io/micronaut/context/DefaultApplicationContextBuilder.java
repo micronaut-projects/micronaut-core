@@ -57,6 +57,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private final List<PropertySource> propertySources = new ArrayList<>();
     private final Collection<String> configurationIncludes = new HashSet<>();
     private final Collection<String> configurationExcludes = new HashSet<>();
+    private final ApplicationContextConfigurer contextConfigurer;
     private Boolean deduceEnvironments = null;
     private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
@@ -76,11 +77,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
-        loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
+        ApplicationContextConfigurer applicationContextConfigurer = loadApplicationContextCustomizer(resolveClassLoader());
+        applicationContextConfigurer.configure(this);
+        this.contextConfigurer = applicationContextConfigurer;
     }
 
     DefaultApplicationContextBuilder(ClassLoader classLoader) {
-        loadApplicationContextCustomizer(classLoader).configure(this);
+        ApplicationContextConfigurer applicationContextConfigurer = loadApplicationContextCustomizer(classLoader);
+        applicationContextConfigurer.configure(this);
+        this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
     }
 
@@ -90,6 +95,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             return contextClassLoader;
         }
         return DefaultApplicationContextBuilder.class.getClassLoader();
+    }
+
+    @Override
+    public Optional<ApplicationContextConfigurer> getContextConfigurer() {
+        return Optional.ofNullable(this.contextConfigurer);
     }
 
     @Override
@@ -449,6 +459,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
                 }
             }
 
+            @Override
+            public void configure(ApplicationContext applicationContext) {
+                for (ApplicationContextConfigurer customizer : configurers) {
+                    customizer.configure(applicationContext);
+                }
+            }
         };
     }
 }

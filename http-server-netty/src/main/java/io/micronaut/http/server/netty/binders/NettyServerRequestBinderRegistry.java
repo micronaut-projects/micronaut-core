@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Order;
@@ -27,7 +26,7 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.scheduling.TaskExecutors;
@@ -53,8 +52,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
 
     public NettyServerRequestBinderRegistry(ConversionService conversionService,
                                             List<RequestArgumentBinder> binders,
-                                            BeanLocator beanLocator,
-                                            BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+                                            BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
                                             @Named(TaskExecutors.BLOCKING)
                                             BeanProvider<ExecutorService> executorService,
                                             MessageBodyHandlerRegistry bodyHandlerRegistry) {
@@ -68,11 +66,9 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
         internalRequestBinderRegistry.addArgumentBinder(new NettyPublisherBodyBinder(
             nettyBodyAnnotationBinder));
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
-            beanLocator,
             httpServerConfiguration
         ));
-        internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder(
-            httpServerConfiguration.get()));
+        internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder());
         NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(
             httpServerConfiguration.get().getMultipart(),
             executorService.get()

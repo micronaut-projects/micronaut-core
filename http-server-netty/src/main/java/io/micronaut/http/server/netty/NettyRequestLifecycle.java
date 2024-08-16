@@ -24,8 +24,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
-import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -33,6 +35,7 @@ import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +51,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
     private final RoutingInBoundHandler rib;
     private final OutboundAccess outboundAccess;
-    private final boolean validateUrl;
 
     /**
      * Should only be used where netty-specific stuff is needed, such as reading the body or
@@ -59,7 +61,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
         this.rib = rib;
-        this.validateUrl = rib.serverConfiguration.isValidateUrl();
         this.outboundAccess = outboundAccess;
     }
 
@@ -89,7 +90,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
             ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
             if (imperativeFlow != null) {
-                rib.writeResponse(outboundAccess, request, imperativeFlow.getValue(), imperativeFlow.getError());
+                Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
+                // usually this is a MutableHttpResponse, avoid scalability issues here
+                HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
+                rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
             } else {
                 result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
             }
@@ -142,7 +146,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             ByteBody rootBody = nettyRequest.byteBody();
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
-                rootBody.processMulti(processor).handleForm(formRouteCompleter);
+                HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(rootBody).map(DefaultHttpContent::new)).subscribe(formRouteCompleter);
                 nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);

@@ -44,7 +44,7 @@ public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGener
         if (cloudFoundryId.isPresent()) {
             return cloudFoundryId.get();
         } else {
-            StringJoiner joiner = new StringJoiner(":");
+            var joiner = new StringJoiner(":");
             String applicationName = serviceInstance.getId();
 
             joiner.add(applicationName);

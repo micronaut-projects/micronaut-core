@@ -76,10 +76,10 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     /**
      * Default constructor.
      *
-     * @param elements        The elementUtils
-     * @param messager        The messager
+     * @param elements The elementUtils
+     * @param messager The messager
      * @param annotationUtils The annotation utils
-     * @param modelUtils      The model utils
+     * @param modelUtils The model utils
      * @deprecated Not needed
      */
     @Deprecated(forRemoval = true, since = "4.3.0")
@@ -94,11 +94,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     /**
      * Default constructor.
      *
-     * @param elements             The elementUtils
-     * @param messager             The messager
-     * @param modelUtils           The model utils
+     * @param elements The elementUtils
+     * @param messager The messager
+     * @param modelUtils The model utils
      * @param nativeElementsHelper The native elements helper
-     * @param visitorContext       The visitor context
+     * @param visitorContext The visitor context
      */
     public JavaAnnotationMetadataBuilder(
         Elements elements,
@@ -202,7 +202,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
-        List<AnnotationMirror> expanded = new ArrayList<>();
+        var expanded = new ArrayList<AnnotationMirror>();
         for (AnnotationMirror annotation : element.getAnnotationMirrors()) {
             boolean repeatable = false;
             boolean hasOtherMembers = false;
@@ -244,13 +244,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
-            List<Element> onlyDeclared = new ArrayList<>(1);
+            var onlyDeclared = new ArrayList<Element>(1);
             onlyDeclared.add(element);
             return onlyDeclared;
         }
 
         if (element instanceof TypeElement typeElement) {
-            List<TypeElement> hierarchy = new ArrayList<>();
+            var hierarchy = new ArrayList<TypeElement>();
             if (element.getKind() == ElementKind.ANNOTATION_TYPE) {
                 hierarchy.add(typeElement);
             } else {
@@ -272,7 +272,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             hierarchy.add(element);
             return hierarchy;
         } else if (element instanceof VariableElement variable) {
-            List<Element> hierarchy = new ArrayList<>();
+            var hierarchy = new ArrayList<Element>();
             Element enclosingElement = variable.getEnclosingElement();
             if (enclosingElement instanceof ExecutableElement executableElement) {
                 int variableIdx = executableElement.getParameters().indexOf(variable);
@@ -283,7 +283,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             hierarchy.add(variable);
             return hierarchy;
         } else {
-            ArrayList<Element> single = new ArrayList<>();
+            var single = new ArrayList<Element>(1);
             single.add(element);
             return single;
         }
@@ -309,7 +309,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected String getOriginatingClassName(Element orginatingElement) {
+    protected String getOriginatingClassName(@NonNull Element orginatingElement) {
         TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
         if (typeElement != null) {
             return JavaModelUtils.getClassName(typeElement);
@@ -335,7 +335,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             if (annotationMirror.getAnnotationType().toString().endsWith(annotationName)) {
                 Map<? extends Element, ?> values = readAnnotationRawValues(annotationMirror);
-                Map<CharSequence, Object> converted = new LinkedHashMap<>();
+                var converted = new LinkedHashMap<CharSequence, Object>();
                 for (Map.Entry<? extends Element, ?> entry : values.entrySet()) {
                     Element key = entry.getKey();
                     Object value = entry.getValue();
@@ -426,7 +426,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
-        Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
+        var defaultValues = new LinkedHashMap<Element, AnnotationValue>();
         if (element instanceof TypeElement annotationElement) {
             final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
             allMembers
@@ -476,7 +476,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Checks if a method has an annotation.
      *
      * @param element The method
-     * @param ann     The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     @Override
@@ -488,7 +488,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Checks if a method has an annotation.
      *
      * @param element The method
-     * @param ann     The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     @Override
@@ -521,7 +521,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Checks if a method has an annotation.
      *
      * @param method The method
-     * @param ann    The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     public static boolean hasAnnotation(ExecutableElement method, Class<? extends Annotation> ann) {
@@ -636,7 +636,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
-            ArrayValueVisitor arrayValueVisitor = new ArrayValueVisitor(member);
+            var arrayValueVisitor = new ArrayValueVisitor(member);
             for (javax.lang.model.element.AnnotationValue val : vals) {
                 val.accept(arrayValueVisitor, o);
             }
@@ -647,10 +647,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         /**
          * Array value visitor class.
          */
-        @SuppressWarnings("unchecked")
         private final class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
 
-            private List values = new ArrayList();
+            private final List<Object> values = new ArrayList<>();
             private final ExecutableElement member;
 
             private ArrayValueVisitor(ExecutableElement member) {
@@ -783,7 +782,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
-                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
+                io.micronaut.core.annotation.AnnotationValue<?> annotationValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
                 values.add(annotationValue);
                 return null;
             }

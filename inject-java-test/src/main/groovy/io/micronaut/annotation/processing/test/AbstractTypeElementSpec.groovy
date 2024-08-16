@@ -323,6 +323,7 @@ class Test {
                 @Override
                 protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
                     return new TypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors
@@ -333,6 +334,7 @@ class Test {
                 @Override
                 protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
                     return new AggregatingTypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors

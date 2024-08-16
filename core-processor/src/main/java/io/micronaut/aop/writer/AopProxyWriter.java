@@ -552,8 +552,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         final Optional<MethodElement> overridden = methodElement.getOwningType()
                 .getEnclosedElement(ElementQuery.ALL_METHODS
                         .onlyInstance()
-                        .named(name -> name.equals(methodElement.getName()))
-                        .filter(el -> el.overrides(methodElement)));
+                        .filter(el -> el.getName().equals(methodElement.getName()) && el.overrides(methodElement)));
 
         if (overridden.isPresent()) {
             MethodElement overriddenBy = overridden.get();
@@ -717,7 +716,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
                 this.isInterface && overriddenBy.isDefault());
 
-        if (!isVoidReturn) {
+        if (!isVoidReturn && !overriddenBy.isSuspend()) {
             ClassElement returnType = overriddenBy.getReturnType();
             pushCastToType(overriddenMethodGenerator, returnType);
         }

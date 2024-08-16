@@ -82,8 +82,8 @@ class SimpleRetry implements RetryState, MutableRetryState {
 
     /**
      * @param maxAttempts The maximum number of attemps
-     * @param multiplier  The multiplier to use between delays
-     * @param delay       The overall delay so far
+     * @param multiplier The multiplier to use between delays
+     * @param delay The overall delay so far
      */
     SimpleRetry(int maxAttempts, double multiplier, Duration delay) {
         this(maxAttempts, multiplier, delay, null, null);

@@ -9,10 +9,6 @@ micronautBuild {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-client")

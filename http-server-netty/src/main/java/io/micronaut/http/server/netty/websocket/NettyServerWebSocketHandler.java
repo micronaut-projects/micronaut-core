@@ -291,7 +291,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Publisher<?> actual = Publishers.convertPublisher(conversionService, result, Publisher.class);
+        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
         Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
                                                                                           () -> actual.subscribe(new Subscriber<Object>() {
               @Override
@@ -364,7 +364,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                     Mono<?> result;
                     if (returnType.isReactive()) {
                         result = Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
-                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));;
+                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
                     } else if (returnType.isAsync()) {
                         result = Mono.fromFuture((Supplier<CompletableFuture<?>>) invokeWithContext(boundExecutable, messageHandler));
                     } else {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -22,6 +23,7 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
@@ -34,6 +36,7 @@ import jakarta.inject.Singleton;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -62,7 +65,7 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
                 nettyResponse.getNettyHeaders()
             );
             //  can be null if the stream was closed
-            nettyContext.writeStream(finalResponse, object, executorService);
+            nettyContext.write(finalResponse, InputStreamByteBody.create(object, OptionalLong.empty(), executorService, NettyByteBufferFactory.DEFAULT));
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
         }

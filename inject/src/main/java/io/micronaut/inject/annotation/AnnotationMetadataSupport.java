@@ -490,12 +490,11 @@ public final class AnnotationMetadataSupport {
         if (proxyClass.isPresent()) {
             Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
             if (annotationValue != null) {
-                final Map<CharSequence, Object> annotationValues = annotationValue.getValues();
-                annotationValues.forEach((key, o) -> values.put(key.toString(), o));
+                annotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));
             }
             int hashCode = AnnotationUtil.calculateHashCode(values);
 
-            Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, annotationValue));
+            Optional<?> instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), new AnnotationProxyHandler<>(hashCode, annotationClass, annotationValue));
             if (instantiated.isPresent()) {
                 return (T) instantiated.get();
             }
@@ -536,7 +535,7 @@ public final class AnnotationMetadataSupport {
                 return false;
             }
 
-            Annotation other = (Annotation) annotationClass.cast(obj);
+            Annotation other = annotationClass.cast(obj);
 
             final AnnotationValue<?> otherValues = getAnnotationValues(other);
 
@@ -550,7 +549,7 @@ public final class AnnotationMetadataSupport {
         }
 
         private AnnotationValue<?> getAnnotationValues(Annotation other) {
-            if (other instanceof AnnotationProxyHandler handler) {
+            if (other instanceof AnnotationProxyHandler<?> handler) {
                 return handler.annotationValue;
             }
             return null;
@@ -563,6 +562,8 @@ public final class AnnotationMetadataSupport {
                 return hashCode;
             } else if ((args != null && args.length == 1) && "equals".equals(name)) {
                 return equals(args[0]);
+            } else if ("toString".equals(name)) {
+                return annotationValue.toString();
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
             } else if (method.getReturnType() == AnnotationValue.class) {

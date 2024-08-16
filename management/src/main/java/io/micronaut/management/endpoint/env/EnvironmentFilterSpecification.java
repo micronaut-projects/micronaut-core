@@ -36,11 +36,11 @@ import java.util.stream.Stream;
  */
 public final class EnvironmentFilterSpecification {
 
-    private static final Supplier<List<Pattern>> LEGACY_MASK_PATTERNS = SupplierUtil.memoized(() -> {
-        return Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
-                .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
-                .collect(Collectors.toList());
-    });
+    private static final Supplier<List<Pattern>> LEGACY_MASK_PATTERNS = SupplierUtil.memoized(() ->
+        Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
+            .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
+            .collect(Collectors.toList())
+    );
 
     private boolean allMasked;
     private final List<Predicate<String>> exclusions = new ArrayList<>();
@@ -136,7 +136,7 @@ public final class EnvironmentFilterSpecification {
     }
 
     FilterResult test(String key) {
-        for (Predicate<String> exclusion: exclusions) {
+        for (Predicate<String> exclusion : exclusions) {
             if (exclusion.test(key)) {
                 return allMasked ? FilterResult.PLAIN : FilterResult.MASK;
             }

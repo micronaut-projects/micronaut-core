@@ -56,11 +56,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                         @NonNull List<JavaClassElement> upperBounds,
                         @NonNull List<JavaClassElement> lowerBounds) {
         super(
-                mostUpper.getNativeType(),
-                elementAnnotationMetadataFactory,
-                mostUpper.visitorContext,
-                mostUpper.typeArguments,
-                mostUpper.getTypeArguments()
+            mostUpper.getNativeType(),
+            elementAnnotationMetadataFactory,
+            mostUpper.visitorContext,
+            mostUpper.typeArguments,
+            mostUpper.getTypeArguments()
         );
         this.wildcardType = wildcardType;
         this.upperBound = mostUpper;
@@ -74,6 +74,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return Optional.of(upperBound);
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -87,16 +88,19 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return getGenericTypeAnnotationMetadata();
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
+    @NonNull
     @Override
     public Object getGenericNativeType() {
         return wildcardType;
@@ -129,24 +133,29 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
 
     @Override
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
-        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
+        List<JavaClassElement> upperBounds = this.upperBounds.stream()
+            .map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold)))
+            .toList();
+        List<JavaClassElement> lowerBounds = this.lowerBounds.stream()
+            .map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold)))
+            .toList();
         return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds));
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {
-        if (element == null || element instanceof JavaClassElement) {
-            return (JavaClassElement) element;
-        } else {
-            if (element.isWildcard() || element.isGenericPlaceholder()) {
-                throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
-            } else {
-                return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
-                        .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
-                        .withArrayDimensions(element.getArrayDimensions())
-                        .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
-            }
+        if (element == null) {
+            return null;
         }
+        if (element instanceof JavaClassElement classEl) {
+            return classEl;
+        }
+        if (element.isWildcard() || element.isGenericPlaceholder()) {
+            throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
+        }
+        return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
+            .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
+            .withArrayDimensions(element.getArrayDimensions())
+            .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
     }
 
 }

@@ -20,7 +20,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
@@ -48,7 +47,7 @@ class ContentLengthHeaderTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), 0);
+        server = HttpServer.create(new InetSocketAddress(0), 0);
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.createContext(PATH, new MyHandler());
         server.start();

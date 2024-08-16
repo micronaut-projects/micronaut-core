@@ -44,7 +44,7 @@ class MyBean {
             lines[1] == "* [MyBean] requires the presence of a bean of type [test.MyClient]."
             lines[2] == " * [MyClient] requires the presence of a bean of type [test.MyConfiguration]."
             lines[3] == "  * [MyConfiguration] is disabled because:"
-            lines[4] == "   - Required property [myconf] with value [null] not present"
+            lines[4] == "   - Required property [myconf] not present"
         cleanup:
             context.close()
     }
@@ -89,7 +89,7 @@ class MyBean {
             lines[3] == "  * [MyMultiConfiguration] a candidate of [MyConfiguration] is disabled because:"
             lines[4] == "   - Configuration requires entries under the prefix: [myconf2.multiple.default]"
             lines[5] == "  * [MyDefaultConfiguration] a candidate of [MyConfiguration] is disabled because:"
-            lines[6] == "   - Required property [myconf] with value [null] not present"
+            lines[6] == "   - Required property [myconf] not present"
             lines.size() == 7
         cleanup:
             context.close()
@@ -140,11 +140,11 @@ class MyBean {
             lines[1] == "* [MyBean] requires the presence of a bean of type [test.MyClient]."
             lines[2] == " * [MyClient] requires the presence of a bean of type [test.MyConfiguration]."
             lines[3] == "  * [MyDefaultConfiguration] a candidate of [MyConfiguration] is disabled because:"
-            lines[4] == "   - Required property [myconf] with value [null] not present"
+            lines[4] == "   - Required property [myconf] not present"
             lines[5] == "  * [MyMultiConfiguration] a candidate of [MyConfiguration] is disabled because:"
             lines[6] == "   - No bean of type [test.MyHelper] present within context"
             lines[7] == "   * [MyHelper] is disabled because:"
-            lines[8] == "    - Required property [myconf.helper] with value [null] not present"
+            lines[8] == "    - Required property [myconf.helper] not present"
 
             lines.size() == 9
         cleanup:
@@ -382,6 +382,57 @@ class MyBean {
 
         cleanup:
         context.close()
+    }
+
+    void "test requires missing classes as string class name when class present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingClasses = "java.lang.String")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        !beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
+    void "test requires missing classes as string class names when classes not present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingClasses = {"org.hibernate.reactive.provider.ReactiveServiceRegistryBuilder"})
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
+    void "test requires missing classes as class when class present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missing = String.class)
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        !beanDefinition.isEnabled(new DefaultBeanContext())
     }
 
     void "test requires beans with no bean present"() {

@@ -66,7 +66,7 @@ class Test extends Middle {
 ''')
 
             def elements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-        then: "A special case for the indentical methods with package-private access and broken package access in between"
+        then: "A special case for the identical methods with package-private access and broken package access in between"
             elements.size() == 2
     }
 
@@ -157,7 +157,8 @@ interface One<E> {}
         ClassElement classElement = buildClassElement('''
 package ast.test;
 
-import org.jetbrains.annotations.NotNull;import java.util.*;
+import org.jetbrains.annotations.NotNull;
+import java.util.*;
 
 record Test(String constructorProp) implements Parent<String>, One<String> {
     @Override public String publicFunc(String name) {

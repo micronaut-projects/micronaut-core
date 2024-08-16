@@ -40,7 +40,7 @@ import java.lang.annotation.Annotation;
 public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     /**
-     * @param beanContext       The application context
+     * @param beanContext The application context
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration
@@ -63,7 +63,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
         UriTemplate template = buildUriTemplate(method, id);
         String[] consumes = method.stringValues(Write.class, "consumes");
         UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-                .consumes(MediaType.of(consumes));
+            .consumes(MediaType.of(consumes));
         if (port != null) {
             uriRoute = uriRoute.exposedPort(port);
         }

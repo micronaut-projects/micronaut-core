@@ -35,19 +35,19 @@ final class JacksonDatabindFeature implements Feature {
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         Stream.of(
-                PropertyNamingStrategies.LowerCamelCaseStrategy.class,
-                PropertyNamingStrategies.UpperCamelCaseStrategy.class,
-                PropertyNamingStrategies.SnakeCaseStrategy.class,
-                PropertyNamingStrategies.UpperSnakeCaseStrategy.class,
-                PropertyNamingStrategies.LowerCaseStrategy.class,
-                PropertyNamingStrategies.KebabCaseStrategy.class,
-                PropertyNamingStrategies.LowerDotCaseStrategy.class,
+            PropertyNamingStrategies.LowerCamelCaseStrategy.class,
+            PropertyNamingStrategies.UpperCamelCaseStrategy.class,
+            PropertyNamingStrategies.SnakeCaseStrategy.class,
+            PropertyNamingStrategies.UpperSnakeCaseStrategy.class,
+            PropertyNamingStrategies.LowerCaseStrategy.class,
+            PropertyNamingStrategies.KebabCaseStrategy.class,
+            PropertyNamingStrategies.LowerDotCaseStrategy.class,
 
-                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
-                PropertyNamingStrategy.SnakeCaseStrategy.class,
-                PropertyNamingStrategy.LowerCaseStrategy.class,
-                PropertyNamingStrategy.KebabCaseStrategy.class,
-                PropertyNamingStrategy.LowerDotCaseStrategy.class
+            PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+            PropertyNamingStrategy.SnakeCaseStrategy.class,
+            PropertyNamingStrategy.LowerCaseStrategy.class,
+            PropertyNamingStrategy.KebabCaseStrategy.class,
+            PropertyNamingStrategy.LowerDotCaseStrategy.class
         ).forEach(RuntimeReflection::registerForReflectiveInstantiation);
     }
 }

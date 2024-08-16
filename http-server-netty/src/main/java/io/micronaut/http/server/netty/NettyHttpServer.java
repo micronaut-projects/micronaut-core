@@ -62,12 +62,13 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
-import io.netty.channel.unix.ServerDomainSocketChannel;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -82,6 +83,7 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.UnixDomainSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -168,15 +170,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             nettyEmbeddedServices.getExecutorSelector()
                 .select(TaskExecutors.BLOCKING).orElse(null)
         );
-        HttpContentProcessorResolver httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
-            nettyEmbeddedServices.getApplicationContext(),
-            () -> serverConfiguration
-        );
         this.routingHandler = new RoutingInBoundHandler(
             serverConfiguration,
             nettyEmbeddedServices,
             ioExecutor,
-            httpContentProcessorResolver,
             httpRequestTerminatedEventPublisher,
             applicationContext.getConversionService()
         );
@@ -571,7 +568,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 if (fd != null) {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, null, fd);
                                 } else {
-                                    return nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig);
+                                    return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
                                 }
                             });
                             int port = cfg.getPort();
@@ -591,13 +588,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         case UNIX:
                             listenerBootstrap.channelFactory(() -> {
                                 if (fd != null) {
-                                    return (ServerDomainSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig, null, fd);
+                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig, null, fd);
                                 } else {
-                                    return nettyEmbeddedServices.getDomainServerChannelInstance(workerConfig);
+                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig);
                                 }
                             });
                             if (cfg.isBind()) {
-                                future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
+                                if (listenerBootstrap.config().group() instanceof NioEventLoopGroup) {
+                                    // jdk UnixDomainSocketAddress
+                                    future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
+                                } else {
+                                    // netty DomainSocketAddress (epoll/kqueue)
+                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
+                                }
                             } else {
                                 future = listenerBootstrap.register();
                             }
@@ -670,7 +673,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private static String displayAddress(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
         return switch (cfg.getFamily()) {
             case TCP, QUIC -> cfg.getHost() == null ? "*:" + cfg.getPort() : cfg.getHost() + ":" + cfg.getPort();
-            case UNIX -> cfg.getPath().startsWith("\0") ? "unix:@" + cfg.getPath().substring(1) : "unix:" + cfg.getPath();
+            case UNIX -> {
+                if (cfg.getPath() == null) {
+                    yield cfg.getFd() == null ? "unix:accepted-fd:" + cfg.getAcceptedFd() : "unix:fd:" + cfg.getFd();
+                } else {
+                    if (cfg.getPath().startsWith("\0")) {
+                        yield "unix:@" + cfg.getPath().substring(1);
+                    } else {
+                        yield "unix:" + cfg.getPath();
+                    }
+                }
+            }
         };
     }
 

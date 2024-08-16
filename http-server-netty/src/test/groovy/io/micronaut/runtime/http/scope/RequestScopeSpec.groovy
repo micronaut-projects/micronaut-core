@@ -20,8 +20,12 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -174,13 +178,17 @@ class RequestScopeSpec extends AbstractMicronautSpec {
     static class SimpleRequestBean {
 
         private final SimpleBean simpleBean
+        final HttpClient client
 
-        SimpleRequestBean(SimpleBean simpleBean) {
+        SimpleRequestBean(
+                SimpleBean simpleBean,
+                @Client("/") HttpClient client) {
             this.simpleBean = simpleBean
+            this.client = client
         }
 
         String sayHello() {
-            return "HELLO"
+            return client.toBlocking().retrieve("/test-simple-request-scope-other")
         }
 
     }
@@ -200,14 +208,26 @@ class RequestScopeSpec extends AbstractMicronautSpec {
     @Controller
     static class SimpleTestController {
         final SimpleRequestBean simpleRequestBean
+        final HttpClient client
 
-        SimpleTestController(SimpleRequestBean simpleRequestBean) {
+        SimpleTestController(
+                SimpleRequestBean simpleRequestBean,
+                @Client("/") HttpClient client) {
             this.simpleRequestBean = simpleRequestBean
+            this.client = client
         }
 
         @Get("/test-simple-request-scope")
+        @ExecuteOn(TaskExecutors.BLOCKING)
         String test() {
             return simpleRequestBean.sayHello()
+        }
+
+        @Get("/test-simple-request-scope-other")
+        String test2() {
+            simpleRequestBean.client.is(client)
+            assert simpleRequestBean.client.isRunning()
+            return "HELLO"
         }
     }
 

@@ -31,9 +31,9 @@ public class RetryEvent extends ApplicationEvent {
     private final Throwable throwable;
 
     /**
-     * @param source     The source method invocation context for intercepting method call
+     * @param source The source method invocation context for intercepting method call
      * @param retryState To encapsulate current state into {@link io.micronaut.retry.annotation.Retryable}
-     * @param throwable  The error
+     * @param throwable The error
      */
     public RetryEvent(MethodInvocationContext<?, ?> source, RetryState retryState, Throwable throwable) {
         super(source);

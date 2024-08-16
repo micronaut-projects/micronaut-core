@@ -17,7 +17,9 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.server.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
@@ -99,7 +101,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         if (stream == null) {
             return padding; // data not consumed
         }
-        return stream.onDataRead(data, endOfStream) + padding;
+        return stream.onDataRead(data.retain(), endOfStream) + padding;
     }
 
     @Override
@@ -311,6 +313,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return this;
         }
 
+        public ConnectionHandlerBuilder bodySizeLimits(BodySizeLimits bodySizeLimits) {
+            frameListener.bodySizeLimits = bodySizeLimits;
+            return this;
+        }
+
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
@@ -359,6 +366,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         boolean reset(Throwable cause) {
             if (cause instanceof Http2Exception h2e) {
                 connectionHandler.encoder().writeRstStream(ctx, stream.id(), h2e.error().code(), ctx.voidPromise());
+                return true;
+            } else if (cause instanceof ByteBody.BodyDiscardedException) {
+                connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.CANCEL.code(), ctx.voidPromise());
                 return true;
             } else {
                 connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.INTERNAL_ERROR.code(), ctx.voidPromise());

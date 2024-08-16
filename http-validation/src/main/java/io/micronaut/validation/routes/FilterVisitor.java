@@ -16,6 +16,7 @@
 package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.MutablePropagatedContext;
@@ -38,6 +39,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;
@@ -57,7 +59,8 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         FilterContinuation.class,
         Optional.class,
         Throwable.class,
-        MutablePropagatedContext.class
+        MutablePropagatedContext.class,
+        RouteMatch.class
     );
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),
@@ -67,7 +70,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     );
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 

@@ -24,13 +24,13 @@ import io.micronaut.core.order.Ordered;
  * for configuring an application context before the
  * application/function is started.
  *
- * Application context configurers must be registered
+ * <p>Application context configurers must be registered
  * as services. Those services are automatically called
- * whenever a new application context builder is created.
+ * whenever a new application context builder is created.</p>
  *
- * An application context annotated with
+ * <p>An application context annotated with
  * {@link io.micronaut.context.annotation.ContextConfigurer}
- * will automatically be registered as a service provider.
+ * will automatically be registered as a service provider.</p>
  *
  * @since 3.2
  */
@@ -45,9 +45,28 @@ public interface ApplicationContextConfigurer extends Ordered {
 
     /**
      * Configures the application context builder.
+     *
+     * <p>This method allows the programmatic enhancement of the context prior to construction.</p>
+     *
+     * <p>The {@link ApplicationContextBuilder} interface features methods to add environments, property sources etc.</p>
+     *
      * @param builder the builder to configure
+     * @see ApplicationContextBuilder
      */
     default void configure(@NonNull ApplicationContextBuilder builder) {
+        // no-op
+    }
 
+    /**
+     * Configures the application context.
+     *
+     * <p>This method will be called after the context is fully configured but
+     * prior to starting the context.</p>
+     *
+     * @param applicationContext The context.
+     * @since 4.5.0
+     */
+    default void configure(@NonNull ApplicationContext applicationContext) {
+        // no-op
     }
 }

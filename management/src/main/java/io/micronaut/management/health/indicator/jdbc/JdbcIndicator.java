@@ -66,10 +66,10 @@ public class JdbcIndicator implements HealthIndicator {
     private final HealthAggregator<?> healthAggregator;
 
     /**
-     * @param executorService    The executor service
-     * @param dataSources        The data sources
+     * @param executorService The executor service
+     * @param dataSources The data sources
      * @param dataSourceResolver The data source resolver
-     * @param healthAggregator   The health aggregator
+     * @param healthAggregator The health aggregator
      */
     public JdbcIndicator(@Named(TaskExecutors.BLOCKING) ExecutorService executorService,
                          DataSource[] dataSources,
@@ -134,8 +134,8 @@ public class JdbcIndicator implements HealthIndicator {
         }
         return healthAggregator.aggregate(NAME, Flux.merge(
             Arrays.stream(dataSources)
-                    .map(dataSourceResolver::resolve)
-                    .map(this::getResult).collect(Collectors.toList())
+                .map(dataSourceResolver::resolve)
+                .map(this::getResult).collect(Collectors.toList())
         ));
     }
 }

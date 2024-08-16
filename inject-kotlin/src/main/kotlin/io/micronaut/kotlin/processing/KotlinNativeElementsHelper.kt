@@ -98,7 +98,10 @@ internal class KotlinNativeElementsHelper(private val resolver: Resolver) : Nati
         return t == builtIns.anyType ||
                 t == builtIns.nothingType ||
                 t == builtIns.unitType ||
-                classNode.qualifiedName.toString() == Enum::class.java.name
+                (classNode.qualifiedName != null && (
+                        classNode.qualifiedName!!.asString() == Enum::class.java.name ||
+                                classNode.qualifiedName!!.asString() == Record::class.java.name
+                        ))
     }
 
     override fun isInterface(classNode: KSClassDeclaration): Boolean {

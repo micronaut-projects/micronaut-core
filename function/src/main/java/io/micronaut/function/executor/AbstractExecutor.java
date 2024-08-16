@@ -28,18 +28,16 @@ import io.micronaut.inject.ExecutableMethod;
 import jakarta.annotation.PreDestroy;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.Optional;
 
 /**
  * An abstract executor implementation.
  *
  * @param <C> Type of the context
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
+public class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable {
 
     /**
      * The current {@link ApplicationContext}.
@@ -50,7 +48,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * Resolve a function from the {@link LocalFunctionRegistry}.
      *
      * @param localFunctionRegistry The {@link LocalFunctionRegistry}
-     * @param functionName          The function name
+     * @param functionName The function name
      * @return The method
      */
     protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, String functionName) {
@@ -111,6 +109,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
 
     /**
      * Start the environment specified.
+     *
      * @param applicationContext the application context with the environment
      * @return The environment within the context
      */
@@ -121,21 +120,21 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
             }
 
             return applicationContext
-                    .start()
-                    .getEnvironment();
+                .start()
+                .getEnvironment();
         } else {
             return applicationContext.getEnvironment();
         }
     }
 
     @Override
-    public ApplicationContext getApplicationContext() {
+    public @NonNull ApplicationContext getApplicationContext() {
         return this.applicationContext;
     }
 
     @Override
     @PreDestroy
-    public void close() throws IOException {
+    public void close() {
         try {
             applicationContext.close();
         } catch (Exception e) {

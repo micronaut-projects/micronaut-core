@@ -1,9 +1,13 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.InternalByteBody
+import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.ByteBody
+import io.micronaut.http.server.netty.body.AvailableNettyByteBody
+import io.micronaut.http.server.netty.body.NettyByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
@@ -17,6 +21,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.EmptyHttpHeaders
 import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -36,24 +41,22 @@ import io.netty.handler.codec.http2.Http2Exception
 import io.netty.handler.codec.http2.Http2Frame
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
-import io.netty.handler.codec.http2.Http2FrameLogger
 import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
-import io.netty.handler.logging.LogLevel
 import io.netty.util.AsciiString
 import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.channels.ClosedChannelException
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
@@ -90,7 +93,6 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.connect(server, client)
         // adding to the pipeline writes the http2 preface, so do it after connecting the server and client
         server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(requestHandler)
-                .frameLogger(new Http2FrameLogger(LogLevel.INFO)) // TODO
                 .build())
         def duplexHandler = new DuplexHandler()
         client.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
@@ -110,7 +112,8 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 Assertions.assertEquals(HttpMethod.GET, request.method())
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
@@ -156,8 +159,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).cast(ByteBuf).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         serverSubscription = s
@@ -249,7 +252,8 @@ class Http2ServerHandlerSpec extends Specification {
         long demand = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -342,14 +346,15 @@ class Http2ServerHandlerSpec extends Specification {
         long read = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                outboundAccess.writeStream(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new InputStream() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), InputStreamByteBody.create(new InputStream() {
                     @Override
                     int read() throws IOException {
                         read++
                         return 1
                     }
-                }, service)
+                }, OptionalLong.empty(), service, NettyByteBufferFactory.DEFAULT))
             }
 
             @Override
@@ -374,11 +379,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() instanceof Http2HeadersFrame
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            // floor(windowSize/CHUNK_SIZE) chunks successfully written
-            // 1 chunk waiting in the write future
-            // QUEUE_SIZE chunks in queue
-            // 1 chunk waiting in the reader thread
-            read == (BlockingWriter.QUEUE_SIZE + windowSize.intdiv(BlockingWriter.CHUNK_SIZE) + 2) * BlockingWriter.CHUNK_SIZE
+            // 8192 is ExtendedInputStream.CHUNK_SIZE
+            read == (windowSize.intdiv(8192) + 1) * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
@@ -387,7 +389,7 @@ class Http2ServerHandlerSpec extends Specification {
         // have to munch a number of bytes that is:
         // - not too close to a multiple of windowSize so that we aren't below the window update threshold
         // - not too small to be satisfied by the existing buffered chunks
-        int toConsume = (int) (BlockingWriter.CHUNK_SIZE * 1.6)
+        int toConsume = (int) (8192 * 5.5)
         while (toConsume > 0) {
             def n = Math.min(duplexHandler.received.readableBytes(), toConsume)
             duplexHandler.received.skipBytes(n)
@@ -398,9 +400,7 @@ class Http2ServerHandlerSpec extends Specification {
         then:"more chunks read from the input stream"
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            // two more chunks
-            read == BlockingWriter.CHUNK_SIZE * 2
-            println(duplexHandler.received.readableBytes())
+            read == 6 * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
@@ -420,8 +420,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean complete = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.rawContent(new HttpServerConfiguration()).asPublisher()).cast(ByteBuf).subscribe(new Subscriber<ByteBuf>() {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         s.request(Long.MAX_VALUE)
@@ -495,7 +495,8 @@ class Http2ServerHandlerSpec extends Specification {
         Subscriber<? super HttpContent> subscriber = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -563,11 +564,11 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "closeIfNoSubscriber"() {
         given:
-        ByteBody b = null
+        CloseableByteBody b = null
         OutboundAccess oa = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 b = body
                 oa = outboundAccess
             }
@@ -594,7 +595,7 @@ class Http2ServerHandlerSpec extends Specification {
         when:"send some data, then close the request"
         def data1 = randomData(500)
         client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
-        b.release()
+        b.close()
         EmbeddedTestUtil.advance(server, client)
         then:"no reset yet"
         client.readInbound() == null
@@ -625,7 +626,8 @@ class Http2ServerHandlerSpec extends Specification {
         boolean cancelled = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
                 outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
                     @Override
                     void subscribe(Subscriber<? super HttpContent> s) {
@@ -696,7 +698,8 @@ class Http2ServerHandlerSpec extends Specification {
         given:
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
-            void accept(ChannelHandlerContext ctx, HttpRequest request, ByteBody body, OutboundAccess outboundAccess) {
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
             }
 
             @Override
@@ -714,6 +717,105 @@ class Http2ServerHandlerSpec extends Specification {
         Http2PingFrame ack = client.readInbound()
         ack.ack()
         ack.content() == 123
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "100-continue: no continue"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                Assertions.assertEquals(HttpMethod.POST, request.method())
+                Assertions.assertEquals("/", request.uri())
+                Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
+
+                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        req1.set(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        "0".contentEquals(response.headers().get(HttpHeaderNames.CONTENT_LENGTH))
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "100-continue: do continue"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Assertions.assertEquals(HttpMethod.POST, request.method())
+                Assertions.assertEquals("/", request.uri())
+                Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
+
+                InternalByteBody.bufferFlow(body).onComplete((imm, t) -> {
+                    def bb = AvailableNettyByteBody.toByteBuf(imm)
+                    outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        req1.set(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def cresponse = (Http2HeadersFrame) client.readInbound()
+        "100".contentEquals(cresponse.headers().status())
+
+        when:
+        client.writeOutbound(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8), true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        "3".contentEquals(response.headers().get(HttpHeaderNames.CONTENT_LENGTH))
+        !response.isEndStream()
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == "foo"
 
         cleanup:
         client.checkException()

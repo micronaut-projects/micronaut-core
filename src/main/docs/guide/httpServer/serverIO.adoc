@@ -76,4 +76,6 @@ snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", inde
 <1> Returning `null` triggers a 404 (Not Found) response.
 <2> Returning an empty `Mono` triggers a 404 (Not Found) response.
 
-NOTE: Responding with an empty `Publisher` or `Flux` results in an empty array being returned if the content type is JSON.
+NOTE: Responding with an empty `Publisher` or `Flux` is a streaming response, which results in an empty array being returned if the content type is JSON. Annotate the method with api:core.async.annotation.SingleResult[] to disable streaming.
+
+To disable 404 on a null body or an empty publisher set `micronaut.server.not-found-on-missing-body` to `false`.

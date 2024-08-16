@@ -163,6 +163,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
+    /**
+     * Default value for {@link #formMaxFields}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_FIELDS = 128;
+
+    /**
+     * Default value for {@link #formMaxBufferedBytes}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -197,6 +211,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
+    private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
+    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
 
     /**
      * Default empty constructor.
@@ -765,6 +781,48 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @return The maximum number of form fields
+     * @since 4.6.0
+     */
+    public int getFormMaxFields() {
+        return formMaxFields;
+    }
+
+    /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @param formMaxFields The maximum number of form fields
+     * @since 4.6.0
+     */
+    public void setFormMaxFields(int formMaxFields) {
+        this.formMaxFields = formMaxFields;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @return The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public int getFormMaxBufferedBytes() {
+        return formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @param formMaxBufferedBytes The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+        this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
      * Http2 settings.
      */
     @ConfigurationProperties("http2")
@@ -1263,7 +1321,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
-         * Sets the name of the executor.
+         * A named executor service to use for event loop threads
+         * (optional). This property is very specialized. In particular,
+         * it will <i>not</i> solve read timeouts or fix blocking
+         * operations on the event loop, in fact it may do the opposite.
+         * Don't use unless you really know what this does.
+         *
          * @param executor The executor
          */
         public void setExecutor(String executor) {

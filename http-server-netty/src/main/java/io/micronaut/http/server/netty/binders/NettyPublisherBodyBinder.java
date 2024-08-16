@@ -15,33 +15,27 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.server.netty.body.ByteBody;
-import io.micronaut.http.server.netty.body.ImmediateByteBody;
-import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Optional;
@@ -77,7 +71,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
             ByteBody rootBody = nhr.byteBody();
-            if (rootBody instanceof ImmediateByteBody imm && imm.empty()) {
+            if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
             @SuppressWarnings("unchecked")
@@ -86,13 +80,12 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
-                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
+                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), rootBody.toByteBufferPublisher());
                     return () -> Optional.of(pub);
                 }
             }
             // bind a single result
-            ExecutionFlow<Object> flow = rootBody
-                .buffer(nhr.getChannelHandlerContext().alloc())
+            ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
                     Optional<Object> value;
                     try {
@@ -122,37 +115,6 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), message);
             }
             return UnsatisfiedRouteException.create(conversionContext.getArgument());
-        }
-    }
-
-    /**
-     * This method converts a potentially
-     * {@link io.netty.util.ReferenceCounted netty reference counted} and transfers release
-     * ownership to the new object.
-     *
-     * @param conversionService The conversion service
-     * @param conversionContext The context to convert to
-     * @param o The object to convert
-     * @return The converted object
-     */
-    static Object convertAndRelease(ConversionService conversionService, ArgumentConversionContext<?> conversionContext, Object o) {
-        if (o instanceof ByteBufHolder holder) {
-            o = holder.content();
-            if (!((ByteBuf) o).isReadable()) {
-                return null;
-            }
-        }
-
-        Optional<?> converted;
-        if (o instanceof io.netty.util.ReferenceCounted rc) {
-            converted = NettyConverters.refCountAwareConvert(conversionService, rc, conversionContext);
-        } else {
-            converted = conversionService.convert(o, conversionContext);
-        }
-        if (converted.isPresent()) {
-            return converted.get();
-        } else {
-            throw extractError(o, conversionContext);
         }
     }
 }

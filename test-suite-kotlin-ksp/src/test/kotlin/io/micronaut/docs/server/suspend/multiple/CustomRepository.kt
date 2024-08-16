@@ -21,6 +21,8 @@ interface CustomRepository : CoroutineCrudRepository<SomeEntity, Long> {
     // As of Kotlin version 1.7.20 and KAPT, this will generate JVM signature: "SomeEntity findById(long id, continuation)"
     override suspend fun findById(id: Long): SomeEntity?
 
+    override suspend fun deleteById(id: Long): Int
+
     suspend fun xyz(): String
 
     suspend fun abc(): String

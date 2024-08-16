@@ -41,7 +41,7 @@ public class DefaultRouteDataCollector implements RouteDataCollector<Map<String,
     private final RouteData<Object> routeData;
 
     /**
-     * @param routeData       The RouteData
+     * @param routeData The RouteData
      */
     public DefaultRouteDataCollector(RouteData<Object> routeData) {
         this.routeData = routeData;
@@ -69,13 +69,12 @@ public class DefaultRouteDataCollector implements RouteDataCollector<Map<String,
             .map(MediaType::toString)
             .collect(Collectors.joining(" || "));
 
-        return new StringBuilder("{[")
-            .append(route.getUriMatchTemplate())
-            .append("],method=[")
-            .append(route.getHttpMethodName())
-            .append("],produces=[")
-            .append(produces)
-            .append("]}")
-            .toString();
+        return "{[" +
+            route.getUriMatchTemplate() +
+            "],method=[" +
+            route.getHttpMethodName() +
+            "],produces=[" +
+            produces +
+            "]}";
     }
 }

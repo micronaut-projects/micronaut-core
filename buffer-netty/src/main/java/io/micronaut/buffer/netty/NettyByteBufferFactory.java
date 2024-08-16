@@ -17,8 +17,6 @@ package io.micronaut.buffer.netty;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.MutableConversionService;
-import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
@@ -37,7 +35,7 @@ import java.util.function.Supplier;
 @Internal
 @Singleton
 @BootstrapContextCompatible
-public final class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf>, TypeConverterRegistrar {
+public final class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
 
     /**
      * Default Netty ByteBuffer Factory.
@@ -58,17 +56,6 @@ public final class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAl
      */
     public NettyByteBufferFactory(ByteBufAllocator allocator) {
         this.allocatorSupplier = () -> allocator;
-    }
-
-    @Override
-    public void register(MutableConversionService conversionService) {
-        conversionService.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
-        conversionService.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
-            if (byteBuffer instanceof NettyByteBuffer) {
-                return (ByteBuf) byteBuffer.asNativeBuffer();
-            }
-            throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
-        });
     }
 
     @Override

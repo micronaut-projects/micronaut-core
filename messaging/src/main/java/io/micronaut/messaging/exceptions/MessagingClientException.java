@@ -31,7 +31,7 @@ public class MessagingClientException extends MessagingException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public MessagingClientException(String message, Throwable cause) {
         super(message, cause);

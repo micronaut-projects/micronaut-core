@@ -449,12 +449,65 @@ class MaxRequestSizeSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test max buffer"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestBufferSize': '10KB',
+                'spec.name': SPEC_NAME
+        ])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        byte[] kb10 = new byte[10240]
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", kb10).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        byte[] kb101 = new byte[10241]
+        result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/ignored", kb101).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", kb101).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.startsWith("The content length [10241] exceeds the maximum allowed bufferable length [10240]")
+
+        when:
+        byte[] mb1 = new byte[1024000]
+        result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/ignored", mb1).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", mb1).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.matches("The content length \\[\\d+] exceeds the maximum allowed bufferable length \\[10240].*")
+
+        cleanup:
+        client.close()
+        embeddedServer.close()
+    }
+
     @Controller("/test-max-size")
     @Requires(property = "spec.name", value = "MaxRequestSizeSpec")
     static class TestController {
 
         @Post(uri = "/text", consumes = MediaType.TEXT_PLAIN)
         String text(@Body String body) {
+            "OK"
+        }
+
+        // this endpoint ignores the body so it wont trigger the max buffer size
+        @Post(uri = "/ignored", consumes = MediaType.TEXT_PLAIN)
+        String ignored() {
             "OK"
         }
 

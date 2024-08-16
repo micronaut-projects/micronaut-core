@@ -656,6 +656,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             loadTypeMethods
         );
     }
+
     /**
      * Pushes a new Argument creation.
      *

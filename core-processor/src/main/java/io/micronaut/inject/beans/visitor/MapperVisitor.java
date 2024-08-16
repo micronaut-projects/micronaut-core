@@ -111,7 +111,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
     }
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

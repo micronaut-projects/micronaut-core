@@ -25,12 +25,9 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -59,32 +56,11 @@ import java.io.OutputStream;
  *
  * @param <T> The type
  */
-@SuppressWarnings("DefaultAnnotationParam")
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)
-@Produces({
-    MediaType.APPLICATION_JSON,
-    MediaType.TEXT_JSON,
-    MediaType.APPLICATION_HAL_JSON,
-    MediaType.APPLICATION_JSON_GITHUB,
-    MediaType.APPLICATION_JSON_FEED,
-    MediaType.APPLICATION_JSON_PATCH,
-    MediaType.APPLICATION_JSON_MERGE_PATCH,
-    MediaType.APPLICATION_JSON_PROBLEM,
-    MediaType.APPLICATION_JSON_SCHEMA
-})
-@Consumes({
-    MediaType.APPLICATION_JSON,
-    MediaType.TEXT_JSON,
-    MediaType.APPLICATION_HAL_JSON,
-    MediaType.APPLICATION_JSON_GITHUB,
-    MediaType.APPLICATION_JSON_FEED,
-    MediaType.APPLICATION_JSON_PATCH,
-    MediaType.APPLICATION_JSON_MERGE_PATCH,
-    MediaType.APPLICATION_JSON_PROBLEM,
-    MediaType.APPLICATION_JSON_SCHEMA
-})
+@JsonMessageHandler.ProducesJson
+@JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
 @Requires(beans = JsonMapper.class)
 public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler, NettyBodyWriter<T> {
@@ -154,9 +130,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     @Override
     public void writeTo(@NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object, @NonNull NettyWriteContext nettyContext) throws CodecException {
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) outgoingResponse.getHeaders();
-        if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
+        nettyHttpHeaders.setIfMissing(HttpHeaderNames.CONTENT_TYPE, mediaType);
         ByteBuf buffer = nettyContext.alloc().buffer();
         JsonMapper jsonMapper = jsonMessageHandler.getJsonMapper();
         try {
@@ -170,7 +144,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new NettyJsonHandler<>((JsonMessageHandler<T>) jsonMessageHandler.createSpecific(type));
+        return new NettyJsonHandler<>(jsonMessageHandler.createSpecific(type));
     }
 
     @Override

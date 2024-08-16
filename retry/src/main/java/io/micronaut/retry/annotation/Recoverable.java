@@ -46,8 +46,8 @@ public @interface Recoverable {
      * where the fallback is not a direct subclass of the implementation.
      *
      * @return The API to look up a fallback for
-     * @since 2.0.0
      * @see Fallback
+     * @since 2.0.0
      */
     Class<?> api() default void.class;
 }

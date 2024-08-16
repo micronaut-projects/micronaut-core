@@ -3,6 +3,7 @@ package io.micronaut.management.endpoint.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -121,7 +122,7 @@ result.each { println "$it.key => $it.value"}
     static class LegacyEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
 
         @Override
-        void specifyFiltering(EnvironmentFilterSpecification specification) {
+        void specifyFiltering(@NonNull EnvironmentFilterSpecification specification) {
             specification.legacyMasking()
         }
     }
@@ -168,7 +169,7 @@ result.each { println "$it.key => $it.value"}
     static class IndividualEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
 
         @Override
-        void specifyFiltering(EnvironmentFilterSpecification specification) {
+        void specifyFiltering(@NonNull EnvironmentFilterSpecification specification) {
             specification.maskNone().exclude("iShouldBeMasked")
         }
     }
@@ -196,7 +197,7 @@ result.each { println "$it.key => $it.value"}
     static class IndividualPlusLegacyEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
 
         @Override
-        void specifyFiltering(EnvironmentFilterSpecification specification) {
+        void specifyFiltering(@NonNull EnvironmentFilterSpecification specification) {
             specification.legacyMasking().exclude('iShouldBeMasked')
         }
     }
@@ -229,7 +230,7 @@ result.each { println "$it.key => $it.value"}
     static class HiddenAndMaskedEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
 
         @Override
-        void specifyFiltering(EnvironmentFilterSpecification specification) {
+        void specifyFiltering(@NonNull EnvironmentFilterSpecification specification) {
             specification.maskAll().exclude('dontMaskMe')
         }
     }

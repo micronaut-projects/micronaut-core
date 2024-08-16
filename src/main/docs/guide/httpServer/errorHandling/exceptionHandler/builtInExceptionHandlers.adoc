@@ -12,6 +12,14 @@ The Micronaut framework ships with several built-in handlers:
 | api:http.server.exceptions.DuplicateRouteHandler[]
 | api:http.exceptions.HttpStatusException[]
 | api:http.server.exceptions.HttpStatusHandler[]
+| api:http.exceptions.UnsupportedMediaException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.exceptions.NotFoundException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.exceptions.NotAcceptableException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.exceptions.NotAllowedException[]
+| api:http.server.exceptions.NotAllowedExceptionHandler[]
 | `com.fasterxml.jackson.core.JsonProcessingException`
 | api:http.server.exceptions.JsonExceptionHandler[]
 | `java.net.URISyntaxException`

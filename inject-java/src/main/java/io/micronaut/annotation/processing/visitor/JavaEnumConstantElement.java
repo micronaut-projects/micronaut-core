@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -36,10 +37,10 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
     private final JavaEnumElement declaringEnum;
 
     /**
-     * @param declaringEnum             The declaring enum element
-     * @param nativeElement             The native element
+     * @param declaringEnum The declaring enum element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaEnumConstantElement(JavaEnumElement declaringEnum,
                             JavaNativeElement.Variable nativeElement,
@@ -50,7 +51,7 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
     }
 
     @Override
-    public JavaNativeElement.Variable getNativeType() {
+    public JavaNativeElement.@NonNull Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
     }
 
@@ -69,6 +70,7 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
         return declaringEnum;
     }
 
+    @NonNull
     @Override
     public ClassElement getType() {
         return declaringEnum;
@@ -111,11 +113,6 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
 
     @Override
     public boolean isProtected() {
-        return false;
-    }
-
-    @Override
-    public boolean isPrimitive() {
         return false;
     }
 

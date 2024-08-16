@@ -67,7 +67,7 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String[] ANNOTATION_STEREOTYPES = new String[]{
+    private static final String[] ANNOTATION_STEREOTYPES = new String[] {
         AnnotationUtil.POST_CONSTRUCT,
         AnnotationUtil.PRE_DESTROY,
         "jakarta.annotation.PreDestroy",
@@ -170,7 +170,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // process remaining
             int count = beanDefinitions.size();
             if (count > 0) {
-                note("Creating bean classes for %s type elements", count);
                 ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
                 for (String className : beanDefinitions) {
                     if (processed.add(className)) {

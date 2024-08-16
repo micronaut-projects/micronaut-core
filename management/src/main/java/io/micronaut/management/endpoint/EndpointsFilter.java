@@ -42,7 +42,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Requires(missingBeans = EndpointSensitivityHandler.class)
-@ServerFilter(Filter.MATCH_ALL_PATTERN)
+@ServerFilter(value = Filter.MATCH_ALL_PATTERN, appendContextPath = false)
 @Internal
 public class EndpointsFilter implements Ordered {
 
@@ -50,6 +50,7 @@ public class EndpointsFilter implements Ordered {
 
     /**
      * Constructor.
+     *
      * @param endpointSensitivityProcessor The processor that resolves endpoint sensitivity
      */
     public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor) {

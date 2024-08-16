@@ -109,20 +109,20 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
         return memberElement.getAnnotationMetadata();
     }
 
-    protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement) {
+    protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement classElement, MethodElement methodElement) {
         AopProxyWriter aopProxyWriter = (AopProxyWriter) visitor;
 
-        final AnnotationMetadata resolvedTypeMetadata = typeElement.getAnnotationMetadata();
+        final AnnotationMetadata resolvedTypeMetadata = classElement.getAnnotationMetadata();
         final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
 
         if (methodElement.isAbstract()
             || resolvedTypeMetadataIsAopProxyType
             || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
-            addToIntroduction(aopProxyWriter, typeElement, methodElement, false);
+            addToIntroduction(aopProxyWriter, classElement, methodElement, false);
             return true;
-        } else if (!methodElement.isAbstract() && methodElement.hasDeclaredStereotype(Executable.class)) {
+        } else if (methodElement.hasDeclaredStereotype(Executable.class)) {
             aopProxyWriter.visitExecutableMethod(
-                typeElement,
+                classElement,
                 methodElement,
                 visitorContext
             );

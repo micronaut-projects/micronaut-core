@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.netty.body;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
@@ -29,8 +28,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
-import io.micronaut.http.body.RawMessageBodyHandler;
+import io.micronaut.http.body.TypedMessageBodyHandler;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
@@ -48,7 +48,6 @@ import org.reactivestreams.Publisher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Collection;
 
 /**
  * Netty-specific writer implementation.
@@ -57,12 +56,17 @@ import java.util.Collection;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-@Bean(typed = RawMessageBodyHandler.class)
-public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>, RawMessageBodyHandler<Writable> {
+public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>, TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
+
     private final WritableBodyWriter defaultWritable;
 
     public NettyWritableBodyWriter(ApplicationConfiguration applicationConfiguration) {
         defaultWritable = new WritableBodyWriter(applicationConfiguration);
+    }
+
+    @Override
+    public Argument<Writable> getType() {
+        return Argument.of(Writable.class);
     }
 
     @Override
@@ -85,7 +89,7 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
                 ((NettyHttpHeaders) outgoingHeaders).getNettyHeaders(),
                 EmptyHttpHeaders.INSTANCE
             );
-            object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
+            object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, outgoingHeaders));
             nettyContext.writeFull(fullHttpResponse);
         } catch (IOException e) {
             throw new MessageBodyException("Error writing body from writable", e);
@@ -107,8 +111,4 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
         return defaultWritable.read(type, mediaType, httpHeaders, inputStream);
     }
 
-    @Override
-    public Collection<? extends Class<?>> getTypes() {
-        return defaultWritable.getTypes();
-    }
 }

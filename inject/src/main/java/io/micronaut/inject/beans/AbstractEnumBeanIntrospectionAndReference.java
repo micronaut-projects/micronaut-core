@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -47,7 +48,9 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
      * @param propertiesRefs                The property references
      * @param methodsRefs                   The method references
      * @param enumValueRefs                 The enum references
+     * @deprecated the type {@link EnumConstantRef} is replaced by {@link EnumConstantDynamicRef}
      */
+    @Deprecated
     protected AbstractEnumBeanIntrospectionAndReference(Class<E> beanType,
                                                         AnnotationMetadata annotationMetadata,
                                                         AnnotationMetadata constructorAnnotationMetadata,
@@ -55,6 +58,28 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
                                                         BeanPropertyRef<Object>[] propertiesRefs,
                                                         BeanMethodRef<Object>[] methodsRefs,
                                                         EnumConstantRef<E>[] enumValueRefs) {
+        super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
+        this.enumConstantRefs = List.of(enumValueRefs);
+    }
+
+    /**
+     * The default constructor.
+     *
+     * @param beanType                      The bean type
+     * @param annotationMetadata            The annotation metadata
+     * @param constructorAnnotationMetadata The constructor annotation metadata
+     * @param constructorArguments          The constructor arguments
+     * @param propertiesRefs                The property references
+     * @param methodsRefs                   The method references
+     * @param enumValueRefs                 The enum references
+     */
+    protected AbstractEnumBeanIntrospectionAndReference(Class<E> beanType,
+                                                        AnnotationMetadata annotationMetadata,
+                                                        AnnotationMetadata constructorAnnotationMetadata,
+                                                        Argument<?>[] constructorArguments,
+                                                        BeanPropertyRef<Object>[] propertiesRefs,
+                                                        BeanMethodRef<Object>[] methodsRefs,
+                                                        EnumConstantDynamicRef<E>[] enumValueRefs) {
         super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
         this.enumConstantRefs = List.of(enumValueRefs);
     }
@@ -67,9 +92,11 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
 
     /**
      * Enum value compile-time data container.
+     * @deprecated the type {@link EnumConstantRef} is replaced by {@link EnumConstantDynamicRef}
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     public record EnumConstantRef<E extends Enum<E>>(@NonNull E value,
                                                      @NonNull AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
 
@@ -77,6 +104,32 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
         @Override
         public E getValue() {
             return value;
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+    }
+
+    /**
+     * Enum value compile-time data container.
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public record EnumConstantDynamicRef<E extends Enum<E>>(@NonNull AnnotationClassValue<E> enumClass,
+                                                            @NonNull String name,
+                                                            @NonNull AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
+
+        @NonNull
+        @Override
+        public E getValue() {
+            Class<E> type = enumClass.getType().orElse(null);
+            if (type == null) {
+                throw new IllegalStateException("Enum type: " + enumClass.getType() + " is not present on the classpath!");
+            }
+            return Enum.valueOf(type, name);
         }
 
         @NonNull

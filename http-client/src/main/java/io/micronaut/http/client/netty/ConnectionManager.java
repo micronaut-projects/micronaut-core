@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
@@ -55,6 +56,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpScheme;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -69,6 +71,7 @@ import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
@@ -89,11 +92,18 @@ import io.netty.incubator.codec.http3.Http3SettingsFrame;
 import io.netty.incubator.codec.quic.QuicChannel;
 import io.netty.incubator.codec.quic.QuicSslContext;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.resolver.AddressResolver;
+import io.netty.resolver.AddressResolverGroup;
+import io.netty.resolver.DefaultAddressResolverGroup;
+import io.netty.resolver.DefaultNameResolver;
+import io.netty.resolver.InetSocketAddressResolver;
 import io.netty.resolver.NoopAddressResolverGroup;
+import io.netty.resolver.RoundRobinInetAddressResolver;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -112,6 +122,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -134,8 +145,13 @@ public class ConnectionManager {
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
+
     private EventLoopGroup group;
     private final boolean shutdownGroup;
+
+    private final AddressResolverGroup<?> resolverGroup;
+
+    private final AtomicBoolean running = new AtomicBoolean(false);
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -158,6 +174,7 @@ public class ConnectionManager {
         this.log = from.log;
         this.group = from.group;
         this.shutdownGroup = from.shutdownGroup;
+        this.resolverGroup = from.resolverGroup;
         this.threadFactory = from.threadFactory;
         this.socketChannelFactory = from.socketChannelFactory;
         this.udpChannelFactory = from.udpChannelFactory;
@@ -182,7 +199,8 @@ public class ConnectionManager {
         ChannelFactory<? extends Channel> udpChannelFactory,
         ClientSslBuilder nettyClientSslBuilder,
         NettyClientCustomizer clientCustomizer,
-        String informationalServiceId) {
+        String informationalServiceId,
+        @Nullable AddressResolverGroup<?> resolverGroup) {
 
         if (httpVersion == null) {
             httpVersion = HttpVersionSelection.forClientConfiguration(configuration);
@@ -206,6 +224,8 @@ public class ConnectionManager {
             shutdownGroup = true;
         }
 
+        this.resolverGroup = resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : resolverGroup;
+
         refresh();
     }
 
@@ -224,6 +244,7 @@ public class ConnectionManager {
             http3SslContext = null;
         }
         initBootstrap();
+        running.set(true);
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
@@ -315,10 +336,12 @@ public class ConnectionManager {
      * @see DefaultHttpClient#start()
      */
     public final void start() {
-        // only need to start new group if it's managed by us
-        if (shutdownGroup) {
-            group = createEventLoopGroup(configuration, threadFactory);
-            initBootstrap(); // rebuild bootstrap with new group
+        if (running.compareAndSet(false, true)) {
+            // only need to start new group if it's managed by us
+            if (shutdownGroup) {
+                group = createEventLoopGroup(configuration, threadFactory);
+                initBootstrap(); // rebuild bootstrap with new group
+            }
         }
     }
 
@@ -343,40 +366,59 @@ public class ConnectionManager {
             Object v = entry.getValue();
             if (v != null) {
                 String channelOption = entry.getKey();
-                bootstrap.option(ChannelOption.valueOf(channelOption), v);
+                bootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
             }
         }
+
+        bootstrap.resolver(resolverGroup);
+    }
+
+    static @NonNull AddressResolverGroup<? extends SocketAddress> getResolver(HttpClientConfiguration.@NonNull DnsResolutionMode mode) {
+        return switch (mode) {
+            case DEFAULT -> DefaultAddressResolverGroup.INSTANCE;
+            case NOOP -> NoopAddressResolverGroup.INSTANCE;
+            case ROUND_ROBIN -> new AddressResolverGroup<InetSocketAddress>() {
+                @Override
+                protected AddressResolver<InetSocketAddress> newResolver(EventExecutor executor) {
+                    return new InetSocketAddressResolver(executor, new RoundRobinInetAddressResolver(executor, new DefaultNameResolver(executor)));
+                }
+            };
+        };
     }
 
     /**
      * @see DefaultHttpClient#stop()
      */
     public final void shutdown() {
-        for (Pool pool : pools.values()) {
-            pool.shutdown();
-        }
-        if (shutdownGroup) {
-            Duration shutdownTimeout = configuration.getShutdownTimeout()
-                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
-            Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
-                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+        if (running.compareAndSet(true, false)) {
 
-            Future<?> future = group.shutdownGracefully(
-                shutdownQuietPeriod.toMillis(),
-                shutdownTimeout.toMillis(),
-                TimeUnit.MILLISECONDS
-            );
-            try {
-                future.await(shutdownTimeout.toMillis());
-            } catch (InterruptedException e) {
-                // ignore
-                Thread.currentThread().interrupt();
+            for (Pool pool : pools.values()) {
+                pool.shutdown();
             }
+            if (shutdownGroup) {
+                Duration shutdownTimeout = configuration.getShutdownTimeout()
+                    .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                    .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+
+                Future<?> future = group.shutdownGracefully(
+                    shutdownQuietPeriod.toMillis(),
+                    shutdownTimeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+                );
+                try {
+                    future.await(shutdownTimeout.toMillis());
+                } catch (InterruptedException e) {
+                    // ignore
+                    Thread.currentThread().interrupt();
+                }
+            }
+            ReferenceCountUtil.release(sslContext);
+            ReferenceCountUtil.release(websocketSslContext);
+            resolverGroup.close();
+            sslContext = null;
+            websocketSslContext = null;
         }
-        ReferenceCountUtil.release(sslContext);
-        ReferenceCountUtil.release(websocketSslContext);
-        sslContext = null;
-        websocketSslContext = null;
     }
 
     /**
@@ -385,7 +427,7 @@ public class ConnectionManager {
      * @return Whether this connection manager is still running and can serve requests
      */
     public final boolean isRunning() {
-        return !group.isShutdown();
+        return running.get() && !group.isShutdown();
     }
 
     /**
@@ -458,7 +500,7 @@ public class ConnectionManager {
                         }
                     }
                 }
-            } else if (configuration.getProxyAddress().isEmpty()){
+            } else if (configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }
@@ -579,8 +621,8 @@ public class ConnectionManager {
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient();
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final io.netty.handler.logging.LogLevel nettyLevel =
-                    io.netty.handler.logging.LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel =
+                    LogLevel.valueOf(logLevel.name());
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -614,8 +656,8 @@ public class ConnectionManager {
     private void addLogHandler(Channel ch) {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final io.netty.handler.logging.LogLevel nettyLevel =
-                    io.netty.handler.logging.LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel =
+                    LogLevel.valueOf(logLevel.name());
                 ch.pipeline().addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -811,7 +853,7 @@ public class ConnectionManager {
                 @Override
                 public void channelActive(@NonNull ChannelHandlerContext ctx) throws Exception {
                     DefaultFullHttpRequest upgradeRequest =
-                        new DefaultFullHttpRequest(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
+                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
 
                     // Set HOST header as the remote peer may require it.
                     upgradeRequest.headers().set(HttpHeaderNames.HOST, pool.requestKey.getHost() + ':' + pool.requestKey.getPort());
@@ -982,7 +1024,7 @@ public class ConnectionManager {
 
     /**
      * This class represents one pool, and matches to exactly one
-     * {@link io.micronaut.http.client.netty.DefaultHttpClient.RequestKey} (i.e. host, port and
+     * {@link DefaultHttpClient.RequestKey} (i.e. host, port and
      * protocol are the same for one pool).
      * <p>
      * The superclass {@link PoolResizer} handles pool size management, this class just implements
@@ -1113,7 +1155,7 @@ public class ConnectionManager {
             ScheduledFuture<?> ttlFuture;
             volatile boolean windDownConnection = false;
 
-            private ResettableReadTimeoutHandler readTimeoutHandler;
+            private ReadTimeoutHandler readTimeoutHandler;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
@@ -1125,7 +1167,7 @@ public class ConnectionManager {
              */
             private void resetReadTimeout() {
                 if (readTimeoutHandler != null) {
-                    readTimeoutHandler.resetReadTimeoutMn();
+                    readTimeoutHandler.resetReadTimeout();
                 }
             }
 
@@ -1140,7 +1182,7 @@ public class ConnectionManager {
                 // read timeout handles timeouts *during* a request
                 configuration.getReadTimeout()
                     .ifPresent(dur -> {
-                        ResettableReadTimeoutHandler readTimeoutHandler = new ResettableReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
+                        ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
                                 if (hasLiveRequests()) {
@@ -1409,6 +1451,27 @@ public class ConnectionManager {
                         ChannelPipelineCustomizer.HANDLER_SSL :
                         ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
+
+                HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
+                if (http2Configuration != null) {
+                    long read = toNanos(http2Configuration.getPingIntervalRead());
+                    long write = toNanos(http2Configuration.getPingIntervalWrite());
+                    long idle = toNanos(http2Configuration.getPingIntervalIdle());
+                    if (read > 0 || write > 0 || idle > 0) {
+                        channel.pipeline().addAfter(
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_PING_SENDER,
+                            new Http2PingSender(read, write, idle, TimeUnit.NANOSECONDS));
+                    }
+                }
+            }
+
+            private static long toNanos(@Nullable Duration timeout) {
+                if (timeout == null) {
+                    return 0;
+                }
+                long nanos = timeout.toNanos();
+                return nanos < 0 ? 0 : nanos;
             }
 
             @Override

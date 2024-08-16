@@ -56,7 +56,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     Element declaringElement,
                                     GroovyNativeElement placeholderNativeElement,
                                     @Nullable
-                                            GroovyClassElement resolved,
+                                    GroovyClassElement resolved,
                                     List<GroovyClassElement> bounds,
                                     int arrayDimensions,
                                     boolean rawType,
@@ -75,10 +75,10 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     int arrayDimensions,
                                     boolean rawType) {
         super(visitorContext,
-                classElementRepresentingThisPlaceholder.getNativeType(),
-                classElementRepresentingThisPlaceholder.getElementAnnotationMetadataFactory(),
-                classElementRepresentingThisPlaceholder.resolvedTypeArguments,
-                arrayDimensions);
+            classElementRepresentingThisPlaceholder.getNativeType(),
+            classElementRepresentingThisPlaceholder.getElementAnnotationMetadataFactory(),
+            classElementRepresentingThisPlaceholder.resolvedTypeArguments,
+            arrayDimensions);
         this.declaringElement = declaringElement;
         this.placeholderNativeElement = placeholderNativeElement;
         this.variableName = variableName;
@@ -107,6 +107,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         return getGenericTypeAnnotationMetadata();
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -115,16 +116,19 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         return genericTypeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
+    @NonNull
     @Override
     public GroovyNativeElement getGenericNativeType() {
         return placeholderNativeElement;
@@ -135,6 +139,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         return rawType;
     }
 
+    @NonNull
     @Override
     protected GroovyClassElement copyConstructor() {
         return new GroovyGenericPlaceholderElement(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), getArrayDimensions(), rawType);

@@ -32,7 +32,7 @@ public class MessagingSystemException extends MessagingException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public MessagingSystemException(String message, Throwable cause) {
         super(message, cause);
