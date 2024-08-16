@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
@@ -34,7 +35,6 @@ import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.body.NettyBodyWriter;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.scheduling.TaskExecutors;
@@ -80,12 +80,8 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public ServerHttpResponse<?> writeTo(HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
+    public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
         return writeTo(request, httpResponse, object);
-    }
-
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile, NettyWriteContext nettyContext) throws CodecException {
-        nettyContext.write(writeTo(request, response, systemFile));
     }
 
     public ServerHttpResponse<?> writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {

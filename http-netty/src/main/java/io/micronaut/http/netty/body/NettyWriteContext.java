@@ -18,15 +18,8 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
-import org.reactivestreams.Publisher;
 
 /**
  * This interface is used to write the different kinds of netty responses.
@@ -37,12 +30,6 @@ import org.reactivestreams.Publisher;
 @Experimental
 public interface NettyWriteContext {
     /**
-     * @return The bytebuf allocator.
-     */
-    @NonNull
-    ByteBufAllocator alloc();
-
-    /**
      * Write a response.
      *
      * @param response The response status, headers etc
@@ -50,35 +37,11 @@ public interface NettyWriteContext {
      */
     void write(@NonNull HttpResponse response, @NonNull ByteBody body);
 
-    @Deprecated // TODO
-    default void write(@NonNull ServerHttpResponse<?> response) {
-        NettyMutableHttpResponse<?> nhr = (NettyMutableHttpResponse<?>) ((ServerHttpResponseWrapper<?>) response).getDelegate();
-        write(nhr.toHttpResponse(), response.byteBody());
-    }
-
     /**
-     * Write a full response.
+     * Write a response to a {@code HEAD} request. This is special because it never has a body but
+     * may still have a non-zero {@code Content-Length} header.
      *
-     * @param response The response to write
+     * @param response The response status, headers etc
      */
-    default void writeFull(@NonNull FullHttpResponse response) {
-        writeFull(response, false);
-    }
-
-    /**
-     * Write a full response.
-     *
-     * @param response The response to write
-     * @param headResponse If {@code true}, this is a response to a {@code HEAD} request, so the
-     * {@code Content-Length} header should not be overwritten.
-     */
-    void writeFull(@NonNull FullHttpResponse response, boolean headResponse);
-
-    /**
-     * Write a streamed response.
-     *
-     * @param response The response to write
-     * @param content  The body
-     */
-    void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
+    void writeHeadResponse(@NonNull HttpResponse response);
 }

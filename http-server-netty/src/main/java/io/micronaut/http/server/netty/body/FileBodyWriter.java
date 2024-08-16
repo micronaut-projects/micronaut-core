@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
@@ -48,7 +49,7 @@ public final class FileBodyWriter implements NettyBodyWriter<File> {
     }
 
     @Override
-    public ServerHttpResponse<?> writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
+    public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
         SystemFile systemFile = new SystemFile(object);
         MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
         return systemFileBodyWriter.writeTo(request, newResponse, systemFile);

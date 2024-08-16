@@ -30,8 +30,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
+import io.micronaut.http.ServerHttpResponseWrapper;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.codec.CodecException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -161,20 +164,24 @@ public interface MessageBodyWriter<T> {
         @NonNull OutputStream outputStream) throws CodecException;
 
     /**
-     * Writes an object to the given output stream.
+     * Writes an object as a {@link ServerHttpResponse}.
      *
-     * @param type            The type
-     * @param mediaType       The media type
-     * @param object          The object to write
+     * @param bufferFactory
+     * @param type          The type
+     * @param mediaType     The media type
+     * @param object        The object to write
      * @throws CodecException If an error occurs decoding
      */
     default ServerHttpResponse<?> writeTo(
+        @NonNull ByteBufferFactory<?, ?> bufferFactory,
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> httpResponse,
         @NonNull Argument<T> type,
         @NonNull MediaType mediaType,
         T object) throws CodecException {
-
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        writeTo(type, mediaType, object, httpResponse.getHeaders(), baos);
+        return ServerHttpResponseWrapper.wrap(httpResponse, AvailableByteArrayBody.create(bufferFactory, baos.toByteArray()));
     }
 
     /**

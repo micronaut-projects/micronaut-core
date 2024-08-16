@@ -121,6 +121,7 @@ public interface NettyHttpResponseBuilder {
      * @return The full response.
      * @since 4.3.0
      */
+    @Deprecated
     static @NonNull FullHttpResponse toFullHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response, @NonNull ByteBuf byteBuf) {
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
