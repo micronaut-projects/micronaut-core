@@ -54,7 +54,7 @@ import java.io.OutputStream;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>, TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
+public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
 
     private final WritableBodyWriter defaultWritable;
 

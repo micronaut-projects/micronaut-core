@@ -24,11 +24,9 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.netty.handler.codec.http.FullHttpResponse;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -120,14 +118,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         headers.date(now);
     }
 
-    protected FullHttpResponse notModified(MutableHttpResponse<?> originalResponse) {
-        MutableHttpResponse response = HttpResponse.notModified();
-        AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
-        setDateHeader(response);
-        return ((NettyMutableHttpResponse) response).toFullHttpResponse();
-    }
-
-    protected ServerHttpResponse<?> notModified2(MutableHttpResponse<?> originalResponse) {
+    protected ServerHttpResponse<?> notModified(MutableHttpResponse<?> originalResponse) {
         MutableHttpResponse<Void> response = HttpResponse.notModified();
         AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);

@@ -166,12 +166,16 @@ public interface MessageBodyWriter<T> {
     /**
      * Writes an object as a {@link ServerHttpResponse}.
      *
-     * @param bufferFactory
-     * @param type          The type
+     * @param bufferFactory The buffer factory
+     * @param request       The request
+     * @param httpResponse  The response
+     * @param type          The response body type
      * @param mediaType     The media type
      * @param object        The object to write
-     * @throws CodecException If an error occurs decoding
+     * @return A {@link ServerHttpResponse} with the response bytes
+     * @throws CodecException If an error occurs encoding
      */
+    @NonNull
     default ServerHttpResponse<?> writeTo(
         @NonNull ByteBufferFactory<?, ?> bufferFactory,
         @NonNull HttpRequest<?> request,

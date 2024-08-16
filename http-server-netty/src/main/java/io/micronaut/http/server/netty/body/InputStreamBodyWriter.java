@@ -28,7 +28,6 @@ import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
@@ -48,7 +47,7 @@ import java.util.concurrent.ExecutorService;
 @Internal
 @Experimental
 @Singleton
-public final class InputStreamBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<InputStream> {
+public final class InputStreamBodyWriter extends AbstractFileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<InputStream> {
     private final ExecutorService executorService;
 
     InputStreamBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {

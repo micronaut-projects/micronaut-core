@@ -50,7 +50,7 @@ import java.nio.charset.StandardCharsets;
 @Singleton
 @Replaces(CharSequenceBodyWriter.class)
 @Internal
-public final class NettyCharSequenceBodyWriter implements MessageBodyWriter<CharSequence>, NettyBodyWriter<CharSequence> {
+public final class NettyCharSequenceBodyWriter implements MessageBodyWriter<CharSequence> {
     private final CharSequenceBodyWriter defaultHandler = new CharSequenceBodyWriter(StandardCharsets.UTF_8);
 
     @Override

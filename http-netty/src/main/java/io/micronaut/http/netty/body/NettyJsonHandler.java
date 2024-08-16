@@ -62,7 +62,7 @@ import java.io.OutputStream;
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
 @Requires(beans = JsonMapper.class)
-public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler, NettyBodyWriter<T> {
+public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonHandler(JsonMapper jsonMapper) {

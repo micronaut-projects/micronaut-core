@@ -28,7 +28,6 @@ import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.scheduling.TaskExecutors;
@@ -49,7 +48,7 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 @Experimental
 @Internal
-public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<StreamedFile> {
+public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<StreamedFile> {
     private final ExecutorService ioExecutor;
 
     StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
@@ -60,7 +59,7 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
     @Override
     public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object) throws CodecException {
         if (handleIfModifiedAndHeaders(request, outgoingResponse, object, outgoingResponse)) {
-            return notModified2(outgoingResponse);
+            return notModified(outgoingResponse);
         } else {
             long length = object.getLength();
             InputStream inputStream = object.getInputStream();

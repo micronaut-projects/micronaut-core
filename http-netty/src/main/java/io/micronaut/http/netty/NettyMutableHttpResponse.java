@@ -170,6 +170,12 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         }
     }
 
+    /**
+     * Create a non-body netty response from the given MN response.
+     *
+     * @param response The mn response
+     * @return The netty response
+     */
     public static @NonNull HttpResponse toNoBodyResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {

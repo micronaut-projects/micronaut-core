@@ -34,7 +34,6 @@ import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.scheduling.TaskExecutors;
@@ -64,7 +63,7 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 @Singleton
 @Experimental
 @Internal
-public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<SystemFile> {
+public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<SystemFile> {
     private static final String UNIT_BYTES = "bytes";
 
     private final ExecutorService ioExecutor;
@@ -89,7 +88,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
             throw new MessageBodyException("Could not find file");
         }
         if (handleIfModifiedAndHeaders(request, response, systemFile, response)) {
-            return notModified2(response);
+            return notModified(response);
         } else {
 
             // Parse the range headers (if any), and determine the position and content length

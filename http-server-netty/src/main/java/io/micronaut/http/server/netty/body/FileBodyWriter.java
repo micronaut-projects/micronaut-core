@@ -25,7 +25,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.server.types.files.SystemFile;
 import jakarta.inject.Singleton;
 
@@ -41,7 +40,7 @@ import java.io.OutputStream;
 @Internal
 @Experimental
 @Singleton
-public final class FileBodyWriter implements NettyBodyWriter<File> {
+public final class FileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<File> {
     private final SystemFileBodyWriter systemFileBodyWriter;
 
     public FileBodyWriter(SystemFileBodyWriter systemFileBodyWriter) {
