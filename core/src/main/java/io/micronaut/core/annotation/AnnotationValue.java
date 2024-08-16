@@ -707,6 +707,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
             return annotationClassValues;
         }
+        if (o instanceof String className) {
+            return new AnnotationClassValue[] { getAnnotationClassValue(className) };
+        }
+        if (o instanceof String[] classNames) {
+            return Arrays.stream(classNames).map(AnnotationValue::getAnnotationClassValue).toArray(AnnotationClassValue[]::new);
+        }
         return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
     }
 
@@ -723,6 +729,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (annotationClassValues.length > 0) {
                 return Optional.of(annotationClassValues[0]);
             }
+        }
+        if (o instanceof String className) {
+            return Optional.of(getAnnotationClassValue(className));
+        }
+        if (o instanceof String[] classNames && classNames.length > 0) {
+            return Optional.of(getAnnotationClassValue(classNames[0]));
         }
         return Optional.empty();
     }
@@ -1702,5 +1714,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return Optional.empty();
             }
         }
+    }
+
+    /**
+     * Creates {@link AnnotationClassValue} from the class name.
+     *
+     * @param className The class name
+     * @return AnnotationClassValue for given class name
+     */
+    private static AnnotationClassValue<?> getAnnotationClassValue(String className) {
+        Optional<Class<?>> theClass = ClassUtils.forName(className, null);
+        if (theClass.isPresent()) {
+            return new AnnotationClassValue<>(theClass.get());
+        }
+        return new AnnotationClassValue<>(className);
     }
 }
