@@ -54,7 +54,7 @@ public final class NettyCharSequenceBodyWriter implements MessageBodyWriter<Char
     private final CharSequenceBodyWriter defaultHandler = new CharSequenceBodyWriter(StandardCharsets.UTF_8);
 
     @Override
-    public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
+    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
         ByteBuf byteBuf = ByteBufUtil.encodeString(ByteBufAllocator.DEFAULT, CharBuffer.wrap(object), MessageBodyWriter.getCharset(mediaType, headers));
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;

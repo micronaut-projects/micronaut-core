@@ -48,10 +48,10 @@ public final class FileBodyWriter implements io.micronaut.http.body.MessageBodyW
     }
 
     @Override
-    public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
+    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
         SystemFile systemFile = new SystemFile(object);
         MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
-        return systemFileBodyWriter.writeTo(request, newResponse, systemFile);
+        return systemFileBodyWriter.write(request, newResponse, systemFile);
     }
 
     @Override

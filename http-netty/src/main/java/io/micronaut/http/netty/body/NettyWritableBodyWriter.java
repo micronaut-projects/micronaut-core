@@ -73,7 +73,7 @@ public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Wr
     }
 
     @Override
-    public ServerHttpResponse<?> writeTo(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
+    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
         MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
         if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             outgoingHeaders.contentType(mediaType);

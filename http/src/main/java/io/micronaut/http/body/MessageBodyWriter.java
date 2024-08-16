@@ -176,7 +176,7 @@ public interface MessageBodyWriter<T> {
      * @throws CodecException If an error occurs encoding
      */
     @NonNull
-    default ServerHttpResponse<?> writeTo(
+    default ServerHttpResponse<?> write(
         @NonNull ByteBufferFactory<?, ?> bufferFactory,
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> httpResponse,

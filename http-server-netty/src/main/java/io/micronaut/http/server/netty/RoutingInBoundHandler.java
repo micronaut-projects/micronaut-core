@@ -394,7 +394,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(nettyRequest.getChannelHandlerContext().alloc());
         try {
-            return ExecutionFlow.just(messageBodyWriter.writeTo(bufferFactory, nettyRequest, response, responseBodyType, mediaType, body));
+            return ExecutionFlow.just(messageBodyWriter.write(bufferFactory, nettyRequest, response, responseBodyType, mediaType, body));
         } catch (CodecException e) {
             final MutableHttpResponse<Object> errorResponse = (MutableHttpResponse<Object>) routeExecutor.createDefaultErrorResponse(nettyRequest, e);
             Object errorBody = errorResponse.body();
@@ -402,9 +402,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType errorContentType = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             MessageBodyWriter<Object> errorBodyWriter = messageBodyHandlerRegistry.getWriter(type, List.of(errorContentType));
             if (!onIoExecutor && errorBodyWriter.isBlocking()) {
-                return ExecutionFlow.async(getIoExecutor(), () -> ExecutionFlow.just(errorBodyWriter.writeTo(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody)));
+                return ExecutionFlow.async(getIoExecutor(), () -> ExecutionFlow.just(errorBodyWriter.write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody)));
             } else {
-                return ExecutionFlow.just(errorBodyWriter.writeTo(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
+                return ExecutionFlow.just(errorBodyWriter.write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
             }
         }
     }
