@@ -63,6 +63,7 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
      *
      * @param writer The generic message writer
      * @return The response writer
+     * @param <T> The body type
      */
     @NonNull
     static <T> ResponseBodyWriter<T> wrap(@NonNull MessageBodyWriter<T> writer) {

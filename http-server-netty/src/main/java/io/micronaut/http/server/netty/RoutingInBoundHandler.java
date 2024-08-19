@@ -674,8 +674,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
     /**
      * Replacement for {@link ResponseBodyWriterWrapper} that uses a netty {@link ByteBuf} instead
      * of a byte array as the backing store.
+     *
+     * @param <T> Body type
      */
-    private static class NettyResponseBodyWriterWrapper<T> extends ResponseBodyWriterWrapper<T> {
+    private static final class NettyResponseBodyWriterWrapper<T> extends ResponseBodyWriterWrapper<T> {
         private NettyResponseBodyWriterWrapper(MessageBodyWriter<T> wrapped) {
             super(wrapped);
         }
