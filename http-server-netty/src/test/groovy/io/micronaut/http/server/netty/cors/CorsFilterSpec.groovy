@@ -16,32 +16,27 @@
 package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Primary
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.server.HttpServerConfiguration
-import io.micronaut.http.server.cors.CorsFilter
-import io.micronaut.http.server.cors.CorsOriginConfiguration
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.web.router.RouteMatch
-import io.micronaut.web.router.Router
-import io.micronaut.web.router.UriRouteMatch
-import org.apache.http.client.utils.URIBuilder
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.lang.Unroll
-
-import java.util.stream.Collectors
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
@@ -51,84 +46,71 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
 import static io.micronaut.http.HttpHeaders.VARY
 
+@Property(name = "micronaut.server.cors.enabled", value = "true")
+@Property(name = "micronaut.server.dispatch-options-requests", value = "true")
+@MicronautTest
 class CorsFilterSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Inject
+    @Client("/")
+    HttpClient httpClient
 
     void "non CORS request is passed through"() {
         given:
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration()
-        CorsFilter corsHandler = buildCorsHandler(config)
-        HttpRequest request = createRequest(null as String)
+        def request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then: "the request is passed through"
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().isEmpty()
+        response.headers.names().stream().filter { it.startsWith("Access-Control-Allow-") }.toList().isEmpty()
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
     void "request with origin and no matching configuration"() {
         given:
-        String origin = 'http://www.bar.com'
-        HttpRequest request = createRequest(origin)
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example").header(HttpHeaders.ORIGIN, 'http://www.bar.com')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then: "the request is passed through because no configuration matches the origin"
         HttpStatus.OK == response.status()
-        response.headers.names().isEmpty()
+        response.headers.names().stream().filter { it.startsWith("Access-Control-Allow-") }.toList().isEmpty()
     }
 
     @Unroll
     void "regex matching configuration"(String regex, String origin) {
         given:
-        HttpRequest request = createRequest(origin)
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.empty()
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOriginsRegex = regex
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-        CorsFilter corsHandler = buildCorsHandler(config)
-
-        when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                "micronaut.server.cors.enabled": "true",
+                "micronaut.server.dispatch-options-requests": "true",
+                "micronaut.server.cors.configurations.foo.allowedOrigins": origin,
+                "micronaut.server.cors.configurations.foo.allowedOriginsRegex": "regex"
+        ])
+        def client = embeddedServer.applicationContext.getBean(HttpClient)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, embeddedServer.URL.toString() + "/example").header(HttpHeaders.ORIGIN, origin)
 
         when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = client.toBlocking().exchange(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 3
+        response.headers.names().size() == 7
+        response.headers.contains(HttpHeaders.ALLOW)
+        response.headers.contains(HttpHeaders.DATE)
+        response.headers.contains(HttpHeaders.CONTENT_TYPE)
+        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.headers.find { it.key == 'Access-Control-Allow-Origin' }
         response.headers.find { it.key == 'Vary' }
         response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
         response.headers.find { it.key == 'Access-Control-Allow-Origin' }.value == [origin]
         response.headers.find { it.key == 'Vary' }.value == ['Origin']
         response.headers.find { it.key == 'Access-Control-Allow-Credentials' }.value == [StringUtils.TRUE]
+
+        cleanup:
+        embeddedServer.close()
 
         where:
         regex                               | origin
@@ -141,56 +123,36 @@ class CorsFilterSpec extends Specification {
         '.*(bar|foo)$'                      | 'http://asdfasdf.bar'
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
     void "test handleRequest with disallowed method"() {
         given:
-        String origin = 'http://www.foo.com'
-        HttpRequest request = createRequest(origin)
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.FORBIDDEN == response.status()
-        response.headers.names().isEmpty()
+        response.headers.size() == 1
+        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
     void "with disallowed header (not preflight) the request is passed through because allowed headers are only checked for preflight requests"() {
         given:
-        String origin = 'http://www.foo.com'
-        HttpRequest request = createRequest(origin)
-        request.getMethod() >> HttpMethod.GET
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.GET, "/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 3
+        response.headers.names().size() == 6
+        response.headers.contains(HttpHeaders.DATE)
+        response.headers.contains(HttpHeaders.CONTENT_TYPE)
+        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.headers.find { it.key == 'Access-Control-Allow-Origin' }
         response.headers.find { it.key == 'Vary' }
         response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
@@ -199,83 +161,40 @@ class CorsFilterSpec extends Specification {
         response.headers.find { it.key == 'Access-Control-Allow-Credentials' }.value == [StringUtils.TRUE]
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedHeaders", value = "foo")
     void "test preflight handleRequest with disallowed header"() {
         given:
-        String origin = 'http://www.foo.com'
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of(origin)
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo', 'bar'])
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-        }
-        HttpRequest request = createRequest(headers)
-        request.getMethod() >> HttpMethod.OPTIONS
-        request.getUri() >> new URIBuilder( '/example' ).build()
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).findAny(request.getUri().toString(), request).collect(Collectors.toList())
-
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        originConfig.allowedHeaders = ['foo']
-
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header('foo', 'bar')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then: "the request is rejected because bar is not allowed"
         HttpStatus.FORBIDDEN == response.status()
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedHeaders", value = "foo,bar")
     void "test preflight with allowed header"() {
         given:
-        String origin = 'http://www.foo.com'
-
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of(origin)
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo'])
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-        }
-        HttpRequest request = createRequest(headers)
-        request.getMethod() >> HttpMethod.OPTIONS
-        request.getUri() >> new URIBuilder( '/example' ).build()
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request)
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        originConfig.allowedHeaders = ['foo', 'bar']
-
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
-
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'foo')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 6
+        response.headers.names().size() == 7
+        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.headers.find { it.key == 'Access-Control-Allow-Origin' }
         response.headers.find { it.key == 'Vary' }
         response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
@@ -290,30 +209,14 @@ class CorsFilterSpec extends Specification {
         response.headers.find { it.key == 'Access-Control-Max-Age' }.value == ['1800']
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
     void "test handleResponse when configuration not present"() {
         given:
-        String origin = 'http://www.bar.com'
-        HttpServerConfiguration.CorsConfiguration config = new HttpServerConfiguration.CorsConfiguration()
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        config.setConfigurations([foo: originConfig])
-        CorsFilter corsHandler = buildCorsHandler(config)
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of(origin)
-        }
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-        }
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.bar.com')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        notThrown(NullPointerException)
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
@@ -326,33 +229,22 @@ class CorsFilterSpec extends Specification {
         !response.getHeaders().get(ACCESS_CONTROL_MAX_AGE)
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
     void "verify behaviour for normal request"() {
         given:
-        String origin = 'http://www.foo.com'
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of(origin)
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-        }
-        HttpRequest request = createRequest(headers)
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
-
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header('foo', 'bar')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 5
+        response.headers.names().size() == 7
+        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
         response.getHeaders().getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['Foo-Header', 'Bar-Header' ]// Expose headers are set from config
@@ -360,44 +252,24 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800'
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
     void "test handleResponse for preflight request"() {
         given:
-        HttpHeaders headers = Stub(HttpHeaders) {
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            getOrigin() >> Optional.of('http://www.foo.com')
-        }
-        URI uri = new URIBuilder('/example').build()
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-            getMethod() >> HttpMethod.OPTIONS
-            getUri() >> uri
-            getOrigin() >> headers.getOrigin()
-        }
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(uri.toString(), request)
-                .collect(Collectors.toList())
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route -> route.getHttpMethod()).collect(Collectors.toList()))
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'X-Header')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'Y-Header')
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header('foo', 'bar')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 7
+        response.headers.names().size() == 8
+        response.getHeaders().contains(HttpHeaders.CONTENT_LENGTH)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
@@ -407,41 +279,19 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
 
+    @Property(name = "micronaut.server.cors.singleHeader", value = "true")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
     void "test handleResponse for preflight request with single header"() {
         given:
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
-
-        HttpServerConfiguration.CorsConfiguration config = new HttpServerConfiguration.CorsConfiguration(singleHeader: true, enabled: true)
-        config.setConfigurations([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
-
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of('http://www.foo.com')
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-        }
-        URI uri = new URIBuilder( '/example' ).build()
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-            getMethod() >> HttpMethod.OPTIONS
-            getUri() >> uri
-            getOrigin() >> headers.getOrigin()
-        }
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request)
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'X-Header')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'Y-Header')
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header('foo', 'bar')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
@@ -456,85 +306,34 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
     void "test preflight handleRequest on route that doesn't exists"() {
         given:
-        String origin = 'http://www.foo.com'
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            getOrigin() >> Optional.of(origin)
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-        }
-        URI uri = new URIBuilder( '/doesnt-exists-route' ).build()
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-            getUri() >> uri
-            getMethod() >> HttpMethod.OPTIONS
-        }
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(uri.toString(), request)
-                .collect(Collectors.toList())
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        originConfig.allowedHeaders = ['foo', 'bar']
-
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/doesnt-exists-route")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
-
-        then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
+        HttpResponse<?> response = execute(request)
 
         then:
         HttpStatus.OK == response.status()
     }
 
+    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
     void "test preflight handleRequest on route that does exist but doesn't handle requested HTTP Method"() {
         given:
-
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
-
-        HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
-
-        CorsFilter corsHandler = buildCorsHandler(config)
-
-        String origin = 'http://www.foo.com'
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.of(origin)
-            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.POST)
-            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
-        }
-        URI uri = new URIBuilder( '/example' ).build()
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-            getMethod() >> HttpMethod.OPTIONS
-            getUri() >> uri
-        }
-
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request)
-        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
+        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'POST')
 
         when:
-        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
+        HttpResponse<?> response = execute(request)
 
         then:
-        result.isPresent()
-
-        when:
-        MutableHttpResponse<?> response = result.get()
-
-        then:
-        HttpStatus.OK == response.status()
+        HttpStatus.FORBIDDEN == response.status()
     }
 
     @Controller
@@ -544,50 +343,23 @@ class CorsFilterSpec extends Specification {
         String example() { return "Example"}
     }
 
-    private HttpRequest<?> createRequest(String originHeader) {
-        HttpHeaders headers = Stub(HttpHeaders) {
-            getOrigin() >> Optional.ofNullable(originHeader)
-        }
-        createRequest(headers)
-    }
-
-    private HttpRequest<?> createRequest(HttpHeaders headers) {
-        Stub(HttpRequest) {
-            getHeaders() >> headers
-
-            getOrigin() >> headers.getOrigin()
+    private HttpResponse<?> execute(HttpRequest<?> req) {
+        try {
+            return httpClient.toBlocking().exchange(req)
+        } catch (HttpClientResponseException e) {
+            return e.response
         }
     }
 
-    private Optional<HttpResponse<?>> filterOk(CorsFilter filter, HttpRequest<?> req) {
-        def earlyResponse = filter.filterRequest(req)
-        if (earlyResponse != null) {
-            return Optional.of(earlyResponse)
-        }
-        MutableHttpResponse<?> response = HttpResponse.ok()
-        filter.filterResponse(req, response)
-        return Optional.of(response)
-    }
-
-    private HttpServerConfiguration.CorsConfiguration enabledCorsConfiguration(Map<String, CorsOriginConfiguration> corsConfigurationMap = null) {
-        HttpServerConfiguration.CorsConfiguration config = new HttpServerConfiguration.CorsConfiguration() {
-            @Override
-            boolean isEnabled() {
-                true
-            }
-        }
-        if (corsConfigurationMap != null) {
-            config.setConfigurations(corsConfigurationMap)
-        }
-        config
-    }
-
-    private CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: enabledCorsConfiguration(), new HttpHostResolver() {
+    @Singleton
+    @Primary
+    HttpHostResolver testHttpHostResolver() {
+        return new HttpHostResolver() {
             @Override
             String resolve(@Nullable HttpRequest request) {
                 return "http://micronautexample.com";
             }
-        })
+        }
     }
+
 }
