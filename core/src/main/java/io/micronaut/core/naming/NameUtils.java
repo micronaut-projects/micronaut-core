@@ -246,8 +246,9 @@ public class NameUtils {
             int len = methodName.length();
             int prefixLength = writePrefix.length();
             if (len > prefixLength && methodName.startsWith(writePrefix)) {
-                char nextChar = methodName.charAt(prefixLength);
-                isValid = isValidCharacterAfterReaderWriterPrefix(nextChar);
+                char firstVarNameChar = methodName.charAt(prefixLength);
+                Character secondVarNameChar = len > prefixLength + 1 ? methodName.charAt(prefixLength + 1) : null;
+                isValid = isValidCharacterAfterReaderWriterPrefix(firstVarNameChar, secondVarNameChar);
             }
 
             if (isValid) {
@@ -382,7 +383,8 @@ public class NameUtils {
             int len = methodName.length();
             if (len > prefixLength) {
                 char firstVarNameChar = methodName.charAt(prefixLength);
-                isValid = isValidCharacterAfterReaderWriterPrefix(firstVarNameChar);
+                Character secondVarNameChar = len > prefixLength + 1 ? methodName.charAt(prefixLength + 1) : null;
+                isValid = isValidCharacterAfterReaderWriterPrefix(firstVarNameChar, secondVarNameChar);
             }
 
             if (isValid) {
@@ -393,8 +395,11 @@ public class NameUtils {
         return isValid;
     }
 
-    private static boolean isValidCharacterAfterReaderWriterPrefix(char c) {
-        return c == '_' || c == '$' || Character.isUpperCase(c);
+    private static boolean isValidCharacterAfterReaderWriterPrefix(char c, Character nextChar) {
+        return c == '_' || c == '$' || Character.isUpperCase(c)
+                // case with properties with second uupercase letter. For example `eTemperature`
+                // valid getter name will be `geteTemperature`
+                || (nextChar != null && Character.isLowerCase(c) && Character.isUpperCase(nextChar));
     }
 
     /**
@@ -518,8 +523,14 @@ public class NameUtils {
                 return propertyName;
             case 1:
                 return prefix + propertyName.toUpperCase(Locale.ENGLISH);
-            default:
-                return prefix + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+            default: {
+                var firstChar = propertyName.charAt(0);
+                var secondChar = propertyName.charAt(1);
+                if (Character.isLowerCase(firstChar) && Character.isUpperCase(secondChar)) {
+                    return prefix + propertyName;
+                }
+                return prefix + Character.toUpperCase(firstChar) + propertyName.substring(1);
+            }
         }
     }
 
