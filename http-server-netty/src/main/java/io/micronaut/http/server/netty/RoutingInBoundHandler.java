@@ -42,6 +42,8 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriterWrapper;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -65,6 +67,7 @@ import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.compression.DecompressionException;
@@ -394,7 +397,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(nettyRequest.getChannelHandlerContext().alloc());
         try {
-            return ExecutionFlow.just(messageBodyWriter.write(bufferFactory, nettyRequest, response, responseBodyType, mediaType, body));
+            return ExecutionFlow.just(NettyResponseBodyWriterWrapper.wrap(messageBodyWriter)
+                .write(bufferFactory, nettyRequest, response, responseBodyType, mediaType, body));
         } catch (CodecException e) {
             final MutableHttpResponse<Object> errorResponse = (MutableHttpResponse<Object>) routeExecutor.createDefaultErrorResponse(nettyRequest, e);
             Object errorBody = errorResponse.body();
@@ -402,9 +406,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType errorContentType = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             MessageBodyWriter<Object> errorBodyWriter = messageBodyHandlerRegistry.getWriter(type, List.of(errorContentType));
             if (!onIoExecutor && errorBodyWriter.isBlocking()) {
-                return ExecutionFlow.async(getIoExecutor(), () -> ExecutionFlow.just(errorBodyWriter.write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody)));
+                return ExecutionFlow.async(getIoExecutor(), () -> ExecutionFlow.just(NettyResponseBodyWriterWrapper.wrap(errorBodyWriter)
+                    .write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody)));
             } else {
-                return ExecutionFlow.just(errorBodyWriter.write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
+                return ExecutionFlow.just(NettyResponseBodyWriterWrapper.wrap(errorBodyWriter)
+                    .write(bufferFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
             }
         }
     }
@@ -433,7 +439,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
                     responseBodyType = Argument.ofInstance(message);
-                    messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType));
+                    messageBodyWriter = ResponseBodyWriter.wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
                 return writeAsync(
                     messageBodyWriter,
@@ -661,6 +667,40 @@ public final class RoutingInBoundHandler implements RequestHandler {
             } else {
                 headersSent = true;
                 output.complete(ServerHttpResponseWrapper.wrap(headers, AvailableNettyByteBody.empty()));
+            }
+        }
+    }
+
+    /**
+     * Replacement for {@link ResponseBodyWriterWrapper} that uses a netty {@link ByteBuf} instead
+     * of a byte array as the backing store.
+     */
+    private static class NettyResponseBodyWriterWrapper<T> extends ResponseBodyWriterWrapper<T> {
+        private NettyResponseBodyWriterWrapper(MessageBodyWriter<T> wrapped) {
+            super(wrapped);
+        }
+
+        static <T> ResponseBodyWriter<T> wrap(MessageBodyWriter<T> mbw) {
+            if (mbw instanceof ResponseBodyWriter<T> rbw) {
+                return rbw;
+            } else {
+                return new NettyResponseBodyWriterWrapper<>(mbw);
+            }
+        }
+
+        @Override
+        public @NonNull ServerHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+            ByteBuf buf = ((NettyByteBufferFactory) bufferFactory).buffer().asNativeBuffer();
+            ByteBufOutputStream bbos = new ByteBufOutputStream(buf);
+            boolean release = true;
+            try {
+                writeTo(type, mediaType, object, httpResponse.getHeaders(), bbos);
+                release = false;
+                return ServerHttpResponseWrapper.wrap(httpResponse, new AvailableNettyByteBody(buf));
+            } finally {
+                if (release) {
+                    buf.release();
+                }
             }
         }
     }

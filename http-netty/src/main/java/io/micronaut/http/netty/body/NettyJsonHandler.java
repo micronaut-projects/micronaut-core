@@ -33,6 +33,7 @@ import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.json.JsonFeatures;
@@ -62,7 +63,7 @@ import java.io.OutputStream;
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
 @Requires(beans = JsonMapper.class)
-public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
+public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler, ResponseBodyWriter<T> {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonHandler(JsonMapper jsonMapper) {

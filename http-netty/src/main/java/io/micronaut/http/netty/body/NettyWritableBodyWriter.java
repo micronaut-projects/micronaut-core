@@ -33,6 +33,7 @@ import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.TypedMessageBodyHandler;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -54,7 +55,7 @@ import java.io.OutputStream;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
+public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable>, ResponseBodyWriter<Writable> {
 
     private final WritableBodyWriter defaultWritable;
 

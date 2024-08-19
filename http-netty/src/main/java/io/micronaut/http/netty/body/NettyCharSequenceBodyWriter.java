@@ -29,6 +29,7 @@ import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
@@ -50,7 +51,7 @@ import java.nio.charset.StandardCharsets;
 @Singleton
 @Replaces(CharSequenceBodyWriter.class)
 @Internal
-public final class NettyCharSequenceBodyWriter implements MessageBodyWriter<CharSequence> {
+public final class NettyCharSequenceBodyWriter implements ResponseBodyWriter<CharSequence> {
     private final CharSequenceBodyWriter defaultHandler = new CharSequenceBodyWriter(StandardCharsets.UTF_8);
 
     @Override

@@ -125,6 +125,7 @@ public interface MessageBodyHandlerRegistry {
      * @return A message body writer if it is existing.
      * @param <T> The generic type
      */
+    @NonNull
     default <T> MessageBodyWriter<T> getWriter(@NonNull Argument<T> type,
                                                @NonNull List<MediaType> mediaType) {
         return findWriter(type, mediaType)

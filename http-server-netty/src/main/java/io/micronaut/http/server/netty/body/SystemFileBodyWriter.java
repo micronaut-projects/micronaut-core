@@ -31,6 +31,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
@@ -63,7 +64,7 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 @Singleton
 @Experimental
 @Internal
-public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<SystemFile> {
+public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<SystemFile> {
     private static final String UNIT_BYTES = "bytes";
 
     private final ExecutorService ioExecutor;

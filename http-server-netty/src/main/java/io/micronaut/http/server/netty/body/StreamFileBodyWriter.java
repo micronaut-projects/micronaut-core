@@ -26,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.ServerHttpResponseWrapper;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -48,7 +49,7 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 @Experimental
 @Internal
-public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements io.micronaut.http.body.MessageBodyWriter<StreamedFile> {
+public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<StreamedFile> {
     private final ExecutorService ioExecutor;
 
     StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {

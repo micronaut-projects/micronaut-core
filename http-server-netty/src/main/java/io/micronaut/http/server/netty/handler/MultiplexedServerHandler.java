@@ -358,6 +358,8 @@ abstract class MultiplexedServerHandler {
             if (!empty) {
                 // bypass writeDataCompressing
                 writeData0(content, true, ctx.voidPromise());
+            } else if (content != null) {
+                content.release();
             }
             if (!finish()) {
                 throw new IllegalStateException("Response already written");
