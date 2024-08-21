@@ -345,9 +345,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
                 responseBodyType = Argument.ofInstance(body);
-                messageBodyWriter = this.messageBodyHandlerRegistry
-                    .findWriter(responseBodyType, List.of(responseMediaType))
-                    .orElse(null);
+                messageBodyWriter = this.messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
             }
             NettyBodyWriter<Object> closure = wrap(messageBodyWriter);
             closeConnectionIfError(response, nettyRequest, outboundAccess);
