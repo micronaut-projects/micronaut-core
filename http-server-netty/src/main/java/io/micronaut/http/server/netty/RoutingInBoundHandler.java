@@ -273,28 +273,30 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 }
             }
             finalResponse.onComplete((r, t) -> {
-                try {
-                    if (t != null) {
-                        // fallback of the fallback...
-                        r = ServerHttpResponseWrapper.wrap(HttpResponse.serverError(), AvailableNettyByteBody.empty());
-                    }
-                    closeConnectionIfError(r, nettyHttpRequest, outboundAccess);
+                ServerHttpResponse<?> encodedResponse;
+                if (t != null) {
+                    // fallback of the fallback...
+                    encodedResponse = ServerHttpResponseWrapper.wrap(HttpResponse.serverError(), AvailableNettyByteBody.empty());
+                } else {
+                    encodedResponse = r;
+                }
+                try (encodedResponse) {
+                    closeConnectionIfError(encodedResponse, nettyHttpRequest, outboundAccess);
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Response {} - {} {}",
-                            r.code(),
+                            encodedResponse.code(),
                             nettyHttpRequest.getMethodName(),
                             nettyHttpRequest.getUri());
                     }
-                    io.netty.handler.codec.http.HttpResponse noBodyResponse = NettyMutableHttpResponse.toNoBodyResponse(r);
+                    io.netty.handler.codec.http.HttpResponse noBodyResponse = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
                     if (nettyHttpRequest.getMethod() == HttpMethod.HEAD) {
-                        r.close();
                         outboundAccess.writeHeadResponse(new DefaultHttpResponse(
                             noBodyResponse.protocolVersion(),
                             noBodyResponse.status(),
                             noBodyResponse.headers()
                         ));
                     } else {
-                        outboundAccess.write(noBodyResponse, r.byteBody());
+                        outboundAccess.write(noBodyResponse, encodedResponse.byteBody());
                     }
                 } catch (Throwable u) {
                     if (t != null) {

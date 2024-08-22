@@ -240,10 +240,9 @@ abstract class MultiplexedServerHandler {
                 // early check
                 throw new IllegalStateException("Response already written");
             }
-            if (!ctx.executor().inEventLoop()) {
-                ctx.executor().execute(() -> write(response, body));
-                return;
-            }
+
+            // we do some preparation immediately on the calling thread, so that the ByteBody
+            // primary operation happens here.
 
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (PipeliningServerHandler.canHaveBody(response.status())) {
@@ -259,10 +258,6 @@ abstract class MultiplexedServerHandler {
             if (nbb instanceof AvailableNettyByteBody available) {
                 writeFull(response, AvailableNettyByteBody.toByteBuf(available));
             } else {
-                prepareCompression(response);
-
-                writeHeaders(response, false, ctx.voidPromise());
-
                 StreamingNettyByteBody snbb = (StreamingNettyByteBody) nbb;
                 var consumer = new BufferConsumer() {
                     Upstream upstream;
@@ -318,9 +313,30 @@ abstract class MultiplexedServerHandler {
                         flush();
                     }
                 };
-                writerUpstream = consumer.upstream = snbb.primary(consumer);
-                consumer.upstream.start();
+                consumer.upstream = snbb.primary(consumer);
+                writeStreaming(response, consumer.upstream);
             }
+        }
+
+        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream) {
+            if (!ctx.executor().inEventLoop()) {
+                ctx.executor().execute(() -> writeStreaming(response, upstream));
+                return;
+            }
+
+            if (responseDone) {
+                // connection closed?
+                writerUpstream.allowDiscard();
+                writerUpstream.disregardBackpressure();
+                return;
+            }
+
+            writerUpstream = upstream;
+
+            prepareCompression(response);
+
+            writeHeaders(response, false, ctx.voidPromise());
+            upstream.start();
         }
 
         @Override
