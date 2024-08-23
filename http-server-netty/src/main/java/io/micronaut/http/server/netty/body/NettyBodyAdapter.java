@@ -115,10 +115,10 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
     @Override
     public void onSubscribe(Subscription s) {
         this.subscription = s;
-        long demand = this.demand.get();
-        s.request(demand);
         if (cancelled) {
             s.cancel();
+        } else {
+            s.request(1);
         }
     }
 
@@ -130,8 +130,11 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
     }
 
     private void onNext0(ByteBuf bytes) {
-        demand.addAndGet(-bytes.readableBytes());
+        long newDemand = demand.addAndGet(-bytes.readableBytes());
         sharedBuffer.add(bytes);
+        if (newDemand > 0) {
+            subscription.request(1);
+        }
     }
 
     @Override
