@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -56,6 +57,7 @@ import java.io.OutputStream;
  *
  * @param <T> The type
  */
+@Order(JsonMessageHandler.ORDER)
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)

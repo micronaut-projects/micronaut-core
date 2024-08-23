@@ -18,6 +18,7 @@ package io.micronaut.json.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -52,12 +53,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author Jonas Konrad
  * @since 4.0.0
  */
+@Order(JsonMessageHandler.ORDER)
 @Experimental
 @Singleton
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
 public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
+
+    /**
+     * The JSON handler should be preferred if for any type.
+     */
+    public static final int ORDER = -10;
 
     private final JsonMapper jsonMapper;
 
@@ -77,7 +84,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
 
     @Override
     public boolean isReadable(@NonNull Argument<T> type, MediaType mediaType) {
-        return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.matchesExtension(MediaType.EXTENSION_JSON);
     }
 
     private static CodecException decorateRead(Argument<?> type, IOException e) {
@@ -114,7 +121,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
 
     @Override
     public boolean isWriteable(@NonNull Argument<T> type, MediaType mediaType) {
-        return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.matchesExtension(MediaType.EXTENSION_JSON);
     }
 
     private static CodecException decorateWrite(Object object, IOException e) {
