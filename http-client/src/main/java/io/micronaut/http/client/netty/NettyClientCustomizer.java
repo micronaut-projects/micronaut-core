@@ -52,6 +52,7 @@ public interface NettyClientCustomizer {
     /**
      * @param bootstrap The bootstrap that will be used to connect
      * @return The new customizer, or {@code this} if no specialization needs to take place.
+     * @since 4.7.0
      */
     @Experimental
     @NonNull
