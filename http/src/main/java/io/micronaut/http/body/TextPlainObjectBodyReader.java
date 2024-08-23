@@ -62,7 +62,7 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public boolean isReadable(Argument<T> type, MediaType mediaType) {
-        return mediaType == MediaType.TEXT_PLAIN_TYPE;
+        return mediaType != null && mediaType.matches(MediaType.TEXT_PLAIN_TYPE);
     }
 
     @Override

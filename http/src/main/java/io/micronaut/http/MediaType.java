@@ -886,11 +886,38 @@ public class MediaType implements CharSequence {
         if (expectedContentType == this) {
             return true;
         }
-        String expectedType = expectedContentType.getType();
-        String expectedSubtype = expectedContentType.getSubtype();
-        boolean typeMatch = type.equals(WILDCARD) || type.equalsIgnoreCase(expectedType);
-        boolean subtypeMatch = subtype.equals(WILDCARD) || subtype.equalsIgnoreCase(expectedSubtype);
-        return typeMatch && subtypeMatch;
+        return matchesType(expectedContentType.getType()) && matchesSubtype(expectedContentType.getSubtype());
+    }
+
+    /**
+     * Check if the subtype matches.
+     *
+     * @param matchSubtype The subtype to match
+     * @return true if matches
+     * @since 4.6.3
+     */
+    public boolean matchesSubtype(String matchSubtype) {
+        return subtype.equals(WILDCARD) || subtype.equalsIgnoreCase(matchSubtype);
+    }
+
+    /**
+     * Check if the type matches.
+     * @param matchType The type to match
+     * @return true if matches
+     * @since 4.6.3
+     */
+    public boolean matchesType(String matchType) {
+        return type.equals(WILDCARD) || type.equalsIgnoreCase(matchType);
+    }
+
+    /**
+     * Check if the extension matches.
+     * @param matchExtension The extension to match
+     * @return true if matches
+     * @since 4.6.3
+     */
+    public boolean matchesExtension(String matchExtension) {
+        return extension.equalsIgnoreCase(ALL_TYPE.extension) || extension.equals(WILDCARD) || extension.equalsIgnoreCase(matchExtension);
     }
 
     /**
