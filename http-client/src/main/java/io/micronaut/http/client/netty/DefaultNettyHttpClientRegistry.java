@@ -30,7 +30,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
-import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
@@ -378,19 +377,19 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             }
 
 
-            final DefaultHttpClient client = buildClient(
-                    loadBalancer,
-                    clientKey.httpVersion,
+            final DefaultHttpClientBuilder builder = clientBuilder(
                     configuration,
                     clientId,
-                    contextPath,
                     beanContext,
                     annotationMetadata
-            );
+            )
+                .loadBalancer(loadBalancer)
+                .explicitHttpVersion(clientKey.httpVersion)
+                .contextPath(contextPath);
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
+                MediaTypeCodecRegistry codecRegistry = builder.codecRegistry;
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
                     if (codec instanceof MapperMediaTypeCodec typeCodec) {
                         codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
@@ -401,10 +400,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
-                client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
-
-                client.setHandlerRegistry(new MessageBodyHandlerRegistry() {
-                    final MessageBodyHandlerRegistry delegate = client.getHandlerRegistry();
+                builder.codecRegistry(MediaTypeCodecRegistry.of(codecs));
+                builder.handlerRegistry(new MessageBodyHandlerRegistry() {
+                    final MessageBodyHandlerRegistry delegate = builder.handlerRegistry;
 
                     @SuppressWarnings("unchecked")
                     private <T> T customize(T handler) {
@@ -425,49 +423,38 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
                 });
             }
-            return client;
+            return builder.build();
         });
     }
 
-    private DefaultHttpClient buildClient(
-            LoadBalancer loadBalancer,
-            HttpVersionSelection httpVersion,
+    private DefaultHttpClientBuilder clientBuilder(
             HttpClientConfiguration configuration,
             String clientId,
-            String contextPath,
             BeanContext beanContext,
             AnnotationMetadata annotationMetadata) {
 
-        EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
-        ConversionService conversionService = beanContext.getBean(ConversionService.class);
         String addressResolverGroupName = configuration.getAddressResolverGroupName();
-        AddressResolverGroup<?> resolverGroup = addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName));
-        return new DefaultHttpClient(
-                loadBalancer,
-                httpVersion,
-                configuration,
-                contextPath,
-                clientFilterResolver,
-                clientFilterResolver.resolveFilterEntries(new ClientFilterResolutionContext(
-                        clientId == null ? null : Collections.singletonList(clientId),
-                        annotationMetadata
-                )),
-                threadFactory,
-                nettyClientSslBuilder,
-                codecRegistry,
-                handlerRegistry,
-                WebSocketBeanRegistry.forClient(beanContext),
-                beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
-                        new DefaultRequestBinderRegistry(conversionService)
-                ),
-                eventLoopGroup,
-                resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, SocketChannel.class, configuration, beanContext),
-                resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext),
-                clientCustomizer,
-                clientId,
-                conversionService,
-                resolverGroup
-        );
+        DefaultHttpClientBuilder builder = DefaultHttpClient.builder();
+        beanContext.findBean(RequestBinderRegistry.class).ifPresent(builder::requestBinderRegistry);
+        return builder
+            .configuration(configuration)
+            .filterResolver(clientFilterResolver)
+            .clientFilterEntries(clientFilterResolver.resolveFilterEntries(new ClientFilterResolutionContext(
+                clientId == null ? null : Collections.singletonList(clientId),
+                annotationMetadata
+            )))
+            .threadFactory(threadFactory)
+            .nettyClientSslBuilder(nettyClientSslBuilder)
+            .codecRegistry(codecRegistry)
+            .handlerRegistry(handlerRegistry)
+            .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))
+            .eventLoopGroup(resolveEventLoopGroup(configuration, beanContext))
+            .socketChannelFactory(resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, SocketChannel.class, configuration, beanContext))
+            .udpChannelFactory(resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext))
+            .clientCustomizer(clientCustomizer)
+            .informationalServiceId(clientId)
+            .conversionService(beanContext.getBean(ConversionService.class))
+            .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)));
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
@@ -491,15 +478,15 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            DefaultHttpClient c = buildClient(
-                loadBalancer,
-                null,
+            DefaultHttpClient c = clientBuilder(
                 configuration,
                 null,
-                loadBalancer.getContextPath().orElse(null),
                 beanContext,
                 AnnotationMetadata.EMPTY_METADATA
-            );
+            )
+                .loadBalancer(loadBalancer)
+                .contextPath(loadBalancer.getContextPath().orElse(null))
+                .build();
             balancedClients.add(c);
             return c;
         } else {
