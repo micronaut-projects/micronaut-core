@@ -9,9 +9,9 @@ quickStart:
   ideSetup:
     title: Setting up an IDE
     ideaSetup: IntelliJ IDEA
+    vsCodeSetup: Visual Studio Code
     eclipseSetup: Eclipse
     netbeansSetup: Apache NetBeans
-    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
