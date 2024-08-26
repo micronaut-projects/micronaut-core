@@ -75,7 +75,7 @@ managed-methvin-directory-watcher = "0.18.0"
 managed-netty = "4.1.112.Final"
 managed-netty-iouring = "0.0.25.Final"
 managed-netty-http3 = "0.0.28.Final"
-managed-netty-tcnative = "2.0.65.Final"
+managed-netty-tcnative = "2.0.66.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.6.9"
