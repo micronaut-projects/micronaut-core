@@ -293,7 +293,7 @@ final class HttpPipelineBuilder implements Closeable {
             if (address instanceof InetSocketAddress socketAddress) {
                 if (socketAddress.isUnresolved()) {
                     // try resolution
-                    address = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
+                    socketAddress = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
                     if (socketAddress.isUnresolved()) {
                         // resolution failed, bail
                         return "unresolved";
