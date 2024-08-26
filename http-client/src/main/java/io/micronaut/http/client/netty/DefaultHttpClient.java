@@ -477,6 +477,12 @@ public class DefaultHttpClient implements
         );
     }
 
+    /**
+     * Create a new builder for a {@link DefaultHttpClient}.
+     *
+     * @return The builder
+     * @since 4.7.0
+     */
     @NonNull
     public static DefaultHttpClientBuilder builder() {
         return new DefaultHttpClientBuilder();
