@@ -31,6 +31,7 @@ import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -58,6 +59,7 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
 
     @Override
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<InputStream> outgoingResponse, Argument<InputStream> type, MediaType mediaType, InputStream object, NettyWriteContext nettyContext) throws CodecException {
+        outgoingResponse.getHeaders().setIfMissing(HttpHeaderNames.CONTENT_TYPE, mediaType);
         if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
                 nettyResponse.getNettyHttpVersion(),
