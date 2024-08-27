@@ -23,7 +23,7 @@ class FluxFullBodySpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(
             EmbeddedServer,
-            ["micronaut.server.netty.server-type": NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT]
+            ["micronaut.server.netty.server-type": NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT, 'spec.name': FluxFullBodySpec.simpleName]
     )
     @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
 
