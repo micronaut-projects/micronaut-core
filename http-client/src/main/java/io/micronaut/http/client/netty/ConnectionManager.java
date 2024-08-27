@@ -743,7 +743,7 @@ public class ConnectionManager {
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
-    private static abstract class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
+    static abstract class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         NettyClientCustomizer bootstrappedCustomizer;
     }
 
