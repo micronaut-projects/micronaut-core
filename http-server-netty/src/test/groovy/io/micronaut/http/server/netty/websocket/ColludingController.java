@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Produces;
 
+@Requires(property = "spec.name", value = "BinaryWebSocketSpec")
 @Controller("/binary/chat")
 public class ColludingController {
 

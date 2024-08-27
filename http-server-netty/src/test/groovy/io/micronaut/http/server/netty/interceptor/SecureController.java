@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -23,6 +24,7 @@ import io.micronaut.http.annotation.Get;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = "tests", value = "io.micronaut.http.server.netty.interceptor")
 @Controller("/secure")
 public class SecureController {
 

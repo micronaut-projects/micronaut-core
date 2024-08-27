@@ -68,7 +68,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         this.parts = parts;
         List<UriMatchVariable> variables = new ArrayList<>();
         this.segments = provideMatchSegments(parts, variables);
-        this.isRoot = segments.length == 0 || segments[0].type == SegmentType.LITERAL && isRoot(segments[0].value);
+        this.isRoot = segments.length == 0 || segments.length == 1 && segments[0].type == SegmentType.LITERAL && isRoot(segments[0].value);
         this.variables = Collections.unmodifiableList(variables);
     }
 

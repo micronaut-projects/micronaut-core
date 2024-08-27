@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
 class FilterErrorSpec extends Specification {
 
     void "test errors emitted from filters interacting with exception handlers"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['main.name': FilterErrorSpec.simpleName, 'spec.name': FilterErrorSpec.simpleName])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
         First first = ctx.getBean(First)
@@ -78,7 +78,7 @@ class FilterErrorSpec extends Specification {
     }
 
     void "test non once per request filter throwing error does not loop"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2'])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['main.name': FilterErrorSpec.simpleName, 'spec.name': FilterErrorSpec.simpleName + '2'])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
         FirstEvery filter = ctx.getBean(FirstEvery)
@@ -104,7 +104,7 @@ class FilterErrorSpec extends Specification {
     }
 
     void "test non once per request filter throwing error directly does not loop"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2b'])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['main.name': FilterErrorSpec.simpleName, 'spec.name': FilterErrorSpec.simpleName + '2b'])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -128,7 +128,7 @@ class FilterErrorSpec extends Specification {
     }
 
     void "test filter throwing exception handled by exception handler throwing exception"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '3'])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['main.name': FilterErrorSpec.simpleName, 'spec.name': FilterErrorSpec.simpleName + '3'])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
         ExceptionException filter = ctx.getBean(ExceptionException)
@@ -156,7 +156,7 @@ class FilterErrorSpec extends Specification {
     }
 
     void "test the error route is the route match"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '4'])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['main.name': FilterErrorSpec.simpleName, 'spec.name': FilterErrorSpec.simpleName + '4'])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
         ExceptionRoute filter = ctx.getBean(ExceptionRoute)
@@ -301,6 +301,7 @@ class FilterErrorSpec extends Specification {
         }
     }
 
+    @Requires(property = 'main.name', value = 'FilterErrorSpec')
     @Controller("/filter-error-spec")
     static class NeverReachedController {
 
@@ -311,6 +312,7 @@ class FilterErrorSpec extends Specification {
 
     }
 
+    @Requires(property = 'main.name', value = 'FilterErrorSpec')
     @Controller("/filter-error-spec-3")
     static class HandledByHandlerController {
 
@@ -321,6 +323,7 @@ class FilterErrorSpec extends Specification {
 
     }
 
+    @Requires(property = 'main.name', value = 'FilterErrorSpec')
     @Controller("/filter-error-spec-4")
     static class HandledByErrorRouteController {
 
