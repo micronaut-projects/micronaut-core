@@ -16,7 +16,7 @@
 
     <suppress checks=".*" files="FlowControlHandler.java" />
 
-    <suppress checks="ParameterNumber" files="DefaultHttpClient.java" />
+    <suppress checks="ParameterNumber" files="DefaultHttpClient.java|DefaultJdkHttpClient.java|JdkBlockingHttpClient.java" />
 
     <suppress checks="IllegalImport" files="JavaxProviderBeanDefinition.java" />
 
