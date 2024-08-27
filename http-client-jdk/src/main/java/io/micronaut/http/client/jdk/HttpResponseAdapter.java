@@ -23,7 +23,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.buffer.ByteArrayByteBuffer;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
@@ -148,7 +148,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
                         type,
                         contentType,
                         new SimpleHttpHeaders(),
-                        new ByteArrayByteBuffer(bytes)
+                        ByteArrayBufferFactory.INSTANCE.wrap(bytes)
                     );
                     return Optional.of(value);
                 } catch (CodecException e) {

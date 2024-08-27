@@ -42,7 +42,7 @@ public class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
      *
      * @param underlyingBytes the bytes to wrap
      */
-    public ByteArrayByteBuffer(byte[] underlyingBytes) {
+    ByteArrayByteBuffer(byte[] underlyingBytes) {
         this(underlyingBytes, underlyingBytes.length);
     }
 
@@ -54,7 +54,7 @@ public class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
      * @param underlyingBytes the bytes to wrap
      * @param capacity        the capacity of the buffer
      */
-    public ByteArrayByteBuffer(byte[] underlyingBytes, int capacity) {
+    ByteArrayByteBuffer(byte[] underlyingBytes, int capacity) {
         if (capacity < underlyingBytes.length) {
             this.underlyingBytes = Arrays.copyOf(underlyingBytes, capacity);
         } else if (capacity > underlyingBytes.length) {
@@ -97,7 +97,7 @@ public class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
     @Override
     public ByteArrayByteBuffer readerIndex(int readPosition) {
-        this.readerIndex = Math.min(readPosition, underlyingBytes.length - 1);
+        this.readerIndex = Math.min(readPosition, underlyingBytes.length);
         return this;
     }
 
@@ -108,7 +108,7 @@ public class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
     @Override
     public ByteArrayByteBuffer writerIndex(int position) {
-        this.writerIndex = Math.min(position, underlyingBytes.length - 1);
+        this.writerIndex = Math.min(position, underlyingBytes.length);
         return this;
     }
 
