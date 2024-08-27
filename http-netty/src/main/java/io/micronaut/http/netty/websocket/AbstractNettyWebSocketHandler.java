@@ -35,6 +35,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
@@ -364,7 +365,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             .orElse(null);
                         if (reader != null) {
                             ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, originatingRequest.getHeaders(), byteBuffer);
+                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
                         }
                     }
                 }

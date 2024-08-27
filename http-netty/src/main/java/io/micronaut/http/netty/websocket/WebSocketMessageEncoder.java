@@ -29,7 +29,6 @@ import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
@@ -94,7 +93,7 @@ public class WebSocketMessageEncoder {
             MediaType theMediaType = mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE;
             Optional<MediaTypeCodec> codec = codecRegistry.findCodec(theMediaType);
             if (codec.isPresent()) {
-                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, new NettyByteBufferFactory(UnpooledByteBufAllocator.DEFAULT));
+                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, NettyByteBufferFactory.DEFAULT);
                 return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
             }
             if (messageBodyHandlerRegistry != null) {
@@ -106,7 +105,7 @@ public class WebSocketMessageEncoder {
                         theMediaType,
                         message,
                         new SimpleHttpHeaders(),
-                        new NettyByteBufferFactory(UnpooledByteBufAllocator.DEFAULT)
+                        NettyByteBufferFactory.DEFAULT
                     );
                     return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
                 }
