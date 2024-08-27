@@ -182,7 +182,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
+    /**
+     * Set the codec registry. This has mostly been replaced by body handlers by now.
+     *
+     * @param codecRegistry The codec registry
+     * @return This builder
+     * @deprecated Use body handlers instead
+     */
     @NonNull
+    @Deprecated
     DefaultHttpClientBuilder codecRegistry(@NonNull MediaTypeCodecRegistry codecRegistry) {
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         this.codecRegistry = codecRegistry;

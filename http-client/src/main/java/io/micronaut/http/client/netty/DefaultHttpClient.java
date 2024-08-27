@@ -539,7 +539,9 @@ public class DefaultHttpClient implements
 
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
+     * @deprecated Use body handlers instead
      */
+    @Deprecated
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
