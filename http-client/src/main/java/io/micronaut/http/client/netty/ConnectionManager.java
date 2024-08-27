@@ -161,8 +161,9 @@ public class ConnectionManager {
     private volatile SslContext sslContext;
     private volatile /* QuicSslContext */ Object http3SslContext;
     private volatile SslContext websocketSslContext;
-    private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
+
+    final NettyClientCustomizer clientCustomizer;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
