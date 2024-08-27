@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
 
@@ -59,7 +60,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
-public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
+public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, CustomizableJsonHandler {
 
     /**
      * The JSON handler should be preferred if for any type.
@@ -140,6 +141,11 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
         } catch (IOException e) {
             throw decorateWrite(object, e);
         }
+    }
+
+    @Override
+    public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
+        return new JsonMessageHandler<>(jsonMapper.cloneWithFeatures(jsonFeatures));
     }
 
     /**

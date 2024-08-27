@@ -56,7 +56,6 @@ import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.netty.body.CustomizableNettyJsonHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -69,6 +68,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
@@ -408,7 +408,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
                     @SuppressWarnings("unchecked")
                     private <T> T customize(T handler) {
-                        if (handler instanceof CustomizableNettyJsonHandler cnjh) {
+                        if (handler instanceof CustomizableJsonHandler cnjh) {
                             return (T) cnjh.customize(jsonFeatures);
                         }
                         return handler;

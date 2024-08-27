@@ -37,10 +37,12 @@ import java.util.List;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Experimental
 @Singleton
 @BootstrapContextCompatible
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json-stream";
