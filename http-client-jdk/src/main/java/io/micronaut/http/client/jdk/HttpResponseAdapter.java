@@ -34,7 +34,6 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.simple.SimpleHttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,7 +146,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
                     T value = reader.read(
                         type,
                         contentType,
-                        new SimpleHttpHeaders(),
+                        getHeaders(),
                         ByteArrayBufferFactory.INSTANCE.wrap(bytes)
                     );
                     return Optional.of(value);
