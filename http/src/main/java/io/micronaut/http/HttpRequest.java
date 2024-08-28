@@ -445,4 +445,24 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(httpMethodName, "Argument [httpMethodName] is required");
         return HttpRequestFactory.INSTANCE.create(httpMethod, uri, httpMethodName);
     }
+
+    /**
+     * Returns a mutable request based on this request.
+     * @return the mutable request
+     * @since 4.7
+     */
+    default MutableHttpRequest<B> toMutableRequest() {
+        if (this instanceof MutableHttpRequest<B> mutableHttpRequest) {
+            return mutableHttpRequest;
+        }
+        MutableHttpRequest<B> mutableHttpRequest = HttpRequest.create(getMethod(), getUri().toString());
+        getBody().ifPresent(mutableHttpRequest::body);
+        getHeaders().forEach((name, value) -> {
+            for (String val : value) {
+                mutableHttpRequest.header(name, val);
+            }
+        });
+        mutableHttpRequest.getAttributes().putAll(getAttributes());
+        return mutableHttpRequest;
+    }
 }
