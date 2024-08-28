@@ -17,17 +17,22 @@ package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.nio.ByteBuffer;
@@ -44,12 +49,28 @@ import java.util.Optional;
 public class WebSocketMessageEncoder {
 
     private final MediaTypeCodecRegistry codecRegistry;
+    @Nullable
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     /**
      * @param codecRegistry The codec registry
+     * @deprecated Not used anymore
      */
+    @Deprecated(forRemoval = true, since = "4.7")
     public WebSocketMessageEncoder(MediaTypeCodecRegistry codecRegistry) {
         this.codecRegistry = codecRegistry;
+        this.messageBodyHandlerRegistry = null;
+    }
+
+    /**
+     * @param codecRegistry The codec registry
+     * @param messageBodyHandlerRegistry The message body handler registry
+     */
+    @Inject
+    public WebSocketMessageEncoder(MediaTypeCodecRegistry codecRegistry,
+                                   MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        this.codecRegistry = codecRegistry;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
     }
 
     /**
@@ -69,10 +90,25 @@ public class WebSocketMessageEncoder {
         } else if (message instanceof ByteBuffer buffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(buffer));
         } else {
-            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
+            MediaType theMediaType = mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE;
+            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(theMediaType);
             if (codec.isPresent()) {
-                io.micronaut.core.io.buffer.ByteBuffer encoded = codec.get().encode(message, new NettyByteBufferFactory(UnpooledByteBufAllocator.DEFAULT));
+                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, NettyByteBufferFactory.DEFAULT);
                 return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
+            }
+            if (messageBodyHandlerRegistry != null) {
+                Argument<Object> argument = Argument.ofInstance(message);
+                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.findWriter(argument, theMediaType).orElse(null);
+                if (messageBodyWriter != null) {
+                    io.micronaut.core.io.buffer.ByteBuffer<?> encoded = messageBodyWriter.writeTo(
+                        argument,
+                        theMediaType,
+                        message,
+                        new SimpleHttpHeaders(),
+                        NettyByteBufferFactory.DEFAULT
+                    );
+                    return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
+                }
             }
         }
         throw new WebSocketSessionException("Unable to encode WebSocket message: " + message);

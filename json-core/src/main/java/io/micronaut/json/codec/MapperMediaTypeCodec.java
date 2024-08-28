@@ -47,7 +47,9 @@ import java.util.List;
  * @author Graeme Rocher
  * @author svishnyakov
  * @since 1.3.0
+ * @deprecated Replaced with message body writers / readers API
  */
+@Deprecated(since = "4.7")
 @Experimental
 public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";

@@ -36,12 +36,14 @@ import jakarta.inject.Singleton;
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Named("json")
 @Singleton
 @Secondary
 @BootstrapContextCompatible
 @Bean(typed = {JsonMediaTypeCodec.class, JacksonMediaTypeCodec.class}) // do not expose MapperMediaTypeCodec
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";

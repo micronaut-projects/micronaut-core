@@ -23,7 +23,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -80,9 +79,8 @@ public interface MessageBodyHandlerRegistry {
      * @since 4.6
      */
     default <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
-                                                          @NonNull MediaType mediaType) {
-        Objects.requireNonNull(mediaType);
-        return findReader(type, List.of(mediaType));
+                                                          @Nullable MediaType mediaType) {
+        return findReader(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**
@@ -115,8 +113,8 @@ public interface MessageBodyHandlerRegistry {
      * @since 4.6
      */
     default <T> Optional<MessageBodyWriter<T>> findWriter(@NonNull Argument<T> type,
-                                                          @NonNull MediaType mediaType) {
-        return findWriter(type, List.of(mediaType));
+                                                          @Nullable MediaType mediaType) {
+        return findWriter(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**

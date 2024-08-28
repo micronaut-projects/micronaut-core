@@ -29,6 +29,7 @@ import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
@@ -50,7 +51,7 @@ import java.util.List;
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
-public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
+public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonStreamHandler(JsonMapper jsonMapper) {
@@ -62,7 +63,7 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     }
 
     @Override
-    public CustomizableNettyJsonHandler customize(JsonFeatures jsonFeatures) {
+    public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
         return new NettyJsonStreamHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures));
     }
 
