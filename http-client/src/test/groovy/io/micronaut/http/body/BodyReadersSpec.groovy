@@ -11,7 +11,7 @@ import spock.lang.Unroll
 class BodyReadersSpec extends Specification {
 
     @AutoCleanup
-    DefaultHttpClient httpClient = new DefaultHttpClient((URI) null)
+    DefaultHttpClient httpClient = DefaultHttpClient.builder().build()
 
     @Unroll
     void "test type handlers"() {

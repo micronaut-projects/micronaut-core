@@ -42,7 +42,7 @@ class ProxyRequestSpec extends Specification {
         given:"A client with no read timeout"
         def configuration = new DefaultHttpClientConfiguration()
         configuration.setReadTimeout(Duration.ofSeconds(-1))
-        def client = new DefaultHttpClient(embeddedServer.URI, configuration)
+        def client = DefaultHttpClient.builder().uri(embeddedServer.URI).configuration(configuration).build()
 
         when:"A GET request is proxied"
         client.exchange("/proxy/timeout", String).blockFirst()

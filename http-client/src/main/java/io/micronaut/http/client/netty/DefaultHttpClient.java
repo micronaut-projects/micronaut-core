@@ -33,7 +33,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
@@ -69,7 +68,6 @@ import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
-import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
@@ -131,8 +129,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioDatagramChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -190,7 +186,6 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -277,7 +272,9 @@ public class DefaultHttpClient implements
      * @param annotationMetadataResolver      The annotation metadata resolver
      * @param conversionService               The conversion service
      * @param filters                         The filters to use
+     * @deprecated Please go through the {@link #builder()} instead. If you need access to properties that are not public in the builder, make them public in core and document their usage.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
@@ -288,25 +285,19 @@ public class DefaultHttpClient implements
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              ConversionService conversionService,
                              HttpClientFilter... filters) {
-        this(loadBalancer,
-            null,
-            configuration,
-            contextPath,
-            new DefaultHttpClientFilterResolver(null, annotationMetadataResolver, Arrays.asList(filters)),
-            null,
-            threadFactory,
-            nettyClientSslBuilder,
-            codecRegistry,
-            handlerRegistry,
-            WebSocketBeanRegistry.EMPTY,
-            new DefaultRequestBinderRegistry(conversionService),
-            null,
-            NioSocketChannel::new,
-            NioDatagramChannel::new,
-            CompositeNettyClientCustomizer.EMPTY,
-            null,
-            conversionService,
-            null);
+        this(
+            builder()
+                .loadBalancer(loadBalancer)
+                .configuration(configuration)
+                .contextPath(contextPath)
+                .threadFactory(threadFactory)
+                .nettyClientSslBuilder(nettyClientSslBuilder)
+                .codecRegistry(codecRegistry)
+                .handlerRegistry(handlerRegistry)
+                .conversionService(conversionService)
+                .annotationMetadataResolver(annotationMetadataResolver)
+                .filters(filters)
+        );
     }
 
     /**
@@ -330,7 +321,9 @@ public class DefaultHttpClient implements
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      * @param conversionService               The conversion service
      * @param resolverGroup                   Optional predefined resolver group
+     * @deprecated Please go through the {@link #builder()} instead. If you need access to properties that are not public in the builder, make them public in core and document their usage.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable HttpVersionSelection explicitHttpVersion,
                              @NonNull HttpClientConfiguration configuration,
@@ -351,75 +344,105 @@ public class DefaultHttpClient implements
                              ConversionService conversionService,
                              @Nullable AddressResolverGroup<?> resolverGroup
     ) {
-        ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
-        ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
-        ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
-        ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
-        ArgumentUtils.requireNonNull("configuration", configuration);
-        ArgumentUtils.requireNonNull("filterResolver", filterResolver);
-        ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
-        this.loadBalancer = loadBalancer;
+        this(
+            builder()
+                .loadBalancer(loadBalancer)
+                .explicitHttpVersion(explicitHttpVersion)
+                .configuration(configuration)
+                .contextPath(contextPath)
+                .filterResolver(filterResolver)
+                .clientFilterEntries(clientFilterEntries)
+                .threadFactory(threadFactory)
+                .nettyClientSslBuilder(nettyClientSslBuilder)
+                .codecRegistry(codecRegistry)
+                .handlerRegistry(handlerRegistry)
+                .webSocketBeanRegistry(webSocketBeanRegistry)
+                .requestBinderRegistry(requestBinderRegistry)
+                .eventLoopGroup(eventLoopGroup)
+                .socketChannelFactory(socketChannelFactory)
+                .udpChannelFactory(udpChannelFactory)
+                .clientCustomizer(clientCustomizer)
+                .informationalServiceId(informationalServiceId)
+                .conversionService(conversionService)
+                .resolverGroup(resolverGroup)
+        );
+    }
+
+    DefaultHttpClient(DefaultHttpClientBuilder builder) {
+        this.loadBalancer = builder.loadBalancer;
+        this.configuration = builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
         this.defaultCharset = configuration.getDefaultCharset();
-        if (StringUtils.isNotEmpty(contextPath)) {
-            if (contextPath.charAt(0) != '/') {
-                contextPath = '/' + contextPath;
+        if (StringUtils.isNotEmpty(builder.contextPath)) {
+            if (builder.contextPath.charAt(0) != '/') {
+                builder.contextPath = '/' + builder.contextPath;
             }
-            this.contextPath = contextPath;
+            this.contextPath = builder.contextPath;
         } else {
             this.contextPath = null;
         }
-        this.configuration = configuration;
 
-        this.mediaTypeCodecRegistry = codecRegistry;
-        this.handlerRegistry = handlerRegistry;
+        this.mediaTypeCodecRegistry = builder.codecRegistry == null ? createDefaultMediaTypeRegistry() : builder.codecRegistry;
+        this.handlerRegistry = builder.handlerRegistry == null ? createDefaultMessageBodyHandlerRegistry() : builder.handlerRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
-        this.filterResolver = filterResolver;
-        if (clientFilterEntries != null) {
-            this.clientFilterEntries = clientFilterEntries;
+        if (builder.filterResolver == null) {
+            builder.filters();
+        }
+        this.filterResolver = builder.filterResolver;
+        if (builder.clientFilterEntries != null) {
+            this.clientFilterEntries = builder.clientFilterEntries;
         } else {
-            this.clientFilterEntries = filterResolver.resolveFilterEntries(
+            this.clientFilterEntries = builder.filterResolver.resolveFilterEntries(
                     new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
-        this.webSocketRegistry = webSocketBeanRegistry;
-        this.requestBinderRegistry = requestBinderRegistry;
-        this.informationalServiceId = informationalServiceId;
-        this.conversionService = conversionService;
+        this.webSocketRegistry = builder.webSocketBeanRegistry;
+        this.conversionService = builder.conversionService;
+        this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
+        this.informationalServiceId = builder.informationalServiceId;
 
         this.connectionManager = new ConnectionManager(
             log,
-            eventLoopGroup,
-            threadFactory,
+            builder.eventLoopGroup,
+            builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory,
             configuration,
-            explicitHttpVersion,
-            socketChannelFactory,
-            udpChannelFactory,
-            nettyClientSslBuilder,
-            clientCustomizer,
-            informationalServiceId,
-            resolverGroup);
+            builder.explicitHttpVersion,
+            builder.socketChannelFactory,
+            builder.udpChannelFactory,
+            builder.nettyClientSslBuilder == null ? new NettyClientSslBuilder(new ResourceResolver()) : builder.nettyClientSslBuilder,
+            builder.clientCustomizer,
+            builder.informationalServiceId,
+            builder.resolverGroup);
     }
 
     /**
      * @param uri The URL
+     * @deprecated Please go through the {@link #builder()} instead.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable URI uri) {
-        this(uri, new DefaultHttpClientConfiguration());
+        this(builder().uri(uri));
     }
 
     /**
-     *
+     * @deprecated Please go through the {@link #builder()} instead.
      */
+    @Deprecated
     public DefaultHttpClient() {
-        this((URI) null, new DefaultHttpClientConfiguration());
+        this(builder());
     }
 
     /**
      * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
+     * @deprecated Please go through the {@link #builder()} instead.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        this(uri, configuration, new NettyClientSslBuilder(new ResourceResolver()));
+        this(
+            builder()
+                .uri(uri)
+                .configuration(configuration)
+        );
     }
 
     /**
@@ -428,29 +451,41 @@ public class DefaultHttpClient implements
      * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
      * @param clientSslBuilder The SSL builder
+     * @deprecated Please go through the {@link #builder()} instead.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration, @NonNull ClientSslBuilder clientSslBuilder) {
         this(
-            uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-            clientSslBuilder,
-            createDefaultMediaTypeRegistry(),
-            createDefaultMessageBodyHandlerRegistry(),
-            AnnotationMetadataResolver.DEFAULT,
-            ConversionService.SHARED);
+            builder()
+                .uri(uri)
+                .configuration(configuration)
+                .nettyClientSslBuilder(clientSslBuilder)
+        );
     }
 
     /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
+     * @deprecated Please go through the {@link #builder()} instead. If you need access to properties that are not public in the builder, make them public in core and document their usage.
      */
+    @Deprecated
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
-        this(loadBalancer,
-            configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-            new NettyClientSslBuilder(new ResourceResolver()),
-            createDefaultMediaTypeRegistry(),
-            createDefaultMessageBodyHandlerRegistry(),
-            AnnotationMetadataResolver.DEFAULT,
-            ConversionService.SHARED);
+        this(
+            builder()
+                .loadBalancer(loadBalancer)
+                .configuration(configuration)
+        );
+    }
+
+    /**
+     * Create a new builder for a {@link DefaultHttpClient}.
+     *
+     * @return The builder
+     * @since 4.7.0
+     */
+    @NonNull
+    public static DefaultHttpClientBuilder builder() {
+        return new DefaultHttpClientBuilder();
     }
 
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
@@ -504,7 +539,9 @@ public class DefaultHttpClient implements
 
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
+     * @deprecated Use body handlers instead
      */
+    @Deprecated
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -513,8 +550,9 @@ public class DefaultHttpClient implements
      * Sets the {@link MediaTypeCodecRegistry} used by this client.
      *
      * @param mediaTypeCodecRegistry The registry to use. Should not be null
+     * @deprecated Use builder instead
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         if (mediaTypeCodecRegistry != null) {
             this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
@@ -535,7 +573,9 @@ public class DefaultHttpClient implements
      * Set the handler registry for this client.
      *
      * @param handlerRegistry The handler registry
+     * @deprecated Use builder instead
      */
+    @Deprecated(forRemoval = true)
     public final void setHandlerRegistry(@NonNull MessageBodyHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
     }
