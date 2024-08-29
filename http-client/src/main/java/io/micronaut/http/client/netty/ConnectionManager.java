@@ -141,6 +141,8 @@ import java.util.function.Supplier;
 @Internal
 public class ConnectionManager {
 
+    final NettyClientCustomizer clientCustomizer;
+
     private final HttpVersionSelection httpVersion;
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
@@ -162,8 +164,6 @@ public class ConnectionManager {
     private volatile /* QuicSslContext */ Object http3SslContext;
     private volatile SslContext websocketSslContext;
     private final String informationalServiceId;
-
-    final NettyClientCustomizer clientCustomizer;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
@@ -744,7 +744,7 @@ public class ConnectionManager {
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
-    static abstract class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
+    abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         NettyClientCustomizer bootstrappedCustomizer;
     }
 
