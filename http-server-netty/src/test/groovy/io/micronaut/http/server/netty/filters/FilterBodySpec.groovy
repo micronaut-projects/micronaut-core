@@ -73,6 +73,7 @@ class FilterBodySpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'FilterBodySpec')
     @Controller("/filter-body")
     static class MyController {
         @Post("/delayed-body-controller")

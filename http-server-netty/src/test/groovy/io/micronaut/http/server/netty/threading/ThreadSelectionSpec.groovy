@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.threading
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.http.HttpRequest
@@ -45,7 +46,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection strategy #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec': getClass().getSimpleName(), 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         expect:
@@ -67,7 +68,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection strategy for reactive types #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec': getClass().getSimpleName(), 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
 
@@ -90,7 +91,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test thread selection for exception handlers #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec': getClass().getSimpleName(), 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
@@ -117,7 +118,7 @@ class ThreadSelectionSpec extends Specification {
     @Ignore // pending feature, only works sometimes: https://github.com/micronaut-projects/micronaut-core/pull/10104
     void "test thread selection for error route #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec': getClass().getSimpleName(), 'micronaut.server.thread-selection': strategy])
         ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         when:
@@ -140,7 +141,7 @@ class ThreadSelectionSpec extends Specification {
 
     void "test injecting an executor service does not inject the Netty event loop"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec': getClass().getSimpleName()])
         ApplicationContext ctx = embeddedServer.applicationContext
 
         when:
@@ -150,6 +151,7 @@ class ThreadSelectionSpec extends Specification {
         !ctx.getBeansOfType(ExecutorService).contains(eventLoopGroup)
     }
 
+    @Requires(property = "spec", value = "ThreadSelectionSpec")
     @Client("/thread-selection")
     static interface ThreadSelectionClient {
         @Get("/blocking")
@@ -189,6 +191,7 @@ class ThreadSelectionSpec extends Specification {
         String scheduleException()
     }
 
+    @Requires(property = "spec", value = "ThreadSelectionSpec")
     @Controller("/thread-selection")
     static class ThreadSelectionController {
         @Get("/blocking")
@@ -267,6 +270,7 @@ class ThreadSelectionSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec", value = "ThreadSelectionSpec")
     @Filter("/thread-selection/alter**")
     static class ThreadSelectionFilter implements HttpServerFilter {
 
@@ -304,6 +308,7 @@ class ThreadSelectionSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec", value = "ThreadSelectionSpec")
     @Singleton
     static class MyExceptionHandler implements ExceptionHandler<MyException, HttpResponse> {
 
@@ -313,6 +318,7 @@ class ThreadSelectionSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec", value = "ThreadSelectionSpec")
     @Singleton
     static class MyScheduledExceptionHandler implements ExceptionHandler<MyExceptionScheduled, HttpResponse> {
 

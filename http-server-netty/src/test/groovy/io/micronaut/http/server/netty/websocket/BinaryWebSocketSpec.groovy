@@ -44,7 +44,7 @@ class BinaryWebSocketSpec extends Specification {
 
     void "test binary websocket exchange"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
@@ -118,7 +118,7 @@ class BinaryWebSocketSpec extends Specification {
 
     void "test sending multiple frames for a single message"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
@@ -152,7 +152,7 @@ class BinaryWebSocketSpec extends Specification {
 
     void "test sending many continuation frames"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
@@ -186,7 +186,7 @@ class BinaryWebSocketSpec extends Specification {
 
     void "test sending ping messages"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when:"a websocket connection is established"
@@ -210,7 +210,8 @@ class BinaryWebSocketSpec extends Specification {
     void "test per-message compression"() {
         given:
         def ctx = ApplicationContext.run([
-                'spec.name'            : 'test per-message compression',
+                'spec.name': 'BinaryWebSocketSpec',
+                'method.name'            : 'test per-message compression',
                 'micronaut.server.port': -1
         ])
         def cdcServer = ctx.getBean(CompressionDetectionCustomizerServer)
@@ -267,7 +268,8 @@ class BinaryWebSocketSpec extends Specification {
     void "test per-message compression disabled"() {
         given:
         def ctx = ApplicationContext.run([
-                'spec.name'            : 'test per-message compression',
+                'spec.name': 'BinaryWebSocketSpec',
+                'method.name'            : 'test per-message compression',
                 'micronaut.server.port': -1,
                 'micronaut.http.client.ws.compression.enabled': false
         ])
@@ -322,7 +324,7 @@ class BinaryWebSocketSpec extends Specification {
     }
 
     @Singleton
-    @Requires(property = 'spec.name', value = 'test per-message compression')
+    @Requires(property = 'method.name', value = 'test per-message compression')
     static class CompressionDetectionCustomizerServer implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
         List<ChannelPipeline> pipelines = Collections.synchronizedList(new ArrayList<>())
 
@@ -352,7 +354,7 @@ class BinaryWebSocketSpec extends Specification {
     }
 
     @Singleton
-    @Requires(property = 'spec.name', value = 'test per-message compression')
+    @Requires(property = 'method.name', value = 'test per-message compression')
     static class CompressionDetectionCustomizerClient implements BeanCreatedEventListener<NettyClientCustomizer.Registry> {
         List<ChannelPipeline> pipelines = Collections.synchronizedList(new ArrayList<>())
 
