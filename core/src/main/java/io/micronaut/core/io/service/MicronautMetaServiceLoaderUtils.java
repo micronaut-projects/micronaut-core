@@ -59,7 +59,8 @@ public final class MicronautMetaServiceLoaderUtils {
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
-    private static Map<String, Set<String>> services;
+    private static ClassLoader CACHED_SERVICES_CLASSLOADER;
+    private static Map<String, Set<String>> CACHED_SERVICES;
 
     /**
      * Find all instantiated Micronaut service entries.
@@ -95,11 +96,11 @@ public final class MicronautMetaServiceLoaderUtils {
     @NonNull
     public static Set<String> findMicronautMetaServiceEntries(@NonNull ClassLoader classLoader,
                                                               @NonNull String serviceName) throws IOException {
-        if (services == null) {
-            // Should we cache based on the classloader?
-            services = findAllMicronautMetaServices(classLoader);
+        if (CACHED_SERVICES == null || CACHED_SERVICES_CLASSLOADER != classLoader) {
+            CACHED_SERVICES = findAllMicronautMetaServices(classLoader);
+            CACHED_SERVICES_CLASSLOADER = classLoader;
         }
-        return services.getOrDefault(serviceName, Set.of());
+        return CACHED_SERVICES.getOrDefault(serviceName, Set.of());
     }
 
     /**
@@ -249,6 +250,9 @@ public final class MicronautMetaServiceLoaderUtils {
                         collection = constructor.apply(size.get());
                     }
                     task.collect(collection);
+                }
+                if (collection == null) {
+                    return constructor.apply(0);
                 }
                 return collection;
             }
