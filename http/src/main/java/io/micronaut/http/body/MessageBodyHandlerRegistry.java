@@ -56,6 +56,18 @@ public interface MessageBodyHandlerRegistry {
      * @return A message body reader if it is existing.
      * @param <T> The generic type
      */
+    @NonNull
+    default <T> MessageBodyReader<T> getReader(@NonNull Argument<T> type, @Nullable List<MediaType> mediaType) {
+        return findReader(type, mediaType).orElseThrow(() -> new CodecException("Cannot read value of argument [" + type + "]. No possible readers found for media type: " + mediaType));
+    }
+
+    /**
+     * Find a reader for the type and annotation metadata at declaration point.
+     * @param type The type
+     * @param mediaType The media type
+     * @return A message body reader if it is existing.
+     * @param <T> The generic type
+     */
     <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
                                                   @Nullable List<MediaType> mediaType);
 
@@ -125,6 +137,7 @@ public interface MessageBodyHandlerRegistry {
      * @return A message body writer if it is existing.
      * @param <T> The generic type
      */
+    @NonNull
     default <T> MessageBodyWriter<T> getWriter(@NonNull Argument<T> type,
                                                @NonNull List<MediaType> mediaType) {
         return findWriter(type, mediaType)
