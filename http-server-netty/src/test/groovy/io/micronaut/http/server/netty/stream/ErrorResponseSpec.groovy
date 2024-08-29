@@ -1,5 +1,7 @@
 package io.micronaut.http.server.netty.stream
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -16,6 +18,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/4862')
+@Property(name = "spec.name", value = "ErrorResponseSpec")
 @MicronautTest
 class ErrorResponseSpec extends Specification {
     @Inject
@@ -33,12 +36,14 @@ class ErrorResponseSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ErrorResponseSpec')
     @Client("/flowable")
     static interface FlowableClient {
         @Get(uri = "/error", consumes = MediaType.TEXT_PLAIN)
         Foo flowableError()
     }
 
+    @Requires(property = 'spec.name', value = 'ErrorResponseSpec')
     @Controller("/flowable")
     static class FlowableErrorController {
 

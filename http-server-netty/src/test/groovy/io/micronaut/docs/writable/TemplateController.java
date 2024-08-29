@@ -19,6 +19,7 @@ package io.micronaut.docs.writable;
 
 import groovy.text.SimpleTemplateEngine;
 import groovy.text.Template;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MediaType;
@@ -28,6 +29,7 @@ import io.micronaut.http.server.exceptions.HttpServerException;
 //end::imports[]
 
 //tag::clazz[]
+@Requires(property = "spec.name", value = "WritableSpec")
 @Controller("/template")
 public class TemplateController {
 

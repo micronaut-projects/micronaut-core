@@ -15,9 +15,11 @@
  */
 package io.micronaut.http.server.netty.nativetransport;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 
+@Requires(property = "spec", value = "TransportSpec")
 @Controller("/native-transport")
 public class NativeTransportController {
 

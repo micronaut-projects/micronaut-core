@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @MicronautTest
+@Property(name = "spec.name", value = "Http2PostTest")
 @Property(name = "micronaut.server.http-version", value = "2.0")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
@@ -131,6 +132,7 @@ public class Http2PostTest implements TestPropertyProvider {
         );
     }
 
+    @Requires(property = "spec.name", value = "Http2PostTest")
     @Controller("/vertx/demo")
     public static class DemoController {
         @Get("/testGet")
