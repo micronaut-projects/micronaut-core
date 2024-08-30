@@ -91,7 +91,8 @@ public final class MicronautMetaServiceLoaderUtils {
     @NonNull
     public static Set<String> findMicronautMetaServiceEntries(@NonNull ClassLoader classLoader,
                                                               @NonNull String serviceName) throws IOException {
-        if (cacheEntry == null || cacheEntry.classLoader != classLoader) {
+        CacheEntry ce = cacheEntry;
+        if (ce == null || ce.classLoader != classLoader) {
             cacheEntry = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
         }
         return cacheEntry.services.getOrDefault(serviceName, Set.of());
