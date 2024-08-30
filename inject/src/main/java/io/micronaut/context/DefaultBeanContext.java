@@ -1877,7 +1877,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
         if (beanDefinitionReferences == null) {
             beanDefinitionReferences = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
-                ArrayList::new,
                 classLoader,
                 BeanDefinitionReference.class,
                 BeanDefinitionReference::isPresent
@@ -1917,7 +1916,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
         if (beanConfigurationsList == null) {
             beanConfigurationsList = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
-                ArrayList::new,
                 classLoader,
                 BeanConfiguration.class,
                 null

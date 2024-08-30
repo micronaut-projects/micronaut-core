@@ -41,8 +41,6 @@ import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -59,13 +57,11 @@ public final class MicronautMetaServiceLoaderUtils {
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
-    private static ClassLoader cachedServicesClassloader;
-    private static Map<String, Set<String>> cachedServices;
+    private static volatile CacheEntry cacheEntry;
 
     /**
      * Find all instantiated Micronaut service entries.
      *
-     * @param constructor  The final collection constructor by size
      * @param classLoader  The classloader
      * @param serviceClass The service class
      * @param predicate    The predicate
@@ -73,8 +69,7 @@ public final class MicronautMetaServiceLoaderUtils {
      * @return the result
      */
     @NonNull
-    public static <S> List<S> findMetaMicronautServiceEntries(@NonNull Function<Integer, List<S>> constructor,
-                                                              @NonNull ClassLoader classLoader,
+    public static <S> List<S> findMetaMicronautServiceEntries(@NonNull ClassLoader classLoader,
                                                               @NonNull Class<S> serviceClass,
                                                               @Nullable Predicate<S> predicate) {
         SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceClass.getName());
@@ -82,7 +77,7 @@ public final class MicronautMetaServiceLoaderUtils {
             return staticServiceLoader.load(predicate);
         }
         return new MicronautServiceCollector<>(classLoader, serviceClass.getName(), predicate)
-            .collect(constructor, true);
+            .collect(true);
     }
 
     /**
@@ -96,11 +91,10 @@ public final class MicronautMetaServiceLoaderUtils {
     @NonNull
     public static Set<String> findMicronautMetaServiceEntries(@NonNull ClassLoader classLoader,
                                                               @NonNull String serviceName) throws IOException {
-        if (cachedServices == null || cachedServicesClassloader != classLoader) {
-            cachedServices = findAllMicronautMetaServices(classLoader);
-            cachedServicesClassloader = classLoader;
+        if (cacheEntry == null || cacheEntry.classLoader != classLoader) {
+            cacheEntry = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
         }
-        return cachedServices.getOrDefault(serviceName, Set.of());
+        return cacheEntry.services.getOrDefault(serviceName, Set.of());
     }
 
     /**
@@ -217,7 +211,7 @@ public final class MicronautMetaServiceLoaderUtils {
         private final String serviceName;
         private final Predicate<S> predicate;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
-        private final AtomicInteger size = new AtomicInteger();
+        private int size;
 
         MicronautServiceCollector(ClassLoader classLoader, String serviceName, Predicate<S> predicate) {
             this.classLoader = classLoader;
@@ -229,7 +223,7 @@ public final class MicronautMetaServiceLoaderUtils {
         protected void compute() {
             try {
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
-                size.set(serviceEntries.size());
+                size = serviceEntries.size();
                 for (String serviceEntry : serviceEntries) {
                     final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
                     tasks.add(task);
@@ -240,25 +234,25 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
 
-        public List<S> collect(Function<Integer, List<S>> constructor, boolean allowFork) {
+        public List<S> collect(boolean allowFork) {
             if (allowFork && ForkJoinPool.getCommonPoolParallelism() > 1) {
                 ForkJoinPool.commonPool().invoke(this);
                 List<S> collection = null;
                 for (RecursiveActionValuesCollector<S> task : tasks) {
                     task.join();
                     if (collection == null) {
-                        collection = constructor.apply(size.get());
+                        collection = new ArrayList<>(size);
                     }
                     task.collect(collection);
                 }
                 if (collection == null) {
-                    return constructor.apply(0);
+                    return List.of();
                 }
                 return collection;
             }
             try {
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
-                List<S> collection = constructor.apply(serviceEntries.size());
+                List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
                     S val = instantiate(serviceEntry, classLoader);
                     if (val != null && predicate.test(val)) {
@@ -333,6 +327,9 @@ public final class MicronautMetaServiceLoaderUtils {
          */
         public abstract void collect(Collection<S> values);
 
+    }
+
+    private record CacheEntry(ClassLoader classLoader, Map<String, Set<String>> services) {
     }
 
 }
