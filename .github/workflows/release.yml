@@ -66,13 +66,13 @@ jobs:
           # Store the hash in a file, which is uploaded as a workflow artifact.
           sha256sum $ARTIFACTS | base64 -w0 > artifacts-sha256
       - name: Upload build artifacts
-        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: gradle-build-outputs
           path: build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/*
           retention-days: 5
       - name: Upload artifacts-sha256
-        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: artifacts-sha256
           path: artifacts-sha256
