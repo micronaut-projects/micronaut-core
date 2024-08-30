@@ -75,7 +75,6 @@ import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.context.ServerRequestContext;
@@ -774,7 +773,7 @@ public class DefaultHttpClient implements
     @Override
     public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
         setupConversionService(request);
-        MessageBodyReader<B> reader = handlerRegistry.findReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE)).orElseThrow(() -> new CodecException("JSON codec not present"));
+        MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
 
@@ -999,7 +998,7 @@ public class DefaultHttpClient implements
 
             // could also be application/json, in which case we will stream an array
             MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
-            ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.findReader(type, List.of(mediaType)).orElseThrow(() -> new CodecException("Codec missing for media type " + mediaType));
+            ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.getReader(type, List.of(mediaType));
             return reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content())));
         });
     }
