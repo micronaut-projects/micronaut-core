@@ -21,17 +21,17 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 
 /**
- * Simple response wrapper to implement {@link ServerHttpResponse}.
+ * Simple response wrapper to implement {@link ByteBodyHttpResponse}.
  *
  * @param <B> The original body type
  * @since 4.7.0
  * @author Jonas Konrad
  */
 @Experimental
-public final class ServerHttpResponseWrapper<B> extends HttpResponseWrapper<B> implements ServerHttpResponse<B> {
+public final class ByteBodyHttpResponseWrapper<B> extends HttpResponseWrapper<B> implements ByteBodyHttpResponse<B> {
     private final CloseableByteBody byteBody;
 
-    private ServerHttpResponseWrapper(HttpResponse<B> delegate, CloseableByteBody byteBody) {
+    private ByteBodyHttpResponseWrapper(HttpResponse<B> delegate, CloseableByteBody byteBody) {
         super(delegate);
         this.byteBody = byteBody;
     }
@@ -41,11 +41,11 @@ public final class ServerHttpResponseWrapper<B> extends HttpResponseWrapper<B> i
      *
      * @param delegate The original response to be used for e.g. headers and status
      * @param byteBody The bytes to respond with
-     * @return A {@link ServerHttpResponse} implementation with the given response and bytes
+     * @return A {@link ByteBodyHttpResponse} implementation with the given response and bytes
      */
     @NonNull
-    public static ServerHttpResponse<?> wrap(@NonNull HttpResponse<?> delegate, @NonNull CloseableByteBody byteBody) {
-        return new ServerHttpResponseWrapper<>(delegate, byteBody);
+    public static ByteBodyHttpResponse<?> wrap(@NonNull HttpResponse<?> delegate, @NonNull CloseableByteBody byteBody) {
+        return new ByteBodyHttpResponseWrapper<>(delegate, byteBody);
     }
 
     @Override

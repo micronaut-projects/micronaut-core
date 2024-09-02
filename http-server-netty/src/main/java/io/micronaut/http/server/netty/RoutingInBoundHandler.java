@@ -30,14 +30,14 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -245,7 +245,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
         }
         if (response != null) {
-            ExecutionFlow<ServerHttpResponse<?>> finalResponse;
+            ExecutionFlow<ByteBodyHttpResponse<?>> finalResponse;
             try {
                 finalResponse = encodeHttpResponse(
                     nettyHttpRequest,
@@ -273,10 +273,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 }
             }
             finalResponse.onComplete((r, t) -> {
-                ServerHttpResponse<?> encodedResponse;
+                ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
                     // fallback of the fallback...
-                    encodedResponse = ServerHttpResponseWrapper.wrap(HttpResponse.serverError(), AvailableNettyByteBody.empty());
+                    encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), AvailableNettyByteBody.empty());
                 } else {
                     encodedResponse = r;
                 }
@@ -326,7 +326,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @SuppressWarnings("unchecked")
-    private ExecutionFlow<ServerHttpResponse<?>> encodeHttpResponse(
+    private ExecutionFlow<ByteBodyHttpResponse<?>> encodeHttpResponse(
         NettyHttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse,
         Object body) {
@@ -386,13 +386,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private <T> ExecutionFlow<ServerHttpResponse<?>> buildFinalResponse(NettyHttpRequest<?> nettyRequest,
-                                                                        MutableHttpResponse<T> response,
-                                                                        Argument<T> responseBodyType,
-                                                                        MediaType mediaType,
-                                                                        T body,
-                                                                        MessageBodyWriter<T> messageBodyWriter,
-                                                                        boolean onIoExecutor) {
+    private <T> ExecutionFlow<ByteBodyHttpResponse<?>> buildFinalResponse(NettyHttpRequest<?> nettyRequest,
+                                                                          MutableHttpResponse<T> response,
+                                                                          Argument<T> responseBodyType,
+                                                                          MediaType mediaType,
+                                                                          T body,
+                                                                          MessageBodyWriter<T> messageBodyWriter,
+                                                                          boolean onIoExecutor) {
         if (!onIoExecutor && messageBodyWriter.isBlocking()) {
             return ExecutionFlow.async(getIoExecutor(), () -> buildFinalResponse(nettyRequest, response, responseBodyType, mediaType, body, messageBodyWriter, true));
         }
@@ -490,16 +490,16 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private ExecutionFlow<ServerHttpResponse<?>> writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request) {
+    private ExecutionFlow<ByteBodyHttpResponse<?>> writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request) {
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
             return writeStreamedWithErrorHandling(request, message, streamed);
         } else {
-            return ExecutionFlow.just(ServerHttpResponseWrapper.wrap(message, new AvailableNettyByteBody(((FullHttpResponse) nettyResponse).content())));
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(message, new AvailableNettyByteBody(((FullHttpResponse) nettyResponse).content())));
         }
     }
 
-    private ExecutionFlow<ServerHttpResponse<?>> writeStreamedWithErrorHandling(NettyHttpRequest<?> request, HttpResponse<?> response, Publisher<HttpContent> streamed) {
+    private ExecutionFlow<ByteBodyHttpResponse<?>> writeStreamedWithErrorHandling(NettyHttpRequest<?> request, HttpResponse<?> response, Publisher<HttpContent> streamed) {
         LazySendingSubscriber sub = new LazySendingSubscriber(request, response);
         streamed.subscribe(sub);
         return sub.output;
@@ -545,7 +545,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         private final EventLoopFlow flow;
         private final NettyHttpRequest<?> request;
         private final HttpResponse<?> headers;
-        private final DelayedExecutionFlow<ServerHttpResponse<?>> output = DelayedExecutionFlow.create();
+        private final DelayedExecutionFlow<ByteBodyHttpResponse<?>> output = DelayedExecutionFlow.create();
 
         private LazySendingSubscriber(NettyHttpRequest<?> request, HttpResponse<?> headers) {
             this.request = request;
@@ -612,7 +612,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             } else {
                 first = httpContent;
                 headersSent = true;
-                output.complete(ServerHttpResponseWrapper.wrap(headers, NettyBodyAdapter.adapt(this, request.getChannelHandlerContext().channel().eventLoop())));
+                output.complete(ByteBodyHttpResponseWrapper.wrap(headers, NettyBodyAdapter.adapt(this, request.getChannelHandlerContext().channel().eventLoop())));
             }
         }
 
@@ -668,7 +668,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 }
             } else {
                 headersSent = true;
-                output.complete(ServerHttpResponseWrapper.wrap(headers, AvailableNettyByteBody.empty()));
+                output.complete(ByteBodyHttpResponseWrapper.wrap(headers, AvailableNettyByteBody.empty()));
             }
         }
     }
@@ -693,14 +693,14 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
 
         @Override
-        public @NonNull ServerHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+        public @NonNull ByteBodyHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
             ByteBuf buf = ((NettyByteBufferFactory) bufferFactory).buffer().asNativeBuffer();
             ByteBufOutputStream bbos = new ByteBufOutputStream(buf);
             boolean release = true;
             try {
                 writeTo(type, mediaType, object, httpResponse.getHeaders(), bbos);
                 release = false;
-                return ServerHttpResponseWrapper.wrap(httpResponse, new AvailableNettyByteBody(buf));
+                return ByteBodyHttpResponseWrapper.wrap(httpResponse, new AvailableNettyByteBody(buf));
             } finally {
                 if (release) {
                     buf.release();

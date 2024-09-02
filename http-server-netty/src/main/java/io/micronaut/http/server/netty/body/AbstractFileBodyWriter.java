@@ -17,13 +17,13 @@ package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -118,10 +118,10 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         headers.date(now);
     }
 
-    protected ServerHttpResponse<?> notModified(MutableHttpResponse<?> originalResponse) {
+    protected ByteBodyHttpResponse<?> notModified(MutableHttpResponse<?> originalResponse) {
         MutableHttpResponse<Void> response = HttpResponse.notModified();
         AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
-        return ServerHttpResponseWrapper.wrap(response, AvailableNettyByteBody.empty());
+        return ByteBodyHttpResponseWrapper.wrap(response, AvailableNettyByteBody.empty());
     }
 }

@@ -20,10 +20,10 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
 import io.micronaut.http.codec.CodecException;
 
 /**
@@ -38,7 +38,7 @@ import io.micronaut.http.codec.CodecException;
 @Indexed(MessageBodyWriter.class)
 public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
     /**
-     * Writes an object as a {@link ServerHttpResponse}.
+     * Writes an object as a {@link ByteBodyHttpResponse}.
      *
      * @param bufferFactory The buffer factory
      * @param request       The request
@@ -46,11 +46,11 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
      * @param type          The response body type
      * @param mediaType     The media type
      * @param object        The object to write
-     * @return A {@link ServerHttpResponse} with the response bytes
+     * @return A {@link ByteBodyHttpResponse} with the response bytes
      * @throws CodecException If an error occurs encoding
      */
     @NonNull
-    ServerHttpResponse<?> write(
+    ByteBodyHttpResponse<?> write(
         @NonNull ByteBufferFactory<?, ?> bufferFactory,
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> httpResponse,

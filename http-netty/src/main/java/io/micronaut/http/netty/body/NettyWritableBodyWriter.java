@@ -24,13 +24,13 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
@@ -74,7 +74,7 @@ public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Wr
     }
 
     @Override
-    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
         MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
         if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             outgoingHeaders.contentType(mediaType);
@@ -86,7 +86,7 @@ public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Wr
         } catch (IOException e) {
             throw new MessageBodyException("Error writing body from writable", e);
         }
-        return ServerHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(outputStream.buffer()));
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(outputStream.buffer()));
     }
 
     @Override

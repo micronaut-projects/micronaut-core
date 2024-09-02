@@ -20,13 +20,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
@@ -55,14 +55,14 @@ public final class NettyCharSequenceBodyWriter implements ResponseBodyWriter<Cha
     private final CharSequenceBodyWriter defaultHandler = new CharSequenceBodyWriter(StandardCharsets.UTF_8);
 
     @Override
-    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
         ByteBuf byteBuf = ByteBufUtil.encodeString(ByteBufAllocator.DEFAULT, CharBuffer.wrap(object), MessageBodyWriter.getCharset(mediaType, headers));
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
         if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
         }
-        return ServerHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(byteBuf));
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(byteBuf));
     }
 
     @Override

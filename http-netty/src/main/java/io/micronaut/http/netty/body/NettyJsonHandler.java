@@ -25,11 +25,11 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -128,7 +128,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object) throws CodecException {
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) outgoingResponse.getHeaders();
         nettyHttpHeaders.setIfMissing(HttpHeaderNames.CONTENT_TYPE, mediaType);
         ByteBuf buffer = ByteBufAllocator.DEFAULT.buffer();
@@ -139,7 +139,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
             buffer.release();
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
-        return ServerHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(buffer));
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(buffer));
     }
 
     @Override

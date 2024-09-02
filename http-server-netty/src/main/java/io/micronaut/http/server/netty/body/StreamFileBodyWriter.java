@@ -21,11 +21,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
@@ -58,13 +58,13 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object) throws CodecException {
         if (handleIfModifiedAndHeaders(request, outgoingResponse, object, outgoingResponse)) {
             return notModified(outgoingResponse);
         } else {
             long length = object.getLength();
             InputStream inputStream = object.getInputStream();
-            return ServerHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
+            return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
         }
     }
 

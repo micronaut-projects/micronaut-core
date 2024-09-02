@@ -22,11 +22,11 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.codec.CodecException;
 
@@ -74,9 +74,9 @@ public class ResponseBodyWriterWrapper<T> implements ResponseBodyWriter<T> {
     }
 
     @Override
-    public @NonNull ServerHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+    public @NonNull ByteBodyHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         writeTo(type, mediaType, object, httpResponse.getHeaders(), baos);
-        return ServerHttpResponseWrapper.wrap(httpResponse, AvailableByteArrayBody.create(bufferFactory, baos.toByteArray()));
+        return ByteBodyHttpResponseWrapper.wrap(httpResponse, AvailableByteArrayBody.create(bufferFactory, baos.toByteArray()));
     }
 }

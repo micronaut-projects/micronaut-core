@@ -30,7 +30,7 @@ import java.io.Closeable;
  * @author Jonas Konrad
  */
 @Experimental
-public sealed interface ServerHttpResponse<B> extends HttpResponse<B>, Closeable permits ServerHttpResponseWrapper {
+public sealed interface ByteBodyHttpResponse<B> extends HttpResponse<B>, Closeable permits ByteBodyHttpResponseWrapper {
     /**
      * The body bytes.
      *

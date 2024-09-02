@@ -23,14 +23,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpResponse;
-import io.micronaut.http.ServerHttpResponseWrapper;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
@@ -80,11 +80,11 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public ServerHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
         return write(request, httpResponse, object);
     }
 
-    public ServerHttpResponse<?> write(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
+    public ByteBodyHttpResponse<?> write(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
         if (!systemFile.getFile().canRead()) {
             throw new MessageBodyException("Could not find file");
         }
@@ -132,7 +132,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
             }
 
             @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
-            return ServerHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
+            return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
         }
     }
 
