@@ -46,6 +46,7 @@ micronaut-validation = "4.6.1"
 micronaut-rxjava2 = "2.4.0"
 micronaut-rxjava3 = "3.4.0"
 micronaut-reactor = "3.4.1"
+micronaut-kotlin = "4.4.0"
 native-gradle-plugin = "0.10.2"
 neo4j-java-driver = "5.17.0"
 selenium = "4.23.1"
@@ -92,6 +93,7 @@ test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-v
 test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
+test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -274,6 +276,8 @@ micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-bra
 
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
+
+micronaut-kotlin-runtime = { module = "io.micronaut.kotlin:micronaut-kotlin-runtime" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
 
