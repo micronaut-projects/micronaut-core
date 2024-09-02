@@ -49,7 +49,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
-    private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
+    static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
             StaticOptimizations.get(Optimizations.class)
                     .map(Optimizations::getServiceLoaders)
                     .orElse(Collections.emptyMap());

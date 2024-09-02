@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.io.service;
 
-import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
-
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.BuildTimeInit;
@@ -24,32 +22,27 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
-import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.util.ArrayUtils;
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -195,62 +188,13 @@ class ServiceLoaderFeature implements Feature {
      */
     @NonNull
     protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
-        StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions(null);
-        final String path = "META-INF/micronaut/";
         try {
-            final Enumeration<URL> micronautResources = access.getApplicationClassLoader().getResources(path);
-            while (micronautResources.hasMoreElements()) {
-                Set<String> servicePaths = new HashSet<>();
-                URL url = micronautResources.nextElement();
-                URI uri = url.toURI();
-                boolean isFileScheme = "file".equals(uri.getScheme());
-                if (isFileScheme) {
-                    Path p = Paths.get(uri);
-                    // strip the META-INF/micronaut part
-                    uri = p.getParent().getParent().toUri();
-                }
-                IOUtils.eachFile(
-                        uri,
-                        path,
-                        servicePath -> {
-                            if (Files.isDirectory(servicePath)) {
-                                String serviceName = servicePath.toString();
-                                if (isFileScheme) {
-                                    int i = serviceName.indexOf(path);
-                                    if (i > -1) {
-                                        serviceName = serviceName.substring(i);
-                                    }
-                                } else if (serviceName.startsWith("/")) {
-                                    serviceName = serviceName.substring(1);
-                                }
-                                if (serviceName.startsWith(path)) {
-                                    servicePaths.add(serviceName);
-                                }
-                            }
-                        }
-                );
-
-                for (String servicePath : servicePaths) {
-                    IOUtils.eachFile(
-                            uri,
-                            servicePath,
-                            serviceTypePath -> {
-                                if (Files.isRegularFile(serviceTypePath)) {
-                                    final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap()
-                                            .computeIfAbsent(servicePath,
-                                                             key -> new HashSet<>());
-                                    final String serviceTypeName = serviceTypePath.getFileName().toString();
-                                    serviceTypeNames.add(serviceTypeName);
-                                }
-                            }
-                    );
-                }
-            }
-
-        } catch (IOException | URISyntaxException e) {
-            // ignore
+            return new StaticServiceDefinitions(
+                MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader())
+            );
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return staticServiceDefinitions;
     }
 
     private void configureForReflection(BeforeAnalysisAccess access) {

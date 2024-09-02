@@ -72,7 +72,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
@@ -1876,9 +1876,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
         if (beanDefinitionReferences == null) {
-            final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
-            beanDefinitionReferences = new ArrayList<>(300);
-            definitions.collectAll(beanDefinitionReferences, BeanDefinitionReference::isPresent);
+            beanDefinitionReferences = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
+                classLoader,
+                BeanDefinitionReference.class,
+                BeanDefinitionReference::isPresent
+            );
         }
         return beanDefinitionReferences;
     }
@@ -1913,9 +1915,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
         if (beanConfigurationsList == null) {
-            final SoftServiceLoader<BeanConfiguration> definitions = SoftServiceLoader.load(BeanConfiguration.class, classLoader);
-            beanConfigurationsList = new ArrayList<>(300);
-            definitions.collectAll(beanConfigurationsList, null);
+            beanConfigurationsList = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
+                classLoader,
+                BeanConfiguration.class,
+                null
+            );
         }
         return beanConfigurationsList;
     }
