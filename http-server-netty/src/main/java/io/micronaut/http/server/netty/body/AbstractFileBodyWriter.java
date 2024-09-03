@@ -17,15 +17,16 @@ package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.netty.handler.codec.http.FullHttpResponse;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -53,7 +54,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         });
     }
 
-    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, NettyMutableHttpResponse<?> nettyResponse) {
+    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, MutableHttpResponse<?> nettyResponse) {
         long lastModified = systemFile.getLastModified();
 
         // Cache Validation
@@ -117,10 +118,10 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         headers.date(now);
     }
 
-    protected FullHttpResponse notModified(MutableHttpResponse<?> originalResponse) {
-        MutableHttpResponse response = HttpResponse.notModified();
+    protected ByteBodyHttpResponse<?> notModified(MutableHttpResponse<?> originalResponse) {
+        MutableHttpResponse<Void> response = HttpResponse.notModified();
         AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
-        return ((NettyMutableHttpResponse) response).toFullHttpResponse();
+        return ByteBodyHttpResponseWrapper.wrap(response, AvailableNettyByteBody.empty());
     }
 }

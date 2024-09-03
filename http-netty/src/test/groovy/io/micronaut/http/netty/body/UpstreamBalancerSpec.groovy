@@ -1,4 +1,4 @@
-package io.micronaut.http.server.netty.body
+package io.micronaut.http.netty.body
 
 import io.micronaut.http.body.ByteBody.SplitBackpressureMode
 import spock.lang.Specification

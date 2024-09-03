@@ -36,7 +36,6 @@ import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.compression.ZstdEncoder;
 import io.netty.handler.codec.compression.ZstdOptions;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
@@ -77,10 +76,6 @@ final class Compressor {
         if (code < 200 || code == 204 || code == 304 ||
             (request.method().equals(HttpMethod.HEAD) || (request.method().equals(HttpMethod.CONNECT) && code == 200)) ||
             response.protocolVersion() == HttpVersion.HTTP_1_0) {
-            return null;
-        }
-        // special case for FHR to keep behavior identical to HttpContentEncoder
-        if (response instanceof FullHttpResponse fhr && !fhr.content().isReadable()) {
             return null;
         }
         if (!strategy.shouldCompress(response)) {
