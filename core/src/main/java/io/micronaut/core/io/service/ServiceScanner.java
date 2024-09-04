@@ -202,7 +202,7 @@ final class ServiceScanner<S> {
             if (fs == null || !fs.isOpen()) {
                 try {
                     fs = FileSystems.newFileSystem(URI.create("jrt:/"), Collections.emptyMap(), classLoader);
-                } catch (IOException | ProviderNotFoundException e) {
+                } catch (IOException | ProviderNotFoundException | ServiceConfigurationError e) {
                     // not available, probably running in Native Image.
                 }
             }
