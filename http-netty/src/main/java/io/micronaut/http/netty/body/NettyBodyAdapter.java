@@ -13,21 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.BodySizeLimits;
-import io.micronaut.http.netty.body.BufferConsumer;
-import io.micronaut.http.netty.body.NettyByteBody;
-import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.HttpHeaders;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -46,15 +43,18 @@ import java.util.function.LongUnaryOperator;
 public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscriber<ByteBuf> {
     private final EventLoopFlow eventLoopFlow;
     private final Publisher<ByteBuf> source;
+    @Nullable
+    private final Runnable onDiscard;
 
     private volatile boolean cancelled;
     private volatile Subscription subscription;
     private StreamingNettyByteBody.SharedBuffer sharedBuffer;
     private final AtomicLong demand = new AtomicLong(1);
 
-    private NettyBodyAdapter(EventLoop eventLoop, Publisher<ByteBuf> source) {
+    private NettyBodyAdapter(EventLoop eventLoop, Publisher<ByteBuf> source, @Nullable Runnable onDiscard) {
         this.eventLoopFlow = new EventLoopFlow(eventLoop);
         this.source = source;
+        this.onDiscard = onDiscard;
     }
 
     /**
@@ -76,8 +76,15 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
     }
 
     public static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop) {
-        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, publisher);
+        return adapt(publisher, eventLoop, null, null);
+    }
+
+    public static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
+        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, publisher, onDiscard);
         adapter.sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, adapter);
+        if (headersForLength != null) {
+            adapter.sharedBuffer.setExpectedLengthFrom(headersForLength);
+        }
         return new StreamingNettyByteBody(adapter.sharedBuffer);
     }
 
@@ -106,6 +113,9 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
         cancelled = true;
         if (subscription != null) {
             subscription.cancel();
+        }
+        if (onDiscard != null) {
+            onDiscard.run();
         }
     }
 
