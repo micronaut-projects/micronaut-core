@@ -281,6 +281,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * Whether processing is delayed to a later stage
+     * @param className The class name
+     * @return True it is
+     * @since 4.6.5
+     */
+    @Experimental
+    default boolean isPostponedToNextRound(String className) {
+        return false;
+    }
+
+    /**
      * The annotation processor environment custom options.
      * <p><b>All options names MUST start with {@link VisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
      *

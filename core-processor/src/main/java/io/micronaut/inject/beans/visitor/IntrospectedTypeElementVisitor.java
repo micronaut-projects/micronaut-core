@@ -256,13 +256,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void finish(VisitorContext visitorContext) {
         try {
             if (!writers.isEmpty()) {
-                for (BeanIntrospectionWriter writer : writers.values()) {
-                    try {
-                        writer.accept(visitorContext);
-                    } catch (IOException e) {
-                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                writers.forEach((className, writer) ->{
+                    if (!visitorContext.isPostponedToNextRound(className)) {
+                        try {
+                            writer.accept(visitorContext);
+                        } catch (IOException e) {
+                            throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                        }
                     }
-                }
+                });
+
             }
         } finally {
             writers.clear();

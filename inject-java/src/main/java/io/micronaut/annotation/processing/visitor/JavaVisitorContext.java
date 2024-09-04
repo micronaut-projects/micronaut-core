@@ -82,6 +82,7 @@ import java.util.stream.Stream;
 @Internal
 public final class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
+    public static final String POSTPONED = "io.micronaut.POSTPONED";
     private final Messager messager;
     private final Elements elements;
     private final Types types;
@@ -166,6 +167,15 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
         this.filer = filer;
+    }
+
+    @Override
+    public boolean isPostponedToNextRound(String className) {
+        return visitorAttributes.get(
+            JavaVisitorContext.POSTPONED,
+            Set.class,
+            Set.of()
+        ).contains(className);
     }
 
     @Override
