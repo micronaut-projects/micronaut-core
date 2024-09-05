@@ -292,9 +292,11 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void complete0() {
-                        if (finish()) {
+                        if (!responseDone) {
                             writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
-                            flush();
+                            if (finish()) {
+                                flush();
+                            }
                         }
                     }
 

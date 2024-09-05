@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.converters;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
@@ -23,12 +24,16 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelOption;
@@ -54,21 +59,25 @@ public final class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
+    private final BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistries;
     private final BeanProvider<ChannelOptionFactory> channelOptionFactory;
 
     /**
      * Default constructor.
      *
-     * @param conversionService       The conversion service
-     * @param decoderRegistryProvider The decoder registry provider
-     * @param channelOptionFactory    The decoder channel option factory
+     * @param conversionService            The conversion service
+     * @param decoderRegistryProvider      The decoder registry provider
+     * @param messageBodyHandlerRegistries The message body handlers
+     * @param channelOptionFactory         The decoder channel option factory
      */
     public NettyConverters(ConversionService conversionService,
                            //Prevent early initialization of the codecs
                            BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
+                           BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistries,
                            BeanProvider<ChannelOptionFactory> channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
+        this.messageBodyHandlerRegistries = messageBodyHandlerRegistries;
         this.channelOptionFactory = channelOptionFactory;
     }
 
@@ -98,20 +107,23 @@ public final class NettyConverters implements TypeConverterRegistrar {
                         if (!object.isCompleted()) {
                             return Optional.empty();
                         }
+                        Argument<Object> argument = context instanceof ArgumentConversionContext<?> argumentConversionContext ? (Argument<Object>) argumentConversionContext.getArgument() : Argument.of(targetType);
                         String contentType = object.getContentType();
                         ByteBuf byteBuf = object.getByteBuf();
-                        if (StringUtils.isNotEmpty(contentType)) {
-                            MediaType mediaType = MediaType.of(contentType);
-                            Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
-                            if (registered.isPresent()) {
-                                MediaTypeCodec decoder = registered.get();
-                                Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
-                                return Optional.of(val);
-                            } else {
-                                return this.conversionService.convert(byteBuf, targetType, context);
-                            }
+                        MediaType mediaType = StringUtils.isEmpty(contentType) ? null : MediaType.of(contentType);
+                        MediaTypeCodec codec = decoderRegistryProvider.get().findCodec(mediaType).orElse(null);
+                        if (codec != null) {
+                            return Optional.of(
+                                codec.decode(argument, new ByteBufInputStream(byteBuf))
+                            );
                         }
-                        return this.conversionService.convert(byteBuf, targetType, context);
+                        MessageBodyReader<Object> messageBodyReader = messageBodyHandlerRegistries.get().findReader(argument, mediaType).orElse(null);
+                        if (messageBodyReader != null) {
+                            return Optional.of(
+                                messageBodyReader.read(argument, mediaType, new SimpleHttpHeaders(), NettyByteBufferFactory.DEFAULT.wrap(byteBuf))
+                            );
+                        }
+                        return conversionService.convert(byteBuf, targetType, context);
                     } catch (Exception e) {
                         context.reject(e);
                         return Optional.empty();

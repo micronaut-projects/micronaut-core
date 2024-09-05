@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -73,6 +74,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         json.title == 'The title'
     }
 
+    @Requires(property = "spec.name", value = "HttpStatusExceptionSpec")
     @Controller('/errors')
     static class BookController {
         @Get

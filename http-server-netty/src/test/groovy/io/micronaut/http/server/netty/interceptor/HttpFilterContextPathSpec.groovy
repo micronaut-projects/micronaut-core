@@ -11,7 +11,7 @@ class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.context-path': '/context/path']
+        super.getConfiguration() << ['micronaut.server.context-path': '/context/path', 'tests': "io.micronaut.http.server.netty.interceptor"]
     }
 
     void "test interceptor execution and order - proceed"() {

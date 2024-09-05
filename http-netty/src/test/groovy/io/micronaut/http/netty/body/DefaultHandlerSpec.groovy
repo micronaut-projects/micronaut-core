@@ -22,10 +22,40 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 @MicronautTest
-class DefaultStringHandlerSpec extends Specification {
+class DefaultHandlerSpec extends Specification {
 
     @Inject
     DefaultMessageBodyHandlerRegistry bodyHandlerRegistry
+
+    void "test default writer / reader for ALL type"() {
+        when:
+            def writer = bodyHandlerRegistry.findWriter(Argument.listOf(SomeBean), MediaType.ALL_TYPE)
+
+        then:
+            writer.isPresent()
+            writer.get() instanceof NettyJsonHandler
+
+        when:
+            def reader = bodyHandlerRegistry.findReader(Argument.listOf(SomeBean), MediaType.ALL_TYPE)
+
+        then:
+            reader.isPresent()
+            reader.get() instanceof NettyJsonHandler
+    }
+
+    void "test default writer / reader for missing type"() {
+        when:
+            def writer = bodyHandlerRegistry.findWriter(Argument.listOf(SomeBean))
+
+        then:
+            writer.isEmpty()
+
+        when:
+            def reader = bodyHandlerRegistry.findReader(Argument.listOf(SomeBean))
+
+        then:
+            reader.isEmpty()
+    }
 
     @Unroll
     void "test string body handlers"() {
@@ -112,5 +142,7 @@ class DefaultStringHandlerSpec extends Specification {
 
         }
     }
+
+    class SomeBean {}
 
 }

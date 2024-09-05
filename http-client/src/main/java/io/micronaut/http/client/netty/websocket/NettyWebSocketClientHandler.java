@@ -24,6 +24,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
@@ -70,7 +71,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final WebSocketBean<T> genericWebSocketBean;
     private final Sinks.One<T> completion = Sinks.one();
     private final UriMatchInfo matchInfo;
-    private final MediaTypeCodecRegistry codecRegistry;
     private NettyWebSocketSession clientSession;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
@@ -79,12 +79,13 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     /**
      * Default constructor.
      *
-     * @param request                The originating request that created the WebSocket.
-     * @param webSocketBean          The WebSocket client bean.
-     * @param handshaker             The handshaker
-     * @param requestBinderRegistry  The request binder registry
-     * @param mediaTypeCodecRegistry The media type codec registry
-     * @param conversionService      The conversionService
+     * @param request                    The originating request that created the WebSocket.
+     * @param webSocketBean              The WebSocket client bean.
+     * @param handshaker                 The handshaker
+     * @param requestBinderRegistry      The request binder registry
+     * @param mediaTypeCodecRegistry     The media type codec registry
+     * @param messageBodyHandlerRegistry The handler registry
+     * @param conversionService          The conversionService
      */
     public NettyWebSocketClientHandler(
             MutableHttpRequest<?> request,
@@ -92,9 +93,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             final WebSocketClientHandshaker handshaker,
             RequestBinderRegistry requestBinderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             ConversionService conversionService) {
-        super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
-        this.codecRegistry = mediaTypeCodecRegistry;
+        super(requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
@@ -230,7 +231,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     handshakeResponse.headers().get(HttpHeaderNames.SEC_WEBSOCKET_ACCEPT),
                     ctx.channel(),
                     originatingRequest,
-                    codecRegistry,
+                    mediaTypeCodecRegistry,
+                    messageBodyHandlerRegistry,
                     handshaker.version().toHttpHeaderValue(),
                     ctx.pipeline().get(SslHandler.class) != null
             ) {
