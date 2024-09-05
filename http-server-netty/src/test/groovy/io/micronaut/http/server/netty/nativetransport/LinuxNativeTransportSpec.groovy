@@ -25,6 +25,6 @@ class LinuxNativeTransportSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.netty.use-native-transport': true]
+        super.getConfiguration() << ['micronaut.server.netty.use-native-transport': true, 'spec': 'TransportSpec']
     }
 }

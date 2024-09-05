@@ -31,6 +31,7 @@ import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -58,6 +59,7 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
 
     @Override
     public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<InputStream> outgoingResponse, Argument<InputStream> type, MediaType mediaType, InputStream object) throws CodecException {
+        outgoingResponse.getHeaders().setIfMissing(HttpHeaderNames.CONTENT_TYPE, mediaType);
         return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(object, OptionalLong.empty(), executorService, NettyByteBufferFactory.DEFAULT));
     }
 

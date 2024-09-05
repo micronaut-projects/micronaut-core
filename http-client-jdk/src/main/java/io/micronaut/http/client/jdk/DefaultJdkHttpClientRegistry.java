@@ -29,11 +29,15 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientRegistry;
@@ -53,6 +57,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -86,6 +92,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     private final JsonMapper jsonMapper;
     @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider;
     private final JdkClientSslBuilder jdkClientSslBuilder;
     private final CookieDecoder cookieDecoder;
@@ -98,6 +105,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
         JsonMapper jsonMapper,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider,
         BeanProvider<JdkClientSslBuilder> sslBuilderBeanProvider,
         BeanProvider<CookieDecoder> cookieDecoderBeanProvider
@@ -108,6 +116,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         this.clientFilterResolver = httpClientFilterResolver;
         this.jsonMapper = jsonMapper;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestBinderRegistryProvider = requestBinderRegistryProvider;
         this.jdkClientSslBuilder = sslBuilderBeanProvider.orElse(new JdkClientSslBuilder(new ResourceResolver()));
         this.cookieDecoder = cookieDecoderBeanProvider.orElse(new CompositeCookieDecoder(List.of(new DefaultCookieDecoder())));
@@ -261,6 +270,27 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
+                client.setMessageBodyHandlerRegistry(new MessageBodyHandlerRegistry() {
+                    final MessageBodyHandlerRegistry delegate = client.getMessageBodyHandlerRegistry();
+
+                    @SuppressWarnings("unchecked")
+                    private <T> T customize(T handler) {
+                        if (handler instanceof CustomizableJsonHandler cnjh) {
+                            return (T) cnjh.customize(jsonFeatures);
+                        }
+                        return handler;
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findReader(type, mediaType).map(this::customize);
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findWriter(type, mediaType).map(this::customize);
+                    }
+                });
             }
             return client;
         });
@@ -287,6 +317,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 annotationMetadata
             )),
             mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry,
             requestBinderRegistryProvider.orElse(new DefaultRequestBinderRegistry(conversionService)),
             clientId,
             conversionService,
@@ -316,10 +347,9 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
-        HttpClient client = clients.get(key);
+        HttpClient client = clients.remove(key);
         if (client != null && client.isRunning()) {
             client.close();
-            clients.remove(key);
         }
     }
 

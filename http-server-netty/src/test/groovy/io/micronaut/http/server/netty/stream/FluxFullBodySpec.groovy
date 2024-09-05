@@ -1,12 +1,20 @@
 package io.micronaut.http.server.netty.stream
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -15,7 +23,7 @@ class FluxFullBodySpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(
             EmbeddedServer,
-            ["micronaut.server.netty.server-type": NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT]
+            ["micronaut.server.netty.server-type": NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT, 'spec.name': FluxFullBodySpec.simpleName]
     )
     @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
 
@@ -35,6 +43,17 @@ class FluxFullBodySpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.status() == HttpStatus.BAD_REQUEST
+    }
+
+    @Requires(property = 'spec.name', value = 'FluxFullBodySpec')
+    @Controller("/body/flux/test")
+    static class ReactiveController {
+
+        @Post("/")
+        Mono<HttpResponse<?>> read(@Body Publisher<String> body) {
+            return Flux.from(body).collectList()
+                    .map(list -> HttpResponse.ok(list))
+        }
     }
 
 }

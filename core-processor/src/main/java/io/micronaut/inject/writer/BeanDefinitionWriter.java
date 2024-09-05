@@ -3674,8 +3674,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 final int parametersIndex = createConstructorParameterArray(parameters, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
             } else {
-                boolean isKotlin = constructor.getClass().getSimpleName().startsWith("Kotlin");
-                if (isKotlin) {
+                if (WriterUtils.hasKotlinDefaultsParameters(parameters)) {
                     Map<Integer, Integer> checksLocals = new HashMap<>();
                     Map<Integer, Integer> valuesLocals = new HashMap<>();
                     WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, requiresReflection, true, (index, parameter) -> {

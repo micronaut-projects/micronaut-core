@@ -50,11 +50,13 @@ import java.util.List;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Singleton
 @Internal
 @BootstrapContextCompatible
 @Requires(bean = ByteBufferFactory.class)
+@Deprecated(forRemoval = true, since = "4.7")
 public class TextStreamCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "text-stream";

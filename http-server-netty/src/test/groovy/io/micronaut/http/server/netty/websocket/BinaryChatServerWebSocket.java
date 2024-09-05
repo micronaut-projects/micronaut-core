@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
@@ -24,6 +25,7 @@ import io.micronaut.websocket.annotation.ServerWebSocket;
 
 import java.util.Set;
 
+@Requires(property = "spec.name", value = "BinaryWebSocketSpec")
 @ServerWebSocket("/binary/chat/{topic}/{username}")
 public class BinaryChatServerWebSocket {
     @OnOpen

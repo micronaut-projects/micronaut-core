@@ -1108,8 +1108,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
+                int n = buf.readableBytes();
                 writeCompressing(new DefaultHttpContent(buf), true, false);
-                incompleteWrittenBytes += buf.readableBytes();
+                incompleteWrittenBytes += n;
                 if (ctx.channel().isWritable()) {
                     writeSome();
                 }

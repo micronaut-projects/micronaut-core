@@ -16,6 +16,7 @@
 package io.micronaut.runtime.http.scope
 
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
@@ -149,6 +150,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         result == "OK"
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @RequestScope
     static class RequestBean {
 
@@ -174,6 +176,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @RequestScope
     static class SimpleRequestBean {
 
@@ -193,6 +196,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @Prototype
     static class SimpleBean {
 
@@ -205,6 +209,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @Controller
     static class SimpleTestController {
         final SimpleRequestBean simpleRequestBean
@@ -231,6 +236,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @RequestScope
     static class RequestAwareBean implements RequestAware {
 
@@ -242,6 +248,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @Singleton
     static class MessageService {
 
@@ -266,6 +273,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @Controller
     static class TestController {
 
@@ -294,6 +302,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
     @Singleton
     static class ReqTerminatedListener implements ApplicationEventListener<HttpRequestTerminatedEvent> {
         int callCount

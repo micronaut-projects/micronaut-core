@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpMethod
@@ -66,7 +67,7 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
         var e = thrown(HttpClientResponseException)
     }
 
-
+    @Requires(property = 'spec.name', value = 'QueryParameterFormattingSpec')
     @Controller(value = "/formatted", produces = MediaType.TEXT_PLAIN)
     static class FormattedController {
         @Get("csv")

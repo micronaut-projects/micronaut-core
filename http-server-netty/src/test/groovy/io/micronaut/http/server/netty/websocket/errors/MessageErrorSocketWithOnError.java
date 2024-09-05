@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.server.netty.websocket.errors;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnError;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
+@Requires(property = "spec.name", value = "WebSocketErrorsSpec")
 @ServerWebSocket("/ws/errors/message-onerror")
 public class MessageErrorSocketWithOnError {
 

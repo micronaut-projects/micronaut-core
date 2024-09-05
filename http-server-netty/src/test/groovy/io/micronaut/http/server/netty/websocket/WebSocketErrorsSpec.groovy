@@ -31,7 +31,8 @@ class WebSocketErrorsSpec extends Specification {
     void "test idle timeout invokes onclose"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.server.idle-timeout': '5s'
+                'micronaut.server.idle-timeout': '5s',
+                'spec.name': 'WebSocketErrorsSpec'
         ])
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
@@ -62,7 +63,7 @@ class WebSocketErrorsSpec extends Specification {
 
     void "test error from on message handler without @OnMessage closes the connection"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WebSocketErrorsSpec'])
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
@@ -92,7 +93,7 @@ class WebSocketErrorsSpec extends Specification {
 
     void "test error from on message handler without @OnMessage invokes @OnError handler"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WebSocketErrorsSpec'])
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 

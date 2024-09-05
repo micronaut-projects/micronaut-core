@@ -958,6 +958,7 @@ public class DefaultHttpClient implements
                 webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
             requestBinderRegistry,
             mediaTypeCodecRegistry,
+            handlerRegistry,
             conversionService);
 
         return connectionManager.connectForWebsocket(requestKey, handler)
