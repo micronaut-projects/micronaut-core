@@ -281,7 +281,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * Whether processing is delayed to a later stage
+     * Whether processing is delayed to a later stage.
+     *
      * @param className The class name
      * @return True it is
      * @since 4.6.5

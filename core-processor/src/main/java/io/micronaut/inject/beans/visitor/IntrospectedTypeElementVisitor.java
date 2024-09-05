@@ -256,7 +256,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void finish(VisitorContext visitorContext) {
         try {
             if (!writers.isEmpty()) {
-                writers.forEach((className, writer) ->{
+                writers.forEach((className, writer) -> {
                     if (!visitorContext.isPostponedToNextRound(className)) {
                         try {
                             writer.accept(visitorContext);
