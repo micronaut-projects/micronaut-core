@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -77,6 +78,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
     private Set<String> processedTypes;
+    protected Set<String> postponedTypes = new LinkedHashSet<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -216,7 +218,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             modelUtils,
             filer,
             visitorAttributes,
-            getVisitorKind()
+            getVisitorKind(),
+            postponedTypes
         );
     }
 
