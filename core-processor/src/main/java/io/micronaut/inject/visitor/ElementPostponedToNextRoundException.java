@@ -34,6 +34,7 @@ public final class ElementPostponedToNextRoundException extends RuntimeException
      * @param originatingElement The originating element
      */
     public ElementPostponedToNextRoundException(@NonNull Element originatingElement) {
+        super("Original element: " + originatingElement.getName() + " is postponed to the next round!");
         this.originatingElement = originatingElement;
     }
 
