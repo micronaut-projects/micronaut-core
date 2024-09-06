@@ -74,31 +74,37 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
         ExecutionFlow<HttpResponse<?>> result;
 
-        try {
-            // handle decoding failure
-            DecoderResult decoderResult = request.getNativeRequest().decoderResult();
-            if (decoderResult.isFailure()) {
-                Throwable cause = decoderResult.cause();
-                HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+        // handle decoding failure
+        DecoderResult decoderResult = request.getNativeRequest().decoderResult();
+        if (decoderResult.isFailure()) {
+            Throwable cause = decoderResult.cause();
+            HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+            try {
                 result = onStatusError(
                     request,
                     HttpResponse.status(status),
                     status.getReason()
                 );
-            } else {
+            } catch (Exception e) {
+                result = ExecutionFlow.error(e);
+            }
+        } else {
+            try {
                 result = normalFlow(request);
+            } catch (Exception e) {
+                handleException(request, e);
+                return;
             }
-            ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
-            if (imperativeFlow != null) {
-                Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
-                // usually this is a MutableHttpResponse, avoid scalability issues here
-                HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
-                rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
-            } else {
-                result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
-            }
-        } catch (Exception e) {
-            handleException(request, e);
+        }
+
+        ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
+        if (imperativeFlow != null) {
+            Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
+            // usually this is a MutableHttpResponse, avoid scalability issues here
+            HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
+            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
+        } else {
+            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
         }
     }
 
