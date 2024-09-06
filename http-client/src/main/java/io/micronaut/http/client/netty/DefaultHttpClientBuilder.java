@@ -44,6 +44,7 @@ import io.netty.resolver.AddressResolverGroup;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -90,6 +91,8 @@ public final class DefaultHttpClientBuilder {
     ConversionService conversionService = ConversionService.SHARED;
     @Nullable
     AddressResolverGroup<?> resolverGroup = null;
+    @Nullable
+    ExecutorService blockingExecutor = null;
 
     DefaultHttpClientBuilder() {
     }
@@ -261,6 +264,12 @@ public final class DefaultHttpClientBuilder {
     @NonNull
     DefaultHttpClientBuilder resolverGroup(@Nullable AddressResolverGroup<?> resolverGroup) {
         this.resolverGroup = resolverGroup;
+        return this;
+    }
+
+    @NonNull
+    DefaultHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
+        this.blockingExecutor = blockingExecutor;
         return this;
     }
 

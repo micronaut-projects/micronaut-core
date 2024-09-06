@@ -71,6 +71,7 @@ import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -79,6 +80,7 @@ import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
 import io.netty.resolver.AddressResolverGroup;
 import jakarta.annotation.PreDestroy;
+import jakarta.inject.Named;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +94,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -129,6 +132,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
     private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
+    private final ExecutorService blockingExecutor;
 
     /**
      * Default constructor.
@@ -144,6 +148,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
      * @param jsonMapper                      JSON Mapper
+     * @param blockingExecutor                Optional executor for blocking operations
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
@@ -156,7 +161,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
-            JsonMapper jsonMapper) {
+            JsonMapper jsonMapper,
+            @Nullable
+            @Named(TaskExecutors.BLOCKING)
+            ExecutorService blockingExecutor) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -168,6 +176,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.jsonMapper = jsonMapper;
+        this.blockingExecutor = blockingExecutor;
     }
 
     @NonNull
@@ -452,7 +461,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .clientCustomizer(clientCustomizer)
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))
-            .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)));
+            .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)))
+            .blockingExecutor(blockingExecutor);
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {

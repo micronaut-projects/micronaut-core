@@ -36,6 +36,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.functional.ThrowingFunction;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
@@ -46,6 +47,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -102,7 +104,6 @@ import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.sse.Event;
@@ -157,17 +158,19 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.flow.FlowControlHandler;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.resolver.AddressResolverGroup;
+import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -183,6 +186,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.Closeable;
 import java.io.File;
@@ -201,6 +205,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -268,6 +273,8 @@ public class DefaultHttpClient implements
     private final RequestBinderRegistry requestBinderRegistry;
     private final String informationalServiceId;
     private final ConversionService conversionService;
+    @Nullable
+    private final ExecutorService blockingExecutor;
 
     /**
      * Construct a client for the given arguments.
@@ -409,6 +416,7 @@ public class DefaultHttpClient implements
         this.conversionService = builder.conversionService;
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
+        this.blockingExecutor = builder.blockingExecutor;
 
         this.connectionManager = new ConnectionManager(
             log,
@@ -1321,10 +1329,10 @@ public class DefaultHttpClient implements
      * @param requestContentType     The request content type
      * @param permitsBody            Whether permits body
      * @param onError                Called when the body publisher encounters an error
-     * @return A {@link NettyRequestWriter}
+     * @return The body
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
-    private NettyRequestWriter buildNettyRequest(
+    private NettyByteBody buildNettyRequest(
         MutableHttpRequest<?> request,
         URI requestURI,
         MediaType requestContentType,
@@ -1347,28 +1355,11 @@ public class DefaultHttpClient implements
         }
 
         NettyHttpRequestBuilder nettyRequestBuilder = NettyHttpRequestBuilder.asBuilder(request);
-        Optional<HttpRequest> direct = nettyRequestBuilder.toHttpRequestDirect();
-        String newUri = requestURI.getRawPath();
-        if (requestURI.getRawQuery() != null) {
-            newUri += "?" + requestURI.getRawQuery();
-        }
+        Optional<ByteBody> direct = nettyRequestBuilder.byteBodyDirect();
         if (direct.isPresent()) {
-            if (direct.get() instanceof StreamedHttpRequest shr) {
-                return new ByteBodyRequestWriter(
-                    direct.get().setUri(newUri),
-                    NettyBodyAdapter.adapt(Flux.from(shr).map(HttpContent::content), eventLoop, shr.headers(), shr::closeIfNoSubscriber)
-                );
-            } else {
-                return new ByteBodyRequestWriter(new DefaultHttpRequest(
-                    direct.get().protocolVersion(),
-                    direct.get().method(),
-                    newUri,
-                    direct.get().headers()
-                ), new AvailableNettyByteBody(((FullHttpRequest) direct.get()).content()));
-            }
+            return NettyBodyAdapter.adapt(direct.get(), eventLoop);
         }
 
-        HttpPostRequestEncoder postRequestEncoder;
         if (permitsBody) {
             Optional<?> body = request.getBody();
             boolean hasBody = body.isPresent();
@@ -1376,17 +1367,12 @@ public class DefaultHttpClient implements
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence sequence) {
                     ByteBuf byteBuf = charSequenceToByteBuf(sequence, requestContentType);
-                    HttpRequest nettyRequest = nettyRequestBuilder.toHttpRequestWithoutBody();
-                    nettyRequest.setUri(newUri);
-                    return new ByteBodyRequestWriter(nettyRequest, new AvailableNettyByteBody(byteBuf));
+                    return new AvailableNettyByteBody(byteBuf);
                 } else {
-                    postRequestEncoder = buildFormDataRequest(request, bodyValue);
-                    return postToWriter(newUri, postRequestEncoder, eventLoop);
+                    return buildFormRequest(request, eventLoop, r -> buildFormDataRequest(r, bodyValue));
                 }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
-                Object bodyValue = body.get();
-                postRequestEncoder = buildMultipartRequest(request, bodyValue);
-                return postToWriter(newUri, postRequestEncoder, eventLoop);
+                return buildFormRequest(request, eventLoop, r -> buildMultipartRequest(r, body.get()));
             } else {
                 ByteBuf bodyContent;
                 if (hasBody) {
@@ -1411,9 +1397,7 @@ public class DefaultHttpClient implements
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);
 
-                        HttpRequest nettyRequest = nettyRequestBuilder.toHttpRequestWithoutBody();
-                        nettyRequest.setUri(newUri);
-                        return new ByteBodyRequestWriter(nettyRequest, NettyBodyAdapter.adapt(requestBodyPublisher.map(ByteBufHolder::content), eventLoop, nettyRequest.headers(), null));
+                        return NettyBodyAdapter.adapt(requestBodyPublisher.map(ByteBufHolder::content), eventLoop, nettyRequestBuilder.toHttpRequestWithoutBody().headers(), null);
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
@@ -1430,31 +1414,10 @@ public class DefaultHttpClient implements
                 } else {
                     bodyContent = Unpooled.EMPTY_BUFFER;
                 }
-                return new ByteBodyRequestWriter(
-                    nettyRequestBuilder.toHttpRequestWithoutBody().setUri(newUri),
-                    new AvailableNettyByteBody(bodyContent)
-                );
+                return new AvailableNettyByteBody(bodyContent);
             }
         } else {
-            return new ByteBodyRequestWriter(
-                nettyRequestBuilder.toHttpRequestWithoutBody().setUri(newUri),
-                (NettyByteBody) AvailableNettyByteBody.empty()
-            );
-        }
-    }
-
-    private NettyRequestWriter postToWriter(String newUri, HttpPostRequestEncoder postRequestEncoder, EventLoop eventLoop) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        HttpRequest nettyRequest = postRequestEncoder.finalizeRequest();
-        nettyRequest.setUri(newUri);
-        if (postRequestEncoder.isChunked()) {
-            return new ChunkedPostRequestWriter(nettyRequest, postRequestEncoder);
-        } else {
-            return new ByteBodyRequestWriter(new DefaultHttpRequest(
-                nettyRequest.protocolVersion(),
-                nettyRequest.method(),
-                newUri,
-                nettyRequest.headers()
-            ), new AvailableNettyByteBody(((FullHttpRequest) nettyRequest).content()));
+            return (NettyByteBody) AvailableNettyByteBody.empty();
         }
     }
 
@@ -1562,9 +1525,8 @@ public class DefaultHttpClient implements
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(finalRequest.getMethod());
 
-        MutableHttpRequest clientHttpRequest = (MutableHttpRequest) finalRequest;
-        NettyRequestWriter requestWriter = buildNettyRequest(
-            clientHttpRequest,
+        NettyByteBody bytes = buildNettyRequest(
+            (MutableHttpRequest) finalRequest,
             requestURI,
             requestContentType,
             permitsBody,
@@ -1575,15 +1537,11 @@ public class DefaultHttpClient implements
             },
             poolHandle.channel.eventLoop()
         );
-        HttpRequest nettyRequest = requestWriter.nettyRequest();
-
-        prepareHttpHeaders(
-            poolHandle,
-            requestURI,
-            finalRequest,
-            nettyRequest,
-            permitsBody
-        );
+        String newUri = requestURI.getRawPath();
+        if (requestURI.getRawQuery() != null) {
+            newUri += "?" + requestURI.getRawQuery();
+        }
+        HttpRequest nettyRequest = NettyHttpRequestBuilder.asBuilder(finalRequest).toHttpRequestWithoutBody().setUri(newUri);
 
         if (log.isDebugEnabled()) {
             debugRequest(requestURI, nettyRequest);
@@ -1600,7 +1558,7 @@ public class DefaultHttpClient implements
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
-        requestWriter.write(poolHandle);
+        new ByteBodyRequestWriter(nettyRequest, bytes).write(poolHandle);
     }
 
     private Flux<MutableHttpResponse<?>> streamRequestThroughChannel(
@@ -1637,7 +1595,7 @@ public class DefaultHttpClient implements
         ConnectionManager.PoolHandle poolHandle) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         URI requestURI = request.getUri();
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
-        NettyRequestWriter requestWriter = buildNettyRequest(
+        NettyByteBody byteBody = buildNettyRequest(
             request,
             requestURI,
             request
@@ -1651,9 +1609,12 @@ public class DefaultHttpClient implements
             },
             poolHandle.channel.eventLoop()
         );
-        prepareHttpHeaders(poolHandle, requestURI, request, requestWriter.nettyRequest(), permitsBody);
+        String newUri = requestURI.getRawPath();
+        if (requestURI.getRawQuery() != null) {
+            newUri += "?" + requestURI.getRawQuery();
+        }
+        HttpRequest nettyRequest = NettyHttpRequestBuilder.asBuilder(request).toHttpRequestWithoutBody().setUri(newUri);
 
-        HttpRequest nettyRequest = requestWriter.nettyRequest();
         Promise<MutableHttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new StreamHttpResponseHandler(responsePromise, parentRequest, request, poolHandle));
@@ -1667,7 +1628,7 @@ public class DefaultHttpClient implements
             traceRequest(request, nettyRequest);
         }
 
-        requestWriter.write(poolHandle);
+        new ByteBodyRequestWriter(nettyRequest, byteBody).write(poolHandle);
         responsePromise.addListener((Future<MutableHttpResponse<?>> future) -> {
             if (future.isSuccess()) {
                 emitter.next(future.getNow());
@@ -1696,25 +1657,66 @@ public class DefaultHttpClient implements
         return host.toString();
     }
 
-    private <I> void prepareHttpHeaders(
-        ConnectionManager.PoolHandle poolHandle,
-        URI requestURI,
-        io.micronaut.http.HttpRequest<I> request,
-        HttpRequest nettyRequest,
-        boolean permitsBody) {
-        HttpHeaders headers = nettyRequest.headers();
+    private NettyByteBody buildFormRequest(
+        MutableHttpRequest<?> request,
+        EventLoop eventLoop,
+        ThrowingFunction<HttpRequest, HttpPostRequestEncoder, HttpPostRequestEncoder.ErrorDataEncoderException> buildMethod
+    ) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        // this function acts like a wrapper around HttpPostRequestEncoder. HttpPostRequestEncoder
+        // takes a request + form data and transforms it to a request + bytes. Because we only want
+        // the bytes, we need to copy the data from the netty request back to the original
+        // MutableHttpRequest. This is just the Content-Type header, which sometimes gets an extra
+        // boundary specifier that we need.
 
-        if (!poolHandle.http2) {
-            if (poolHandle.canReturn()) {
-                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-            } else {
-                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+        // build the mock netty request (only the content-type matters)
+        HttpRequest nettyRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        List<AsciiString> relevantHeaders = List.of(HttpHeaderNames.CONTENT_TYPE);
+        for (AsciiString header : relevantHeaders) {
+            nettyRequest.headers().add(header, request.getHeaders().getAll(header));
+        }
+
+        HttpPostRequestEncoder encoder = buildMethod.apply(nettyRequest);
+        HttpRequest finalized = encoder.finalizeRequest();
+        // copy back the content-type
+        for (AsciiString header : relevantHeaders) {
+            request.getHeaders().remove(header);
+            for (String value : finalized.headers().getAll(header)) {
+                request.getHeaders().add(header, value);
             }
+        }
+        // return the body bytes
+        if (encoder.isChunked()) {
+            Flux<ByteBuf> bytes = Flux.create(em -> {
+                em.onRequest(n -> {
+                    try {
+                        while (n-- > 0) {
+                            HttpContent chunk = encoder.readChunk(PooledByteBufAllocator.DEFAULT);
+                            if (chunk == null) {
+                                assert encoder.isEndOfInput();
+                                em.complete();
+                                break;
+                            }
+                            em.next(chunk.content());
+                        }
+                    } catch (Exception e) {
+                        em.error(e);
+                    }
+                });
+                em.onDispose(encoder::cleanFiles);
+            });
+            if (blockingExecutor != null &&
+                encoder.getBodyListAttributes().stream().anyMatch(d -> !(d instanceof HttpData hd) || !hd.isInMemory())) {
+                // readChunk in the above code can block.
+                bytes = bytes.subscribeOn(Schedulers.fromExecutor(blockingExecutor));
+            }
+            return NettyBodyAdapter.adapt(bytes, eventLoop);
+        } else {
+            return new AvailableNettyByteBody(((FullHttpRequest) finalized).content());
         }
     }
 
-    private HttpPostRequestEncoder buildFormDataRequest(MutableHttpRequest<?> clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(NettyHttpRequestBuilder.asBuilder(clientHttpRequest).toHttpRequestWithoutBody(), false);
+    private HttpPostRequestEncoder buildFormDataRequest(HttpRequest baseRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(baseRequest, false);
 
         Map<String, Object> formData;
         if (bodyValue instanceof Map) {
@@ -1744,10 +1746,9 @@ public class DefaultHttpClient implements
         }
     }
 
-    private HttpPostRequestEncoder buildMultipartRequest(MutableHttpRequest<?> clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+    private HttpPostRequestEncoder buildMultipartRequest(HttpRequest baseRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
-        HttpRequest request = NettyHttpRequestBuilder.asBuilder(clientHttpRequest).toHttpRequestWithoutBody();
-        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, baseRequest, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
         if (bodyValue instanceof MultipartBody.Builder builder) {
             bodyValue = builder.build();
         }
@@ -1757,7 +1758,7 @@ public class DefaultHttpClient implements
                 @Override
                 public InterfaceHttpData createFileUpload(@NonNull String name, @NonNull String filename, @NonNull MediaType contentType, @Nullable String encoding, @Nullable Charset charset, long length) {
                     return factory.createFileUpload(
-                            request,
+                            baseRequest,
                             name,
                             filename,
                             contentType.toString(),
@@ -1771,7 +1772,7 @@ public class DefaultHttpClient implements
                 @Override
                 public InterfaceHttpData createAttribute(@NonNull String name, @NonNull String value) {
                     return factory.createAttribute(
-                            request,
+                            baseRequest,
                             name,
                             value
                     );
@@ -1944,19 +1945,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    /**
-     * A Netty request writer.
-     */
-    private interface NettyRequestWriter {
-        /**
-         * @param poolHandle The pool handle to write to. Can be tainted, but should not be
-         *                   released by the writer
-         */
-        void write(ConnectionManager.PoolHandle poolHandle);
-
-        HttpRequest nettyRequest();
-    }
-
     private abstract static class ContinueHandler extends ChannelInboundHandlerAdapter {
         private boolean continued;
 
@@ -1982,7 +1970,7 @@ public class DefaultHttpClient implements
         protected abstract void continueBody(ChannelHandlerContext ctx);
     }
 
-    private record ByteBodyRequestWriter(HttpRequest nettyRequest, NettyByteBody byteBody) implements NettyRequestWriter {
+    private record ByteBodyRequestWriter(HttpRequest nettyRequest, NettyByteBody byteBody) {
         ByteBodyRequestWriter {
             HttpHeaders headers = nettyRequest.headers();
             OptionalLong length = byteBody.expectedLength();
@@ -1997,8 +1985,15 @@ public class DefaultHttpClient implements
             }
         }
 
-        @Override
         public void write(ConnectionManager.PoolHandle poolHandle) {
+            if (!poolHandle.http2) {
+                if (poolHandle.canReturn()) {
+                    nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                } else {
+                    nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                }
+            }
+
             Channel channel = poolHandle.channel();
             if (byteBody instanceof AvailableNettyByteBody available) {
                 ByteBuf byteBuf = AvailableNettyByteBody.toByteBuf(available);
@@ -2132,45 +2127,6 @@ public class DefaultHttpClient implements
 
             ctx.fireExceptionCaught(e);
             ctx.pipeline().remove(ctx.name());
-        }
-    }
-
-    private record ChunkedPostRequestWriter(HttpRequest nettyRequest,
-                                            HttpPostRequestEncoder encoder) implements NettyRequestWriter {
-
-        @Override
-        public void write(ConnectionManager.PoolHandle poolHandle) {
-            Channel channel = poolHandle.channel();
-            channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
-            if (HttpUtil.is100ContinueExpected(nettyRequest)) {
-                channel.writeAndFlush(nettyRequest, channel.voidPromise());
-                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, "continue-handler", new ContinueHandler() {
-                    @Override
-                    protected void discard() {
-                        encoder.cleanFiles();
-                        channel.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK);
-                    }
-
-                    @Override
-                    protected void continueBody(ChannelHandlerContext ctx) {
-                        channel.writeAndFlush(encoder).addListener((ChannelFutureListener) future -> {
-                            if (!future.isSuccess()) {
-                                channel.pipeline().fireExceptionCaught(future.cause());
-                            }
-                            discard();
-                        });
-                    }
-                });
-            } else {
-                channel.write(nettyRequest, channel.voidPromise());
-                channel.writeAndFlush(encoder).addListener((ChannelFutureListener) future -> {
-                    if (!future.isSuccess()) {
-                        channel.pipeline().fireExceptionCaught(future.cause());
-                    }
-                    encoder.cleanFiles();
-                    channel.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK);
-                });
-            }
         }
     }
 

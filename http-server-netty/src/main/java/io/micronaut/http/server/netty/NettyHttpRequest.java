@@ -52,6 +52,8 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
@@ -59,8 +61,6 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.DefaultUriRouteMatch;
@@ -627,6 +627,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    public @NonNull Optional<ByteBody> byteBodyDirect() {
+        return Optional.of(byteBody());
+    }
+
+    @Override
     public io.netty.handler.codec.http.HttpRequest toHttpRequestWithoutBody() {
         if (nettyRequest instanceof FullHttpRequest) {
             // do not include body, the body is owned by us
@@ -860,6 +865,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         @Override
         public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
             return body != null ? Optional.empty() : NettyHttpRequest.this.toHttpRequestDirect();
+        }
+
+        @Override
+        public @NonNull Optional<ByteBody> byteBodyDirect() {
+            return body != null ? Optional.empty() : NettyHttpRequest.this.byteBodyDirect();
         }
     }
 

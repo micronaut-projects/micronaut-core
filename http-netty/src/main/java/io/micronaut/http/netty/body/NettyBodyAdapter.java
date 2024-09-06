@@ -28,7 +28,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.publisher.Flux;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongUnaryOperator;
@@ -72,7 +71,10 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
         if (body instanceof AvailableByteBody available) {
             return new AvailableNettyByteBody(Unpooled.wrappedBuffer(available.toByteArray()));
         }
-        return adapt(Flux.from(body.toByteArrayPublisher()).map(Unpooled::wrappedBuffer), eventLoop);
+        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, NettyByteBody.toByteBufs(body), null);
+        adapter.sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, adapter);
+        body.expectedLength().ifPresent(adapter.sharedBuffer::setExpectedLength);
+        return new StreamingNettyByteBody(adapter.sharedBuffer);
     }
 
     public static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop) {

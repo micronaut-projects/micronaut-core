@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
  * @since 4.7
  */
 @Internal
-public class ByteArrayBufferFactory implements ByteBufferFactory<Void, byte[]> {
+public final class ByteArrayBufferFactory implements ByteBufferFactory<Void, byte[]> {
     public static final ByteArrayBufferFactory INSTANCE = new ByteArrayBufferFactory();
 
     private ByteArrayBufferFactory() {
