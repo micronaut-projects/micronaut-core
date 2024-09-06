@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -257,12 +258,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         try {
             if (!writers.isEmpty()) {
                 writers.forEach((className, writer) -> {
-                    if (!visitorContext.isPostponedToNextRound(className)) {
-                        try {
-                            writer.accept(visitorContext);
-                        } catch (IOException e) {
-                            throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
-                        }
+                    try {
+                        writer.accept(visitorContext);
+                    } catch (ElementPostponedToNextRoundException ignore) {
+                        // Ignore, next round will redo
+                    } catch (IOException e) {
+                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
                     }
                 });
 

@@ -19,12 +19,10 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import java.util.LinkedHashSet;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -38,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -79,11 +78,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
     private Set<String> processedTypes;
-    private Set<String> postponedTypes = new LinkedHashSet<>();
-
-    {
-        visitorAttributes.put(JavaVisitorContext.POSTPONED, postponedTypes);
-    }
+    protected Set<String> postponedTypes = new LinkedHashSet<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -104,14 +99,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         }
         options.addAll(super.getSupportedOptions());
         return options;
-    }
-
-    /**
-     * A list of types that are still pending.
-     * @return The pending types
-     */
-    protected Set<String> getPostponedTypes() {
-        return postponedTypes;
     }
 
     /**
@@ -231,7 +218,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             modelUtils,
             filer,
             visitorAttributes,
-            getVisitorKind()
+            getVisitorKind(),
+            postponedTypes
         );
     }
 

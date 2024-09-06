@@ -240,10 +240,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
 
-            Set<String> postponedTypes = getPostponedTypes();
-            postponedTypes.stream().map(elementUtils::getTypeElement)
-                .filter(Objects::nonNull)
-                .forEach(elements::add);
+            postponedTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
             postponedTypes.clear();
 
             if (!elements.isEmpty()) {
