@@ -591,9 +591,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
             }
         } else if (value instanceof Enum<?> enumObject) {
-            Class<?> declaringClass = enumObject.getDeclaringClass();
-            Type t = Type.getType(declaringClass);
-            methodVisitor.getStatic(t, enumObject.name(), t);
+            methodVisitor.push(enumObject.name()); // Always store enum values as string
         } else if (value.getClass().isArray()) {
             Class<?> jt = ReflectionUtils.getPrimitiveType(value.getClass().getComponentType());
             final Type componentType = Type.getType(jt);
