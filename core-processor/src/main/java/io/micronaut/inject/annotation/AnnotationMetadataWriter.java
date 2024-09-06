@@ -594,6 +594,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.push(enumObject.name()); // Always store enum values as string
         } else if (value.getClass().isArray()) {
             Class<?> jt = ReflectionUtils.getPrimitiveType(value.getClass().getComponentType());
+            if (jt.isEnum()) {
+                jt = String.class; // Always store enum values as string
+            }
             final Type componentType = Type.getType(jt);
             int len = Array.getLength(value);
             if (Object.class == jt && len == 0) {
