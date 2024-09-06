@@ -248,9 +248,9 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     private DateTimeFormatter getFormatter(String pattern, ConversionContext context) {
         var key = pattern + context.getLocale();
-        var cachedFormater = formattersCache.get(key);
-        if (cachedFormater != null) {
-            return cachedFormater;
+        var cachedFormatter = formattersCache.get(key);
+        if (cachedFormatter != null) {
+            return cachedFormatter;
         }
         var formatter = DateTimeFormatter.ofPattern(pattern, context.getLocale());
         formattersCache.put(key, formatter);
