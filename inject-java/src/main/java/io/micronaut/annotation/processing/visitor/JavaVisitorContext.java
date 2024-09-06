@@ -171,6 +171,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * @param filer The filer
      * @param visitorAttributes The attributes
      * @param visitorKind The visitor kind
+     * @param postponedTypes The postponed types
      */
     public JavaVisitorContext(
         ProcessingEnvironment processingEnv,
