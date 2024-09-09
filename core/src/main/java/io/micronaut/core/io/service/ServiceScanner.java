@@ -18,9 +18,6 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.IOUtils;
-import java.nio.file.FileSystemNotFoundException;
-import java.nio.file.ProviderNotFoundException;
-import java.util.stream.Stream;
 import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
@@ -52,6 +49,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Wrapper class for the tasks required to find services of a particular type.
@@ -192,22 +190,11 @@ final class ServiceScanner<S> {
             uniqueURIs.add(uri);
         }
 
+        FileSystem jrtProvider = null;
         if (uniqueURIs.isEmpty()) {
-            FileSystem fs = null;
-            try {
-                fs = FileSystems.getFileSystem(URI.create("jrt:/"));
-            } catch (FileSystemNotFoundException | ProviderNotFoundException e) {
-                //no-op
-            }
-            if (fs == null || !fs.isOpen()) {
-                try {
-                    fs = FileSystems.newFileSystem(URI.create("jrt:/"), Collections.emptyMap(), classLoader);
-                } catch (IOException | ProviderNotFoundException e) {
-                    // not available, probably running in Native Image.
-                }
-            }
-            if (fs != null) {
-                Path modulesPath = fs.getPath("modules");
+            jrtProvider = getJrtProvider();
+            if (jrtProvider != null) {
+                Path modulesPath = jrtProvider.getPath("modules");
                 try (Stream<Path> stream = Files.list(modulesPath)) {
                     stream
                         .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
@@ -218,7 +205,6 @@ final class ServiceScanner<S> {
                         .map(Path::toUri)
                         .forEach(uniqueURIs::add);
                 }
-
                 // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
             }
         }
@@ -234,6 +220,31 @@ final class ServiceScanner<S> {
                 consumer.accept(uri, path);
             }
         }
+        if (jrtProvider != null && jrtProvider.isOpen()) {
+            try {
+                jrtProvider.close();
+            } catch (Throwable ignore) {
+                // Ignore
+            }
+        }
+    }
+
+    @Nullable
+    private FileSystem getJrtProvider() {
+        try {
+            URI uri = URI.create("jrt:/");
+            FileSystem fs = FileSystems.getFileSystem(uri);
+            if (fs.isOpen()) {
+                return fs;
+            }
+            fs = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+            if (fs.isOpen()) {
+                return fs;
+            }
+        } catch (Throwable e) {
+            // not available, probably running in Native Image.
+        }
+        return null;
     }
 
     /**
