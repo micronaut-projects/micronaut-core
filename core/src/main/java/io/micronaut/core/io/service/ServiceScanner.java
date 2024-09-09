@@ -241,7 +241,7 @@ final class ServiceScanner<S> {
             if (fs.isOpen()) {
                 return fs;
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // not available, probably running in Native Image.
         }
         return null;
