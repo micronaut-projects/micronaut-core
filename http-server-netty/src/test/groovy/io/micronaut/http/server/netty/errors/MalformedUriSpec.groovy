@@ -15,6 +15,7 @@ import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
+import io.micronaut.http.server.annotation.PreMatching
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
@@ -64,6 +65,31 @@ class MalformedUriSpec extends Specification {
         result == 'Exception: Illegal character in path at index 17: /malformed-proxy/[]'
     }
 
+    void "header too long"() {
+        given:
+        OncePerFilter filter = embeddedServer.applicationContext.getBean(OncePerFilter)
+        filter.filterCalled = false
+
+        MalformedUriFilter newFilter = embeddedServer.applicationContext.getBean(MalformedUriFilter)
+        newFilter.preMatchingCalled = false
+
+        def connection = new URL("$embeddedServer.URL/malformed-proxy/xyz").openConnection()
+        connection.setRequestProperty("foo", "b".repeat(9000))
+
+        when:
+        connection.inputStream
+        then:
+        thrown IOException
+
+        when:
+        def result = ((HttpURLConnection) connection).errorStream.text
+
+        then:
+        result == '{"message":"Request Entity Too Large","_links":{"self":{"href":"/malformed-proxy/xyz","templated":false}},"_embedded":{"errors":[{"message":"Request Entity Too Large"}]}}'
+        !filter.filterCalled
+        !newFilter.preMatchingCalled
+    }
+
     @Requires(property = "spec.name", value = "MalformedUriSpec")
     @Controller('/malformed')
     static class SomeController {
@@ -97,10 +123,17 @@ class MalformedUriSpec extends Specification {
     @Singleton
     @ServerFilter("/malformed-proxy/**")
     static class MalformedUriFilter {
+        boolean preMatchingCalled
 
         @RequestFilter
         HttpResponse<?> filter(HttpRequest<?> request) {
             return HttpResponse.ok("ok: " + request.path)
+        }
+
+        @RequestFilter
+        @PreMatching
+        void preMatching(HttpRequest<?> request) {
+            preMatchingCalled = false
         }
     }
 }
