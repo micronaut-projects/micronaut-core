@@ -1,6 +1,7 @@
-package io.micronaut.views;
+package io.micronaut.http.server.tck.tests.jsonview;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import reactor.core.publisher.Flux;
@@ -10,8 +11,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+@Requires(property = "spec.name", value = JsonViewsTest.SPEC_NAME)
 @Controller("/views")
-public class UserController {
+class UserController {
 
     private static final User USER = new User(1, "Joe", "secret");
 
