@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Controller("/views")
 public class UserController {
@@ -30,6 +31,12 @@ public class UserController {
     @Get("/optional")
     public Optional<User> getUserOptional() {
         return Optional.of(USER);
+    }
+
+    @JsonView(Views.Public.class)
+    @Get("/future")
+    public CompletableFuture<User> getUserFuture() {
+        return CompletableFuture.completedFuture(USER);
     }
 
     @JsonView(Views.Public.class)

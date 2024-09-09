@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -64,11 +65,22 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration The configuration for the codec
      */
-    @Inject
     public JsonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
                               ApplicationConfiguration applicationConfiguration,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * @param jacksonDatabindMappers To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration The configuration for the codec
+     */
+    @Inject
+    public JsonMediaTypeCodec(BeanProvider<JacksonDatabindMapper> jacksonDatabindMappers,
+                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration,
+                              ApplicationConfiguration applicationConfiguration) {
+        super(jacksonDatabindMappers, applicationConfiguration, MediaType.APPLICATION_JSON_TYPE, codecConfiguration);
     }
 
     @Override

@@ -161,17 +161,20 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     private static Argument<?> resolveBodyType(ReturnType<?> returnType) {
         if (returnType.isAsyncOrReactive()) {
-            Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (HttpResponse.class.isAssignableFrom(reactiveType.getType())) {
-                reactiveType = reactiveType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (HttpResponse.class.isAssignableFrom(unwrappedType.getType())) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return reactiveType;
+            return unwrappedType.withAnnotationMetadata(returnType.getAnnotationMetadata());
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
-            Argument<?> responseType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (responseType.isAsyncOrReactive()) {
-                return responseType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (unwrappedType.isAsyncOrReactive()) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return responseType;
+            return unwrappedType.withAnnotationMetadata(returnType.getAnnotationMetadata());
+        } else if (returnType.isOptional()) {
+            return returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                .withAnnotationMetadata(returnType.getAnnotationMetadata());
         }
         return returnType.asArgument();
     }

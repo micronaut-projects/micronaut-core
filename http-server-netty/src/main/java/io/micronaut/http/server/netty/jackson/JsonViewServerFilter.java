@@ -16,9 +16,7 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
@@ -27,10 +25,8 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.ServerFilterPhase;
-import io.micronaut.json.JsonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteInfo;
 import jakarta.inject.Named;
@@ -49,11 +45,6 @@ import java.util.concurrent.ExecutorService;
  * @author mmindenhall
  * @author graemerocher
  */
-@Requires(beans = JsonConfiguration.class)
-@Requires(classes = JsonView.class)
-@Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
-@ServerFilter("/**")
-@Internal
 public class JsonViewServerFilter implements Ordered {
 
     /**

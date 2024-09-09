@@ -21,6 +21,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.jackson.JacksonConfiguration
+import io.micronaut.jackson.databind.JacksonDatabindMapper
 import spock.lang.Specification
 
 class JsonViewSetupSpec extends Specification {
@@ -33,7 +34,7 @@ class JsonViewSetupSpec extends Specification {
         expect:
         applicationContext.containsBean(JacksonConfiguration)
         !applicationContext.containsBean(JsonViewMediaTypeCodecFactory)
-        !applicationContext.containsBean(JsonViewServerFilter)
+        !applicationContext.getBean(JacksonDatabindMapper).@allowViews
 
         cleanup:
         applicationContext?.close()
@@ -52,7 +53,7 @@ class JsonViewSetupSpec extends Specification {
         expect:
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.containsBean(JsonViewMediaTypeCodecFactory)
-        applicationContext.containsBean(JsonViewServerFilter)
+        applicationContext.getBean(JacksonDatabindMapper).@allowViews
 
         cleanup:
         applicationContext?.close()
