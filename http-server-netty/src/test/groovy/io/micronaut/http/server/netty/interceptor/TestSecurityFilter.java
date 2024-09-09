@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -30,6 +31,7 @@ import org.spockframework.util.Assert;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = "tests", value = "io.micronaut.http.server.netty.interceptor")
 @Filter("/secure**")
 public class TestSecurityFilter implements HttpServerFilter {
 

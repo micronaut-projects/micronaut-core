@@ -2165,7 +2165,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 }
 
                 if (collectIterables && loadedBean.isConfigurationProperties()) {
-                    collectIterableBeans(resolutionContext, loadedBean, candidates);
+                    collectIterableBeans(resolutionContext, loadedBean, candidates, beanType);
                 } else {
                     candidates.add(loadedBean);
                 }
@@ -2195,9 +2195,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * @param resolutionContext The resolution context
      * @param iterableBean The iterable
      * @param targetSet The target set
+     * @param beanType The bean type
      * @param <T> The bean type
      */
-    protected <T> void collectIterableBeans(@Nullable BeanResolutionContext resolutionContext, @NonNull BeanDefinition<T> iterableBean, Set<BeanDefinition<T>> targetSet) {
+    protected <T> void collectIterableBeans(@Nullable BeanResolutionContext resolutionContext,
+                                            @NonNull BeanDefinition<T> iterableBean,
+                                            @NonNull Set<BeanDefinition<T>> targetSet,
+                                            @NonNull Argument<T> beanType) {
         // no-op
     }
 
@@ -2678,7 +2682,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             collectIterableBeans(
                 null,
                 beanDefinition,
-                beanCandidates
+                beanCandidates,
+                Argument.OBJECT_ARGUMENT
             );
             for (BeanDefinition beanCandidate : beanCandidates) {
                 findOrCreateSingletonBeanRegistration(

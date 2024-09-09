@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Status;
@@ -94,6 +95,21 @@ class HttpMethodDeleteTest {
         );
     }
 
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void deleteMethodMappingWithRequestBody(boolean blocking) throws IOException {
+        asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
+            HttpRequest.DELETE("/delete/echo").body("{\"foo\":\"bar\"}"),
+            (server, request) ->
+                AssertionUtils.assertDoesNotThrow(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .body(BodyAssertion.builder().body("{\"foo\":\"bar\"}").equals())
+                        .build())
+        );
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/delete")
     static class HttpMethodDeleteTestController {
@@ -112,6 +128,11 @@ class HttpMethodDeleteTest {
         @Delete("/object-response")
         Person person() {
             return new Person("Tim", 49);
+        }
+
+        @Delete("/echo")
+        String echo(@Body String body) {
+            return body;
         }
     }
 

@@ -107,7 +107,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     private List<LoadedVisitor> loadedVisitors;
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
-    private final Set<String> pendingTypes = new LinkedHashSet<>();
 
     /**
      * The visited annotation names.
@@ -241,8 +240,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
 
-            pendingTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
-            pendingTypes.clear();
+            postponedTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
+            postponedTypes.clear();
 
             if (!elements.isEmpty()) {
 
@@ -272,7 +271,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            pendingTypes.add(javaClassElement.getName());
+                            postponedTypes.add(javaClassElement.getName());
                         }
                     }
                 }

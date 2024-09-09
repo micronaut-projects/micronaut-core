@@ -17,6 +17,7 @@ package io.micronaut.runtime
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Context
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.scheduling.TaskExecutors
@@ -35,6 +36,7 @@ class ExecutorServiceWithMultipleEventLoopsSpec extends Specification {
                     'micronaut.netty.event-loops.clients.num-threads': 1,
                     'micronaut.netty.event-loops.abc.num-threads': 1,
                     'micronaut.netty.event-loops.xyz.num-threads': 1,
+                    'spec.name': 'ExecutorServiceWithMultipleEventLoopsSpec'
             ])
 
         then:
@@ -45,6 +47,7 @@ class ExecutorServiceWithMultipleEventLoopsSpec extends Specification {
             applicationContext.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ExecutorServiceWithMultipleEventLoopsSpec')
     @Controller
     static class MyController1 {
 
@@ -62,6 +65,7 @@ class ExecutorServiceWithMultipleEventLoopsSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'ExecutorServiceWithMultipleEventLoopsSpec')
     @Context
     @Controller
     static class MyController2 {

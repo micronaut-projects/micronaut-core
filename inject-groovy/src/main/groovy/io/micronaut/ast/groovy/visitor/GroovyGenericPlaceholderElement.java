@@ -56,7 +56,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     Element declaringElement,
                                     GroovyNativeElement placeholderNativeElement,
                                     @Nullable
-                                            GroovyClassElement resolved,
+                                    GroovyClassElement resolved,
                                     List<GroovyClassElement> bounds,
                                     int arrayDimensions,
                                     boolean rawType,
@@ -75,10 +75,10 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     int arrayDimensions,
                                     boolean rawType) {
         super(visitorContext,
-                classElementRepresentingThisPlaceholder.getNativeType(),
-                classElementRepresentingThisPlaceholder.getElementAnnotationMetadataFactory(),
-                classElementRepresentingThisPlaceholder.resolvedTypeArguments,
-                arrayDimensions);
+            classElementRepresentingThisPlaceholder.getNativeType(),
+            classElementRepresentingThisPlaceholder.getElementAnnotationMetadataFactory(),
+            classElementRepresentingThisPlaceholder.resolvedTypeArguments,
+            arrayDimensions);
         this.declaringElement = declaringElement;
         this.placeholderNativeElement = placeholderNativeElement;
         this.variableName = variableName;

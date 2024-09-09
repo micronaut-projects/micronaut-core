@@ -34,6 +34,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -66,25 +67,18 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
     @SuppressWarnings({"unchecked"})
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
+        List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(
                 Argument.of(MessageBodyReader.class), // Select all readers and eliminate by the type later
                 Qualifiers.byQualifiers(
                     // Filter by media types first before filtering by the type hierarchy
-                    newMediaTypeQualifier(Argument.of(MessageBodyReader.class, type), mediaTypes, Consumes.class),
+                    new MediaTypeQualifier<>(Argument.of(MessageBodyReader.class, type), resolvedMediaTypes, Consumes.class),
                     MatchArgumentQualifier.covariant(MessageBodyReader.class, type)
                 )
             ).stream()
-            .filter(reader -> mediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
+            .filter(reader -> resolvedMediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
             .findFirst()
             .orElse(null);
-    }
-
-    @NonNull
-    private <T, B> MediaTypeQualifier<B> newMediaTypeQualifier(Argument<T> type,
-                                                               List<MediaType> mediaTypes,
-                                                               Class<? extends Annotation> qualifierType) {
-        List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
-        return new MediaTypeQualifier<>(type, resolvedMediaTypes, qualifierType);
     }
 
     @NonNull
@@ -111,15 +105,16 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
     @SuppressWarnings({"unchecked"})
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
+        List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(
                 Argument.of(MessageBodyWriter.class), // Select all writers and eliminate by the type later
                 Qualifiers.byQualifiers(
                     // Filter by media types first before filtering by the type hierarchy
-                    newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class),
+                    new MediaTypeQualifier<>(Argument.of(MessageBodyWriter.class, type), resolvedMediaTypes, Produces.class),
                     MatchArgumentQualifier.contravariant(MessageBodyWriter.class, type)
                 )
             ).stream()
-            .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
+            .filter(writer -> resolvedMediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
             .findFirst().orElse(null);
     }
 
@@ -139,24 +134,41 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         @Override
         public <K extends BeanType<T>> Collection<K> filter(Class<T> beanType, Collection<K> candidates) {
             List<K> all = new ArrayList<>(candidates.size());
-            List<K> matchesMediaType = new ArrayList<>(candidates.size());
-            List<K> matchesAll = new ArrayList<>(candidates.size());
+            candidatesLoop:
             for (K candidate : candidates) {
                 String[] applicableTypes = candidate.getAnnotationMetadata().stringValues(annotationType);
                 if (applicableTypes.length == 0) {
-                    matchesAll.add(candidate);
+                    all.add(candidate);
                     continue;
                 }
                 for (String mt : applicableTypes) {
-                    if (mediaTypes.contains(new MediaType(mt))) {
-                        matchesMediaType.add(candidate);
+                    MediaType mediaType = new MediaType(mt);
+                    for (MediaType m : mediaTypes) {
+                        if (m.matches(mediaType)) {
+                            all.add(candidate);
+                            continue candidatesLoop;
+                        }
                     }
                 }
             }
             // Handlers with a media type defined should have a priority
-            all.addAll(matchesMediaType);
-            all.addAll(matchesAll);
+            all.sort(Comparator.comparingInt(this::findOrder).reversed());
             return all;
+        }
+
+        private int findOrder(BeanType<?> beanType) {
+            int order = 0;
+            String[] applicableTypes = beanType.getAnnotationMetadata().stringValues(annotationType);
+            int size = mediaTypes.size();
+            for (String mt : applicableTypes) {
+                int index = mediaTypes.indexOf(new MediaType(mt));
+                if (index == -1) {
+                    continue;
+                }
+                int compareValue = size - index; // First value should have the priority
+                order = Integer.max(order, compareValue);
+            }
+            return order;
         }
 
         private static boolean isInvalidType(List<Argument<?>> consumedType, Argument<?> requiredType) {

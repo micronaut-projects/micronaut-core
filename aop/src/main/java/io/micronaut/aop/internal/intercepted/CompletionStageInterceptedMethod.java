@@ -104,10 +104,10 @@ final class CompletionStageInterceptedMethod implements InterceptedMethod {
         if (returnTypeClass.isInstance(result)) {
             return result;
         }
-        if (result instanceof CompletionStage stage && (returnTypeClass == CompletableFuture.class || returnTypeClass == Future.class)) {
+        if (result instanceof CompletionStage<?> stage && (returnTypeClass == CompletableFuture.class || returnTypeClass == Future.class)) {
             return stage.toCompletableFuture();
         }
         return conversionService.convert(result, returnType.asArgument())
-                .orElseThrow(() -> new IllegalStateException("Cannot convert completion stage result: " + result + " to '" + returnType.getType().getName() + "'"));
+            .orElseThrow(() -> new IllegalStateException("Cannot convert completion stage result: " + result + " to '" + returnType.getType().getName() + "'"));
     }
 }

@@ -39,8 +39,8 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     protected List<String> values;
 
     /**
-     * @param visitorContext            The visitor context
-     * @param nativeElement             The native element
+     * @param visitorContext The visitor context
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
      */
     GroovyEnumElement(GroovyVisitorContext visitorContext,
@@ -50,10 +50,10 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     }
 
     /**
-     * @param visitorContext            The visitor context
-     * @param nativeElement             The native element
+     * @param visitorContext The visitor context
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata
-     * @param arrayDimensions           The number of array dimensions factory
+     * @param arrayDimensions The number of array dimensions factory
      */
     GroovyEnumElement(GroovyVisitorContext visitorContext,
                       GroovyNativeElement nativeElement,

@@ -35,11 +35,13 @@ import java.util.List;
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Experimental
 @Named(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME)
 @Singleton
 @BootstrapContextCompatible
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";

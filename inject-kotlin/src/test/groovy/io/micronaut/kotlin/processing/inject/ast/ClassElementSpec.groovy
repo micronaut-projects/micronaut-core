@@ -48,6 +48,39 @@ record Product2(Double price, String name) {
             properties.get(1).name == "name"
     }
 
+    void "test Java annotations"() {
+        def ce  = buildClassElementJava('test.Product', '''
+package test;
+
+class Product {
+
+    private final Double price;
+    @javax.persistence.Id
+    private final String name;
+
+    public Product(Double price, String name) {
+        this.price = price;
+        this.name = name;
+    }
+
+    public Double getPrice() {
+        return price;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def properties = ce.getBeanProperties()
+        expect:
+            properties.size() == 2
+            properties.get(0).name == "price"
+            !properties.get(0).getType().isPrimitive()
+            properties.get(1).name == "name"
+            properties.get(1).hasStereotype(javax.persistence.Id)
+    }
+
     void "test Java Bean compile"() {
         def ce  = buildClassElementJava('test.Product', '''
 package test;

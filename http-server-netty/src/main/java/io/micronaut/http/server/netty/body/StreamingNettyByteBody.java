@@ -83,7 +83,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         this.upstream = upstream;
     }
 
-    private BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(BufferConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

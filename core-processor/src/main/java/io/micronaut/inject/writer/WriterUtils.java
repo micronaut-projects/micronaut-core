@@ -55,6 +55,26 @@ import static org.objectweb.asm.commons.GeneratorAdapter.EQ;
 public final class WriterUtils {
     private static final String METHOD_NAME_INSTANTIATE = "instantiate";
 
+    /**
+     * The number of Kotlin defaults masks.
+     * @param parameters The parameters
+     * @return The number if masks
+     * @since 4.6.2
+     */
+    public static int calculateNumberOfKotlinDefaultsMasks(List<ParameterElement> parameters) {
+        return  (int) Math.ceil(parameters.size() / 32.0);
+    }
+
+    /**
+     * Checks if parameter include Kotlin defaults.
+     * @param arguments The arguments
+     * @return true if include
+     * @since 4.6.2
+     */
+    public static boolean hasKotlinDefaultsParameters(List<ParameterElement> arguments) {
+        return arguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+    }
+
     public static void invokeBeanConstructor(GeneratorAdapter writer,
                                              MethodElement constructor,
                                              boolean allowKotlinDefaults,
@@ -80,7 +100,7 @@ public final class WriterUtils {
         Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
             JavaModelUtils.getTypeReference(pe.getType())
         ).toList();
-        boolean isKotlinDefault = allowKotlinDefaults && constructorArguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+        boolean isKotlinDefault = allowKotlinDefaults && hasKotlinDefaultsParameters(constructorArguments);
 
         int[] masksLocal = null;
         if (isKotlinDefault) {
@@ -247,7 +267,7 @@ public final class WriterUtils {
                                                   @Nullable
                                                   BiFunction<Integer, ParameterElement, Boolean> argumentValueIsPresentPusher,
                                                   List<ParameterElement> parameters) {
-        int numberOfMasks = (int) Math.ceil(parameters.size() / 32.0);
+        int numberOfMasks = calculateNumberOfKotlinDefaultsMasks(parameters);
         int[] masksLocal = new int[numberOfMasks];
         for (int i = 0; i < numberOfMasks; i++) {
             int maskLocal = writer.newLocal(Type.INT_TYPE);

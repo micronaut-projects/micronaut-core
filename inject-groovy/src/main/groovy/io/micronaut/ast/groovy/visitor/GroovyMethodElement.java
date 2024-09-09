@@ -64,10 +64,10 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private final MethodElementAnnotationsHelper helper;
 
     /**
-     * @param owningType         The owning type
-     * @param visitorContext     The visitor context
-     * @param nativeElement      The native element
-     * @param methodNode         The {@link MethodNode}
+     * @param owningType The owning type
+     * @param visitorContext The visitor context
+     * @param nativeElement The native element
+     * @param methodNode The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
     GroovyMethodElement(GroovyClassElement owningType,
@@ -87,22 +87,22 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public ElementAnnotationMetadata getMethodAnnotationMetadata() {
+    public @NonNull ElementAnnotationMetadata getMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public @NonNull AnnotationMetadata getAnnotationMetadata() {
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyMethodElement(owningType, visitorContext, getNativeType(), methodNode, elementAnnotationMetadataFactory);
     }
 
     @Override
-    protected void copyValues(AbstractGroovyElement element) {
+    protected void copyValues(@NonNull AbstractGroovyElement element) {
         ((GroovyMethodElement) element).parameters = parameters;
     }
 
@@ -112,15 +112,15 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public MethodElement withParameters(ParameterElement... newParameters) {
-        GroovyMethodElement methodElement = (GroovyMethodElement) copy();
+    public @NonNull MethodElement withParameters(ParameterElement... newParameters) {
+        var methodElement = (GroovyMethodElement) copy();
         methodElement.parameters = newParameters;
         return methodElement;
     }
 
     @Override
-    public MethodElement withNewOwningType(ClassElement owningType) {
-        GroovyMethodElement groovyMethodElement = new GroovyMethodElement((GroovyClassElement) owningType, visitorContext, getNativeType(), methodNode, elementAnnotationMetadataFactory);
+    public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
+        var groovyMethodElement = new GroovyMethodElement((GroovyClassElement) owningType, visitorContext, getNativeType(), methodNode, elementAnnotationMetadataFactory);
         copyValues(groovyMethodElement);
         return groovyMethodElement;
     }
@@ -151,7 +151,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return methodNode.getName();
     }
 
@@ -196,7 +196,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public Map<String, ClassElement> getDeclaredTypeArguments() {
+    public @NonNull Map<String, ClassElement> getDeclaredTypeArguments() {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = resolveMethodTypeArguments(getNativeType(), methodNode, getDeclaringType().getTypeArguments());
         }
@@ -204,7 +204,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public @NonNull Map<String, ClassElement> getTypeArguments() {
         if (typeArguments == null) {
             typeArguments = MethodElement.super.getTypeArguments();
         }

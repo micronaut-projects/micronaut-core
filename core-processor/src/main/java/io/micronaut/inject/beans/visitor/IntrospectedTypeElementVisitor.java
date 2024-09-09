@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -182,8 +183,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             if (builderMethod != null) {
                 MethodElement methodElement = element
                     .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()
-                        .named(builderMethod)
-                        .filter(m -> !m.getGenericReturnType().isVoid())
+                        .filter(m -> m.getName().equals(builderMethod) && !m.getGenericReturnType().isVoid())
                         .onlyAccessible(element))
                     .orElse(null);
                 if (methodElement != null) {
@@ -257,13 +257,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void finish(VisitorContext visitorContext) {
         try {
             if (!writers.isEmpty()) {
-                for (BeanIntrospectionWriter writer : writers.values()) {
+                writers.forEach((className, writer) -> {
                     try {
                         writer.accept(visitorContext);
+                    } catch (ElementPostponedToNextRoundException ignore) {
+                        // Ignore, next round will redo
                     } catch (IOException e) {
                         throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
                     }
-                }
+                });
+
             }
         } finally {
             writers.clear();
@@ -341,9 +344,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 ElementQuery<MethodElement> builderMethodQuery = ElementQuery.ALL_METHODS
                     .onlyAccessible(classToBuild)
                     .onlyInstance()
-                    .named(n -> Arrays.stream(writePrefixes).anyMatch(n::startsWith))
                     .filter(m ->
-                        builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
+                        Arrays.stream(writePrefixes).anyMatch(m.getName()::startsWith) &&
+                            builderType.isAssignable(m.getGenericReturnType()) && m.getParameters().length <= 1
                     );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);

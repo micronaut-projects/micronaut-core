@@ -57,6 +57,7 @@ afterEvaluate {
 
 kotlin {
     jvmToolchain(17)
+//    kotlinDaemonJvmArgs = ["-Xdebug","-Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=y"]
 }
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {

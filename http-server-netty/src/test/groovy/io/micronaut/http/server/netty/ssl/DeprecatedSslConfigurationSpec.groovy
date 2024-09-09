@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.ssl
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
@@ -25,6 +26,7 @@ class DeprecatedSslConfigurationSpec extends Specification {
     def "self signed certificate is generated for #type configuration #property"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'DeprecatedSslConfigurationSpec',
                 'micronaut.server.ssl.port'                                : -1,
                 'micronaut.server.ssl.enabled'                             : true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
@@ -57,6 +59,7 @@ class DeprecatedSslConfigurationSpec extends Specification {
     def "ssl port can be set with #type property #property"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'DeprecatedSslConfigurationSpec',
                 (property)                                                 : -1,
                 'micronaut.server.ssl.enabled'                             : true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
@@ -88,6 +91,7 @@ class DeprecatedSslConfigurationSpec extends Specification {
         "micronaut.server.ssl.port" | false     | 'moved'
     }
 
+    @Requires(property = 'spec.name', value = 'DeprecatedSslConfigurationSpec')
     @Controller("/cert")
     static class TestController {
 

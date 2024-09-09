@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.netty.NettyClientCustomizer
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
@@ -144,6 +145,44 @@ class CompressionSpec extends Specification {
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
     }
 
+    def compressionStream(ChannelHandler decompressor, CharSequence contentEncoding) {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CompressionSpec'] + serverOptions())
+
+        byte[] uncompressed = new byte[100000]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        server.applicationContext.getBean(Ctrl).data = uncompressed
+
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
+
+        when:
+        byte[] compressed = client.retrieve(HttpRequest.GET("/compress-stream").header("Accept-Encoding", contentEncoding.toString()), byte[])
+        def compChannel = new EmbeddedChannel(decompressor)
+        compChannel.writeInbound(Unpooled.copiedBuffer(compressed))
+        compChannel.finish()
+        ByteBuf decompressed = Unpooled.buffer()
+        while (true) {
+            ByteBuf o = compChannel.readInbound()
+            if (o == null) {
+                break
+            }
+            decompressed.writeBytes(o)
+            o.release()
+        }
+        then:
+        ByteBufUtil.getBytes(decompressed) == uncompressed
+
+        cleanup:
+        client.close()
+        server.stop()
+
+        where:
+        contentEncoding            | decompressor
+        HttpHeaderValues.GZIP      | ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB)
+        HttpHeaderValues.SNAPPY    | new SnappyFrameDecoder()
+    }
+
     @Requires(property = "spec.name", value = "CompressionSpec")
     @Controller
     static class Ctrl {
@@ -157,6 +196,12 @@ class CompressionSpec extends Specification {
         @Post("/decompress")
         void receive(@Body byte[] data) {
             this.data = data
+        }
+
+        @Get("/compress-stream")
+        @Produces("text/plain")
+        InputStream sendStream() {
+            return new ByteArrayInputStream(data)
         }
     }
 

@@ -31,8 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
-import java.util.concurrent.CompletableFuture;
-
 /**
  * Common base class for streaming and immediate netty ByteBody implementations.
  *
@@ -69,11 +67,6 @@ public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody
     }
 
     public abstract @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
-
-    @Override
-    public CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
-        return bufferFlow().toCompletableFuture();
-    }
 
     abstract Flux<ByteBuf> toByteBufPublisher();
 

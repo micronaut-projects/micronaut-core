@@ -43,6 +43,7 @@ public class LocalFunctionDefinitionProvider implements FunctionDefinitionProvid
 
     /**
      * Constructor.
+     *
      * @param embeddedServer embeddedServer
      * @param localFunctionRegistry localFunctionRegistry
      */

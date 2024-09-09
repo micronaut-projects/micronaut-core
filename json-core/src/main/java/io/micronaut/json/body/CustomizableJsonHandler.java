@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -22,11 +22,11 @@ import io.micronaut.json.JsonFeatures;
 /**
  * {@link io.micronaut.http.body.MessageBodyHandler} that is customizable with {@link JsonFeatures}.
  *
- * @since 4.0.0
- * @author Jonas Konrad
+ * @since 4.7.0
+ * @author Denis Stepanov
  */
 @Internal
-public interface CustomizableNettyJsonHandler {
+public interface CustomizableJsonHandler {
     @NonNull
-    CustomizableNettyJsonHandler customize(@NonNull JsonFeatures jsonFeatures);
+    CustomizableJsonHandler customize(@NonNull JsonFeatures jsonFeatures);
 }

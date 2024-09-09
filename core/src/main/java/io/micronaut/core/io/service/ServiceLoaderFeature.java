@@ -179,7 +179,7 @@ class ServiceLoaderFeature implements Feature {
     }
 
     /**
-     * Initialize a class at build time
+     * Initialize a class at build time.
      * @param buildInitClass The class
      */
     protected void initializeAtBuildTime(@Nullable Class<?> buildInitClass) {

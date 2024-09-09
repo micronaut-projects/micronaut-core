@@ -123,9 +123,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         ExecutorSelector executorSelector,
         @Nullable CoroutineHelper coroutineHelper) {
         super(
-                ctx,
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
                 nettyEmbeddedServices.getMediaTypeCodecRegistry(),
+                nettyEmbeddedServices.getMessageBodyHandlerRegistry(),
                 webSocketBean,
                 request,
                 routeMatch.getVariableValues(),
@@ -243,6 +243,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 channel,
                 originatingRequest,
                 mediaTypeCodecRegistry,
+                messageBodyHandlerRegistry,
                 webSocketVersion.toHttpHeaderValue(),
                 ctx.pipeline().get(SslHandler.class) != null
         ) {
@@ -291,7 +292,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Publisher<?> actual = Publishers.convertPublisher(conversionService, result, Publisher.class);
+        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
         Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
                                                                                           () -> actual.subscribe(new Subscriber<Object>() {
               @Override

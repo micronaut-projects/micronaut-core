@@ -345,9 +345,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
                 responseBodyType = Argument.ofInstance(body);
-                messageBodyWriter = this.messageBodyHandlerRegistry
-                    .findWriter(responseBodyType, List.of(responseMediaType))
-                    .orElse(null);
+                messageBodyWriter = this.messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
             }
             NettyBodyWriter<Object> closure = wrap(messageBodyWriter);
             closeConnectionIfError(response, nettyRequest, outboundAccess);
@@ -410,7 +408,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                                                ChannelHandlerContext context) {
         MediaType mediaType = response.getContentType().orElse(null);
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
-        Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(conversionService, body, Publisher.class));
+        Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
         Flux<HttpContent> httpContentPublisher;
         boolean isJson = false;
         if (routeInfo != null) {

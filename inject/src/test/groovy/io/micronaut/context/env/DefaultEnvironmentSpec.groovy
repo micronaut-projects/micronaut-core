@@ -38,6 +38,11 @@ import spock.util.environment.RestoreSystemProperties
 })
 class DefaultEnvironmentSpec extends Specification {
 
+    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
+    private static final String PCF_ENV = "VCAP_SERVICES";
+    private static final String HEROKU_DYNO = "DYNO";
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+
     void "test environment system property resolve"() {
         given:
         System.setProperty("test.foo.bar", "10")
@@ -740,7 +745,112 @@ class DefaultEnvironmentSpec extends Specification {
         expect:
         env.getProperty("micronaut.server.port", Integer).get() == 8081
     }
+    void "should deduce environment when environment is set to GOOGLE_APPENGINE_ENVIRONMENT"() {
 
+        when: 'an environment is specified through env var as GOOGLE_APPENGINE_ENVIRONMENT '
+        Environment env = SystemLambda.withEnvironmentVariable(GOOGLE_APPENGINE_ENVIRONMENT, "standard")
+                .execute(() -> {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList()
+                        }
+
+                        @Override
+                        List<String> getDefaultEnvironments() {
+                            return ['default']
+                        }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(true)
+                        }
+                    }).start()
+                })
+
+        then: 'the environment is deduced'
+        env.activeNames == ["test", Environment.GAE, Environment.GOOGLE_COMPUTE, Environment.CLOUD] as Set
+    }
+
+    void "should deduce environment when environment is set to PCF_ENV"() {
+
+        when: 'an environment is specified through env var as PCF_ENV '
+        Environment env = SystemLambda.withEnvironmentVariable(PCF_ENV, "{}")
+                .execute(() -> {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList()
+                        }
+
+                        @Override
+                        List<String> getDefaultEnvironments() {
+                            return ['default']
+                        }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(true)
+                        }
+                    }).start()
+                })
+
+        then: 'the environment is deduced'
+        env.activeNames == ["test", Environment.CLOUD_FOUNDRY, Environment.CLOUD] as Set
+    }
+
+    void "should deduce environment when environment is set to HEROKU_DYNO"() {
+
+        when: 'an environment is specified through env var as HEROKU_DYNO '
+        Environment env = SystemLambda.withEnvironmentVariable(HEROKU_DYNO, "web.1")
+                .execute(() -> {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList()
+                        }
+
+                        @Override
+                        List<String> getDefaultEnvironments() {
+                            return ['default']
+                        }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(true)
+                        }
+                    }).start()
+                })
+
+        then: 'the environment is deduced'
+        env.activeNames == ["test", Environment.HEROKU, Environment.CLOUD] as Set
+    }
+    void "should deduce environment when environment is set to K8S_ENV"() {
+
+        when: 'an environment is specified through env var as K8S_ENV '
+        Environment env = SystemLambda.withEnvironmentVariable(K8S_ENV, "x.x.x.x")
+                .execute(() -> {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList()
+                        }
+
+                        @Override
+                        List<String> getDefaultEnvironments() {
+                            return ['default']
+                        }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(true)
+                        }
+                    }).start()
+                })
+
+        then: 'the environment is deduced'
+        env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
+    }
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
             @Override

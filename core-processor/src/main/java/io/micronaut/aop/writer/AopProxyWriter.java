@@ -52,6 +52,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -62,6 +63,7 @@ import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import io.micronaut.inject.writer.WriterUtils;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -211,6 +213,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private boolean constructorRequiresReflection;
     private MethodElement declaredConstructor;
     private MethodElement newConstructor;
+    private String newConstructorSignature;
+    private List<Map.Entry<ParameterElement, Integer>> superConstructorParametersBinding;
     private ParameterElement qualifierParameter;
     private ParameterElement interceptorsListParameter;
     private VisitorContext visitorContext;
@@ -491,15 +495,38 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorsListParameter = ParameterElement.of(interceptorList, INTERCEPTORS_PARAMETER);
         ParameterElement interceptorRegistryParameter = ParameterElement.of(ClassElement.of(InterceptorRegistry.class), "$interceptorRegistry");
         ClassElement proxyClass = ClassElement.of(proxyType.getClassName());
-
+        superConstructorParametersBinding = new ArrayList<>();
         ParameterElement[] constructorParameters = constructor.getParameters();
         List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 5);
         newConstructorParameters.addAll(Arrays.asList(constructorParameters));
-        newConstructorParameters.add(ParameterElement.of(BeanResolutionContext.class, "$beanResolutionContext"));
-        newConstructorParameters.add(ParameterElement.of(BeanContext.class, "$beanContext"));
+        int superConstructorParameterIndex = 0;
+        for (ParameterElement newConstructorParameter : newConstructorParameters) {
+            superConstructorParametersBinding.add(Map.entry(newConstructorParameter, superConstructorParameterIndex++));
+        }
+
+        ParameterElement beanResolutionContext = ParameterElement.of(BeanResolutionContext.class, "$beanResolutionContext");
+        newConstructorParameters.add(beanResolutionContext);
+        ParameterElement beanContext = ParameterElement.of(BeanContext.class, "$beanContext");
+        newConstructorParameters.add(beanContext);
         newConstructorParameters.add(qualifierParameter);
         newConstructorParameters.add(interceptorsListParameter);
         newConstructorParameters.add(interceptorRegistryParameter);
+        superConstructorParameterIndex += 5; // Skip internal parameters
+        if (WriterUtils.hasKotlinDefaultsParameters(List.of(constructorParameters))) {
+            List<ParameterElement> realNewConstructorParameters = new ArrayList<>(newConstructorParameters);
+            int count = WriterUtils.calculateNumberOfKotlinDefaultsMasks(List.of(constructorParameters));
+            for (int j = 0; j < count; j++) {
+                ParameterElement mask = ParameterElement.of(PrimitiveElement.INT, "mask" + j);
+                realNewConstructorParameters.add(mask);
+                superConstructorParametersBinding.add(Map.entry(mask, superConstructorParameterIndex++));
+            }
+            ParameterElement marker = ParameterElement.of(ClassElement.of("kotlin.jvm.internal.DefaultConstructorMarker"), "marker");
+            realNewConstructorParameters.add(marker);
+            superConstructorParametersBinding.add(Map.entry(marker, superConstructorParameterIndex));
+            this.newConstructorSignature = getConstructorDescriptor(realNewConstructorParameters);
+        } else {
+            this.newConstructorSignature = getConstructorDescriptor(newConstructorParameters);
+        }
         this.newConstructor = MethodElement.of(
                 proxyClass,
                 constructor.getAnnotationMetadata(),
@@ -508,11 +535,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 "<init>",
                 newConstructorParameters.toArray(ZERO_PARAMETER_ELEMENTS)
         );
-        this.beanResolutionContextArgumentIndex = constructorParameters.length;
-        this.beanContextArgumentIndex = constructorParameters.length + 1;
-        this.qualifierIndex = constructorParameters.length + 2;
-        this.interceptorsListArgumentIndex = constructorParameters.length + 3;
-        this.interceptorRegistryArgumentIndex = constructorParameters.length + 4;
+        this.beanResolutionContextArgumentIndex = newConstructorParameters.indexOf(beanResolutionContext);
+        this.beanContextArgumentIndex = newConstructorParameters.indexOf(beanContext);
+        this.qualifierIndex = newConstructorParameters.indexOf(qualifierParameter);
+        this.interceptorsListArgumentIndex = newConstructorParameters.indexOf(interceptorsListParameter);
+        this.interceptorRegistryArgumentIndex = newConstructorParameters.indexOf(interceptorRegistryParameter);
     }
 
     @NonNull
@@ -552,8 +579,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         final Optional<MethodElement> overridden = methodElement.getOwningType()
                 .getEnclosedElement(ElementQuery.ALL_METHODS
                         .onlyInstance()
-                        .named(name -> name.equals(methodElement.getName()))
-                        .filter(el -> el.overrides(methodElement)));
+                        .filter(el -> el.getName().equals(methodElement.getName()) && el.overrides(methodElement)));
 
         if (overridden.isPresent()) {
             MethodElement overriddenBy = overridden.get();
@@ -717,7 +743,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
                 this.isInterface && overriddenBy.isDefault());
 
-        if (!isVoidReturn) {
+        if (!isVoidReturn && !overriddenBy.isSuspend()) {
             ClassElement returnType = overriddenBy.getReturnType();
             pushCastToType(overriddenMethodGenerator, returnType);
         }
@@ -746,28 +772,30 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         });
         qualifierParameter.annotate(AnnotationUtil.NULLABLE);
 
-        String constructorDescriptor = getConstructorDescriptor(Arrays.asList(newConstructor.getParameters()));
         ClassWriter proxyClassWriter = this.classWriter;
         this.constructorWriter = proxyClassWriter.visitMethod(
                 ACC_PUBLIC,
                 CONSTRUCTOR_NAME,
-                constructorDescriptor,
+                newConstructorSignature,
                 null,
                 null);
 
-        this.constructorGenerator = new GeneratorAdapter(constructorWriter, ACC_PUBLIC, CONSTRUCTOR_NAME, constructorDescriptor);
+        this.constructorGenerator = new GeneratorAdapter(constructorWriter, ACC_PUBLIC, CONSTRUCTOR_NAME, newConstructorSignature);
         GeneratorAdapter proxyConstructorGenerator = this.constructorGenerator;
 
         proxyConstructorGenerator.loadThis();
         if (isInterface) {
             proxyConstructorGenerator.invokeConstructor(TYPE_OBJECT, METHOD_DEFAULT_CONSTRUCTOR);
         } else {
-            ParameterElement[] existingArguments = declaredConstructor.getParameters();
-            for (int i = 0; i < existingArguments.length; i++) {
-                proxyConstructorGenerator.loadArg(i);
+            List<ParameterElement> arguments = new ArrayList<>();
+            for (Map.Entry<ParameterElement, Integer> e : superConstructorParametersBinding) {
+                proxyConstructorGenerator.loadArg(e.getValue());
+                arguments.add(e.getKey());
             }
-            String superConstructorDescriptor = getConstructorDescriptor(Arrays.asList(existingArguments));
-            proxyConstructorGenerator.invokeConstructor(getTypeReferenceForName(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
+            proxyConstructorGenerator.invokeConstructor(
+                getTypeReferenceForName(targetClassFullName),
+                new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(arguments))
+            );
         }
 
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(
