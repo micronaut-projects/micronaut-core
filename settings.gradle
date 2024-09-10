@@ -84,6 +84,8 @@ include "test-suite-logback-graalvm"
 include "test-suite-netty-ssl-graalvm"
 include "test-suite-kotlin-graalvm"
 include "test-utils"
+include "test-suite-annotation-remapper"
+include "test-suite-annotation-remapper-visitor"
 
 // benchmarks
 include "benchmarks"
