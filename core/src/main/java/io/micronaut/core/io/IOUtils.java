@@ -37,7 +37,6 @@ import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.ProviderNotFoundException;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -263,7 +262,7 @@ public class IOUtils {
      * @param classLoader The classloader
      * @param path        The path
      * @return the resources as URIs
-     * @throws IOException
+     * @throws IOException The IO exception
      * @since 4.7
      */
     public static List<URI> getResources(ClassLoader classLoader, final String path) throws IOException {
@@ -278,22 +277,11 @@ public class IOUtils {
             }
         }
 
+        FileSystem jrtProvider = null;
         if (uniqueURIs.isEmpty()) {
-            FileSystem fs = null;
-            try {
-                fs = FileSystems.getFileSystem(URI.create("jrt:/"));
-            } catch (FileSystemNotFoundException | ProviderNotFoundException e) {
-                //no-op
-            }
-            if (fs == null || !fs.isOpen()) {
-                try {
-                    fs = FileSystems.newFileSystem(URI.create("jrt:/"), Collections.emptyMap(), classLoader);
-                } catch (IOException | ProviderNotFoundException e) {
-                    // not available, probably running in Native Image.
-                }
-            }
-            if (fs != null) {
-                Path modulesPath = fs.getPath("modules");
+            jrtProvider = getJrtProvider(classLoader);
+            if (jrtProvider != null) {
+                Path modulesPath = jrtProvider.getPath("modules");
                 try (Stream<Path> stream = Files.list(modulesPath)) {
                     stream
                         .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
@@ -320,7 +308,32 @@ public class IOUtils {
                 uris.add(uri);
             }
         }
+        if (jrtProvider != null && jrtProvider.isOpen()) {
+            try {
+                jrtProvider.close();
+            } catch (Throwable ignore) {
+                // Ignore
+            }
+        }
         return uris;
+    }
+
+    @Nullable
+    private static FileSystem getJrtProvider(ClassLoader classLoader) {
+        try {
+            URI uri = URI.create("jrt:/");
+            FileSystem fs = FileSystems.getFileSystem(uri);
+            if (fs.isOpen()) {
+                return fs;
+            }
+            fs = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+            if (fs.isOpen()) {
+                return fs;
+            }
+        } catch (Throwable e) {
+            // not available, probably running in Native Image.
+        }
+        return null;
     }
 
     private static URI normalizeFilePath(String path, URI uri) {
