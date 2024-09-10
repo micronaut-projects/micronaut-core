@@ -91,6 +91,9 @@ public class JsonViewServerFilter implements Ordered {
                 final Optional<?> optionalBody = response.getBody();
                 if (optionalBody.isPresent()) {
                     Object body = optionalBody.get();
+                    if (routeInfo.getReturnType().isOptional()) {
+                        body = Optional.of(body);
+                    }
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                     if (Publishers.isConvertibleToPublisher(body)) {
                         Publisher<?> pub = Publishers.convertToPublisher(conversionService, body);
@@ -98,8 +101,9 @@ public class JsonViewServerFilter implements Ordered {
                             .map(o -> codec.encode((Argument) routeInfo.getResponseBodyType(), o))
                             .subscribeOn(Schedulers.fromExecutorService(executorService)));
                     } else {
+                        Object finalBody = body;
                         return Mono.fromCallable(() -> {
-                            @SuppressWarnings({"unchecked", "rawtypes"}) final byte[] encoded = codec.encode((Argument) routeInfo.getResponseBodyType(), body);
+                            @SuppressWarnings({"unchecked", "rawtypes"}) final byte[] encoded = codec.encode((Argument) routeInfo.getResponseBodyType(), finalBody);
                             response.body(encoded);
                             return response;
                         }).subscribeOn(Schedulers.fromExecutorService(executorService));

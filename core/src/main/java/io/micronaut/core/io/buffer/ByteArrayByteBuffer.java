@@ -31,7 +31,7 @@ import java.util.Arrays;
  */
 @Internal
 @Experimental
-public class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
+public final class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
     private final byte[] underlyingBytes;
     private int readerIndex;
