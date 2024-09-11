@@ -2450,7 +2450,7 @@ public class DefaultHttpClient implements
                         parts.get(parts.size() - 1).release();
                         body = Flux.fromIterable(parts.subList(0, parts.size() - 1)).map(DefaultHttpContent::new);
                     } else {
-                        body = SseSplitter.split(NettyByteBody.toByteBufs(bb)).map(DefaultHttpContent::new);
+                        body = SseSplitter.split(NettyByteBody.toByteBufs(bb), sizeLimits()).map(DefaultHttpContent::new);
                     }
                 } else {
                     body = NettyByteBody.toByteBufs(bb).map(DefaultHttpContent::new);

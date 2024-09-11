@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.client.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.body.BodySizeLimits;
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Flux;
 
@@ -43,14 +45,18 @@ final class SseSplitter {
         return split;
     }
 
-    static Flux<ByteBuf> split(Flux<ByteBuf> buf) {
-        // todo: buffer limit
+    static Flux<ByteBuf> split(Flux<ByteBuf> buf, BodySizeLimits limits) {
         AtomicReference<ByteBuf> last = new AtomicReference<>();
         return buf.concatMapIterable(bb -> {
             ByteBuf joined = last.get();
             if (joined == null) {
                 joined = bb;
             } else {
+                long combinedLength = (long) joined.readableBytes() + bb.readableBytes();
+                if (combinedLength > limits.maxBufferSize()) {
+                    bb.release();
+                    throw new ContentLengthExceededException(limits.maxBufferSize(), combinedLength);
+                }
                 joined.writeBytes(bb);
             }
             List<ByteBuf> split = split(joined);

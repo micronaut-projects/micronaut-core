@@ -1,5 +1,6 @@
 package io.micronaut.http.client.netty
 
+import io.micronaut.http.netty.body.BodySizeLimits
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import reactor.core.publisher.Flux
@@ -29,7 +30,7 @@ class SseSplitterSpec extends Specification {
     def async(List<String> input, List<String> expectedOutput) {
         when:
         def parts = SseSplitter
-                .split(Flux.fromIterable(input).map { Unpooled.copiedBuffer(it, StandardCharsets.UTF_8) })
+                .split(Flux.fromIterable(input).map { Unpooled.copiedBuffer(it, StandardCharsets.UTF_8) }, BodySizeLimits.UNLIMITED)
                 .map { it.toString(StandardCharsets.UTF_8) }
                 .collectList().block()
 
