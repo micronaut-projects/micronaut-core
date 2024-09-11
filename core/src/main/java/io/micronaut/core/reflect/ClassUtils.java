@@ -33,6 +33,15 @@ import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.MonthDay;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -149,6 +158,15 @@ public class ClassUtils {
         BASIC_TYPE_MAP.put(LocalDate.class.getName(), LocalDate.class);
         BASIC_TYPE_MAP.put(Instant.class.getName(), Instant.class);
         BASIC_TYPE_MAP.put(ZonedDateTime.class.getName(), ZonedDateTime.class);
+        BASIC_TYPE_MAP.put(LocalTime.class.getName(), LocalTime.class);
+        BASIC_TYPE_MAP.put(OffsetTime.class.getName(), OffsetTime.class);
+        BASIC_TYPE_MAP.put(OffsetDateTime.class.getName(), OffsetDateTime.class);
+        BASIC_TYPE_MAP.put(Period.class.getName(), Period.class);
+        BASIC_TYPE_MAP.put(YearMonth.class.getName(), YearMonth.class);
+        BASIC_TYPE_MAP.put(Year.class.getName(), Year.class);
+        BASIC_TYPE_MAP.put(MonthDay.class.getName(), MonthDay.class);
+        BASIC_TYPE_MAP.put(ZoneId.class.getName(), ZoneId.class);
+        BASIC_TYPE_MAP.put(ZoneOffset.class.getName(), ZoneOffset.class);
     }
 
     /**
