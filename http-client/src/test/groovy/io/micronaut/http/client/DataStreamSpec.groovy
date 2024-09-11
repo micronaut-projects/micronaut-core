@@ -45,6 +45,7 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -241,6 +242,8 @@ class DataStreamSpec extends Specification {
         @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
             return Flux.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
+                    // prevent coalescing
+                    .delayElements(Duration.ofMillis(100))
         }
 
         @Post(uri = "/books", consumes = "custom/content", produces = MediaType.TEXT_PLAIN)

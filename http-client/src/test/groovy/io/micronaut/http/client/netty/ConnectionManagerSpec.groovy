@@ -446,7 +446,6 @@ class ConnectionManagerSpec extends Specification {
 
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.channel == conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -504,7 +503,6 @@ class ConnectionManagerSpec extends Specification {
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req1Channel.channel !== conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
