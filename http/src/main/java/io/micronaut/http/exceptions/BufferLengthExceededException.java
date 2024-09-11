@@ -23,6 +23,9 @@ package io.micronaut.http.exceptions;
  */
 public final class BufferLengthExceededException extends HttpException {
 
+    private final long advertisedLength;
+    private final long receivedLength;
+
     /**
      * @param advertisedLength The advertised length
      * @param receivedLength   The received length
@@ -32,5 +35,25 @@ public final class BufferLengthExceededException extends HttpException {
             The content length [%d] exceeds the maximum allowed bufferable length [%d]. \
             Note that the maximum buffer size got its own configuration property (micronaut.server.max-request-buffer-size) in 4.5.0 that you may have to configure. \
             Alternatively you can rewrite your controller to stream the request instead of buffering it.""".formatted(receivedLength, advertisedLength));
+        this.advertisedLength = advertisedLength;
+        this.receivedLength = receivedLength;
+    }
+
+    /**
+     * The maximum permitted length.
+     *
+     * @return The maximum permitted length
+     */
+    public long getAdvertisedLength() {
+        return advertisedLength;
+    }
+
+    /**
+     * The actual received length.
+     *
+     * @return The actual received length
+     */
+    public long getReceivedLength() {
+        return receivedLength;
     }
 }

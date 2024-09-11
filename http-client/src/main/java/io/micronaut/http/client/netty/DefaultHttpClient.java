@@ -2177,6 +2177,8 @@ public class DefaultHttpClient implements
             HttpClientException result;
             if (cause instanceof io.micronaut.http.exceptions.ContentLengthExceededException clee) {
                 result = decorate(new ContentLengthExceededException(clee.getMessage()));
+            } else if (cause instanceof io.micronaut.http.exceptions.BufferLengthExceededException blee) {
+                result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
             } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
                 result = ReadTimeoutException.TIMEOUT_EXCEPTION;
             } else if (cause instanceof HttpClientException hce) {
