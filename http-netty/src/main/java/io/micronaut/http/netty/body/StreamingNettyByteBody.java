@@ -25,7 +25,6 @@ import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.PublisherAsBlocking;
 import io.micronaut.http.netty.PublisherAsStream;
 import io.netty.buffer.ByteBuf;
@@ -57,14 +56,30 @@ import java.util.function.Supplier;
 @Internal
 public final class StreamingNettyByteBody extends NettyByteBody implements CloseableByteBody {
     private final SharedBuffer sharedBuffer;
+    /**
+     * We have reserve, subscribe, and add calls in {@link SharedBuffer} that all modify the same
+     * data structures. They can all happen concurrently and must be moved to the event loop. We
+     * also need to ensure that a reserve and associated subscribe stay serialized
+     * ({@link io.micronaut.http.netty.EventLoopFlow} semantics). But because of the potential
+     * concurrency, we actually need stronger semantics than
+     * {@link io.micronaut.http.netty.EventLoopFlow}.
+     * <p>
+     * The solution is to use the old {@link EventLoop#inEventLoop()} + {@link EventLoop#execute}
+     * pattern. Serialization semantics for reserve to subscribe are guaranteed using this field:
+     * If the reserve call is delayed, this field is {@code true}, and the subscribe call will also
+     * be delayed. This approach is possible because we only need to serialize a single reserve
+     * with a single subscribe.
+     */
+    private final boolean forceDelaySubscribe;
     private BufferConsumer.Upstream upstream;
 
     public StreamingNettyByteBody(SharedBuffer sharedBuffer) {
-        this(sharedBuffer, sharedBuffer.rootUpstream);
+        this(sharedBuffer, false, sharedBuffer.rootUpstream);
     }
 
-    private StreamingNettyByteBody(SharedBuffer sharedBuffer, BufferConsumer.Upstream upstream) {
+    private StreamingNettyByteBody(SharedBuffer sharedBuffer, boolean forceDelaySubscribe, BufferConsumer.Upstream upstream) {
         this.sharedBuffer = sharedBuffer;
+        this.forceDelaySubscribe = forceDelaySubscribe;
         this.upstream = upstream;
     }
 
@@ -74,7 +89,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             failClaim();
         }
         this.upstream = null;
-        sharedBuffer.subscribe(primary, upstream);
+        sharedBuffer.subscribe(primary, upstream, forceDelaySubscribe);
         return upstream;
     }
 
@@ -86,8 +101,8 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         }
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
-        this.sharedBuffer.reserve();
-        return new StreamingNettyByteBody(sharedBuffer, pair.right());
+        boolean forceDelaySubscribe = this.sharedBuffer.reserve();
+        return new StreamingNettyByteBody(sharedBuffer, forceDelaySubscribe, pair.right());
     }
 
     @Override
@@ -163,7 +178,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         this.upstream = null;
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
-        return sharedBuffer.subscribeFull(upstream).map(AvailableNettyByteBody::new);
+        return sharedBuffer.subscribeFull(upstream, forceDelaySubscribe).map(AvailableNettyByteBody::new);
     }
 
     @Override
@@ -176,14 +191,14 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         upstream.allowDiscard();
         upstream.disregardBackpressure();
         upstream.start();
-        sharedBuffer.subscribe(null, upstream);
+        sharedBuffer.subscribe(null, upstream, forceDelaySubscribe);
     }
 
     /**
      * This class buffers input data and distributes it to multiple {@link StreamingNettyByteBody}
      * instances.
      * <p>Thread safety: The {@link BufferConsumer} methods <i>must</i> only be called from one
-     * thread, the {@link #eventLoopFlow} thread. The other methods (subscribe, reserve) can be
+     * thread, the {@link #eventLoop} thread. The other methods (subscribe, reserve) can be
      * called from any thread.
      */
     public static final class SharedBuffer implements BufferConsumer {
@@ -193,7 +208,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         @Nullable
         private final ResourceLeakTracker<SharedBuffer> tracker = LEAK_DETECTOR.get().track(this);
 
-        private final EventLoopFlow eventLoopFlow;
+        private final EventLoop eventLoop;
         private final BodySizeLimits limits;
         /**
          * Upstream of all subscribers. This is only used to cancel incoming data if the max
@@ -231,6 +246,11 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
          */
         private boolean working = false;
         /**
+         * {@code true} during {@link #add(ByteBuf)} to avoid reentrant subscribe or reserve calls.
+         * Field must only be accessed on the event loop.
+         */
+        private boolean adding = false;
+        /**
          * Number of bytes received so far.
          */
         private long lengthSoFar = 0;
@@ -242,7 +262,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         private volatile long expectedLength = -1;
 
         public SharedBuffer(EventLoop loop, BodySizeLimits limits, Upstream rootUpstream) {
-            this.eventLoopFlow = new EventLoopFlow(loop);
+            this.eventLoop = loop;
             this.limits = limits;
             this.rootUpstream = rootUpstream;
         }
@@ -274,9 +294,13 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             this.expectedLength = length;
         }
 
-        void reserve() {
-            if (eventLoopFlow.executeNow(this::reserve0)) {
+        boolean reserve() {
+            if (eventLoop.inEventLoop() && !adding) {
                 reserve0();
+                return false;
+            } else {
+                eventLoop.execute(this::reserve0);
+                return true;
             }
         }
 
@@ -295,10 +319,13 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
          *
          * @param subscriber       The subscriber to add. Can be {@code null}, then the bytes will just be discarded
          * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
+         * @param forceDelay       Whether to require an {@link EventLoop#execute} call to ensure serialization with previous {@link #reserve()} call
          */
-        void subscribe(@Nullable BufferConsumer subscriber, Upstream specificUpstream) {
-            if (eventLoopFlow.executeNow(() -> subscribe0(subscriber, specificUpstream))) {
+        void subscribe(@Nullable BufferConsumer subscriber, Upstream specificUpstream, boolean forceDelay) {
+            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
                 subscribe0(subscriber, specificUpstream);
+            } else {
+                eventLoop.execute(() -> subscribe0(subscriber, specificUpstream));
             }
         }
 
@@ -354,16 +381,18 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
          * body.
          *
          * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
+         * @param forceDelay       Whether to require an {@link EventLoop#execute} call to ensure serialization with previous {@link #reserve()} call
          * @return A flow that will complete when all data has arrived, with a buffer containing that data
          */
-        ExecutionFlow<ByteBuf> subscribeFull(Upstream specificUpstream) {
+        ExecutionFlow<ByteBuf> subscribeFull(Upstream specificUpstream, boolean forceDelay) {
             DelayedExecutionFlow<ByteBuf> asyncFlow = DelayedExecutionFlow.create();
-            if (eventLoopFlow.executeNow(() -> {
-                ExecutionFlow<ByteBuf> res = subscribeFull0(asyncFlow, specificUpstream, false);
-                assert res == asyncFlow;
-            })) {
+            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
                 return subscribeFull0(asyncFlow, specificUpstream, true);
             } else {
+                eventLoop.execute(() -> {
+                    ExecutionFlow<ByteBuf> res = subscribeFull0(asyncFlow, specificUpstream, false);
+                    assert res == asyncFlow;
+                });
                 return asyncFlow;
             }
         }
@@ -440,6 +469,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
             buf.touch();
 
+            adding = true;
             // calculate the new total length
             long newLength = lengthSoFar + buf.readableBytes();
             long expectedLength = this.expectedLength;
@@ -451,6 +481,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
                 buf.release();
+                adding = false;
                 return;
             }
             if (newLength > limits.maxBodySize()) {
@@ -458,6 +489,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
                 buf.release();
                 error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
                 rootUpstream.allowDiscard();
+                adding = false;
                 return;
             }
 
@@ -491,6 +523,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             } else {
                 buf.release();
             }
+            adding = false;
             working = false;
         }
 

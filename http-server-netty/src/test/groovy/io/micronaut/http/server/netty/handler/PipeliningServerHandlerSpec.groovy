@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.handler
 
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.body.AvailableByteBody
+import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.netty.body.AvailableNettyByteBody
@@ -609,6 +610,38 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
         then:
         unwritten == 0
+    }
+
+    def 'reentrant close'() {
+        given:
+        def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                def split = body.split(ByteBody.SplitBackpressureMode.FASTEST)
+                Flux.from(split.toByteArrayPublisher())
+                    .subscribe {
+                        body.close()
+                        outboundAccess.writeFull(resp)
+                    }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+
+        def request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        request.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        when:
+        ch.writeInbound(request)
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+
+        then:
+        ch.checkException()
     }
 
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {

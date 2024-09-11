@@ -29,6 +29,7 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.Set;
 
 /**
  * Utility methods for annotations.
@@ -143,7 +144,8 @@ public class AnnotationUtils {
             modelUtils,
             filer,
             visitorAttributes,
-            TypeElementVisitor.VisitorKind.ISOLATING
+            TypeElementVisitor.VisitorKind.ISOLATING,
+            Set.of()
         );
     }
 
