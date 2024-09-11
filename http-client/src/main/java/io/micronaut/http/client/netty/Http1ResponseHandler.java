@@ -153,6 +153,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                 LOG.warn("Discarding unexpected message {}", msg);
                 ReferenceCountUtil.release(msg);
                 break;
+            default:
+                throw new AssertionError(state);
         }
     }
 
@@ -218,6 +220,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             case AFTER_CONTENT:
                 ctx.fireExceptionCaught(cause);
                 break;
+            default:
+                throw new AssertionError(state);
         }
     }
 
@@ -288,6 +292,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     public interface ResponseListener {
         /**
          * Size limits for the request body.
+         *
+         * @return The size limits
          */
         default BodySizeLimits sizeLimits() {
             return BodySizeLimits.UNLIMITED;

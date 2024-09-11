@@ -67,6 +67,12 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     /**
      * This is a wrapper around {@link AvailableNettyByteBody#AvailableNettyByteBody(ByteBuf)}
      * with an extra body length check.
+     *
+     * @param loop The event loop for constructing {@link StreamingNettyByteBody}
+     * @param bodySizeLimits The body size limits to check
+     * @param buf The input buffer
+     * @return The body with the given input buffer, or a {@link StreamingNettyByteBody} with the
+     * appropriate content length error
      */
     @NonNull
     public static CloseableByteBody createChecked(@NonNull EventLoop loop, @NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
