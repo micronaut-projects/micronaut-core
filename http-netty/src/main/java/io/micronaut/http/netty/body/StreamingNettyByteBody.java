@@ -469,7 +469,6 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
             buf.touch();
 
-            adding = true;
             // calculate the new total length
             long newLength = lengthSoFar + buf.readableBytes();
             long expectedLength = this.expectedLength;
@@ -481,9 +480,9 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
                 buf.release();
-                adding = false;
                 return;
             }
+            adding = true;
             if (newLength > limits.maxBodySize()) {
                 // for maxBodySize, all subscribers get the error
                 buf.release();
