@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.body.BodySizeLimits;
 import io.netty.buffer.ByteBuf;
@@ -24,8 +25,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Split buffers into lines for SSE parsing.
+ *
+ * @author Jonas Konrad
+ * @since 4.7.0
+ */
 final class SseSplitter {
-    static List<ByteBuf> split(ByteBuf buf) {
+    /**
+     * Split a single buffer.
+     *
+     * @param buf The buffer
+     * @return The individual split pieces
+     */
+    @NonNull
+    static List<ByteBuf> split(@NonNull ByteBuf buf) {
         buf.touch();
         List<ByteBuf> split = new ArrayList<>();
         while (true) {
@@ -45,7 +59,16 @@ final class SseSplitter {
         return split;
     }
 
-    static Flux<ByteBuf> split(Flux<ByteBuf> buf, BodySizeLimits limits) {
+    /**
+     * Split a stream of bytes. Any content past the last newline is ignored.
+     * (This matches legacy behavior)
+     *
+     * @param buf The input buffers
+     * @param limits Buffer limits
+     * @return The output buffers, split into lines
+     */
+    @NonNull
+    static Flux<ByteBuf> split(@NonNull Flux<ByteBuf> buf, @NonNull BodySizeLimits limits) {
         AtomicReference<ByteBuf> last = new AtomicReference<>();
         return buf.concatMapIterable(bb -> {
             ByteBuf joined = last.get();
