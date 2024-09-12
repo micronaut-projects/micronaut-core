@@ -421,7 +421,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     /**
      * @param uriTemplate     The URI template
-     * @param len             The lenght
+     * @param len             The length
      * @param parserArguments The parsed arguments
      * @return A list of path segments
      */
