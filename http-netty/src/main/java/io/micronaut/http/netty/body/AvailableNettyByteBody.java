@@ -56,7 +56,8 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
         return new AvailableNettyByteBody(Unpooled.EMPTY_BUFFER);
     }
 
-    public static ByteBuf toByteBuf(AvailableByteBody body) {
+    @NonNull
+    public static ByteBuf toByteBuf(@NonNull AvailableByteBody body) {
         if (body instanceof AvailableNettyByteBody net) {
             return net.claim();
         } else {

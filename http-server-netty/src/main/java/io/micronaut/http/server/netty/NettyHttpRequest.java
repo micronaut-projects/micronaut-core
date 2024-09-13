@@ -627,8 +627,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
-    public @NonNull Optional<ByteBody> byteBodyDirect() {
-        return Optional.of(byteBody());
+    public ByteBody byteBodyDirect() {
+        return byteBody();
     }
 
     @Override
@@ -868,8 +868,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
 
         @Override
-        public @NonNull Optional<ByteBody> byteBodyDirect() {
-            return body != null ? Optional.empty() : NettyHttpRequest.this.byteBodyDirect();
+        public ByteBody byteBodyDirect() {
+            // if the body has been changed we can't return the byteBody directly
+            return body != null ? null : NettyHttpRequest.this.byteBodyDirect();
         }
     }
 
