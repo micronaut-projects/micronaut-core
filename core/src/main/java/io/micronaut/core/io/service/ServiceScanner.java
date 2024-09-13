@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -47,6 +48,10 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import com.oracle.svm.core.layeredimagesingleton.ApplicationLayerOnlyImageSingleton;
+import com.oracle.svm.core.layeredimagesingleton.LayeredImageSingletonBuilderFlags;
+import com.oracle.svm.core.layeredimagesingleton.UnsavedSingleton;
 
 /**
  * Wrapper class for the tasks required to find services of a particular type.
@@ -386,11 +391,24 @@ final class ServiceScanner<S> {
     }
 
     @Internal
-    record StaticServiceDefinitions(Map<String, Set<String>> serviceTypeMap) {
-        StaticServiceDefinitions {
+    public static class StaticServiceDefinitions implements UnsavedSingleton, ApplicationLayerOnlyImageSingleton {
+        public Map<String, Set<String>> serviceTypeMap;
+
+        public StaticServiceDefinitions(Map<String, Set<String>> serviceTypeMap) {
             if (serviceTypeMap == null) {
-                serviceTypeMap = new HashMap<>();
+                this.serviceTypeMap = new HashMap<>();
+            } else {
+                this.serviceTypeMap = serviceTypeMap;
             }
+        }
+
+        public Map<String, Set<String>> serviceTypeMap() {
+            return serviceTypeMap;
+        }
+
+        @Override
+        public EnumSet<LayeredImageSingletonBuilderFlags> getImageBuilderFlags() {
+            return LayeredImageSingletonBuilderFlags.ALL_ACCESS;
         }
     }
 

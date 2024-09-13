@@ -41,6 +41,8 @@ import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
+import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
+
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
  *
@@ -52,7 +54,7 @@ final class ServiceLoaderFeature implements Feature {
 
     @Override
     @SuppressWarnings("java:S1119")
-    public void beforeAnalysis(BeforeAnalysisAccess access) {
+    public void duringSetup(DuringSetupAccess access) {
         configureForReflection(access);
 
         StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
@@ -76,11 +78,13 @@ final class ServiceLoaderFeature implements Feature {
                 }
             }
         }
-        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+        if (ImageLayerBuildingSupport.lastImageBuild()) {
+            ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+        }
     }
 
     @NonNull
-    private StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
+    private StaticServiceDefinitions buildStaticServiceDefinitions(DuringSetupAccess access) {
         StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions(null);
         final String path = "META-INF/micronaut/";
         try {
@@ -139,7 +143,7 @@ final class ServiceLoaderFeature implements Feature {
         return staticServiceDefinitions;
     }
 
-    private void configureForReflection(BeforeAnalysisAccess access) {
+    private void configureForReflection(DuringSetupAccess access) {
         Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
         SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
                 .collectAll(configurers);

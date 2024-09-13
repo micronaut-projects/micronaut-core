@@ -40,3 +40,9 @@ dependencies {
     compileOnly libs.log4j
 
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

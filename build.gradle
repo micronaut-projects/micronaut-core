@@ -9,6 +9,12 @@ repositories {
     mavenCentral()
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 tasks.named("updateVersionCatalogs") {
     // we set the list to empty because we accept upgrades which improve the status
     rejectedQualifiers = []

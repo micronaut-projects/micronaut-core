@@ -59,7 +59,6 @@ include "websocket"
 
 // test suites
 include "test-suite"
-include "test-suite-geb"
 include "test-suite-helper"
 include "test-suite-http-client-jdk-ssl"
 include "test-suite-http-client-tck-netty"

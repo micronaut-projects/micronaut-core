@@ -1,6 +1,13 @@
 plugins {
     id "io.micronaut.build.internal.convention-core-library"
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":core-processor")

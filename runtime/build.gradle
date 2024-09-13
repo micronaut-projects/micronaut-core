@@ -54,3 +54,9 @@ tasks.withType(Test).configureEach {
         ]
     }
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

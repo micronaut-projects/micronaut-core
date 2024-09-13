@@ -9,6 +9,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     annotationProcessor(projects.httpValidation)
+    annotationProcessor(providers.environmentVariable("GRAALVM_HOME").map { files("$it/lib/svm/builder/svm.jar") })
 
     compileOnly(platform(libs.test.boms.micronaut.validation))
     compileOnly(libs.micronaut.validation) {

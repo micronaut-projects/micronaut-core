@@ -3,6 +3,12 @@ plugins {
     alias libs.plugins.managed.kotlin.jvm
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     api project(":core")
     api libs.managed.reactive.streams
@@ -15,7 +21,7 @@ dependencies {
 
 tasks.named("compileKotlin") {
     kotlinOptions {
-        jvmTarget = 17
+        jvmTarget = 21
         languageVersion = "1.7"
     }
 }

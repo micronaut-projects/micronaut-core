@@ -16,6 +16,12 @@ dependencies {
     testImplementation project(":jackson-databind")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 //tasks.withType(Test).configureEach {
 //    testLogging {
 //        showStandardStreams = true

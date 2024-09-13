@@ -11,3 +11,9 @@ dependencies {
     testCompileOnly project(":inject-groovy")
     testImplementation project(":inject-java-test")
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

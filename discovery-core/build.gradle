@@ -11,3 +11,9 @@ dependencies {
     testImplementation project(":jackson-databind")
 //    api project(":http")
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

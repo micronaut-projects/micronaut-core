@@ -9,3 +9,9 @@ dependencies {
 
     implementation libs.managed.reactor
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

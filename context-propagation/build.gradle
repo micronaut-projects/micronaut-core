@@ -71,12 +71,12 @@ dependencies {
 
 tasks.named("compileKotlin") {
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = 21
     }
 }
 
 tasks.named("compileTestKotlin") {
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = 21
     }
 }

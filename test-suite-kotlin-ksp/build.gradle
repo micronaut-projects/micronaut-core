@@ -16,6 +16,12 @@ repositories {
     mavenCentral()
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     api libs.managed.kotlin.stdlib
     api libs.managed.kotlin.reflect

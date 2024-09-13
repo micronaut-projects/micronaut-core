@@ -19,3 +19,9 @@ dependencies {
     testImplementation project(":jackson-databind")
     testImplementation project(":discovery-core")
 }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

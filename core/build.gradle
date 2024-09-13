@@ -14,6 +14,7 @@ micronautBuild {
 dependencies {
     compileOnly libs.managed.jakarta.annotation.api
     compileOnly libs.graal
+    compileOnly providers.environmentVariable('GRAALVM_HOME').map { files("$it/lib/svm/builder/svm.jar") }
     compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.common
 }

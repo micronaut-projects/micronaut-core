@@ -2,6 +2,12 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")

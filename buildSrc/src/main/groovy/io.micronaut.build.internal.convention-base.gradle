@@ -8,10 +8,25 @@ plugins {
 micronautBuild {
     enableBom = false
     enableProcessing = false
+    javaVersion = 21
 }
 
 repositories {
-    mavenCentral()
+    maven {
+        url "file://tmp/repo"
+        mavenContent {
+            snapshotsOnly()
+        }
+        content {
+            includeGroup("org.graalvm.sdk")
+            includeGroup("org.graalvm.nativeimage")
+        }
+    }
+    mavenCentral {
+        mavenContent {
+            releasesOnly()
+        }
+    }
 }
 
 configurations.all {
