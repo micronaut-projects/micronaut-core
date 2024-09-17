@@ -17,11 +17,13 @@ package io.micronaut.http.server.tck.tests.jsonview;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 @SuppressWarnings({
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
+@ReflectiveAccess // Views require reflection metadata for Jackson and Graal native
 @Introspected
 public class User {
     private int id;
