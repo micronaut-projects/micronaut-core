@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -74,12 +75,30 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
      * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration The configuration for the codec
+     * @deprecated Use {@link #JsonStreamMediaTypeCodec(BeanProvider, ApplicationConfiguration, CodecConfiguration, ApplicationConfiguration)} instead.
      */
-    @Inject
+    @Deprecated
     public JsonStreamMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
                                     ApplicationConfiguration applicationConfiguration,
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, null);
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
+    }
+
+    /**
+     * @param jacksonDatabindMappers To read/write JSON
+     * @param codecConfiguration The configuration for the codec
+     * @param applicationConfiguration The common application configurations
+     */
+    @Inject
+    public JsonStreamMediaTypeCodec(BeanProvider<JacksonDatabindMapper> jacksonDatabindMappers,
+                                    @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration,
+                                    ApplicationConfiguration applicationConfiguration) {
+        super(jacksonDatabindMappers, null, applicationConfiguration);
         if (codecConfiguration != null) {
             this.additionalTypes = codecConfiguration.getAdditionalTypes();
         } else {
