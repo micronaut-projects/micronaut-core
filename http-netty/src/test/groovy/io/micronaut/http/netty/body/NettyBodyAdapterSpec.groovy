@@ -1,12 +1,10 @@
-package io.micronaut.http.server.netty.body
+package io.micronaut.http.netty.body
 
-import io.micronaut.http.netty.body.BufferConsumer
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.embedded.EmbeddedChannel
 import reactor.core.publisher.Flux
 import spock.lang.Specification
-import io.micronaut.http.server.netty.body.NettyBodyAdapter
 
 class NettyBodyAdapterSpec extends Specification {
     def 'empty buffers'() {

@@ -469,15 +469,20 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
             buf.touch();
 
+            // calculate the new total length
+            long newLength = lengthSoFar + buf.readableBytes();
+            long expectedLength = this.expectedLength;
+            if (expectedLength != -1 && newLength > expectedLength) {
+                throw new IllegalStateException("Received more bytes than specified by Content-Length");
+            }
+            lengthSoFar = newLength;
+
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
                 buf.release();
                 return;
             }
             adding = true;
-            // calculate the new total length
-            long newLength = lengthSoFar + buf.readableBytes();
-            lengthSoFar = newLength;
             if (newLength > limits.maxBodySize()) {
                 // for maxBodySize, all subscribers get the error
                 buf.release();
@@ -523,6 +528,9 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
         @Override
         public void complete() {
+            if (expectedLength > lengthSoFar) {
+                throw new IllegalStateException("Received fewer bytes than specified by Content-Length");
+            }
             complete = true;
             expectedLength = lengthSoFar;
             if (subscribers != null) {

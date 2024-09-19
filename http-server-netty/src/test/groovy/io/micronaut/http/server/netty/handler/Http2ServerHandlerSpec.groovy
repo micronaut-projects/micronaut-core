@@ -6,9 +6,9 @@ import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.netty.body.AvailableNettyByteBody
+import io.micronaut.http.netty.body.NettyBodyAdapter
 import io.micronaut.http.netty.body.NettyByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.NettyBodyAdapter
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf

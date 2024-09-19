@@ -6,7 +6,7 @@ import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.netty.body.AvailableNettyByteBody
-import io.micronaut.http.server.netty.body.NettyBodyAdapter
+import io.micronaut.http.netty.body.NettyBodyAdapter
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled

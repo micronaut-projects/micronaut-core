@@ -18,6 +18,7 @@ package io.micronaut.http.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -74,9 +75,22 @@ public interface NettyHttpRequestBuilder {
      * request has been changed, this will return an empty value.
      *
      * @return The request including the body
+     * @deprecated Go through {@link #toHttpRequestWithoutBody()} and {@link #byteBodyDirect()} instead
      */
+    @Deprecated
     @NonNull
     default Optional<HttpRequest> toHttpRequestDirect() {
+        return Optional.empty();
+    }
+
+    /**
+     * Directly convert this request body to a {@link ByteBody}, if possible. If the body of this
+     * request has been changed, this will return an empty value.
+     *
+     * @return The body
+     */
+    @NonNull
+    default Optional<ByteBody> byteBodyDirect() {
         return Optional.empty();
     }
 
