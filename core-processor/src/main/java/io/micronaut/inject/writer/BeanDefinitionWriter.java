@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1237,7 +1237,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (hasMethodInjection) {
             Type methodsFieldType = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_METHODS, methodsFieldType.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, allMethodVisits, methodVisitData -> {
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, allMethodVisits, methodVisitData ->
                 pushNewMethodReference(
                     staticInit,
                     JavaModelUtils.getTypeReference(methodVisitData.beanType),
@@ -1245,8 +1245,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     methodVisitData.getAnnotationMetadata(),
                     methodVisitData.isPostConstruct(),
                     methodVisitData.isPreDestroy()
-                );
-            });
+                ));
             staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_METHODS, methodsFieldType);
         }
 
@@ -1254,14 +1253,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (hasFieldInjection) {
             Type fieldsFieldType = Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_FIELDS, fieldsFieldType.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.FieldReference.class, fieldInjectionPoints, fieldVisitData -> {
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.FieldReference.class, fieldInjectionPoints, fieldVisitData ->
                 pushNewFieldReference(
                     staticInit,
                     JavaModelUtils.getTypeReference(fieldVisitData.beanType),
                     fieldVisitData.fieldElement,
                     fieldVisitData.annotationMetadata
-                );
-            });
+                ));
             staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
         }
 
@@ -1272,9 +1270,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 annotationInjectionsFieldType.getDescriptor(), null, null);
 
             List<Type> injectedTypes = new ArrayList<>(annotationInjectionPoints.keySet());
-            pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, injectedTypes, annotationVisitData -> {
-                pushNewAnnotationReference(staticInit, annotationVisitData);
-            });
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, injectedTypes, annotationVisitData ->
+                pushNewAnnotationReference(staticInit, annotationVisitData));
             staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, annotationInjectionsFieldType);
         }
 
@@ -1282,21 +1279,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (hasTypeArguments) {
             Type typeArgumentsFieldType = Type.getType(Map.class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType.getDescriptor(), null, null);
-            pushStringMapOf(staticInit, typeArguments, true, null, new Consumer<Map<String, ClassElement>>() {
-                @Override
-                public void accept(Map<String, ClassElement> stringClassElementMap) {
-                    pushTypeArgumentElements(
-                        annotationMetadata,
-                        beanDefinitionType,
-                        classWriter,
-                        staticInit,
-                        beanDefinitionName,
-                        stringClassElementMap,
-                        defaultsStorage,
-                        loadTypeMethods
-                    );
-                }
-            });
+            pushStringMapOf(staticInit, typeArguments, true, null, stringClassElementMap ->
+                pushTypeArgumentElements(
+                    annotationMetadata,
+                    beanDefinitionType,
+                    classWriter,
+                    staticInit,
+                    beanDefinitionName,
+                    stringClassElementMap,
+                    defaultsStorage,
+                    loadTypeMethods
+                ));
             staticInit.putStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType);
         }
 
@@ -1390,30 +1383,24 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         staticInit.push(matchesPropertyCondition.defaultValue());
                         pushEnumValue(matchesPropertyCondition.condition());
                     });
-                } else if (condition instanceof MatchesAbsenceOfBeansCondition matchesAbsenseOfBeansCondition) {
-                    pushRecord(matchesAbsenseOfBeansCondition.getClass(), () -> {
-                        pushAnnotationClassValues(matchesAbsenseOfBeansCondition.missingBeans());
-                    });
+                } else if (condition instanceof MatchesAbsenceOfBeansCondition matchesAbsenceOfBeansCondition) {
+                    pushRecord(matchesAbsenceOfBeansCondition.getClass(), () ->
+                        pushAnnotationClassValues(matchesAbsenceOfBeansCondition.missingBeans()));
                 } else if (condition instanceof MatchesPresenceOfBeansCondition matchesPresenceOfBeansCondition) {
-                    pushRecord(matchesPresenceOfBeansCondition.getClass(), () -> {
-                        pushAnnotationClassValues(matchesPresenceOfBeansCondition.beans());
-                    });
-                } else if (condition instanceof MatchesAbsenceOfClassesCondition matchesAbsenseOfClassesCondition) {
-                    pushRecord(matchesAbsenseOfClassesCondition.getClass(), () -> {
-                        pushAnnotationClassValues(matchesAbsenseOfClassesCondition.classes());
-                    });
+                    pushRecord(matchesPresenceOfBeansCondition.getClass(), () ->
+                        pushAnnotationClassValues(matchesPresenceOfBeansCondition.beans()));
+                } else if (condition instanceof MatchesAbsenceOfClassesCondition matchesAbsenceOfClassesCondition) {
+                    pushRecord(matchesAbsenceOfClassesCondition.getClass(), () ->
+                        pushAnnotationClassValues(matchesAbsenceOfClassesCondition.classes()));
                 } else if (condition instanceof MatchesPresenceOfClassesCondition matchesPresenceOfClassesCondition) {
-                    pushRecord(matchesPresenceOfClassesCondition.getClass(), () -> {
-                        pushAnnotationClassValues(matchesPresenceOfClassesCondition.classes());
-                    });
+                    pushRecord(matchesPresenceOfClassesCondition.getClass(), () ->
+                        pushAnnotationClassValues(matchesPresenceOfClassesCondition.classes()));
                 } else if (condition instanceof MatchesPresenceOfEntitiesCondition matchesPresenceOfEntitiesCondition) {
-                    pushRecord(matchesPresenceOfEntitiesCondition.getClass(), () -> {
-                        pushAnnotationClassValues(matchesPresenceOfEntitiesCondition.classes());
-                    });
-                } else if (condition instanceof MatchesAbsenceOfClassNamesCondition matchesAbsenseOfClassNamesCondition) {
-                    pushRecord(matchesAbsenseOfClassNamesCondition.getClass(), () -> {
-                        pushNewArray(staticInit, String.class, matchesAbsenseOfClassNamesCondition.classes(), staticInit::push);
-                    });
+                    pushRecord(matchesPresenceOfEntitiesCondition.getClass(), () ->
+                        pushAnnotationClassValues(matchesPresenceOfEntitiesCondition.classes()));
+                } else if (condition instanceof MatchesAbsenceOfClassNamesCondition matchesAbsenceOfClassNamesCondition) {
+                    pushRecord(matchesAbsenceOfClassNamesCondition.getClass(), () ->
+                        pushNewArray(staticInit, String.class, matchesAbsenceOfClassNamesCondition.classes(), staticInit::push));
                 } else if (condition instanceof MatchesConfigurationCondition matchesConfigurationCondition) {
                     pushRecord(matchesConfigurationCondition.getClass(), () -> {
                         staticInit.push(matchesConfigurationCondition.configurationName());
@@ -1448,34 +1435,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         }
                     });
                 } else if (condition instanceof MatchesCustomCondition matchesCustomCondition) {
-                    pushRecord(matchesCustomCondition.getClass(), () -> {
-                        pushAnnotationClassValue(matchesCustomCondition.customConditionClass());
-                    });
+                    pushRecord(matchesCustomCondition.getClass(), () ->
+                        pushAnnotationClassValue(matchesCustomCondition.customConditionClass()));
                 } else if (condition instanceof MatchesEnvironmentCondition matchesEnvironmentCondition) {
-                    pushRecord(matchesEnvironmentCondition.getClass(), () -> {
-                        pushNewArray(staticInit, String.class, matchesEnvironmentCondition.env(), staticInit::push);
-                    });
+                    pushRecord(matchesEnvironmentCondition.getClass(), () ->
+                        pushNewArray(staticInit, String.class, matchesEnvironmentCondition.env(), staticInit::push));
                 } else if (condition instanceof MatchesMissingPropertyCondition matchesMissingPropertyCondition) {
-                    pushRecord(matchesMissingPropertyCondition.getClass(), () -> {
-                        staticInit.push(matchesMissingPropertyCondition.property());
-                    });
+                    pushRecord(matchesMissingPropertyCondition.getClass(), () ->
+                        staticInit.push(matchesMissingPropertyCondition.property()));
                 } else if (condition instanceof MatchesNotEnvironmentCondition matchesNotEnvironmentCondition) {
-                    pushRecord(matchesNotEnvironmentCondition.getClass(), () -> {
-                        pushNewArray(staticInit, String.class, matchesNotEnvironmentCondition.env(), staticInit::push);
-                    });
-                } else if (condition instanceof MatchesPresenceOfResourcesCondition matchesPresenseOfResourcesCondition) {
-                    pushRecord(matchesPresenseOfResourcesCondition.getClass(), () -> {
-                        pushNewArray(staticInit, String.class, matchesPresenseOfResourcesCondition.resourcePaths(), staticInit::push);
-                    });
+                    pushRecord(matchesNotEnvironmentCondition.getClass(), () ->
+                        pushNewArray(staticInit, String.class, matchesNotEnvironmentCondition.env(), staticInit::push));
+                } else if (condition instanceof MatchesPresenceOfResourcesCondition matchesPresenceOfResourcesCondition) {
+                    pushRecord(matchesPresenceOfResourcesCondition.getClass(), () ->
+                        pushNewArray(staticInit, String.class, matchesPresenceOfResourcesCondition.resourcePaths(), staticInit::push));
                 } else if (condition instanceof MatchesSdkCondition matchesSdkCondition) {
                     pushRecord(matchesSdkCondition.getClass(), () -> {
                         pushEnumValue(matchesSdkCondition.sdk());
                         staticInit.push(matchesSdkCondition.version());
                     });
                 } else if (condition instanceof MatchesDynamicCondition matchesDynamicCondition) {
-                    pushRecord(matchesDynamicCondition.getClass(), () -> {
-                        pushAnnotationMetadata(staticInit, matchesDynamicCondition.annotationMetadata());
-                    });
+                    pushRecord(matchesDynamicCondition.getClass(), () ->
+                        pushAnnotationMetadata(staticInit, matchesDynamicCondition.annotationMetadata()));
                 } else {
                     throw new IllegalStateException("Unsupported condition type: " + condition.getClass().getName());
                 }
@@ -1678,7 +1659,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         if (scope != null) {
-            return scope.equals(Singleton.class.getName()) || scope.equals(AnnotationUtil.SINGLETON);
+            return scope.equals(Singleton.class.getName());
         } else {
             final AnnotationMetadata annotationMetadata;
             if (beanProducingElement instanceof ClassElement) {
@@ -1688,7 +1669,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
 
             return annotationMetadata.stringValue(DefaultScope.class)
-                    .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                    .map(t -> t.equals(Singleton.class.getName()))
                     .orElse(false);
         }
     }
@@ -2242,14 +2223,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushInvokeGetPropertyValueForField(injectMethodVisitor, fieldElement, annotationMetadata, property.get());
             } else {
                 Optional<String> valueValue = annotationMetadata.stringValue(Value.class);
-                if (valueValue.isPresent()) {
-                    pushInvokeGetPropertyPlaceholderValueForField(injectMethodVisitor, fieldElement, annotationMetadata, valueValue.get());
-                }
+                valueValue.ifPresent(vv -> pushInvokeGetPropertyPlaceholderValueForField(injectMethodVisitor, fieldElement, annotationMetadata, vv));
             }
-            putField(injectMethodVisitor, fieldElement, requiresReflection, declaringType);
+            putField(injectMethodVisitor, fieldElement, false, declaringType);
 
             if (keepConfPropInjectPoints) {
-                fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, requiresReflection));
+                fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, false));
                 currentFieldIndex++;
             }
 
@@ -2791,7 +2770,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushMethodParameterValue(injectMethodVisitor, index, parameter)
             );
 
-            // invoke isMethodResolved with method paremeters
+            // invoke isMethodResolved with method parameters
             injectMethodVisitor.loadThis();
             injectMethodVisitor.push(currentMethodIndex);
             injectMethodVisitor.loadLocal(parametersIndex, Type.getType(Object[].class));
@@ -3712,9 +3691,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         return false;
                     });
                 } else {
-                    WriterUtils.invokeBeanConstructor(buildMethodVisitor, constructor, requiresReflection, true, (index, parameter) -> {
-                        pushConstructorArgument(buildMethodVisitor, parameter, index);
-                    }, null);
+                    WriterUtils.invokeBeanConstructor(
+                        buildMethodVisitor,
+                        constructor,
+                        requiresReflection,
+                        true,
+                        (index, parameter) -> pushConstructorArgument(buildMethodVisitor, parameter, index),
+                        null);
                 }
             }
 
@@ -3956,7 +3939,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
         classWriter.visitInnerClass(constructorInternalName, beanDefinitionInternalName, null, ACC_PRIVATE);
         return new InnerClassDef(
-                interceptedConstructorWriterName,
                 interceptedConstructorWriter,
                 constructorInternalName,
                 interceptedConstructorType
@@ -4063,9 +4045,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean pushParametersAsArray(GeneratorAdapter buildMethodVisitor, ParameterElement[] parameters) {
-        pushNewArrayIndexed(buildMethodVisitor, Object.class, Arrays.asList(parameters), (index, parameter) -> {
-            pushConstructorArgument(buildMethodVisitor, parameter, index, true);
-        });
+        pushNewArrayIndexed(
+            buildMethodVisitor,
+            Object.class,
+            Arrays.asList(parameters),
+            (index, parameter) -> pushConstructorArgument(buildMethodVisitor, parameter, index, true)
+        );
         boolean hasInjectScope = false;
         for (ParameterElement parameter : parameters) {
             if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
@@ -4153,9 +4138,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 resolveConstructorArgumentGenericType(buildMethodVisitor, parameter.getGenericType(), index);
             }
             // push qualifier
-            pushQualifier(buildMethodVisitor, parameter, () -> {
-                resolveConstructorArgument(buildMethodVisitor, index);
-            });
+            pushQualifier(buildMethodVisitor, parameter, () -> resolveConstructorArgument(buildMethodVisitor, index));
             // invoke method
             pushInvokeMethodOnSuperClass(buildMethodVisitor, methodToInvoke);
             if (isArray && hasGenericType) {
@@ -4518,7 +4501,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
                 protectedConstructor.invokeConstructor(getSuperType(), org.objectweb.asm.commons.Method.getMethod(BEAN_DEFINITION_CLASS_CONSTRUCTOR2.get()));
             } else {
-                protectedConstructor.invokeConstructor(getSuperType(), org.objectweb.asm.commons.Method.getMethod(BEAN_DEFINITION_CLASS_CONSTRUCTOR1.get()));
+                BEAN_DEFINITION_CLASS_CONSTRUCTOR1.ifPresent(constructor1 ->
+                    protectedConstructor.invokeConstructor(getSuperType(), org.objectweb.asm.commons.Method.getMethod(constructor1)));
             }
 
             protectedConstructor.returnValue();
@@ -5144,7 +5128,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         private final String constructorInternalName;
         private final Type innerClassType;
 
-        public InnerClassDef(String interceptedConstructorWriterName, ClassWriter innerClassWriter, String constructorInternalName, Type innerClassType) {
+        public InnerClassDef(ClassWriter innerClassWriter, String constructorInternalName, Type innerClassType) {
             this.innerClassWriter = innerClassWriter;
             this.constructorInternalName = constructorInternalName;
             this.innerClassType = innerClassType;
