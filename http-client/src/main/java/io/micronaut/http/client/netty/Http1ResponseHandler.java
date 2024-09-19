@@ -46,24 +46,18 @@ import java.util.List;
  * @since 4.7.0
  */
 @Internal
-final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented<HttpObject> implements BufferConsumer.Upstream {
+final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented<HttpObject> {
     private static final Logger LOG = LoggerFactory.getLogger(Http1ResponseHandler.class);
 
-    private final ResponseListener listener;
-    private ReaderState state = ReaderState.BEFORE_RESPONSE;
-    private HttpResponse response;
-    private List<ByteBuf> buffered;
-    private StreamingNettyByteBody.SharedBuffer streaming;
-    private long demand;
-    private ChannelHandlerContext streamingContext;
+    private ReaderState<?> state;
 
     public Http1ResponseHandler(ResponseListener listener) {
         super(false);
-        this.listener = listener;
+        state = new BeforeResponse(listener);
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         ctx.read();
     }
 
@@ -75,213 +69,318 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             return;
         }
 
-        if (state == ReaderState.AFTER_CONTENT) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Discarding unexpected message {}", msg);
-            }
-            ReferenceCountUtil.release(msg);
-            return;
-        }
-
-        // HttpResponse handling
-        if (state == ReaderState.BEFORE_RESPONSE) {
-            HttpResponse response = (HttpResponse) msg;
-            if (response.status().code() == HttpResponseStatus.CONTINUE.code()) {
-                listener.continueReceived(ctx);
-                state = ReaderState.DISCARDING_CONTINUE_CONTENT;
-            } else {
-                this.response = response;
-                state = ReaderState.BUFFERED_CONTENT;
-            }
-
-            if (!(msg instanceof HttpContent)) {
-                // no content, we're done
-                return;
-            }
-            // msg is not just a HttpResponse but also carries HttpContent. Proceed with content handling.
-        } else {
-            assert !(msg instanceof HttpResponse);
-        }
-
-        // handling for HttpContent messages
-        HttpContent content = (HttpContent) msg;
-        content.touch();
-        switch (state) {
-            case BUFFERED_CONTENT:
-                if (content.content().isReadable()) {
-                    if (buffered == null) {
-                        buffered = new ArrayList<>();
-                    }
-                    buffered.add(content.content());
-                } else {
-                    content.release();
-                }
-                if (content instanceof LastHttpContent) {
-                    List<ByteBuf> buffered = this.buffered;
-                    this.buffered = null;
-                    state = ReaderState.AFTER_CONTENT;
-                    BodySizeLimits limits = listener.sizeLimits();
-                    if (buffered == null) {
-                        complete(AvailableNettyByteBody.empty());
-                    } else if (buffered.size() == 1) {
-                        complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, buffered.get(0)));
-                    } else {
-                        CompositeByteBuf composite = ctx.alloc().compositeBuffer();
-                        composite.addComponents(true, buffered);
-                        complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, composite));
-                    }
-                    listener.finish(ctx);
-                }
-                break;
-            case UNBUFFERED_CONTENT:
-                if (content.content().isReadable()) {
-                    demand -= content.content().readableBytes();
-                    streaming.add(content.content());
-                } else {
-                    content.release();
-                }
-                if (content instanceof LastHttpContent) {
-                    state = ReaderState.AFTER_CONTENT;
-                    streaming.complete();
-                    listener.finish(ctx);
-                }
-                break;
-            case DISCARDING_CONTENT:
-                content.release();
-                if (msg instanceof LastHttpContent) {
-                    state = ReaderState.AFTER_CONTENT;
-                    listener.finish(ctx);
-                }
-                break;
-            case DISCARDING_CONTINUE_CONTENT:
-                content.release();
-                if (msg instanceof LastHttpContent) {
-                    state = ReaderState.BEFORE_RESPONSE;
-                }
-                break;
-            default:
-                throw new AssertionError(state);
-        }
+        //noinspection unchecked,rawtypes
+        ((ReaderState) state).read(ctx, msg);
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        if (state == ReaderState.BUFFERED_CONTENT) {
-            devolveToStreaming(ctx);
-        }
-        if (state != ReaderState.AFTER_CONTENT && demand > 0) {
-            ctx.read();
-        } else if (state == ReaderState.BEFORE_RESPONSE || state == ReaderState.DISCARDING_CONTINUE_CONTENT || state == ReaderState.DISCARDING_CONTENT) {
-            ctx.read();
-        }
-    }
-
-    private void devolveToStreaming(ChannelHandlerContext ctx) {
-        assert state == ReaderState.BUFFERED_CONTENT;
-        assert ctx.executor().inEventLoop();
-
-        streaming = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), listener.sizeLimits(), this);
-        if (!listener.isHeadResponse()) {
-            streaming.setExpectedLengthFrom(response.headers());
-        }
-        streamingContext = ctx;
-        if (buffered != null) {
-            for (ByteBuf buf : buffered) {
-                demand -= buf.readableBytes();
-                streaming.add(buf);
-            }
-            buffered = null;
-        }
-        state = ReaderState.UNBUFFERED_CONTENT;
-        complete(new StreamingNettyByteBody(streaming));
+    public void channelReadComplete(ChannelHandlerContext ctx) {
+        state.channelReadComplete(ctx);
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        if (state != ReaderState.AFTER_CONTENT) {
-            exceptionCaught(ctx, new ResponseClosedException("Connection closed before response was received"));
-        }
+    public void channelInactive(ChannelHandlerContext ctx) {
+        state.channelInactive(ctx);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        switch (state) {
-            case BEFORE_RESPONSE, DISCARDING_CONTINUE_CONTENT -> listener.fail(ctx, cause);
-            case BUFFERED_CONTENT -> {
-                if (buffered != null) {
-                    for (ByteBuf buf : buffered) {
-                        buf.release();
-                    }
-                    buffered = null;
-                }
-                devolveToStreaming(ctx);
-                streaming.error(cause);
+        state.exceptionCaught(ctx, cause);
+    }
+
+    private static sealed abstract class ReaderState<M extends HttpObject> {
+        abstract void read(ChannelHandlerContext ctx, M msg);
+
+        void channelReadComplete(ChannelHandlerContext ctx) {
+            ctx.read();
+        }
+
+        abstract void exceptionCaught(ChannelHandlerContext ctx, Throwable cause);
+
+        void channelInactive(ChannelHandlerContext ctx) {
+            exceptionCaught(ctx, new ResponseClosedException("Connection closed before response was received"));
+        }
+    }
+
+    /**
+     * Before any response data has been received.
+     */
+    private final class BeforeResponse extends ReaderState<HttpResponse> {
+        private final ResponseListener listener;
+
+        BeforeResponse(ResponseListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        void read(ChannelHandlerContext ctx, HttpResponse msg) {
+            ReaderState<HttpContent> nextState;
+            if (msg.status().code() == HttpResponseStatus.CONTINUE.code()) {
+                listener.continueReceived(ctx);
+                nextState = new DiscardingContinueContent(this);
+            } else {
+                nextState = new BufferedContent(listener, msg);
             }
-            case UNBUFFERED_CONTENT, DISCARDING_CONTENT -> streaming.error(cause);
-            case AFTER_CONTENT -> ctx.fireExceptionCaught(cause);
-            default -> throw new AssertionError(state);
+            state = nextState;
+
+            if (msg instanceof HttpContent c) {
+                nextState.read(ctx, c);
+            }
+        }
+
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            listener.fail(ctx, cause);
         }
     }
 
-    @Override
-    public void start() {
-        assert streamingContext.executor().inEventLoop();
+    /**
+     * After the {@link HttpResponse}, but before the first {@link #channelReadComplete}. We
+     * optimistically buffer data until {@link #channelReadComplete} so that we may return it as a
+     * more efficient {@link AvailableNettyByteBody}. If there's too much data, fall back to
+     * streaming.
+     */
+    private final class BufferedContent extends ReaderState<HttpContent> {
+        private final ResponseListener listener;
+        private final HttpResponse response;
+        private List<ByteBuf> buffered;
 
-        demand++;
-        if (demand == 1) {
-            streamingContext.read();
+        BufferedContent(ResponseListener listener, HttpResponse response) {
+            this.listener = listener;
+            this.response = response;
+        }
+
+        @Override
+        void read(ChannelHandlerContext ctx, HttpContent msg) {
+            if (msg.content().isReadable()) {
+                if (buffered == null) {
+                    buffered = new ArrayList<>();
+                }
+                buffered.add(msg.content());
+            } else {
+                msg.release();
+            }
+            if (msg instanceof LastHttpContent) {
+                List<ByteBuf> buffered = this.buffered;
+                this.buffered = null;
+                state = AfterContent.INSTANCE;
+                BodySizeLimits limits = listener.sizeLimits();
+                if (buffered == null) {
+                    complete(AvailableNettyByteBody.empty());
+                } else if (buffered.size() == 1) {
+                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, buffered.get(0)));
+                } else {
+                    CompositeByteBuf composite = ctx.alloc().compositeBuffer();
+                    composite.addComponents(true, buffered);
+                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, composite));
+                }
+                listener.finish(ctx);
+            }
+        }
+
+        @Override
+        void channelReadComplete(ChannelHandlerContext ctx) {
+            devolveToStreaming(ctx);
+            state.channelReadComplete(ctx); // check if there's demand
+        }
+
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            devolveToStreaming(ctx);
+            state.exceptionCaught(ctx, cause);
+        }
+
+        private void devolveToStreaming(ChannelHandlerContext ctx) {
+            assert ctx.executor().inEventLoop();
+
+            UnbufferedContent unbufferedContent = new UnbufferedContent(listener, ctx, response);
+            if (buffered != null) {
+                for (ByteBuf buf : buffered) {
+                    unbufferedContent.add(buf);
+                }
+            }
+            state = unbufferedContent;
+            complete(new StreamingNettyByteBody(unbufferedContent.streaming));
+        }
+
+        private void complete(CloseableByteBody body) {
+            assert state != this : "should have been replaced already";
+            listener.complete(response, body);
         }
     }
 
-    @Override
-    public void onBytesConsumed(long bytesConsumed) {
-        assert streamingContext.executor().inEventLoop();
+    /**
+     * Normal content handler, streaming data into a {@link StreamingNettyByteBody}.
+     */
+    private final class UnbufferedContent extends ReaderState<HttpContent> implements BufferConsumer.Upstream {
+        private final ResponseListener listener;
+        private final ChannelHandlerContext streamingContext;
+        private final StreamingNettyByteBody.SharedBuffer streaming;
+        private long demand;
 
-        long oldDemand = demand;
-        long newDemand = oldDemand + bytesConsumed;
-        if (newDemand < oldDemand) {
-            // overflow
-            newDemand = oldDemand;
+        UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx, HttpResponse response) {
+            this.listener = listener;
+            streaming = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), listener.sizeLimits(), this);
+            if (!listener.isHeadResponse()) {
+                streaming.setExpectedLengthFrom(response.headers());
+            }
+            streamingContext = ctx;
         }
-        this.demand = newDemand;
-        if (oldDemand <= 0 && newDemand > 0) {
-            streamingContext.read();
+
+        void add(ByteBuf buf) {
+            if (buf.isReadable()) {
+                demand -= buf.readableBytes();
+                streaming.add(buf);
+            } else {
+                buf.release();
+            }
+        }
+
+        @Override
+        void read(ChannelHandlerContext ctx, HttpContent msg) {
+            add(msg.content());
+            if (msg instanceof LastHttpContent) {
+                state = AfterContent.INSTANCE;
+                streaming.complete();
+                listener.finish(ctx);
+            }
+        }
+
+        @Override
+        void channelReadComplete(ChannelHandlerContext ctx) {
+            if (demand > 0) {
+                ctx.read();
+            }
+        }
+
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            streaming.error(cause);
+        }
+
+        @Override
+        public void start() {
+            assert streamingContext.executor().inEventLoop();
+
+            demand++;
+            if (demand == 1) {
+                streamingContext.read();
+            }
+        }
+
+        @Override
+        public void onBytesConsumed(long bytesConsumed) {
+            assert streamingContext.executor().inEventLoop();
+
+            long oldDemand = demand;
+            long newDemand = oldDemand + bytesConsumed;
+            if (newDemand < oldDemand) {
+                // overflow
+                newDemand = oldDemand;
+            }
+            this.demand = newDemand;
+            if (oldDemand <= 0 && newDemand > 0) {
+                streamingContext.read();
+            }
+        }
+
+        @Override
+        public void allowDiscard() {
+            assert streamingContext.executor().inEventLoop();
+
+            if (state == this) {
+                state = new DiscardingContent(listener, streaming);
+                disregardBackpressure();
+            }
+            listener.allowDiscard();
+        }
+
+        @Override
+        public void disregardBackpressure() {
+            assert streamingContext.executor().inEventLoop();
+
+            long oldDemand = demand;
+            demand = Long.MAX_VALUE;
+            if (oldDemand <= 0 && state == this) {
+                streamingContext.read();
+            }
         }
     }
 
-    @Override
-    public void allowDiscard() {
-        assert streamingContext.executor().inEventLoop();
+    /**
+     * Short-circuiting handler that discards incoming content.
+     */
+    private final class DiscardingContent extends ReaderState<HttpContent> {
+        private final ResponseListener listener;
+        private final StreamingNettyByteBody.SharedBuffer streaming;
 
-        if (state == ReaderState.UNBUFFERED_CONTENT || state == ReaderState.BUFFERED_CONTENT) {
-            state = ReaderState.DISCARDING_CONTENT;
-            disregardBackpressure();
+        DiscardingContent(ResponseListener listener, StreamingNettyByteBody.SharedBuffer streaming) {
+            this.listener = listener;
+            this.streaming = streaming;
         }
-        listener.allowDiscard();
-    }
 
-    @Override
-    public void disregardBackpressure() {
-        assert streamingContext.executor().inEventLoop();
+        @Override
+        void read(ChannelHandlerContext ctx, HttpContent msg) {
+            msg.release();
+            if (msg instanceof LastHttpContent) {
+                state = AfterContent.INSTANCE;
+                listener.finish(ctx);
+            }
+        }
 
-        long oldDemand = demand;
-        demand = Long.MAX_VALUE;
-        if (oldDemand <= 0 && state == ReaderState.UNBUFFERED_CONTENT) {
-            streamingContext.read();
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            streaming.error(cause);
         }
     }
 
-    private void complete(CloseableByteBody body) {
-        listener.complete(response, body);
+    /**
+     * Short-circuiting handler that discards incoming content of a CONTINUE response.
+     */
+    private final class DiscardingContinueContent extends ReaderState<HttpContent> {
+        private final BeforeResponse beforeResponse;
+
+        DiscardingContinueContent(BeforeResponse beforeResponse) {
+            this.beforeResponse = beforeResponse;
+        }
+
+        @Override
+        void read(ChannelHandlerContext ctx, HttpContent msg) {
+            msg.release();
+            if (msg instanceof LastHttpContent) {
+                state = this.beforeResponse;
+            }
+        }
+
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            this.beforeResponse.exceptionCaught(ctx, cause);
+        }
     }
 
-    private enum ReaderState {
-        BEFORE_RESPONSE,
-        DISCARDING_CONTINUE_CONTENT,
-        BUFFERED_CONTENT,
-        UNBUFFERED_CONTENT,
-        DISCARDING_CONTENT,
-        AFTER_CONTENT,
+    /**
+     * Special handler that is used after the {@link LastHttpContent}. There should be no more
+     * incoming messages at this point.
+     */
+    private static final class AfterContent extends ReaderState<HttpContent> {
+        static final AfterContent INSTANCE = new AfterContent();
+
+        @Override
+        void read(ChannelHandlerContext ctx, HttpContent msg) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Discarding unexpected message {}", msg);
+            }
+            ReferenceCountUtil.release(msg);
+        }
+
+        @Override
+        void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            ctx.fireExceptionCaught(cause);
+        }
+
+        @Override
+        void channelInactive(ChannelHandlerContext ctx) {
+        }
     }
 
     /**
