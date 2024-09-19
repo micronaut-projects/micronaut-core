@@ -43,7 +43,7 @@ import java.lang.annotation.Target;
 @Experimental
 public @interface RouteCondition {
     /**
-     * An expression that evalutes to {@code true} or {@code false}.
+     * An expression that evaluates to {@code true} or {@code false}.
      * @return The expression
      * @since 4.0.0
      */

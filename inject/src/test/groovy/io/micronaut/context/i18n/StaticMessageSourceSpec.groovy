@@ -19,7 +19,7 @@ class StaticMessageSourceSpec extends Specification {
         ms.getMessage("foo.bar", MessageSource.MessageContext.of(Locale.FRENCH)).get() == 'wi'
     }
 
-    void "test messge interpolate"() {
+    void "test message interpolate"() {
         given:
         def ms = new StaticMessageSource()
         ms.addMessage("foo.bar", "test")

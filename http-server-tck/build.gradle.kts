@@ -9,6 +9,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     annotationProcessor(projects.httpValidation)
+    annotationProcessor(projects.graal)
 
     compileOnly(platform(libs.test.boms.micronaut.validation))
     compileOnly(libs.micronaut.validation) {
