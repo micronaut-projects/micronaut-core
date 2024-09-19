@@ -88,7 +88,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         state.exceptionCaught(ctx, cause);
     }
 
-    private static sealed abstract class ReaderState<M extends HttpObject> {
+    private abstract static sealed class ReaderState<M extends HttpObject> {
         abstract void read(ChannelHandlerContext ctx, M msg);
 
         void channelReadComplete(ChannelHandlerContext ctx) {
