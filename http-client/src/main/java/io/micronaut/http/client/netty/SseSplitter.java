@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.body.BodySizeLimits;
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Jonas Konrad
  * @since 4.7.0
  */
+@Internal
 final class SseSplitter {
     /**
      * Split a single buffer.
