@@ -380,6 +380,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void channelInactive(ChannelHandlerContext ctx) {
+            ctx.fireChannelInactive();
         }
     }
 
