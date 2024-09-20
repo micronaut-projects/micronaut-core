@@ -93,7 +93,6 @@ import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.BodySizeLimits;
-import io.micronaut.http.netty.body.BodySizeLimits;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
@@ -1135,7 +1134,7 @@ public class DefaultHttpClient implements
                 Publisher<HttpContent> body;
                 if (!hasBody(resp)) {
                     resp.close();
-                    body = Publishers.empty();
+                    body = Flux.empty();
                 } else {
                     if (isAcceptEvents(req)) {
                         if (bb instanceof AvailableNettyByteBody anbb) {
@@ -1160,7 +1159,12 @@ public class DefaultHttpClient implements
     }
 
     private <B> MutableHttpResponse<B> toStreamingResponse(NettyClientByteBodyResponse resp, Publisher<HttpContent> content) {
-        DefaultStreamedHttpResponse nettyResponse = new DefaultStreamedHttpResponse(resp.nettyResponse.protocolVersion(), resp.nettyResponse.status(), resp.getHeaders().getNettyHeaders(), content);
+        DefaultStreamedHttpResponse nettyResponse = new DefaultStreamedHttpResponse(
+            resp.nettyResponse.protocolVersion(),
+            resp.nettyResponse.status(),
+            resp.getHeaders().getNettyHeaders(),
+            content
+        );
         return new NettyStreamedHttpResponse<>(nettyResponse, conversionService);
     }
 
@@ -1188,7 +1192,7 @@ public class DefaultHttpClient implements
                             Publisher<HttpContent> body;
                             if (!hasBody(resp)) {
                                 resp.close();
-                                body = Publishers.empty();
+                                body = Flux.empty();
                             } else {
                                 body = NettyByteBody.toByteBufs(resp.byteBody()).map(DefaultHttpContent::new);
                             }
@@ -1754,6 +1758,8 @@ public class DefaultHttpClient implements
                     streamWriter.startWriting();
                 }
             }
+
+            // need to run the create() on the event loop so that pipeline modification happens synchronously
         }).subscribeOn(Schedulers.fromExecutor(poolHandle.channel.eventLoop()));
     }
 

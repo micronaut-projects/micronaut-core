@@ -138,6 +138,7 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
 
     @Override
     public void discard() {
+        // explicit cancel requested -> don't call errorHandler
     }
 
     @Override
