@@ -88,6 +88,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         state.exceptionCaught(ctx, cause);
     }
 
+    private void transitionToState(ChannelHandlerContext ctx, ReaderState<?> fromState, ReaderState<?> nextState) {
+        if (!ctx.executor().inEventLoop()) {
+            throw new IllegalStateException("Not on event loop");
+        }
+        if (state != fromState) {
+            throw new IllegalStateException("Wrong source state");
+        }
+        state = nextState;
+    }
+
     private abstract static sealed class ReaderState<M extends HttpObject> {
         abstract void read(ChannelHandlerContext ctx, M msg);
 
@@ -121,7 +131,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             } else {
                 nextState = new BufferedContent(listener, msg);
             }
-            state = nextState;
+            transitionToState(ctx, this, nextState);
 
             if (msg instanceof HttpContent c) {
                 nextState.read(ctx, c);
@@ -163,7 +173,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             if (msg instanceof LastHttpContent) {
                 List<ByteBuf> buffered = this.buffered;
                 this.buffered = null;
-                state = AfterContent.INSTANCE;
+                transitionToState(ctx, this, AfterContent.INSTANCE);
                 BodySizeLimits limits = listener.sizeLimits();
                 if (buffered == null) {
                     complete(AvailableNettyByteBody.empty());
@@ -199,7 +209,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                     unbufferedContent.add(buf);
                 }
             }
-            state = unbufferedContent;
+            transitionToState(ctx, this, unbufferedContent);
             complete(new StreamingNettyByteBody(unbufferedContent.streaming));
         }
 
@@ -240,7 +250,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             add(msg.content());
             if (msg instanceof LastHttpContent) {
-                state = AfterContent.INSTANCE;
+                transitionToState(ctx, this, AfterContent.INSTANCE);
                 streaming.complete();
                 listener.finish(ctx);
             }
@@ -289,7 +299,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             assert streamingContext.executor().inEventLoop();
 
             if (state == this) {
-                state = new DiscardingContent(listener, streaming);
+                transitionToState(streamingContext, this, new DiscardingContent(listener, streaming));
                 disregardBackpressure();
             }
             listener.allowDiscard();
@@ -323,7 +333,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             msg.release();
             if (msg instanceof LastHttpContent) {
-                state = AfterContent.INSTANCE;
+                transitionToState(ctx, this, AfterContent.INSTANCE);
                 listener.finish(ctx);
             }
         }
@@ -348,7 +358,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             msg.release();
             if (msg instanceof LastHttpContent) {
-                state = this.beforeResponse;
+                transitionToState(ctx, this, this.beforeResponse);
             }
         }
 
