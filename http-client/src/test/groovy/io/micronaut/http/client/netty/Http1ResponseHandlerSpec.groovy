@@ -262,7 +262,7 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.writeInbound(LastHttpContent.EMPTY_LAST_CONTENT)
         then:
         completed
-        counter.reads == 3
+        counter.reads == 4
 
         cleanup:
         channel.checkException()

@@ -79,7 +79,8 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     public static CloseableByteBody createChecked(@NonNull EventLoop loop, @NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
         // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
         // limits, we return a StreamingNettyByteBody instead.
-        if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
+        int readable = buf.readableBytes();
+        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
             BufferConsumer.Upstream upstream = bytesConsumed -> {
             };
             StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);

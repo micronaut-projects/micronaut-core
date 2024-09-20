@@ -33,6 +33,7 @@ import io.micronaut.http.annotation.Status;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
@@ -161,19 +162,32 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     private static Argument<?> resolveBodyType(ReturnType<?> returnType) {
         if (returnType.isAsyncOrReactive()) {
-            Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (HttpResponse.class.isAssignableFrom(reactiveType.getType())) {
-                reactiveType = reactiveType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (HttpResponse.class.isAssignableFrom(unwrappedType.getType())) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return reactiveType;
+            return appendAnnotations(returnType, unwrappedType);
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
-            Argument<?> responseType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (responseType.isAsyncOrReactive()) {
-                return responseType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (unwrappedType.isAsyncOrReactive()) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return responseType;
+            return appendAnnotations(returnType, unwrappedType);
+        } else if (returnType.isOptional()) {
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            return appendAnnotations(returnType, unwrappedType);
         }
         return returnType.asArgument();
+    }
+
+    private static Argument<?> appendAnnotations(ReturnType<?> returnType, Argument<?> unwrappedType) {
+        if (unwrappedType.getAnnotationMetadata().isEmpty()) {
+            return unwrappedType.withAnnotationMetadata(returnType.getAnnotationMetadata());
+        }
+        MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
+        mutableAnnotationMetadata.addAnnotationMetadata(MutableAnnotationMetadata.of(unwrappedType.getAnnotationMetadata()));
+        mutableAnnotationMetadata.addAnnotationMetadata(MutableAnnotationMetadata.of(returnType.getAnnotationMetadata()));
+        return unwrappedType.withAnnotationMetadata(mutableAnnotationMetadata);
     }
 
     @Override
