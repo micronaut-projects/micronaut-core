@@ -23,10 +23,12 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.EventLoop;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -59,6 +61,32 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
             return net.claim();
         } else {
             return Unpooled.wrappedBuffer(body.toByteArray());
+        }
+    }
+
+    /**
+     * This is a wrapper around {@link AvailableNettyByteBody#AvailableNettyByteBody(ByteBuf)}
+     * with an extra body length check.
+     *
+     * @param loop The event loop for constructing {@link StreamingNettyByteBody}
+     * @param bodySizeLimits The body size limits to check
+     * @param buf The input buffer
+     * @return The body with the given input buffer, or a {@link StreamingNettyByteBody} with the
+     * appropriate content length error
+     */
+    @NonNull
+    public static CloseableByteBody createChecked(@NonNull EventLoop loop, @NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
+        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
+        // limits, we return a StreamingNettyByteBody instead.
+        int readable = buf.readableBytes();
+        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
+            BufferConsumer.Upstream upstream = bytesConsumed -> {
+            };
+            StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
+            mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            return new StreamingNettyByteBody(mockBuffer);
+        } else {
+            return new AvailableNettyByteBody(buf);
         }
     }
 

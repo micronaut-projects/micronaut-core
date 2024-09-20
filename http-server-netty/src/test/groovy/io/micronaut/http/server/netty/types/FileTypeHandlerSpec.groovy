@@ -201,7 +201,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/html"
         response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"fileTypeHandlerSpec")
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.body() == tempFileContents
@@ -214,7 +213,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == MediaType.TEXT_PLAIN
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.body() == "My file content".bytes
@@ -309,7 +307,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/plain"
         response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"temp.html\"")
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.body() == tempFileContents
@@ -322,7 +319,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/plain"
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.body() == ("a".."z").join('')
     }
 

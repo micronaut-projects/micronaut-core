@@ -161,7 +161,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, PipeliningServerHandler.createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, fullBody), this);
+                    requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();

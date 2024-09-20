@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.BodySizeLimits;
@@ -313,24 +312,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * This is a wrapper around {@link AvailableNettyByteBody#AvailableNettyByteBody(ByteBuf)}
-     * with an extra body length check.
-     */
-    static CloseableByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
-        // ImmediateNettyByteBody does not support exceptions, so if we hit one of the configured
-        // limits, we return a StreamingNettyByteBody instead.
-        if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = bytesConsumed -> {
-            };
-            StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
-            mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
-            return new StreamingNettyByteBody(mockBuffer);
-        } else {
-            return new AvailableNettyByteBody(buf);
-        }
-    }
-
-    /**
      * An inbound handler is responsible for all incoming messages.
      */
     private abstract class InboundHandler {
@@ -401,7 +382,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // getClass for performance
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (full) {
@@ -497,7 +478,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, request, createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }
