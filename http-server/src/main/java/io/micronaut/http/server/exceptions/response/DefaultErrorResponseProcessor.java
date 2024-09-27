@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import io.micronaut.context.annotation.Secondary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -33,7 +33,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-@Secondary
+@Requires(missingBeans = ErrorResponseProcessor.class)
 final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
     private final JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider;
     private final HtmlErrorResponseBodyProvider<?> htmlBodyErrorResponseProvider;
