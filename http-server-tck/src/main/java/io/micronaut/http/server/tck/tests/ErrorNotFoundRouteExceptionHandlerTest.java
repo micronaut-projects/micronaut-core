@@ -21,7 +21,6 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.HttpStatusHandler;
 import io.micronaut.http.server.exceptions.NotAllowedException;
 import io.micronaut.http.server.exceptions.NotAllowedExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
