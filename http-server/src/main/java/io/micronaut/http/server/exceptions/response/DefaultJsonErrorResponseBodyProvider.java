@@ -33,7 +33,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
-class DefaultJsonErrorResponseBodyProvider implements JsonErrorResponseBodyProvider<JsonError> {
+final class DefaultJsonErrorResponseBodyProvider implements JsonErrorResponseBodyProvider<JsonError> {
     private final boolean alwaysSerializeErrorsAsList;
 
     DefaultJsonErrorResponseBodyProvider(JsonConfiguration jacksonConfiguration) {
