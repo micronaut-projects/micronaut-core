@@ -25,7 +25,7 @@ import jakarta.inject.Singleton;
 
 /**
  * Default implementation of {@link ErrorResponseProcessor}.
- * It delegates to {@link JsonBodyErrorResponseProvider} for JSON responses and to {@link HtmlBodyErrorResponseProvider} for HTML responses.
+ * It delegates to {@link JsonErrorResponseBodyProvider} for JSON responses and to {@link HtmlErrorResponseBodyProvider} for HTML responses.
  *
  * @author Sergio del Amo
  * @since 4.7.0
@@ -34,10 +34,10 @@ import jakarta.inject.Singleton;
 @Singleton
 @Secondary
 final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
-    private final JsonBodyErrorResponseProvider<?> jsonBodyErrorResponseProvider;
-    private final HtmlBodyErrorResponseProvider<?> htmlBodyErrorResponseProvider;
+    private final JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider;
+    private final HtmlErrorResponseBodyProvider<?> htmlBodyErrorResponseProvider;
 
-    DefaultErrorResponseProcessor(JsonBodyErrorResponseProvider<?> jsonBodyErrorResponseProvider, HtmlBodyErrorResponseProvider<?> htmlBodyErrorResponseProvider) {
+    DefaultErrorResponseProcessor(JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider, HtmlErrorResponseBodyProvider<?> htmlBodyErrorResponseProvider) {
         this.jsonBodyErrorResponseProvider = jsonBodyErrorResponseProvider;
         this.htmlBodyErrorResponseProvider = htmlBodyErrorResponseProvider;
     }

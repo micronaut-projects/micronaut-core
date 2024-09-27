@@ -35,11 +35,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Property(name = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
 @MicronautTest
-class DefaultHtmlBodyErrorResponseProviderTest extends Specification {
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultHtmlBodyErrorResponseProviderTest.class);
+class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultHtmlErrorResponseBodyProviderTest.class);
 
     @Inject
-    HtmlBodyErrorResponseProvider<String> htmlProvider;
+    HtmlErrorResponseBodyProvider<String> htmlProvider;
 
     @Client("/")
     @Inject

@@ -15,21 +15,20 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import io.micronaut.context.annotation.DefaultImplementation;
-import io.micronaut.http.MediaType;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.HttpResponse;
 
 /**
- * A {@link BodyErrorResponseProvider} for HTML responses.
- * Responses with content type {@link io.micronaut.http.MediaType#TEXT_HTML}.
+ * Provides an HTTP Response body of an error response.
  * @author Sergio del Amo
  * @since 4.7.0
- * @param <T> The body type
+ *  @param <T> The body type
  */
-@DefaultImplementation(DefaultHtmlBodyErrorResponseProvider.class)
-public interface HtmlBodyErrorResponseProvider<T> extends BodyErrorResponseProvider<T> {
+public interface ErrorResponseBodyProvider<T> {
+    @NonNull
+    T body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response);
 
-    @Override
-    default String contentType() {
-        return MediaType.TEXT_HTML;
-    }
+    @NonNull
+    String contentType();
+
 }

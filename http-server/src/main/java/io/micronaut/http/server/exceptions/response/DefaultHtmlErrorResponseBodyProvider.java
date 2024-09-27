@@ -38,7 +38,7 @@ import static io.micronaut.http.HttpStatus.*;
  */
 @Internal
 @Singleton
-final class DefaultHtmlBodyErrorResponseProvider implements HtmlBodyErrorResponseProvider<String> {
+final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBodyProvider<String> {
     private static final Map<HttpStatus, String> DEFAULT_ERROR_BOLD = Map.of(
             NOT_FOUND, "The page you were looking for doesn’t exist",
             REQUEST_ENTITY_TOO_LARGE, "The file or data you are trying to upload exceeds the allowed size"
@@ -126,8 +126,8 @@ final class DefaultHtmlBodyErrorResponseProvider implements HtmlBodyErrorRespons
     private final LocaleResolver<HttpRequest<?>> localeResolver;
     private final Map<LocaleStatus, String> cache = new ConcurrentHashMap<>();
 
-    DefaultHtmlBodyErrorResponseProvider(MessageSource messageSource,
-                                 LocaleResolver<HttpRequest<?>> localeResolver) {
+    DefaultHtmlErrorResponseBodyProvider(MessageSource messageSource,
+                                         LocaleResolver<HttpRequest<?>> localeResolver) {
         this.messageSource = messageSource;
         this.localeResolver = localeResolver;
     }

@@ -18,11 +18,11 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 @MicronautTest(startApplication = false)
-class HtmlBodyErrorResponseProviderTest extends Specification {
-    private static final Logger LOG = LoggerFactory.getLogger(HtmlBodyErrorResponseProviderTest.class);
+class HtmlErrorResponseBodyProviderTest extends Specification {
+    private static final Logger LOG = LoggerFactory.getLogger(HtmlErrorResponseBodyProviderTest.class);
 
     @Inject
-    HtmlBodyErrorResponseProvider<String> htmlProvider;
+    HtmlErrorResponseBodyProvider<String> htmlProvider;
 
     @ParameterizedTest
     @EnumSource(HttpStatus.class)

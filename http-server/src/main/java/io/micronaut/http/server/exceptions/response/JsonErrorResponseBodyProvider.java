@@ -19,14 +19,14 @@ import io.micronaut.http.MediaType;
 import jakarta.inject.Singleton;
 
 /**
- * A {@link BodyErrorResponseProvider} for JSON responses.
+ * A {@link ErrorResponseBodyProvider} for JSON responses.
  * Responses with content type {@link io.micronaut.http.MediaType#APPLICATION_JSON}.
  * @author Sergio del Amo
  * @since 4.7.0
  * @param <T> The error type
  */
 @Singleton
-public interface JsonBodyErrorResponseProvider<T> extends BodyErrorResponseProvider<T> {
+public interface JsonErrorResponseBodyProvider<T> extends ErrorResponseBodyProvider<T> {
     @Override
     default String contentType() {
         return MediaType.APPLICATION_JSON;

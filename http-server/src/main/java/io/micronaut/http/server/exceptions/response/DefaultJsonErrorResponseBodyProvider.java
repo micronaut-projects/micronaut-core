@@ -27,16 +27,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Default implementation of {@link JsonBodyErrorResponseProvider} which returns a {@link JsonError}.
+ * Default implementation of {@link JsonErrorResponseBodyProvider} which returns a {@link JsonError}.
  *
  * @since 4.7.0
  */
 @Internal
 @Singleton
-class DefaultJsonBodyErrorResponseProvider implements JsonBodyErrorResponseProvider<JsonError> {
+class DefaultJsonErrorResponseBodyProvider implements JsonErrorResponseBodyProvider<JsonError> {
     private final boolean alwaysSerializeErrorsAsList;
 
-    DefaultJsonBodyErrorResponseProvider(JsonConfiguration jacksonConfiguration) {
+    DefaultJsonErrorResponseBodyProvider(JsonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
     }
 
