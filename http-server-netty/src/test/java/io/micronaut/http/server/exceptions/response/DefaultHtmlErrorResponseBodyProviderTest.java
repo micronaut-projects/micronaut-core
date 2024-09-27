@@ -95,6 +95,7 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
         @Post("/save")
         @Status(HttpStatus.CREATED)
         void save(@Body @Valid Book book) {
+            throw new UnsupportedOperationException();
         }
     }
 
