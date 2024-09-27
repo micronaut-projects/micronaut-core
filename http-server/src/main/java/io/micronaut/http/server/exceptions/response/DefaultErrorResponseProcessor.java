@@ -50,7 +50,7 @@ final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
             return (MutableHttpResponse<JsonError>) response;
         }
         final boolean isError = response.status().getCode() >= 400;
-        if (request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE)) && isError) {
+        if (isError && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE))) {
             return response.body(htmlBodyErrorResponseProvider.body(errorContext, response))
                     .contentType(htmlBodyErrorResponseProvider.contentType());
         }
