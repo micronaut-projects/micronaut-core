@@ -18,6 +18,7 @@ package io.micronaut.http.server.exceptions.response;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.JsonError;
@@ -44,11 +45,12 @@ final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
 
     @Override
     public MutableHttpResponse processResponse(ErrorContext errorContext, MutableHttpResponse response) {
-        if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
+        HttpRequest<?> request = errorContext.getRequest();
+        if (request.getMethod() == HttpMethod.HEAD) {
             return (MutableHttpResponse<JsonError>) response;
         }
         final boolean isError = response.status().getCode() >= 400;
-        if (errorContext.getRequest().accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE)) && isError) {
+        if (request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE)) && isError) {
             return response.body(htmlBodyErrorResponseProvider.body(errorContext, response))
                     .contentType(htmlBodyErrorResponseProvider.contentType());
         }
