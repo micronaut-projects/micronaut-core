@@ -1,0 +1,78 @@
+package io.micronaut.http.server.exceptions.response;
+
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Status;
+import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotBlank;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import spock.lang.Specification;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@Property(name = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
+@MicronautTest
+class DefaultHtmlBodyErrorResponseProviderTest extends Specification {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultHtmlBodyErrorResponseProviderTest.class);
+
+    @Inject
+    HtmlBodyErrorResponseProvider<String> htmlProvider;
+
+    @Client("/")
+    @Inject
+    HttpClient httpClient;
+
+    @Test
+    void validationErrorsShowInHtmlErrorPages() {
+        BlockingHttpClient client = httpClient.toBlocking();
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(HttpRequest.POST("/book/save", new Book("Building Microservices", "", 5000)).accept(MediaType.TEXT_HTML)));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        Optional<String> htmlOptional = ex.getResponse().getBody(String.class);
+        assertTrue(htmlOptional.isPresent());
+        String html = htmlOptional.get();
+        assertExpectedSubstringInHtml("<!doctype html>", html);
+        assertExpectedSubstringInHtml("book.author: must not be blank", html);
+        assertExpectedSubstringInHtml("book.pages: must be less than or equal to 4032", html);
+    }
+
+    private void assertExpectedSubstringInHtml(String expected, String html) {
+        if (!html.contains(expected)) {
+            LOG.trace("{}", html);
+        }
+        assertTrue(html.contains(expected));
+    }
+
+    @Requires(property = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
+    @Controller("/book")
+    static class FooController {
+
+        @Produces(MediaType.TEXT_HTML)
+        @Post("/save")
+        @Status(HttpStatus.CREATED)
+        void save(@Body @Valid Book book) {
+        }
+    }
+
+    @Introspected
+    record Book(@NotBlank String title, @NotBlank String author, @Max(4032 ) int pages) {
+    }
+}
