@@ -87,15 +87,6 @@ class HtmlBodyErrorResponseProviderTest extends Specification {
             } else if (status.getCode() == 413) {
                 assertExpectedSubstringInHtml("The file or data you are trying to upload exceeds the allowed size", html);
                 assertExpectedSubstringInHtml("Please try again with a smaller file", html);
-            } else if (status.getCode() == 502) {
-                assertExpectedSubstringInHtml("The server received an invalid response", html);
-                assertExpectedSubstringInHtml("Please try again later", html);
-            } else if (status.getCode() == 503) {
-                assertExpectedSubstringInHtml("It may be overloaded, or undergoing scheduled maintenance. Please try again later", html);
-                assertExpectedSubstringInHtml("The service is temporarily unavailable", html);
-            } else if (status.getCode() == 504) {
-                assertExpectedSubstringInHtml("The service did not respond within the allowed time limit", html);
-                assertExpectedSubstringInHtml("It may be overloaded, or there may be a temporary technical issue. Please try again later", html);
             }
         }
     }

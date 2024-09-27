@@ -1,7 +1,10 @@
 package io.micronaut.http.server.exceptions.response;
 
+import io.micronaut.context.MessageSource;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.i18n.ResourceBundleMessageSource;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
@@ -15,6 +18,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
@@ -52,6 +56,28 @@ class DefaultHtmlBodyErrorResponseProviderTest extends Specification {
         assertExpectedSubstringInHtml("<!doctype html>", html);
         assertExpectedSubstringInHtml("book.author: must not be blank", html);
         assertExpectedSubstringInHtml("book.pages: must be less than or equal to 4032", html);
+
+
+        ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(HttpRequest.GET("/paginanoencontrada").accept(MediaType.TEXT_HTML)));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        htmlOptional = ex.getResponse().getBody(String.class);
+        assertTrue(htmlOptional.isPresent());
+        html = htmlOptional.get();
+        assertExpectedSubstringInHtml("<!doctype html>", html);
+        assertExpectedSubstringInHtml("Not Found", html);
+        assertExpectedSubstringInHtml("The page you were looking for doesn’t exist", html);
+        assertExpectedSubstringInHtml("You may have mistyped the address or the page may have moved", html);
+
+
+        ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(HttpRequest.GET("/paginanoencontrada").header(HttpHeaders.ACCEPT_LANGUAGE, "es").accept(MediaType.TEXT_HTML)));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        htmlOptional = ex.getResponse().getBody(String.class);
+        assertTrue(htmlOptional.isPresent());
+        html = htmlOptional.get();
+        assertExpectedSubstringInHtml("<!doctype html>", html);
+        assertExpectedSubstringInHtml("No encontrado", html);
+        assertExpectedSubstringInHtml("La página que buscabas no existe", html);
+        assertExpectedSubstringInHtml("Es posible que haya escrito mal la dirección o que la página se haya movido.", html);
     }
 
     private void assertExpectedSubstringInHtml(String expected, String html) {
@@ -69,6 +95,15 @@ class DefaultHtmlBodyErrorResponseProviderTest extends Specification {
         @Post("/save")
         @Status(HttpStatus.CREATED)
         void save(@Body @Valid Book book) {
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
+    @Factory
+    static class MessageSourceFactory {
+        @Singleton
+        MessageSource createMessageSource() {
+            return new ResourceBundleMessageSource("i18n.messages");
         }
     }
 
