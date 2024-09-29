@@ -17,7 +17,16 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
 
+/**
+ * Body size limits.
+ *
+ * @param maxBodySize max body size
+ * @param maxBufferSize max buffer size
+ */
 @Internal
-public record BodySizeLimits(long maxBodySize, long maxBufferSize) {
+public record BodySizeLimits(
+    long maxBodySize,
+    long maxBufferSize
+) {
     public static final BodySizeLimits UNLIMITED = new BodySizeLimits(Long.MAX_VALUE, Integer.MAX_VALUE);
 }
