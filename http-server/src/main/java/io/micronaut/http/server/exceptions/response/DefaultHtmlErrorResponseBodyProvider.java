@@ -39,14 +39,14 @@ import static io.micronaut.http.HttpStatus.*;
 @Internal
 @Singleton
 final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBodyProvider {
-    private static final Map<HttpStatus, String> DEFAULT_ERROR_BOLD = Map.of(
-            NOT_FOUND, "The page you were looking for doesn’t exist",
-            REQUEST_ENTITY_TOO_LARGE, "The file or data you are trying to upload exceeds the allowed size"
+    private static final Map<Integer, String> DEFAULT_ERROR_BOLD = Map.of(
+            NOT_FOUND.getCode(), "The page you were looking for doesn’t exist",
+            REQUEST_ENTITY_TOO_LARGE.getCode(), "The file or data you are trying to upload exceeds the allowed size"
     );
 
-    private static final Map<HttpStatus, String> DEFAULT_ERROR = Map.of(
-            NOT_FOUND, "You may have mistyped the address or the page may have moved",
-            REQUEST_ENTITY_TOO_LARGE, "Please try again with a smaller file"
+    private static final Map<Integer, String> DEFAULT_ERROR = Map.of(
+            NOT_FOUND.getCode(), "You may have mistyped the address or the page may have moved",
+            REQUEST_ENTITY_TOO_LARGE.getCode(), "Please try again with a smaller file"
     );
 
     private static final String CSS = """
@@ -135,34 +135,42 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
     @Override
     public String body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response) {
         final HttpStatus status = response.status();
+        int httpStatusCode = response.code();
+        String httpStatusReason = response.reason();
         Locale locale = localeResolver.resolveOrDefault(errorContext.getRequest());
-        return cache.computeIfAbsent(new LocaleStatus(locale, status), key -> html(locale, status, errorContext));
+        return cache.computeIfAbsent(new LocaleStatus(locale, httpStatusCode), key -> html(locale, httpStatusCode, httpStatusReason, errorContext));
     }
 
-    private String html(Locale locale, HttpStatus status, ErrorContext errorContext) {
-        final String errorTitleCode = status.getCode() + ".error.title";
-        final String errorTitle = messageSource.getMessage(errorTitleCode, status.getReason(), locale);
+    private String html(Locale locale,
+                        int httpStatusCode,
+                        String httpStatusReason,
+                        ErrorContext errorContext) {
+        final String errorTitleCode = httpStatusCode + ".error.title";
+        final String errorTitle = messageSource.getMessage(errorTitleCode, httpStatusReason, locale);
         String header = "<h1>" + errorTitle + "</h1>";
-        header += "<h2>" + status.getCode() + "</h1>";
+        header += "<h2>" + httpStatusCode + "</h1>";
         return MessageFormat.format("<!doctype html><html lang=\"en\"><head><title>{0} — {1}</title><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"initial-scale=1, width=device-width\"><meta name=\"robots\" content=\"noindex, nofollow\"><style>{2}</style></head><body><main><header>{3}</header><article>{4}</article></main></body></html>",
-                status.getCode(),
+                httpStatusCode,
                 errorTitle,
                 CSS,
                 header,
-                article(locale, status, errorContext));
+                article(locale, httpStatusCode, httpStatusReason, errorContext));
     }
 
-    private String article(Locale locale, HttpStatus status, ErrorContext errorContext) {
-        final String errorBoldCode = status.getCode() + ".error.bold";
-        final String errorCode = status.getCode() + ".error";
-        String defaultErrorBold = DEFAULT_ERROR_BOLD.get(status);
-        String defaultError = DEFAULT_ERROR.get(status);
+    private String article(Locale locale,
+                           int httpStatusCode,
+                           String httpStatusReason,
+                           ErrorContext errorContext) {
+        final String errorBoldCode = httpStatusCode + ".error.bold";
+        final String errorCode = httpStatusCode + ".error";
+        String defaultErrorBold = DEFAULT_ERROR_BOLD.get(httpStatusCode);
+        String defaultError = DEFAULT_ERROR.get(httpStatusCode);
         String errorBold = defaultErrorBold != null ? messageSource.getMessage(errorBoldCode, defaultErrorBold, locale) : messageSource.getMessage(errorBoldCode, locale).orElse(null);
         String error = defaultError != null ? messageSource.getMessage(errorCode, defaultError, locale) : messageSource.getMessage(errorCode, locale).orElse(null);
         StringBuilder sb = new StringBuilder();
 
         for (io.micronaut.http.server.exceptions.response.Error e : errorContext.getErrors()) {
-            if (!e.getMessage().equalsIgnoreCase(status.getReason())) {
+            if (!e.getMessage().equalsIgnoreCase(httpStatusReason)) {
                 sb.append(e.getMessage());
                 sb.append("<br/>");
             }
@@ -184,7 +192,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return sb.toString();
     }
 
-    private record LocaleStatus(Locale locale, HttpStatus status) {
+    private record LocaleStatus(Locale locale, int httpStatusCode) {
 
     }
 }
