@@ -17,11 +17,14 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.HttpStatusHandler;
 import io.micronaut.http.server.exceptions.NotAllowedException;
 import io.micronaut.http.server.exceptions.NotAllowedExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;

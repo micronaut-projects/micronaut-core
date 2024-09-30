@@ -47,8 +47,8 @@ import java.util.stream.Collectors;
 /**
  * Processes the type and its super classes.
  *
- * @param <R>
- * @param <P>
+ * @param <R> The return type of the visitor's method
+ * @param <P> The type of the additional parameter to the visitor's methods.
  * @deprecated No longer used
  */
 @Deprecated(forRemoval = true, since = "4.3.0")

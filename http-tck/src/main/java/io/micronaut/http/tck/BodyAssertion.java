@@ -34,11 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Experimental
 public final class BodyAssertion<T, E> {
 
-    private final Class<T> bodyType;
-    private final Class<E> errorType;
-    private final T expected;
-    private final BodyEvaluator<T> evaluator;
-
     public static final BodyAssertion<?, ?> IS_MISSING = new BodyAssertion<>(Object.class, Object.class, null, new BodyEvaluator<>() {
         @Override
         public EvaluatorType type() {
@@ -55,6 +50,11 @@ public final class BodyAssertion<T, E> {
             return "Body not expected. Got: " + actual;
         }
     });
+
+    private final Class<T> bodyType;
+    private final Class<E> errorType;
+    private final T expected;
+    private final BodyEvaluator<T> evaluator;
 
     private BodyAssertion(Class<T> bodyType,
                           Class<E> errorType,
