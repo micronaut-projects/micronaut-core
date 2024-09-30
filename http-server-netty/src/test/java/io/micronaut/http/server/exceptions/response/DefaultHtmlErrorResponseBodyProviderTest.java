@@ -40,7 +40,7 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHtmlErrorResponseBodyProviderTest.class);
 
     @Inject
-    HtmlErrorResponseBodyProvider<String> htmlProvider;
+    HtmlErrorResponseBodyProvider htmlProvider;
 
     @Client("/")
     @Inject

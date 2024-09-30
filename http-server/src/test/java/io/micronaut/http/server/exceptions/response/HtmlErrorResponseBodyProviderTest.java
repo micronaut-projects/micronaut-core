@@ -22,7 +22,7 @@ class HtmlErrorResponseBodyProviderTest extends Specification {
     private static final Logger LOG = LoggerFactory.getLogger(HtmlErrorResponseBodyProviderTest.class);
 
     @Inject
-    HtmlErrorResponseBodyProvider<String> htmlProvider;
+    HtmlErrorResponseBodyProvider htmlProvider;
 
     @ParameterizedTest
     @EnumSource(HttpStatus.class)
