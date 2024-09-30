@@ -13,6 +13,7 @@ class MediaTypeUtilsTest {
     @MethodSource
     void isJsonTrue(MediaType mediaType) {
         assertTrue(MediaTypeUtils.isJson(mediaType));
+        assertTrue(mediaType.matchesExtension(MediaType.EXTENSION_JSON));
     }
 
     private static List<MediaType> isJsonTrue() {
