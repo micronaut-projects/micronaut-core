@@ -57,7 +57,7 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
             jsonError.getPath().ifPresent(error::path);
         } else {
             error = new JsonError(response.reason());
-            List<Resource> errors = new ArrayList<>();
+            List<Resource> errors = new ArrayList<>(errorContext.getErrors().size());
             for (Error jsonError : errorContext.getErrors()) {
                 errors.add(new JsonError(jsonError.getMessage()).path(jsonError.getPath().orElse(null)));
             }
