@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
  * Provides an HTTP Response body of an error response.
  * @author Sergio del Amo
  * @since 4.7.0
- *  @param <T> The body type
+ * @param <T> The body type
  */
 public interface ErrorResponseBodyProvider<T> {
     @NonNull
