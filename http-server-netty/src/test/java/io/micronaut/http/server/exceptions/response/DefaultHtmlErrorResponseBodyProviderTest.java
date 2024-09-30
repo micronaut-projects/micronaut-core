@@ -29,6 +29,7 @@ import spock.lang.Specification;
 
 import java.util.Optional;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,10 +47,29 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
     HttpClient httpClient;
 
     @Test
+    void ifRequestAcceptsBothJsonAnHtmlJsonIsUsed() {
+        BlockingHttpClient client = httpClient.toBlocking();
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () ->
+            client.exchange(HttpRequest.POST("/book/save", new Book("Building Microservices", "", 5000))
+                .accept(MediaType.TEXT_HTML, MediaType.APPLICATION_JSON)));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertTrue(ex.getResponse().getContentType().isPresent());
+        assertEquals(MediaType.APPLICATION_JSON, ex.getResponse().getContentType().get().toString());
+        Optional<String> jsonOptional = ex.getResponse().getBody(String.class);
+        assertTrue(jsonOptional.isPresent());
+        String json = jsonOptional.get();
+        assertFalse(json.contains("<!doctype html>"));
+    }
+
+    @Test
     void validationErrorsShowInHtmlErrorPages() {
         BlockingHttpClient client = httpClient.toBlocking();
-        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(HttpRequest.POST("/book/save", new Book("Building Microservices", "", 5000)).accept(MediaType.TEXT_HTML)));
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () ->
+            client.exchange(HttpRequest.POST("/book/save", new Book("Building Microservices", "", 5000))
+                .accept(MediaType.TEXT_HTML)));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertTrue(ex.getResponse().getContentType().isPresent());
+        assertEquals(MediaType.TEXT_HTML, ex.getResponse().getContentType().get().toString());
         Optional<String> htmlOptional = ex.getResponse().getBody(String.class);
         assertTrue(htmlOptional.isPresent());
         String html = htmlOptional.get();

@@ -17,10 +17,7 @@ package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.*;
 import io.micronaut.http.hateoas.JsonError;
 import jakarta.inject.Singleton;
 
@@ -50,7 +47,10 @@ final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
             return (MutableHttpResponse<JsonError>) response;
         }
         final boolean isError = response.status().getCode() >= 400;
-        if (isError && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE))) {
+        if (isError
+            && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE))
+            && request.accept().stream().noneMatch(MediaTypeUtils::isJson)
+        ) {
             return response.body(htmlBodyErrorResponseProvider.body(errorContext, response))
                     .contentType(htmlBodyErrorResponseProvider.contentType());
         }
