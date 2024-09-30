@@ -25,9 +25,18 @@ import io.micronaut.http.HttpResponse;
  * @param <T> The body type
  */
 public interface ErrorResponseBodyProvider<T> {
+    /**
+     *
+     * @param errorContext Error Context
+     * @param response Base HTTP Response
+     * @return The HTTP Response Body
+     */
     @NonNull
     T body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response);
 
+    /**
+     * @return The content type of the HTTP response
+     */
     @NonNull
     String contentType();
 
