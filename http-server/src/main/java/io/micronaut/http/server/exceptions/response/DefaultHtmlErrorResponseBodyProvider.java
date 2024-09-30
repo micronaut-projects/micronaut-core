@@ -38,7 +38,7 @@ import static io.micronaut.http.HttpStatus.*;
  */
 @Internal
 @Singleton
-final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBodyProvider<String> {
+final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBodyProvider {
     private static final Map<HttpStatus, String> DEFAULT_ERROR_BOLD = Map.of(
             NOT_FOUND, "The page you were looking for doesn’t exist",
             REQUEST_ENTITY_TOO_LARGE, "The file or data you are trying to upload exceeds the allowed size"
@@ -49,7 +49,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
             REQUEST_ENTITY_TOO_LARGE, "Please try again with a smaller file"
     );
 
-    private static final String CSS = """           
+    private static final String CSS = """
                                   *, *::before, *::after {
                                     box-sizing: border-box;
                                   }
@@ -85,41 +85,41 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                     font-weight: 700;
                                     text-decoration: underline;
                                     text-underline-offset: 0.0925em;
-                                  }            
+                                  }
                                   b, strong {
                                     font-weight: 700;
-                                  }            
+                                  }
                                   i, em {
                                     font-style: italic;
-                                  }            
+                                  }
                                   main {
                                     display: grid;
                                     gap: 1em;
                                     padding: 2em;
                                     place-items: center;
                                     text-align: center;
-                                  }            
+                                  }
                                   main header {
                                     width: min(100%, 18em);
-                                  }            
+                                  }
                                   main header svg {
                                     height: auto;
                                     max-width: 100%;
                                     width: 100%;
-                                  }            
+                                  }
                                   main article {
                                     margin-top: -0.95em;
                                     width: min(100%, 30em);
-                                  }            
+                                  }
                                   main article p {
                                     font-size: 75%;
-                                  }            
-                                  main article br {            
-                                    display: none;            
+                                  }
+                                  main article br {
+                                    display: none;
                                     @media(min-width: 48em) {
                                       display: inline;
-                                    }            
-                                  }          
+                                    }
+                                  }
             """;
 
     private final MessageSource messageSource;

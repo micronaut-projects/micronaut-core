@@ -23,10 +23,9 @@ import io.micronaut.http.MediaType;
  * Responses with content type {@link io.micronaut.http.MediaType#TEXT_HTML}.
  * @author Sergio del Amo
  * @since 4.7.0
- * @param <T> The body type
  */
 @DefaultImplementation(DefaultHtmlErrorResponseBodyProvider.class)
-public interface HtmlErrorResponseBodyProvider<T> extends ErrorResponseBodyProvider<T> {
+public interface HtmlErrorResponseBodyProvider extends ErrorResponseBodyProvider<String> {
 
     @Override
     default String contentType() {

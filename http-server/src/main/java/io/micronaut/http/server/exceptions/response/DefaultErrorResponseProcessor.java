@@ -33,9 +33,10 @@ import jakarta.inject.Singleton;
 @Requires(missingBeans = ErrorResponseProcessor.class)
 final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
     private final JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider;
-    private final HtmlErrorResponseBodyProvider<?> htmlBodyErrorResponseProvider;
+    private final HtmlErrorResponseBodyProvider htmlBodyErrorResponseProvider;
 
-    DefaultErrorResponseProcessor(JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider, HtmlErrorResponseBodyProvider<?> htmlBodyErrorResponseProvider) {
+    DefaultErrorResponseProcessor(JsonErrorResponseBodyProvider<?> jsonBodyErrorResponseProvider,
+                                  HtmlErrorResponseBodyProvider htmlBodyErrorResponseProvider) {
         this.jsonBodyErrorResponseProvider = jsonBodyErrorResponseProvider;
         this.htmlBodyErrorResponseProvider = htmlBodyErrorResponseProvider;
     }
