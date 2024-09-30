@@ -30,10 +30,16 @@ import io.netty.handler.codec.http.HttpResponse;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+/**
+ * {@link ByteBodyHttpResponse} implementation for the client.
+ *
+ * @since 4.7.0
+ * @author Jonas Konrad
+ */
 @Internal
 final class NettyClientByteBodyResponse implements ByteBodyHttpResponse<Object> {
     final HttpResponse nettyResponse;
-    
+
     private final CloseableByteBody body;
     private final NettyHttpHeaders headers;
     private final Supplier<MutableConvertibleValues<Object>> attributes = SupplierUtil.memoized(MutableConvertibleValuesMap::new);

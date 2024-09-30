@@ -49,6 +49,7 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
@@ -868,73 +869,18 @@ public class DefaultHttpClient implements
     private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
-        Mono<HttpResponse<O>> mono = resolveRequestURI(request)
-            .flatMap(uri -> {
-                MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
-                //noinspection unchecked
-                return sendRequestWithRedirects(
-                    parentRequest,
-                    blockHint,
-                    mutableRequest,
-                    (req, resp) -> Mono.<HttpResponse<O>>from(ReactiveExecutionFlow.fromFlow(InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
-                        .flatMap(av -> {
-                            ByteBuf buf = AvailableNettyByteBody.toByteBuf(av);
-                            DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-                                resp.nettyResponse.protocolVersion(),
-                                resp.nettyResponse.status(),
-                                buf,
-                                resp.nettyResponse.headers(),
-                                EmptyHttpHeaders.INSTANCE
-                            );
-
-                            try {
-                                if (log.isTraceEnabled()) {
-                                    traceBody("Response", fullHttpResponse.content());
-                                }
-
-                                boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
-                                FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
-
-                                if (convertBodyWithBodyType) {
-                                    return ExecutionFlow.just(response);
-                                } else { // error flow
-                                    try {
-                                        return ExecutionFlow.error(makeErrorFromRequestBody(errorType, fullHttpResponse.status(), response));
-                                    } catch (HttpClientResponseException t) {
-                                        return ExecutionFlow.error(t);
-                                    } catch (Exception t) {
-                                        return ExecutionFlow.error(makeErrorBodyParseError(fullHttpResponse, t));
-                                    }
-                                }
-                            } catch (HttpClientResponseException t) {
-                                return ExecutionFlow.error(t);
-                            } catch (Exception t) {
-                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
-                                    fullHttpResponse,
-                                    handlerRegistry,
-                                    null,
-                                    false,
-                                    conversionService
-                                );
-                                HttpClientResponseException clientResponseError = decorate(new HttpClientResponseException(
-                                    "Error decoding HTTP response body: " + t.getMessage(),
-                                    t,
-                                    response,
-                                    new HttpClientErrorDecoder() {
-                                        @Override
-                                        public Argument<?> getErrorType(MediaType mediaType) {
-                                            return errorType;
-                                        }
-                                    }
-                                ));
-                                return ExecutionFlow.error(clientResponseError);
-                            } finally {
-                                fullHttpResponse.release();
-                            }
-                        })).toPublisher())
-                ).map(r -> (HttpResponse<O>) r);
-            });
+        Mono<HttpResponse<O>> mono = resolveRequestURI(request).flatMap(uri -> {
+            MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
+            //noinspection unchecked
+            return sendRequestWithRedirects(
+                parentRequest,
+                blockHint,
+                mutableRequest,
+                (req, resp) -> Mono.<HttpResponse<O>>from(ReactiveExecutionFlow.fromFlow(InternalByteBody.bufferFlow(resp.byteBody())
+                    .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
+                    .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av))).toPublisher())
+            ).map(r -> (HttpResponse<O>) r);
+        });
 
         Duration requestTimeout = configuration.getRequestTimeout();
         if (requestTimeout == null) {
@@ -955,6 +901,62 @@ public class DefaultHttpClient implements
             }
         }
         return mono;
+    }
+
+    private <O, E> @NonNull ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+        ByteBuf buf = AvailableNettyByteBody.toByteBuf(av);
+        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
+            resp.nettyResponse.protocolVersion(),
+            resp.nettyResponse.status(),
+            buf,
+            resp.nettyResponse.headers(),
+            EmptyHttpHeaders.INSTANCE
+        );
+
+        try {
+            if (log.isTraceEnabled()) {
+                traceBody("Response", fullHttpResponse.content());
+            }
+
+            boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
+            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
+
+            if (convertBodyWithBodyType) {
+                return ExecutionFlow.just(response);
+            } else { // error flow
+                try {
+                    return ExecutionFlow.error(makeErrorFromRequestBody(errorType, fullHttpResponse.status(), response));
+                } catch (HttpClientResponseException t) {
+                    return ExecutionFlow.error(t);
+                } catch (Exception t) {
+                    return ExecutionFlow.error(makeErrorBodyParseError(fullHttpResponse, t));
+                }
+            }
+        } catch (HttpClientResponseException t) {
+            return ExecutionFlow.error(t);
+        } catch (Exception t) {
+            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
+                fullHttpResponse,
+                handlerRegistry,
+                null,
+                false,
+                conversionService
+            );
+            HttpClientResponseException clientResponseError = decorate(new HttpClientResponseException(
+                "Error decoding HTTP response body: " + t.getMessage(),
+                t,
+                response,
+                new HttpClientErrorDecoder() {
+                    @Override
+                    public Argument<?> getErrorType(MediaType mediaType) {
+                        return errorType;
+                    }
+                }
+            ));
+            return ExecutionFlow.error(clientResponseError);
+        } finally {
+            fullHttpResponse.release();
+        }
     }
 
     @Override
