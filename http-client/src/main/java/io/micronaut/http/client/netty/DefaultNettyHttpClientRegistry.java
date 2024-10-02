@@ -43,6 +43,8 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.StreamingHttpClientRegistry;
@@ -113,6 +115,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         StreamingHttpClientRegistry<StreamingHttpClient>,
         WebSocketClientRegistry<WebSocketClient>,
         ProxyHttpClientRegistry<ProxyHttpClient>,
+        RawHttpClientRegistry,
         ChannelPipelineCustomizer,
         NettyClientCustomizer.Registry,
         RefreshEventListener {
@@ -181,7 +184,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     @NonNull
     @Override
-    public HttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public DefaultHttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -191,6 +194,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 null
         );
         return getClient(key, beanContext, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    @Override
+    public @NonNull RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+        return getClient(httpVersion, clientId, path);
     }
 
     @Override

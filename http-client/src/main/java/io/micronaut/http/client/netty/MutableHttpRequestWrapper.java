@@ -38,7 +38,7 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-final class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
+class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
     private ConversionService conversionService;
 
     @Nullable
