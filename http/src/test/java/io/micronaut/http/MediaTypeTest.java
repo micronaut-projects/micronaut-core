@@ -8,11 +8,11 @@ import java.util.List;
 import static io.micronaut.http.MediaType.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-class MediaTypeUtilsTest {
+class MediaTypeTest {
     @ParameterizedTest
     @MethodSource
     void isJsonTrue(MediaType mediaType) {
-        assertTrue(MediaTypeUtils.isJson(mediaType));
+        assertTrue(mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON));
         assertTrue(mediaType.matchesExtension(MediaType.EXTENSION_JSON));
     }
 
@@ -33,7 +33,7 @@ class MediaTypeUtilsTest {
     @ParameterizedTest
     @MethodSource
     void isJsonFalse(MediaType mediaType) {
-        assertFalse(MediaTypeUtils.isJson(mediaType));
+        assertFalse(mediaType.matchesExtension(MediaType.EXTENSION_JSON));
     }
 
     private static List<MediaType> isJsonFalse() {

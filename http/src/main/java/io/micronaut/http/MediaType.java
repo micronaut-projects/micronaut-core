@@ -914,10 +914,20 @@ public class MediaType implements CharSequence {
      * Check if the extension matches.
      * @param matchExtension The extension to match
      * @return true if matches
+     * @since 4.7.0
+     */
+    public boolean matchesAllOrWildcardOrExtension(String matchExtension) {
+        return extension.equalsIgnoreCase(ALL_TYPE.extension) || extension.equals(WILDCARD) || matchesExtension(matchExtension);
+    }
+
+    /**
+     * Check if the extension matches.
+     * @param matchExtension The extension to match
+     * @return true if matches
      * @since 4.6.3
      */
     public boolean matchesExtension(String matchExtension) {
-        return extension.equalsIgnoreCase(ALL_TYPE.extension) || extension.equals(WILDCARD) || extension.equalsIgnoreCase(matchExtension);
+        return extension.equalsIgnoreCase(matchExtension);
     }
 
     /**
