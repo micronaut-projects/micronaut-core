@@ -34,11 +34,11 @@ public class HtmlEntityEncodingHtmlSanitizer implements HtmlSanitizer {
 
     public HtmlEntityEncodingHtmlSanitizer() {
         encodedMap = new LinkedHashMap<>();
-        encodedMap.put("&",  "&amp;");
-        encodedMap.put("<",    "&lt;");
-        encodedMap.put(">",    "&gt;");
-        encodedMap.put("\"",    "&quot;");
-        encodedMap.put("'",   "&#x27;");
+        encodedMap.put("&", "&amp;");
+        encodedMap.put("<", "&lt;");
+        encodedMap.put(">", "&gt;");
+        encodedMap.put("\"", "&quot;");
+        encodedMap.put("'", "&#x27;");
     }
 
     @Override
