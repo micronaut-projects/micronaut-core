@@ -16,6 +16,7 @@
 package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.MessageSource;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.LocaleResolver;
@@ -39,6 +40,7 @@ import static io.micronaut.http.HttpStatus.*;
  */
 @Internal
 @Singleton
+@Requires(missingBeans = HtmlErrorResponseBodyProvider.class)
 final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBodyProvider {
     private static final Map<Integer, String> DEFAULT_ERROR_BOLD = Map.of(
             NOT_FOUND.getCode(), "The page you were looking for doesn’t exist",

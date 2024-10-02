@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.hateoas.JsonError;
@@ -33,6 +34,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
+@Requires(missingBeans = JsonErrorResponseBodyProvider.class)
 final class DefaultJsonErrorResponseBodyProvider implements JsonErrorResponseBodyProvider<JsonError> {
     private final boolean alwaysSerializeErrorsAsList;
 
