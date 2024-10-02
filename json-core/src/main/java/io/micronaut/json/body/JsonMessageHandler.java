@@ -85,7 +85,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
 
     @Override
     public boolean isReadable(@NonNull Argument<T> type, MediaType mediaType) {
-        return mediaType != null && mediaType.matchesExtension(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
     private static CodecException decorateRead(Argument<?> type, IOException e) {
@@ -122,7 +122,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
 
     @Override
     public boolean isWriteable(@NonNull Argument<T> type, MediaType mediaType) {
-        return mediaType != null && mediaType.matchesExtension(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
     private static CodecException decorateWrite(Object object, IOException e) {

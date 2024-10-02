@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,39 +15,35 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.json.JsonConfiguration;
+import jakarta.inject.Singleton;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Creates Hateoas JSON error responses.
+ * Default implementation of {@link JsonErrorResponseBodyProvider} which returns a {@link JsonError}.
  *
- * @author James Kleeh
- * @since 2.4.0
- * @deprecated use {@link io.micronaut.http.server.exceptions.response.DefaultErrorResponseProcessor} instead
+ * @since 4.7.0
  */
-@Deprecated(forRemoval = true)
-public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<JsonError> {
-
+@Internal
+@Singleton
+@Requires(missingBeans = JsonErrorResponseBodyProvider.class)
+final class DefaultJsonErrorResponseBodyProvider implements JsonErrorResponseBodyProvider<JsonError> {
     private final boolean alwaysSerializeErrorsAsList;
 
-    public HateoasErrorResponseProcessor(JsonConfiguration jacksonConfiguration) {
+    DefaultJsonErrorResponseBodyProvider(JsonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
     }
 
     @Override
-    @NonNull
-    public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
-        if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
-            return (MutableHttpResponse<JsonError>) response;
-        }
+    public JsonError body(ErrorContext errorContext, HttpResponse<?> response) {
         JsonError error;
         if (!errorContext.hasErrors()) {
             error = new JsonError(response.reason());
@@ -68,7 +64,6 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
         } catch (IllegalArgumentException ignored) {
             // invalid URI, don't include it
         }
-
-        return response.body(error).contentType(MediaType.APPLICATION_JSON_TYPE);
+        return error;
     }
 }

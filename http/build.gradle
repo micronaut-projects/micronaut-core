@@ -22,6 +22,7 @@ dependencies {
     testImplementation project(":runtime")
     testImplementation(libs.logback.classic)
     testImplementation(libs.jazzer.junit)
+    testImplementation(libs.junit.jupiter.params)
 }
 
 tasks.named("compileKotlin") {
