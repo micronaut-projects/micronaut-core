@@ -1,10 +1,10 @@
 The Micronaut framework produces error responses via a bean of type api:http.server.exceptions.response.ErrorResponseProcessor[].
 
 JSON error responses are provided with a bean of type api:http.server.exceptions.response.JsonErrorResponseBodyProvider[].
-The default implementation api:http.server.exceptions.response.DefaultJsonErrorResponseBodyProvider[] outputs link:https://github.com/blongden/vnd.error[vnd.error] responses.
+The default implementation outputs link:https://github.com/blongden/vnd.error[vnd.error] responses.
 
 HTML error responses are provided via a bean of type api:http.server.exceptions.response.HtmlErrorResponseBodyProvider[].
-The default implementation api:http.server.exceptions.response.DefaultHtmlErrorResponseBodyProvider[] outputs HTML which <<i18n, can be localized>> with codes such as:
+The default implementation outputs HTML which <<i18n, can be localized>> with codes such as:
 `<status>.error.bold`, `<status>.error.title`, `<status>.error`. For example, you could localize the default 404 error page into Spanish:
 
 [source,properties]
