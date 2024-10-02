@@ -74,11 +74,11 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
+    protected Set<String> postponedTypes = new LinkedHashSet<>();
     private boolean incremental = false;
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
     private Set<String> processedTypes;
-    protected Set<String> postponedTypes = new LinkedHashSet<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {

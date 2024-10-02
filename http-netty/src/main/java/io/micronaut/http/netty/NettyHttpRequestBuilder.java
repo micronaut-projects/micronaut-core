@@ -17,6 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -89,9 +90,9 @@ public interface NettyHttpRequestBuilder {
      *
      * @return The body
      */
-    @NonNull
-    default Optional<ByteBody> byteBodyDirect() {
-        return Optional.empty();
+    @Nullable
+    default ByteBody byteBodyDirect() {
+        return null;
     }
 
     /**
