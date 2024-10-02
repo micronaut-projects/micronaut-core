@@ -129,6 +129,6 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
     }
 
     @Introspected
-    record Book(@NotBlank String title, @NotBlank String author, @Max(4032 ) int pages) {
+    record Book(@NotBlank String title, @NotBlank String author, @Max(4032) int pages) {
     }
 }
