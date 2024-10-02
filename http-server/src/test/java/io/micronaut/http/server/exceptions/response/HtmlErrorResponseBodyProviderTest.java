@@ -53,12 +53,12 @@ class HtmlErrorResponseBodyProviderTest extends Specification {
 
                 @Override
                 public int code() {
-                    return 0;
+                    return status.getCode();
                 }
 
                 @Override
                 public String reason() {
-                    return "";
+                    return status.getReason();
                 }
 
                 @Override
