@@ -71,7 +71,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                     background: #2559a7;
                                     color: #FFF;
                                     display: grid;
-                                    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Aptos, Roboto, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+                                    font-family: -apple-system, "Helvetica Neue", Helvetica, sans-serif;
                                     font-size: clamp(1rem, 2.5vw, 2rem);
                                     -webkit-font-smoothing: antialiased;
                                     font-style: normal;
