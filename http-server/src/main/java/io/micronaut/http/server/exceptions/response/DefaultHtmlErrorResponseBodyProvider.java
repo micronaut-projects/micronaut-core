@@ -22,6 +22,7 @@ import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.util.HtmlSanitizer;
 import jakarta.inject.Singleton;
 
 import java.text.MessageFormat;
@@ -122,21 +123,23 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                   }
             """;
 
+    private final HtmlSanitizer htmlSanitizer;
     private final MessageSource messageSource;
     private final LocaleResolver<HttpRequest<?>> localeResolver;
     private final Map<LocaleStatus, String> cache = new ConcurrentHashMap<>();
 
-    DefaultHtmlErrorResponseBodyProvider(MessageSource messageSource,
+    DefaultHtmlErrorResponseBodyProvider(HtmlSanitizer htmlSanitizer,
+                                         MessageSource messageSource,
                                          LocaleResolver<HttpRequest<?>> localeResolver) {
+        this.htmlSanitizer = htmlSanitizer;
         this.messageSource = messageSource;
         this.localeResolver = localeResolver;
     }
 
     @Override
     public String body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response) {
-        final HttpStatus status = response.status();
         int httpStatusCode = response.code();
-        String httpStatusReason = response.reason();
+        String httpStatusReason = htmlSanitizer.sanitize(response.reason());
         Locale locale = localeResolver.resolveOrDefault(errorContext.getRequest());
         return cache.computeIfAbsent(new LocaleStatus(locale, httpStatusCode), key -> html(locale, httpStatusCode, httpStatusReason, errorContext));
     }
@@ -171,7 +174,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
 
         for (io.micronaut.http.server.exceptions.response.Error e : errorContext.getErrors()) {
             if (!e.getMessage().equalsIgnoreCase(httpStatusReason)) {
-                sb.append(e.getMessage());
+                sb.append(htmlSanitizer.sanitize(e.getMessage()));
                 sb.append("<br/>");
             }
         }
