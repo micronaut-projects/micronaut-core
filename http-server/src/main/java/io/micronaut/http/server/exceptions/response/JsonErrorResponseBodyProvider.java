@@ -16,7 +16,6 @@
 package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.http.MediaType;
-import jakarta.inject.Singleton;
 
 /**
  * A {@link ErrorResponseBodyProvider} for JSON responses.
@@ -25,7 +24,7 @@ import jakarta.inject.Singleton;
  * @since 4.7.0
  * @param <T> The error type
  */
-@Singleton
+@FunctionalInterface
 public interface JsonErrorResponseBodyProvider<T> extends ErrorResponseBodyProvider<T> {
     @Override
     default String contentType() {
