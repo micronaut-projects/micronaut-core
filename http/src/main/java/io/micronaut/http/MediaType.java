@@ -27,7 +27,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1262,7 +1261,7 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
     }
 
     @Override
-    public int compareTo(@NotNull MediaType o2) {
+    public int compareTo(@NonNull MediaType o2) {
         //The */* type is always last
         MediaType o1 = this;
         boolean fullWildcard1 = o1.type.equals(WILDCARD);
