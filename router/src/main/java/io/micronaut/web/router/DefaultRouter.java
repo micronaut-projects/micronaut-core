@@ -270,7 +270,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 uriRoutes.add(match);
             }
         }
-        if (routes.size() == 1) {
+        if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);
         }
         uriRoutes = resolveAmbiguity(request, uriRoutes);
@@ -290,11 +290,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return Collections.emptyList();
         }
         List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
-        if (routes.size() == 1) {
+        if (uriRoutes.size() == 1) {
             return uriRoutes;
         }
-        uriRoutes = resolveAmbiguity(request, uriRoutes);
-        return uriRoutes;
+        return resolveAmbiguity(request, uriRoutes);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
