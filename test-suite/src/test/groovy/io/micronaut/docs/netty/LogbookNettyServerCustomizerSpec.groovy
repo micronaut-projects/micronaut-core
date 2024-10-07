@@ -87,22 +87,14 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         return clientEmbeddedChannel
     }
 
-    private void runPending(EmbeddedChannel... channels) {
-        // https://github.com/netty/netty/pull/12536 will make this more sensible :)
-        for (int i = 0; i < 30; i++) {
-            for (EmbeddedChannel channel : channels) {
-                channel.runPendingTasks()
-            }
-        }
-    }
-
     def 'plaintext http 1'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': 'LogbookNettyServerCustomizerSpec'])
         ctx.getBean(Logbook)
 
         def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(false)
-        def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
         clientEmbeddedChannel.pipeline()
                 .addLast(new HttpClientCodec())
                 .addLast(new HttpObjectAggregator(1024))
@@ -120,7 +112,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         clientEmbeddedChannel.writeOneOutbound(request1)
         clientEmbeddedChannel.flushOutbound()
 
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response = clientEmbeddedChannel.readInbound()
@@ -133,6 +125,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'foo',
         ]
+
         cleanup:
         ctx.close()
     }
@@ -143,6 +136,8 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'micronaut.server.http-version'       : '2.0',
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port'           : 0,
+                'micronaut.server.netty.legacy-multiplex-handlers': true,
                 'spec.name'                           : 'LogbookNettyServerCustomizerSpec'
         ])
 
@@ -159,7 +154,8 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 .build()
 
         def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(true)
-        def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
 
         def connection = new DefaultHttp2Connection(false)
         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
@@ -199,7 +195,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 })
 
         when:
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response = clientEmbeddedChannel.readInbound()
@@ -212,6 +208,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 '200',
                 'foo',
         ]
+
         cleanup:
         ctx.close()
     }
@@ -237,7 +234,8 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 .build()
 
         def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(true)
-        def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
 
         clientEmbeddedChannel.pipeline()
                 .addLast(sslContext.newHandler(clientEmbeddedChannel.alloc(), "localhost", 443))
@@ -265,7 +263,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 })
 
         when:
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response = clientEmbeddedChannel.readInbound()
@@ -292,7 +290,9 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
 
         def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(false)
-        def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
+
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
 
         clientEmbeddedChannel.pipeline()
                 .addLast(new HttpClientCodec())
@@ -318,7 +318,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
         when:
         clientEmbeddedChannel.writeAndFlush(request1)
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response1 = clientEmbeddedChannel.readInbound()
@@ -327,7 +327,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
         when:
         clientEmbeddedChannel.writeAndFlush(request2)
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response2 = clientEmbeddedChannel.readInbound()
@@ -353,6 +353,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
+                'micronaut.server.netty.legacy-multiplex-handlers': true,
                 'spec.name'                    : 'LogbookNettyServerCustomizerSpec'
         ])
 
@@ -363,7 +364,9 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 true, false
         )
         ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(serverEmbeddedChannel, false)
-        def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
+
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
 
         def http2Connection = new DefaultHttp2Connection(false)
         def inboundAdapter = new InboundHttp2ToHttpAdapterBuilder(http2Connection)
@@ -402,7 +405,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
         when:
         clientEmbeddedChannel.writeAndFlush(request1)
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         (Http2Settings) clientEmbeddedChannel.readInbound()
@@ -414,7 +417,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
         when:
         clientEmbeddedChannel.writeAndFlush(request2)
-        runPending(clientEmbeddedChannel, serverEmbeddedChannel)
+        EmbeddedTestUtil.advance(clientEmbeddedChannel, serverEmbeddedChannel)
 
         then:
         FullHttpResponse response2 = clientEmbeddedChannel.readInbound()

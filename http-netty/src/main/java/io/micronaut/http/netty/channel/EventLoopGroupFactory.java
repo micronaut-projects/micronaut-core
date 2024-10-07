@@ -108,18 +108,25 @@ public interface EventLoopGroupFactory {
      * Returns the server channel class.
      *
      * @return A ServerChannelClass.
+     * @deprecated Use {@link #channelClass(NettyChannelType)} instead
      */
-    @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass();
+    @Deprecated(since = "4.5.0", forRemoval = true)
+    @NonNull
+    default Class<? extends ServerSocketChannel> serverSocketChannelClass() {
+        return channelClass(NettyChannelType.SERVER_SOCKET).asSubclass(ServerSocketChannel.class);
+    }
 
     /**
      * Returns the domain socket server channel class.
      *
      * @return A ServerDomainSocketChannel class.
      * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #channelClass(NettyChannelType)} instead
      */
     @NonNull
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("Domain server socket channels not supported by this transport");
+        return channelClass(NettyChannelType.DOMAIN_SERVER_SOCKET).asSubclass(ServerDomainSocketChannel.class);
     }
 
     /**
@@ -143,9 +150,11 @@ public interface EventLoopGroupFactory {
      *
      * @param configuration The configuration
      * @return A ServerSocketChannel class.
+     * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return serverSocketChannelClass();
+        return channelClass(NettyChannelType.SERVER_SOCKET, configuration).asSubclass(ServerSocketChannel.class);
     }
 
     /**
@@ -154,9 +163,11 @@ public interface EventLoopGroupFactory {
      * @param configuration The configuration
      * @return A ServerDomainSocketChannel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default @NonNull Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return domainServerSocketChannelClass();
+        return channelClass(NettyChannelType.DOMAIN_SERVER_SOCKET, configuration).asSubclass(ServerDomainSocketChannel.class);
     }
 
     /**
@@ -181,13 +192,11 @@ public interface EventLoopGroupFactory {
      *
      * @param configuration The configuration
      * @return A ServerSocketChannel instance.
+     * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default @NonNull ServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        try {
-            return serverSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Cannot instantiate server socket channel instance");
-        }
+        return (ServerSocketChannel) channelInstance(NettyChannelType.SERVER_SOCKET, configuration);
     }
 
     /**
@@ -196,13 +205,11 @@ public interface EventLoopGroupFactory {
      * @param configuration The configuration
      * @return A ServerDomainSocketChannel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default @NonNull ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        try {
-            return domainServerSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Cannot instantiate server socket channel instance", e);
-        }
+        return (ServerChannel) channelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, configuration);
     }
 
     /**
@@ -223,25 +230,57 @@ public interface EventLoopGroupFactory {
     }
 
     /**
+     * Returns the channel instance.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @param fd The pre-defined file descriptor
+     * @return A channel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration, Channel, int)} instead
+     */
+    @Deprecated(since = "4.4.0")
+    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
+        return channelInstance(type, configuration, null, fd);
+    }
+
+    /**
+     * Returns the channel instance.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @param parent The {@link Channel#parent() parent channel}
+     * @param fd The pre-defined file descriptor
+     * @return A channel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
+        throw new UnsupportedOperationException("This transport does not support creating channels from file descriptors. Please use kqueue or epoll.");
+    }
+
+    /**
      * Returns the client channel class.
      *
      * @param configuration The configuration
      * @return A SocketChannel class.
+     * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
-    @NonNull Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration);
+    @Deprecated(since = "4.5.0", forRemoval = true)
+    @NonNull
+    default Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return channelClass(NettyChannelType.CLIENT_SOCKET, configuration).asSubclass(SocketChannel.class);
+    }
 
     /**
      * Returns the client channel class instance.
      *
      * @param configuration The configuration
      * @return A SocketChannel instance.
+     * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     default @NonNull SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        try {
-            return clientSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Cannot instantiate server socket channel instance");
-        }
+        return (SocketChannel) channelInstance(NettyChannelType.CLIENT_SOCKET, configuration);
     }
 
 }

@@ -26,6 +26,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -66,6 +67,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService,
@@ -81,6 +83,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             filterResolver,
             clientFilterEntries,
             mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,
             conversionService,
@@ -98,6 +101,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             null,
             null,
             createDefaultMediaTypeRegistry(),
+            JdkHttpClientFactory.createDefaultMessageBodyHandlerRegistry(),
             new DefaultRequestBinderRegistry(conversionService),
             null,
             conversionService,
@@ -110,6 +114,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
         URI uri,
         HttpClientConfiguration configuration,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         ConversionService conversionService
     ) {
         this(
@@ -120,6 +125,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             null,
             null,
             mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry,
             new DefaultRequestBinderRegistry(conversionService),
             null,
             conversionService,
@@ -147,6 +153,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             filterResolver,
             clientFilterEntries,
             mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,
             conversionService,

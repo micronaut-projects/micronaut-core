@@ -15,19 +15,16 @@
  */
 package io.micronaut.ast.groovy.annotation;
 
-import groovy.lang.GroovyObject;
-import groovy.lang.GroovyObjectSupport;
-import groovy.lang.Script;
-import io.micronaut.ast.groovy.utils.AstGenericUtils;
+import io.micronaut.ast.groovy.GroovyNativeElementHelper;
 import io.micronaut.ast.groovy.utils.AstMessageUtils;
 import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -83,14 +80,24 @@ import java.util.Optional;
  * @since 1.0
  */
 public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<AnnotatedNode, AnnotationNode> {
+
     public static final ClassNode ANN_OVERRIDE = ClassHelper.make(Override.class);
     public static final String VALIDATOR_KEY = "io.micronaut.VALIDATOR";
 
     final SourceUnit sourceUnit;
     final AnnotatedElementValidator elementValidator;
     final CompilationUnit compilationUnit;
+    final GroovyNativeElementHelper nativeElementHelper;
+    final GroovyVisitorContext visitorContext;
 
     public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this(sourceUnit, compilationUnit, new GroovyNativeElementHelper(), new GroovyVisitorContext(sourceUnit, compilationUnit));
+    }
+
+    public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit,
+                                           CompilationUnit compilationUnit,
+                                           GroovyNativeElementHelper nativeElementHelper,
+                                           GroovyVisitorContext visitorContext) {
         this.compilationUnit = compilationUnit;
         this.sourceUnit = sourceUnit;
         if (sourceUnit != null) {
@@ -109,6 +116,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         } else {
             this.elementValidator = null;
         }
+        this.nativeElementHelper = nativeElementHelper;
+        this.visitorContext = visitorContext;
     }
 
     @Override
@@ -150,7 +159,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected String getOriginatingClassName(AnnotatedNode originatingElement) {
+    protected String getOriginatingClassName(@NonNull AnnotatedNode originatingElement) {
         if (originatingElement instanceof ClassNode classNode) {
             return classNode.getName();
         } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
@@ -168,7 +177,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
+    protected @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations();
         for (AnnotationNode ann : annotations) {
             if (ann.getClassNode().getName().equals(Retention.class.getName())) {
@@ -225,8 +234,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected VisitorContext createVisitorContext() {
-        return new GroovyVisitorContext(sourceUnit, compilationUnit);
+    protected VisitorContext getVisitorContext() {
+        return visitorContext;
     }
 
     @Override
@@ -236,11 +245,11 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getRepeatableName(AnnotationNode annotationMirror) {
-        return getRepeatableNameForType(annotationMirror.getClassNode());
+        return getRepeatableContainerNameForType(annotationMirror.getClassNode());
     }
 
     @Override
-    protected String getRepeatableNameForType(AnnotatedNode annotationType) {
+    protected String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
         List<AnnotationNode> annotationNodes = annotationType.getAnnotations(ClassHelper.makeCached(Repeatable.class));
         if (CollectionUtils.isNotEmpty(annotationNodes)) {
             Expression expression = annotationNodes.get(0).getMember("value");
@@ -298,7 +307,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
-        List<AnnotationNode> expanded = new ArrayList<>(annotations.size());
+        var expanded = new ArrayList<AnnotationNode>(annotations.size());
         expandAnnotations(annotations, expanded);
         return expanded;
     }
@@ -310,7 +319,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (value instanceof ListExpression listExpression) {
                 for (Expression expression : listExpression.getExpressions()) {
                     if (expression instanceof AnnotationConstantExpression annotationConstantExpression) {
-                        String name = getRepeatableNameForType(expression.getType());
+                        String name = getRepeatableContainerNameForType(expression.getType());
                         if (name != null && name.equals(node.getClassNode().getName())) {
                             repeatable = true;
                             expanded.add((AnnotationNode) annotationConstantExpression.getValue());
@@ -329,14 +338,14 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (declaredOnly) {
             return new ArrayList<>(Collections.singletonList(element));
         } else if (element instanceof ClassNode classNode) {
-            List<AnnotatedNode> hierarchy = new ArrayList<>();
-            hierarchy.add(classNode);
+            var hierarchy = new ArrayList<ClassNode>();
             if (classNode.isAnnotationDefinition()) {
-                return hierarchy;
+                hierarchy.add(classNode);
+            } else {
+                nativeElementHelper.populateTypeHierarchy(classNode, hierarchy);
             }
-            populateTypeHierarchy(classNode, hierarchy);
-            Collections.reverse(hierarchy);
-            return hierarchy;
+            return (List) hierarchy;
+
         } else if (element instanceof MethodNode methodNode) {
             List<AnnotatedNode> hierarchy;
             if (inheritTypeAnnotations) {
@@ -345,16 +354,16 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 hierarchy = new ArrayList<>();
             }
             if (!methodNode.getAnnotations(ANN_OVERRIDE).isEmpty()) {
-                hierarchy.addAll(findOverriddenMethods(methodNode));
+                hierarchy.addAll(nativeElementHelper.findOverriddenMethods(methodNode.getDeclaringClass(), methodNode));
             }
             hierarchy.add(methodNode);
             return hierarchy;
         } else if (element instanceof ExtendedParameter extendedParameter) {
-            List<AnnotatedNode> hierarchy = new ArrayList<>();
+            var hierarchy = new ArrayList<AnnotatedNode>();
             MethodNode methodNode = extendedParameter.getMethodNode();
             if (!methodNode.getAnnotations(ANN_OVERRIDE).isEmpty()) {
                 int variableIdx = Arrays.asList(methodNode.getParameters()).indexOf(extendedParameter.getParameter());
-                for (MethodNode overridden : findOverriddenMethods(methodNode)) {
+                for (MethodNode overridden : nativeElementHelper.findOverriddenMethods(methodNode.getDeclaringClass(), methodNode)) {
                     hierarchy.add(new ExtendedParameter(overridden, overridden.getParameters()[variableIdx]));
                 }
             }
@@ -388,9 +397,9 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(String annotationName, AnnotatedNode annotationType) {
-        Map<MethodNode, Expression> defaultValues = new LinkedHashMap<>();
+        var defaultValues = new LinkedHashMap<MethodNode, Expression>();
         if (annotationType instanceof ClassNode classNode) {
-            List<MethodNode> methods = new ArrayList<>(classNode.getMethods());
+            var methods = new ArrayList<>(classNode.getMethods());
             for (MethodNode method : methods) {
                 Statement stmt = method.getCode();
                 Expression expression = null;
@@ -438,7 +447,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return new AnnotationClassValue<>(classExpression.getType().getName());
         } else if (annotationValue instanceof ListExpression listExpression) {
             List<Expression> expressions = listExpression.getExpressions();
-            List<Object> converted = new ArrayList<>(expressions.size());
+            var converted = new ArrayList<>(expressions.size());
             for (Expression exp : expressions) {
                 if (exp instanceof PropertyExpression propertyExpression) {
                     Expression valueExpression = propertyExpression.getProperty();
@@ -532,7 +541,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (arrayType.isPrimitive()) {
             Class<?> wrapperType = ReflectionUtils.getWrapperType(arrayType);
             Class<?> primitiveArrayType = Array.newInstance(arrayType, 0).getClass();
-            Object[] emptyWrapperArray = (Object[]) Array.newInstance(wrapperType, 0);
+            var emptyWrapperArray = (Object[]) Array.newInstance(wrapperType, 0);
             Object[] wrapperArray = collection.toArray(emptyWrapperArray);
             // Convert to a proper primitive type array
             return ConversionService.SHARED.convertRequired(wrapperArray, primitiveArrayType);
@@ -543,7 +552,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     private Object readConstantExpression(AnnotatedNode originatingElement, String annotationName, AnnotatedNode member, ConstantExpression constantExpression) {
         if (constantExpression instanceof AnnotationConstantExpression ann) {
-            AnnotationNode value = (AnnotationNode) ann.getValue();
+            var value = (AnnotationNode) ann.getValue();
             return readNestedAnnotationValue(originatingElement, value);
         } else {
             Object value = constantExpression.getValue();
@@ -582,7 +591,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 return null;
             }
             // Desc will return "Ljava/lang/String;"
-            StringBuilder arraySuffix = new StringBuilder();
+            var arraySuffix = new StringBuilder();
             while (desc.startsWith("[")) {
                 desc = desc.substring(1);
                 arraySuffix.append("[]");
@@ -599,7 +608,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected Map<? extends AnnotatedNode, ?> readAnnotationRawValues(AnnotationNode annotationMirror) {
         Map<String, Expression> members = annotationMirror.getMembers();
-        Map<MethodNode, Object> values = new LinkedHashMap<>();
+        var values = new LinkedHashMap<MethodNode, Object>();
         ClassNode annotationClassNode = annotationMirror.getClassNode();
         members.forEach((key, value) ->
             values.put(annotationClassNode.getMethods(key).get(0), value));
@@ -613,7 +622,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             final List<AnnotationNode> anns = member.getAnnotations(annotationTypeNode);
             if (CollectionUtils.isNotEmpty(anns)) {
                 AnnotationNode ann = anns.get(0);
-                Map<CharSequence, Object> converted = new LinkedHashMap<>();
+                var converted = new LinkedHashMap<CharSequence, Object>();
                 ClassNode annotationNode = ann.getClassNode();
                 for (Map.Entry<String, Expression> entry : ann.getMembers().entrySet()) {
                     String key = entry.getKey();
@@ -643,85 +652,4 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return ((MethodNode) member).getName();
     }
 
-    private void populateTypeHierarchy(ClassNode classNode, List<AnnotatedNode> hierarchy) {
-        while (classNode != null) {
-            ClassNode[] interfaces = classNode.getInterfaces();
-            for (ClassNode anInterface : interfaces) {
-                if (!hierarchy.contains(anInterface) && !anInterface.getName().equals(GroovyObject.class.getName())) {
-                    hierarchy.add(anInterface);
-                    populateTypeHierarchy(anInterface, hierarchy);
-                }
-            }
-            classNode = classNode.getSuperClass();
-            if (classNode != null) {
-                if (classNode.equals(ClassHelper.OBJECT_TYPE) || classNode.getName().equals(Script.class.getName()) || classNode.getName().equals(GroovyObjectSupport.class.getName())) {
-                    break;
-                } else {
-                    hierarchy.add(classNode);
-                }
-            } else {
-                break;
-            }
-        }
-    }
-
-    private List<MethodNode> findOverriddenMethods(MethodNode methodNode) {
-        List<MethodNode> overriddenMethods = new ArrayList<>();
-        ClassNode classNode = methodNode.getDeclaringClass();
-
-        String methodName = methodNode.getName();
-        Map<String, Map<String, ClassNode>> genericsInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, createVisitorContext());
-
-        classLoop:
-        while (classNode != null && !classNode.getName().equals(Object.class.getName())) {
-            for (ClassNode i : classNode.getAllInterfaces()) {
-                for (MethodNode parent : i.getMethods(methodName)) {
-                    if (methodOverrides(methodNode, parent, genericsInfo.get(i.getName()))) {
-                        overriddenMethods.add(parent);
-                    }
-                }
-            }
-            classNode = classNode.getSuperClass();
-            if (classNode != null && !classNode.getName().equals(Object.class.getName())) {
-
-                for (MethodNode parent : classNode.getMethods(methodName)) {
-                    if (methodOverrides(methodNode, parent, genericsInfo.get(classNode.getName()))) {
-                        if (!parent.isPrivate()) {
-                            overriddenMethods.add(parent);
-                        }
-                        if (parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
-                            break classLoop;
-                        }
-                    }
-                }
-            }
-        }
-        return overriddenMethods;
-    }
-
-    private boolean methodOverrides(MethodNode child,
-                                    MethodNode parent,
-                                    Map<String, ClassNode> genericsSpec) {
-        Parameter[] childParameters = child.getParameters();
-        Parameter[] parentParameters = parent.getParameters();
-        if (childParameters.length == parentParameters.length) {
-            for (int i = 0, n = childParameters.length; i < n; i += 1) {
-                ClassNode aType = childParameters[i].getType();
-                ClassNode bType = parentParameters[i].getType();
-
-                if (!aType.equals(bType)) {
-                    if (bType.isGenericsPlaceHolder() && genericsSpec != null) {
-                        ClassNode classNode = genericsSpec.get(bType.getUnresolvedName());
-                        if (!aType.equals(classNode)) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-        return false;
-    }
 }

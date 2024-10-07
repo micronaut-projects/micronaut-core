@@ -2,7 +2,6 @@ package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
-import io.micronaut.core.beans.BeanProperty
 import spock.lang.Specification
 
 class BeanIntrospectorSpec extends Specification {
@@ -16,9 +15,9 @@ class BeanIntrospectorSpec extends Specification {
         beanIntrospection.instantiate() instanceof TestBean
         beanIntrospection.propertyNames.size() == 5
 
-        and:"You get a unique instance per call"
+        and:"You don't get a unique instance per call"
         BeanIntrospection.getIntrospection(TestBean).instantiate() instanceof TestBean
-        !beanIntrospection.is(BeanIntrospection.getIntrospection(TestBean))
+        beanIntrospection.is(BeanIntrospection.getIntrospection(TestBean))
 
         when:
         def flagProp = beanIntrospection.getRequiredProperty("flag", boolean.class)

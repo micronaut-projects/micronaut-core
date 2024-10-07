@@ -320,7 +320,8 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
-                         boolean requiresReflection, boolean isOptional);
+                         boolean requiresReflection,
+                         boolean isOptional);
 
     /**
      * @return The package name of the bean
@@ -441,7 +442,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @since 3.0.0
      */
     default @NonNull ClassElement[] getTypeArguments() {
-        return new ClassElement[0];
+        return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     /**

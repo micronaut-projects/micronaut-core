@@ -18,14 +18,18 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.FastThreadLocalThread;
 import io.netty.util.internal.SystemPropertyUtil;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import reactor.core.scheduler.NonBlocking;
 
 import java.util.concurrent.ThreadFactory;
 
@@ -60,6 +64,29 @@ public class NettyThreadFactory {
     @Deprecated(forRemoval = true, since = "4.2.0")
     public static final int DEFAULT_EVENT_LOOP_THREADS = 1;
 
+    private final NettyGlobalConfiguration configuration;
+
+    /**
+     * Create a new netty ThreadFactory factory.
+     *
+     * @param configuration The configuration
+     * @since 4.4.0
+     */
+    @Inject
+    public NettyThreadFactory(NettyGlobalConfiguration configuration) {
+        this.configuration = configuration;
+    }
+
+    /**
+     * Create a new netty ThreadFactory factory.
+     *
+     * @deprecated Pass the config instead, through {@link #NettyThreadFactory(NettyGlobalConfiguration)}
+     */
+    @Deprecated
+    public NettyThreadFactory() {
+        this(new NettyGlobalConfiguration());
+    }
+
     /**
      * Get the default number of threads in the event loop.
      *
@@ -78,10 +105,27 @@ public class NettyThreadFactory {
     @Named(NAME)
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
-        return new DefaultThreadFactory("default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
+        String poolName = "default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class);
+        if (configuration.isDefaultThreadFactoryReactorNonBlocking()) {
+            return new DefaultThreadFactory(poolName) {
+                @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
+                @Override
+                protected Thread newThread(Runnable r, String name) {
+                    return new NonBlockingFastThreadLocalThread(threadGroup, r, name);
+                }
+            };
+        } else {
+            return new DefaultThreadFactory(poolName);
+        }
     }
 
     private static final class EventLoopThreadsHolder {
         static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
+    }
+
+    private static final class NonBlockingFastThreadLocalThread extends FastThreadLocalThread implements NonBlocking {
+        public NonBlockingFastThreadLocalThread(ThreadGroup group, Runnable target, String name) {
+            super(group, target, name);
+        }
     }
 }

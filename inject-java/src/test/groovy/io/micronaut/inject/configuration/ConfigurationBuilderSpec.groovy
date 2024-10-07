@@ -93,7 +93,7 @@ final class TestProps {
         ex.message.contains("private Engine.Builder builder = Engine.builder();")
     }
 
-    void "test config field with setter abnormal paramater name"() {
+    void "test config field with setter abnormal parameter name"() {
         given:
         ApplicationContext ctx = buildContext("test.TestProps", '''
 package test;

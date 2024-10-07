@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpMethod
@@ -23,7 +24,7 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
         given:
         var encodedUri = uri.replace("|", PIPE).replace(" ", "+")
         HttpRequest<?> req = HttpRequest.create(HttpMethod.GET, encodedUri)
-        Publisher<HttpResponse<?>> exchange = rxClient.exchange(req, String)
+        Publisher<HttpResponse<?>> exchange = httpClient.exchange(req, String)
         HttpResponse<?> response = Flux.from(exchange).blockFirst()
         def body = response.body()
 
@@ -60,13 +61,13 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
     void "test bind formatted query parameters object initialization error"() {
         when:
         HttpRequest<?> req = HttpRequest.create(HttpMethod.GET, '/formatted/o/csv')
-        Publisher<HttpResponse<?>> exchange = rxClient.exchange(req, String)
+        Publisher<HttpResponse<?>> exchange = httpClient.exchange(req, String)
         Flux.from(exchange).blockFirst()
         then:
         var e = thrown(HttpClientResponseException)
     }
 
-
+    @Requires(property = 'spec.name', value = 'QueryParameterFormattingSpec')
     @Controller(value = "/formatted", produces = MediaType.TEXT_PLAIN)
     static class FormattedController {
         @Get("csv")

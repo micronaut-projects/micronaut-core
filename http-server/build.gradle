@@ -2,10 +2,6 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     api project(":http")
     api project(":router")
@@ -19,6 +15,21 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     testImplementation libs.managed.netty.codec.http
+
+    testAnnotationProcessor(project(":inject-java"))
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

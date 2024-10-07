@@ -31,28 +31,34 @@ import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyGetter
 import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.ArrayUtils
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
-internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
-                                      private val resolver: Resolver,
-                                      private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+internal class KotlinAnnotationMetadataBuilder(
+    private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
+    private val resolver: Resolver,
+    private val visitorContext: KotlinVisitorContext
+) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     companion object {
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
@@ -62,6 +68,21 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
             return type.getBinaryName(resolver, visitorContext)
         }
+    }
+
+    override fun isRepeatableAnnotationContainer(annotationValue: AnnotationValue<*>?): Boolean {
+        val repeatableAnnotations = annotationValue!!.getAnnotations<Annotation>(AnnotationMetadata.VALUE_MEMBER)
+        return repeatableAnnotations.isNotEmpty() && repeatableAnnotations.all { isRepeatableAnnotation(it) }
+    }
+
+    private fun isRepeatableAnnotation(value: AnnotationValue<Annotation>): Boolean {
+        val annotationMirror = getAnnotationMirror(value.annotationName).orElse(null)
+        if (annotationMirror == null) {
+            return ClassUtils.forName(value.annotationName, null)
+                .map { it -> it.annotations.any { it.annotationClass.java == Repeatable::class.java } }
+                .orElse(false)
+        }
+        return getRepeatableContainerNameForType(annotationMirror) != null
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
@@ -270,20 +291,18 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
 
             is KSClassDeclaration -> {
-                val hierarchy = mutableListOf<KSAnnotated>()
-                hierarchy.add(annotated)
+                val hierarchy = mutableListOf<KSClassDeclaration>()
                 if (annotated.classKind == ClassKind.ANNOTATION_CLASS) {
-                    return hierarchy
+                    hierarchy.add(annotated)
+                } else {
+                    visitorContext.nativeElementsHelper.populateTypeHierarchy(annotated, hierarchy)
                 }
-                populateTypeHierarchy(annotated, hierarchy)
-                hierarchy.reverse()
-                return hierarchy
+                return hierarchy as MutableList<KSAnnotated>
             }
 
             is KSFunctionDeclaration -> {
-                val methodsHierarchy = methodsHierarchy(annotated)
                 val hierarchy = mutableListOf<KSAnnotated>()
-                hierarchy.addAll(methodsHierarchy)
+                hierarchy.addAll(methodsHierarchy(annotated))
                 return hierarchy
             }
 
@@ -297,13 +316,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         if (element.isConstructor()) {
             listOf(element)
         } else {
-            val hierarchy = mutableListOf(element)
-            var overriden = element.findOverridee() as KSFunctionDeclaration?
-            while (overriden != null) {
-                hierarchy.add(overriden)
-                overriden = overriden.findOverridee() as KSFunctionDeclaration?
-            }
-            hierarchy.reverse()
+            val hierarchy = mutableListOf<KSFunctionDeclaration>()
+            hierarchy.addAll(visitorContext.nativeElementsHelper.findOverriddenMethods(element))
+            hierarchy.add(element)
             hierarchy
         }
 
@@ -353,12 +368,13 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         memberName: String,
         annotationValue: Any
     ): Any? {
+        val property = member as KSPropertyDeclaration
         return when (annotationValue) {
             is Collection<*> -> {
-                toArray(annotationValue, originatingElement)
+                toArray(annotationValue, member, property.type)
             }
             is Array<*> -> {
-                toArray(annotationValue.toList(), originatingElement)
+                toArray(annotationValue.toList(), member, property.type)
             }
             else -> {
                 if (isEvaluatedExpression(annotationValue)) {
@@ -377,11 +393,22 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
 
     private fun toArray(
         annotationValue: Collection<*>,
-        originatingElement: KSAnnotated
+        element: KSAnnotated,
+        type: KSTypeReference
     ): Array<out Any>? {
         var valueType = Any::class.java
+        if (annotationValue.isEmpty()) {
+            val arrayType = type.resolve()
+            if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
+                val className = arrayType.arguments[0].type!!.resolve().declaration.getBinaryName(resolver, visitorContext);
+                val optionalClassName = ClassUtils.forName(className, javaClass.classLoader)
+                if (optionalClassName.isPresent) {
+                    valueType = optionalClassName.get() as Class<Any>
+                }
+            }
+        }
         val collection = annotationValue.mapNotNull {
-            val v = readAnnotationValue(originatingElement, it)
+            val v = readAnnotationValue(element, it)
             if (v != null) {
                 valueType = v.javaClass
             }
@@ -400,7 +427,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
                 if (argument?.value != null && argument.isDefault()) {
                     val value = argument.value!!
-                    map[prop] = value
+                    if (value !is String || !StringUtils.isEmpty(value)) {
+                        map[prop] = value
+                    }
                 }
             }
             map
@@ -481,12 +510,14 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
-        return getRepeatableNameForType(annotationMirror.annotationType)
+        val repeatableContainer =
+            getRepeatableContainerNameForType(annotationMirror.annotationType.getClassDeclaration(visitorContext))
+        return repeatableContainer
     }
 
-    override fun getRepeatableNameForType(annotationType: KSAnnotated): String? {
+    override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
         val name = java.lang.annotation.Repeatable::class.java.name
-        val repeatable = annotationType.getClassDeclaration(visitorContext).annotations.find {
+        val repeatable = annotationType.annotations.find {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == name
         }
         if (repeatable != null) {
@@ -497,6 +528,25 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
         }
         return null
+    }
+
+    override fun findRepeatableContainerNameForType(annotationName: String): String? {
+        val container = super.findRepeatableContainerNameForType(annotationName)
+        if (container == null) {
+            return ClassUtils.forName(annotationName, null)
+            .flatMap<String> {
+                for (annotation in it.annotations) {
+                    if (annotation.annotationClass.java == Repeatable::class.java) {
+                        return@flatMap Optional.of(
+                            (annotation as Repeatable).value.java.name
+                        )
+                    }
+                }
+                return@flatMap Optional.empty()
+            }
+            .orElse(null)
+        }
+        return container
     }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
@@ -525,8 +575,8 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         throw IllegalStateException("Unknown annotation member element: $annotated")
     }
 
-    override fun createVisitorContext(): VisitorContext {
-        return KotlinVisitorContext(symbolProcessorEnvironment, resolver)
+    override fun getVisitorContext(): VisitorContext {
+        return visitorContext
     }
 
     override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
@@ -570,23 +620,10 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
     }
 
-    private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
-        element.superTypes.forEach {
-            val t = it.resolve()
-            if (t != resolver.builtIns.anyType) {
-                val declaration = t.declaration
-                if (!hierarchy.contains(declaration)) {
-                    hierarchy.add(declaration)
-                    populateTypeHierarchy(declaration.getClassDeclaration(visitorContext), hierarchy)
-                }
-            }
-        }
-    }
-
     private fun readAnnotationValue(originatingElement: KSAnnotated, value: Any?): Any? {
         if (value == null) {
             return null
-        }
+        }// (originatingElement as KSPropertyDeclaration).type
         if (value is KSType) {
             val declaration = value.declaration
             if (declaration is KSClassDeclaration) {
@@ -595,6 +632,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 }
                 if (declaration.classKind == ClassKind.CLASS ||
                     declaration.classKind == ClassKind.INTERFACE ||
+                    declaration.classKind == ClassKind.ENUM_CLASS ||
                     declaration.classKind == ClassKind.ANNOTATION_CLASS) {
                     return AnnotationClassValue<Any>(declaration.getBinaryName(resolver, visitorContext))
                 }

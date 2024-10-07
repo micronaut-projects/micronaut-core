@@ -60,6 +60,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
 
     /**
      * Obtains the qualifier.
+     *
      * @param beanDefinition The bean definition.
      * @return The qualifier
      */

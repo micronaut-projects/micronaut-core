@@ -15,24 +15,25 @@
  */
 package io.micronaut.http.server.netty.multipart;
 
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.multipart.CompletedPart;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.MultiObjectBody;
+import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.util.ReferenceCounted;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
@@ -47,15 +48,14 @@ import java.util.Set;
  */
 @Internal
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
-    private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
      *
-     * @param beanLocator             The bean locator
      * @param httpServerConfiguration The server configuration
      */
-    public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
+    public MultipartBodyArgumentBinder(BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration) {
         this.httpServerConfiguration = httpServerConfiguration;
     }
 
@@ -68,16 +68,14 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
-            MultiObjectBody multiObjectBody;
+            @NonNull Flux<HttpData> multiObjectBody;
             try {
-                multiObjectBody = nhr.byteBody()
-                    .processMulti(processor);
+                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
             } catch (Throwable e) {
                 return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
             }
             Set<ReferenceCounted> partial = new HashSet<>();
-            //noinspection unchecked
-            Flux<CompletedPart> completed = Flux.from(((Publisher<HttpData>) multiObjectBody.asPublisher())).mapNotNull(message -> {
+            Flux<CompletedPart> completed = multiObjectBody.mapNotNull(message -> {
                 if (message.isCompleted() && message.length() != 0) {
                     partial.remove(message);
                     if (message instanceof FileUpload fu) {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
@@ -24,9 +25,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -43,7 +42,6 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
-import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -53,14 +51,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -71,36 +67,50 @@ import java.util.stream.Collectors;
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
 
-    private static final Map<ExecutableElement, List<ExecutableElement>> OVERRIDDEN_METHOD_CACHE = new ConcurrentLinkedHashMap.Builder<ExecutableElement, List<ExecutableElement>>().maximumWeightedCapacity(100).build();
-
     private final Elements elementUtils;
     private final Messager messager;
-    private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
+    private final JavaNativeElementsHelper nativeElementsHelper;
+    private final JavaVisitorContext visitorContext;
 
     /**
      * Default constructor.
      *
-     * @param elements        The elementUtils
-     * @param messager        The messager
+     * @param elements The elementUtils
+     * @param messager The messager
      * @param annotationUtils The annotation utils
-     * @param modelUtils      The model utils
+     * @param modelUtils The model utils
+     * @deprecated Not needed
      */
+    @Deprecated(forRemoval = true, since = "4.3.0")
     public JavaAnnotationMetadataBuilder(
         Elements elements,
         Messager messager,
         AnnotationUtils annotationUtils,
         ModelUtils modelUtils) {
-        this.elementUtils = elements;
-        this.messager = messager;
-        this.annotationUtils = annotationUtils;
-        this.modelUtils = modelUtils;
+        this(elements, messager, modelUtils, new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils()), annotationUtils.newVisitorContext());
     }
 
-    @Nullable
-    @Override
-    protected AnnotatedElementValidator getElementValidator() {
-        return annotationUtils.getElementValidator();
+    /**
+     * Default constructor.
+     *
+     * @param elements The elementUtils
+     * @param messager The messager
+     * @param modelUtils The model utils
+     * @param nativeElementsHelper The native elements helper
+     * @param visitorContext The visitor context
+     */
+    public JavaAnnotationMetadataBuilder(
+        Elements elements,
+        Messager messager,
+        ModelUtils modelUtils,
+        JavaNativeElementsHelper nativeElementsHelper,
+        JavaVisitorContext visitorContext) {
+        this.elementUtils = elements;
+        this.messager = messager;
+        this.modelUtils = modelUtils;
+        this.nativeElementsHelper = nativeElementsHelper;
+        this.visitorContext = visitorContext;
     }
 
     @Override
@@ -122,12 +132,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getRepeatableName(AnnotationMirror annotationMirror) {
         final Element typeElement = annotationMirror.getAnnotationType().asElement();
-        return getRepeatableNameForType(typeElement);
+        return getRepeatableContainerNameForType(typeElement);
     }
 
     @Nullable
     @Override
-    protected String getRepeatableNameForType(Element annotationType) {
+    protected String getRepeatableContainerNameForType(Element annotationType) {
         List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();
@@ -159,8 +169,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected VisitorContext createVisitorContext() {
-        return annotationUtils.newVisitorContext();
+    protected VisitorContext getVisitorContext() {
+        return visitorContext;
     }
 
     @NonNull
@@ -192,14 +202,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
-        List<AnnotationMirror> expanded = new ArrayList<>();
+        var expanded = new ArrayList<AnnotationMirror>();
         for (AnnotationMirror annotation : element.getAnnotationMirrors()) {
             boolean repeatable = false;
             boolean hasOtherMembers = false;
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : annotation.getElementValues().entrySet()) {
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
-                    if (value instanceof List list) {
+                    if (value instanceof List<?> list) {
                         String parentAnnotationName = getAnnotationTypeName(annotation);
                         for (Object val : list) {
                             if (val instanceof AnnotationMirror mirror) {
@@ -234,20 +244,19 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
-            List<Element> onlyDeclared = new ArrayList<>(1);
+            var onlyDeclared = new ArrayList<Element>(1);
             onlyDeclared.add(element);
             return onlyDeclared;
         }
 
-        if (element instanceof TypeElement) {
-            List<Element> hierarchy = new ArrayList<>();
-            hierarchy.add(element);
+        if (element instanceof TypeElement typeElement) {
+            var hierarchy = new ArrayList<TypeElement>();
             if (element.getKind() == ElementKind.ANNOTATION_TYPE) {
-                return hierarchy;
+                hierarchy.add(typeElement);
+            } else {
+                nativeElementsHelper.populateTypeHierarchy(typeElement, hierarchy);
             }
-            populateTypeHierarchy(element, hierarchy);
-            Collections.reverse(hierarchy);
-            return hierarchy;
+            return (List) hierarchy;
         } else if (element instanceof ExecutableElement executableElement) {
             // we have a method
             // for methods we merge the data from any overridden interface or abstract methods
@@ -259,22 +268,22 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             } else {
                 hierarchy = new ArrayList<>();
             }
-            hierarchy.addAll(findOverriddenMethods(executableElement));
+            hierarchy.addAll(nativeElementsHelper.findOverriddenMethods(executableElement));
             hierarchy.add(element);
             return hierarchy;
         } else if (element instanceof VariableElement variable) {
-            List<Element> hierarchy = new ArrayList<>();
+            var hierarchy = new ArrayList<Element>();
             Element enclosingElement = variable.getEnclosingElement();
             if (enclosingElement instanceof ExecutableElement executableElement) {
                 int variableIdx = executableElement.getParameters().indexOf(variable);
-                for (ExecutableElement overridden : findOverriddenMethods(executableElement)) {
+                for (ExecutableElement overridden : nativeElementsHelper.findOverriddenMethods(executableElement)) {
                     hierarchy.add(overridden.getParameters().get(variableIdx));
                 }
             }
             hierarchy.add(variable);
             return hierarchy;
         } else {
-            ArrayList<Element> single = new ArrayList<>();
+            var single = new ArrayList<Element>(1);
             single.add(element);
             return single;
         }
@@ -300,7 +309,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected String getOriginatingClassName(Element orginatingElement) {
+    protected String getOriginatingClassName(@NonNull Element orginatingElement) {
         TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
         if (typeElement != null) {
             return JavaModelUtils.getClassName(typeElement);
@@ -326,7 +335,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             if (annotationMirror.getAnnotationType().toString().endsWith(annotationName)) {
                 Map<? extends Element, ?> values = readAnnotationRawValues(annotationMirror);
-                Map<CharSequence, Object> converted = new LinkedHashMap<>();
+                var converted = new LinkedHashMap<CharSequence, Object>();
                 for (Map.Entry<? extends Element, ?> entry : values.entrySet()) {
                     Element key = entry.getKey();
                     Object value = entry.getValue();
@@ -417,7 +426,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
-        Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
+        var defaultValues = new LinkedHashMap<Element, AnnotationValue>();
         if (element instanceof TypeElement annotationElement) {
             final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
             allMembers
@@ -463,96 +472,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return element.getSimpleName().toString();
     }
 
-    private void populateTypeHierarchy(Element element, List<Element> hierarchy) {
-        final boolean isInterface = JavaModelUtils.resolveKind(element, ElementKind.INTERFACE).isPresent();
-        final Types typeUtils = modelUtils.getTypeUtils();
-        if (isInterface) {
-            TypeElement typeElement = (TypeElement) element;
-            List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
-            for (TypeMirror anInterface : interfaces) {
-                final Element e = typeUtils.asElement(anInterface);
-                if (e != null) {
-                    hierarchy.add(e);
-                    populateTypeHierarchy(e, hierarchy);
-                }
-            }
-        } else {
-            while (JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent()) {
-
-                TypeElement typeElement = (TypeElement) element;
-                List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
-                for (TypeMirror anInterface : interfaces) {
-                    if (anInterface instanceof DeclaredType type) {
-                        Element interfaceElement = type.asElement();
-                        hierarchy.add(interfaceElement);
-                        populateTypeHierarchy(interfaceElement, hierarchy);
-                    }
-                }
-                TypeMirror superMirror = typeElement.getSuperclass();
-                if (superMirror instanceof DeclaredType type) {
-                    if (type.toString().equals(Object.class.getName())) {
-                        break;
-                    } else {
-                        element = type.asElement();
-                        hierarchy.add(element);
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
-    private List<ExecutableElement> findOverriddenMethods(ExecutableElement sourceMethod) {
-        return OVERRIDDEN_METHOD_CACHE.computeIfAbsent(sourceMethod, executableElement -> {
-            List<ExecutableElement> overridden = new ArrayList<>(3);
-            Element enclosingElement = executableElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement declaringElement) {
-                final Set<TypeElement> allInterfaces = modelUtils.getAllInterfaces(declaringElement);
-                for (TypeElement itfe : allInterfaces) {
-                    addOverriddenMethodIfNecessary(executableElement, overridden, declaringElement, itfe);
-                }
-                final Types typeUtils = modelUtils.getTypeUtils();
-                TypeElement supertype = toTypeElement(declaringElement.getSuperclass(), typeUtils);
-                while (supertype != null && !supertype.toString().equals(Object.class.getName())) {
-                    addOverriddenMethodIfNecessary(executableElement, overridden, declaringElement, supertype);
-                    supertype = toTypeElement(supertype.getSuperclass(), typeUtils);
-                }
-
-            }
-            return overridden;
-        });
-
-    }
-
-    private void addOverriddenMethodIfNecessary(ExecutableElement executableElement,
-                                                List<ExecutableElement> overridden,
-                                                TypeElement declaringElement,
-                                                TypeElement supertype) {
-        final List<ExecutableElement> possibleMethods =
-            ElementFilter.methodsIn(supertype.getEnclosedElements());
-        for (ExecutableElement possibleMethod : possibleMethods) {
-            if (elementUtils.overrides(executableElement, possibleMethod, declaringElement)) {
-                overridden.add(possibleMethod);
-            }
-        }
-    }
-
-    private TypeElement toTypeElement(TypeMirror mirror, Types typeUtils) {
-        if (mirror != null) {
-            final Element e = typeUtils.asElement(mirror);
-            if (e instanceof TypeElement element) {
-                return element;
-            }
-        }
-        return null;
-    }
-
     /**
      * Checks if a method has an annotation.
      *
      * @param element The method
-     * @param ann     The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     @Override
@@ -564,7 +488,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Checks if a method has an annotation.
      *
      * @param element The method
-     * @param ann     The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     @Override
@@ -590,7 +514,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Clears any caches from the last compilation round.
      */
     public static void clearCaches() {
-        OVERRIDDEN_METHOD_CACHE.clear();
         AbstractAnnotationMetadataBuilder.clearCaches();
     }
 
@@ -598,7 +521,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Checks if a method has an annotation.
      *
      * @param method The method
-     * @param ann    The annotation to look for
+     * @param ann The annotation to look for
      * @return Whether if the method has the annotation
      */
     public static boolean hasAnnotation(ExecutableElement method, Class<? extends Annotation> ann) {
@@ -713,7 +636,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
-            ArrayValueVisitor arrayValueVisitor = new ArrayValueVisitor(member);
+            var arrayValueVisitor = new ArrayValueVisitor(member);
             for (javax.lang.model.element.AnnotationValue val : vals) {
                 val.accept(arrayValueVisitor, o);
             }
@@ -724,10 +647,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         /**
          * Array value visitor class.
          */
-        @SuppressWarnings("unchecked")
         private final class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
 
-            private List values = new ArrayList();
+            private final List<Object> values = new ArrayList<>();
             private final ExecutableElement member;
 
             private ArrayValueVisitor(ExecutableElement member) {
@@ -860,7 +782,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
-                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
+                io.micronaut.core.annotation.AnnotationValue<?> annotationValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
                 values.add(annotationValue);
                 return null;
             }

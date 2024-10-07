@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -30,26 +31,28 @@ import jakarta.inject.Singleton;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
- *
+ * <p>
  * Note: will be replaced by {@link io.micronaut.json.codec.JsonMediaTypeCodec} in the future, but that class is
  * currently experimental.
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Named("json")
 @Singleton
 @Secondary
 @BootstrapContextCompatible
 @Bean(typed = {JsonMediaTypeCodec.class, JacksonMediaTypeCodec.class}) // do not expose MapperMediaTypeCodec
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonMediaTypeCodec(ObjectMapper objectMapper,
                               ApplicationConfiguration applicationConfiguration,
@@ -58,15 +61,28 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
     }
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
+     * @deprecated Use {@link #JsonMediaTypeCodec(BeanProvider, ApplicationConfiguration, CodecConfiguration, ApplicationConfiguration)} instead
      */
-    @Inject
+    @Deprecated
     public JsonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
                               ApplicationConfiguration applicationConfiguration,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * @param jacksonDatabindMappers To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration The configuration for the codec
+     */
+    @Inject
+    public JsonMediaTypeCodec(BeanProvider<JacksonDatabindMapper> jacksonDatabindMappers,
+                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration,
+                              ApplicationConfiguration applicationConfiguration) {
+        super(jacksonDatabindMappers, applicationConfiguration, MediaType.APPLICATION_JSON_TYPE, codecConfiguration);
     }
 
     @Override

@@ -18,14 +18,8 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpContent;
+import io.micronaut.http.body.ByteBody;
 import io.netty.handler.codec.http.HttpResponse;
-import org.reactivestreams.Publisher;
-
-import java.io.RandomAccessFile;
 
 /**
  * This interface is used to write the different kinds of netty responses.
@@ -36,52 +30,18 @@ import java.io.RandomAccessFile;
 @Experimental
 public interface NettyWriteContext {
     /**
-     * @return The bytebuf allocator.
+     * Write a response.
+     *
+     * @param response The response status, headers etc
+     * @param body     The response body
      */
-    @NonNull
-    ByteBufAllocator alloc();
+    void write(@NonNull HttpResponse response, @NonNull ByteBody body);
 
     /**
-     * Write a full response.
+     * Write a response to a {@code HEAD} request. This is special because it never has a body but
+     * may still have a non-zero {@code Content-Length} header.
      *
-     * @param response The response to write
+     * @param response The response status, headers etc
      */
-    default void writeFull(@NonNull FullHttpResponse response) {
-        writeFull(response, false);
-    }
-
-    /**
-     * Write a full response.
-     *
-     * @param response The response to write
-     * @param headResponse If {@code true}, this is a response to a {@code HEAD} request, so the
-     * {@code Content-Length} header should not be overwritten.
-     */
-    void writeFull(@NonNull FullHttpResponse response, boolean headResponse);
-
-    /**
-     * Write a streamed response.
-     *
-     * @param response The response to write
-     * @param content  The body
-     */
-    void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
-
-    /**
-     * Write a response with a {@link HttpChunkedInput} body.
-     *
-     * @param response     The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param chunkedInput The response body
-     */
-    void writeChunked(@NonNull HttpResponse response, @NonNull HttpChunkedInput chunkedInput);
-
-    /**
-     * Write a response with a body that is a section of a {@link RandomAccessFile}.
-     *
-     * @param response         The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param randomAccessFile File to read from
-     * @param position         Start position
-     * @param contentLength    Length of the section to send
-     */
-    void writeFile(@NonNull HttpResponse response, @NonNull RandomAccessFile randomAccessFile, long position, long contentLength);
+    void writeHeadResponse(@NonNull HttpResponse response);
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 
 import java.util.Optional;
@@ -101,6 +102,17 @@ public interface PropertyElement extends TypedElement, MemberElement {
     }
 
     /**
+     * @return The read type.
+     * @since 4.4.0
+     */
+    default Optional<ClassElement> getReadType() {
+        if (getReadAccessKind() == AccessKind.METHOD) {
+            return getReadMethod().map(MethodElement::getGenericReturnType);
+        }
+        return getField().map(TypedElement::getGenericType);
+    }
+
+    /**
      * @return The member to write the property
      * @since 4.0.0
      */
@@ -108,7 +120,39 @@ public interface PropertyElement extends TypedElement, MemberElement {
         if (getWriteAccessKind() == AccessKind.METHOD) {
             return getWriteMethod();
         }
-        return getField();
+        return getField().filter(fieldElement -> !fieldElement.isFinal());
+    }
+
+    /**
+     * @return The write type.
+     * @since 4.4.0
+     */
+    default Optional<ClassElement> getWriteType() {
+        if (getWriteAccessKind() == AccessKind.METHOD) {
+            return getWriteMethod().flatMap(methodElement -> {
+                if (methodElement.getParameters().length > 0) {
+                    return Optional.of(methodElement.getParameters()[0].getGenericType());
+                }
+                return Optional.empty();
+            });
+        }
+        return getField().filter(fieldElement -> !fieldElement.isFinal()).map(TypedElement::getGenericType);
+    }
+
+    /**
+     * @return The read type annotation metadata.
+     * @since 4.4.0
+     */
+    default Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        return Optional.empty();
+    }
+
+    /**
+     * @return The write type annotation metadata.
+     * @since 4.4.0
+     */
+    default Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        return Optional.empty();
     }
 
     /**

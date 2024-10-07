@@ -45,6 +45,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Abstract shared functionality of the builder.
  *
@@ -107,20 +109,20 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
         return memberElement.getAnnotationMetadata();
     }
 
-    protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement) {
+    protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement classElement, MethodElement methodElement) {
         AopProxyWriter aopProxyWriter = (AopProxyWriter) visitor;
 
-        final AnnotationMetadata resolvedTypeMetadata = typeElement.getAnnotationMetadata();
+        final AnnotationMetadata resolvedTypeMetadata = classElement.getAnnotationMetadata();
         final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
 
         if (methodElement.isAbstract()
             || resolvedTypeMetadataIsAopProxyType
             || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
-            addToIntroduction(aopProxyWriter, typeElement, methodElement, false);
+            addToIntroduction(aopProxyWriter, classElement, methodElement, false);
             return true;
-        } else if (!methodElement.isAbstract() && methodElement.hasDeclaredStereotype(Executable.class)) {
+        } else if (methodElement.hasDeclaredStereotype(Executable.class)) {
             aopProxyWriter.visitExecutableMethod(
-                typeElement,
+                classElement,
                 methodElement,
                 visitorContext
             );
@@ -192,7 +194,7 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
         io.micronaut.core.annotation.AnnotationValue<?>[] introductionInterceptors = InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.INTRODUCTION);
 
-        ClassElement[] interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0]))
+        ClassElement[] interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(EMPTY_STRING_ARRAY))
             .map(v -> visitorContext.getClassElement(v, visitorContext.getElementAnnotationMetadataFactory().readOnly())
                 .orElseThrow(() -> new ProcessingException(typeElement, "Cannot find interface: " + v))
             ).toArray(ClassElement[]::new);

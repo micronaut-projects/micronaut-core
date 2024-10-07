@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpAttributes
@@ -55,7 +56,7 @@ class CorsFilterSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CorsFilterSpec'])
 
     void "non CORS request is passed through"() {
         given:
@@ -537,6 +538,7 @@ class CorsFilterSpec extends Specification {
         HttpStatus.OK == response.status()
     }
 
+    @Requires(property = "spec.name", value = "CorsFilterSpec")
     @Controller
     static class TestController{
 

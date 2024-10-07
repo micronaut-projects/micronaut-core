@@ -1,6 +1,6 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
-    id "org.jetbrains.kotlin.jvm"
+    alias libs.plugins.managed.kotlin.jvm
 }
 
 dependencies {
@@ -8,7 +8,7 @@ dependencies {
     annotationProcessor project(":graal")
     api project(":context")
     api project(":core-reactive")
-    implementation project(":context-propagation")
+    api(project(":context-propagation"))
     implementation libs.managed.reactor
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.kotlinx.coroutines.reactor
@@ -21,6 +21,8 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":runtime")
     testImplementation(libs.logback.classic)
+    testImplementation(libs.jazzer.junit)
+    testImplementation(libs.junit.jupiter.params)
 }
 
 tasks.named("compileKotlin") {

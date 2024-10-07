@@ -33,10 +33,10 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.ConditionalFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.HttpHostResolver;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +53,12 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
 import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
@@ -69,12 +71,12 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  * @since 1.0
  */
 @ServerFilter(MATCH_ALL_PATTERN)
-public class CorsFilter implements Ordered {
+public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-    
+
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
     @Nullable
@@ -88,6 +90,18 @@ public class CorsFilter implements Ordered {
                       @Nullable HttpHostResolver httpHostResolver) {
         this.corsConfiguration = corsConfiguration;
         this.httpHostResolver = httpHostResolver;
+    }
+
+    @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        String origin = request.getOrigin().orElse(null);
+        if (origin == null) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
+            }
+            return false;
+        }
+        return true;
     }
 
     @RequestFilter
@@ -104,7 +118,7 @@ public class CorsFilter implements Ordered {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, corsOriginConfiguration);
             }
-            if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
+            if (validateMethodToMatch(request, corsOriginConfiguration).isEmpty()) {
                 return forbidden();
             }
             if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
@@ -156,7 +170,7 @@ public class CorsFilter implements Ordered {
         String host = httpHostResolver.resolve(request);
 
         return (
-            !corsOriginConfiguration.getAllowedOriginsRegex().isPresent() && isAny(corsOriginConfiguration.getAllowedOrigins())
+            corsOriginConfiguration.getAllowedOriginsRegex().isEmpty() && isAny(corsOriginConfiguration.getAllowedOrigins())
         ) && isHostLocal(host);
     }
 
@@ -237,7 +251,18 @@ public class CorsFilter implements Ordered {
      */
     protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowCredentials()) {
-            response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, Boolean.toString(true));
+            response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, StringUtils.TRUE);
+        }
+    }
+
+    /**
+     * Sets the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK} in the response to {@code true}, if the {@link CorsOriginConfiguration#isAllowPrivateNetwork()} is {@code true}.
+     * @param config   The {@link CorsOriginConfiguration} instance
+     * @param response The {@link MutableHttpResponse} object
+     */
+    protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+        if (config.isAllowPrivateNetwork()) {
+            response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
         }
     }
 
@@ -334,7 +359,7 @@ public class CorsFilter implements Ordered {
         }
         List<String> allowedOrigins = config.getAllowedOrigins();
         return !allowedOrigins.isEmpty() && (
-            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+            (config.getAllowedOriginsRegex().isEmpty() && isAny(allowedOrigins)) ||
                 allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
         );
     }
@@ -374,7 +399,7 @@ public class CorsFilter implements Ordered {
         );
     }
 
-    @NotNull
+    @NonNull
     private static MutableHttpResponse<Object> forbidden() {
         return HttpResponse.status(HttpStatus.FORBIDDEN);
     }
@@ -388,6 +413,8 @@ public class CorsFilter implements Ordered {
             .ifPresent(methods -> setAllowMethods(methods, response));
         headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING)
             .ifPresent(val -> setAllowHeaders(val, response));
+        headers.getFirst(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, ConversionContext.BOOLEAN)
+                .ifPresent(value -> setAllowPrivateNetwork(config, response));
         setMaxAge(config.getMaxAge(), response);
     }
 
@@ -422,7 +449,7 @@ public class CorsFilter implements Ordered {
     private Optional<HttpStatus> validatePreflightRequest(@NonNull HttpRequest<?> request,
                                                           @NonNull CorsOriginConfiguration config) {
         Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
-        if (!methodToMatchOptional.isPresent()) {
+        if (methodToMatchOptional.isEmpty()) {
             return Optional.of(HttpStatus.FORBIDDEN);
         }
         HttpMethod methodToMatch = methodToMatchOptional.get();

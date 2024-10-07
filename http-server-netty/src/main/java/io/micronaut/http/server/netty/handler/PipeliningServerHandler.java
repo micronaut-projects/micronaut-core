@@ -18,64 +18,60 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.body.NettyWriteContext;
-import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
-import io.micronaut.http.netty.stream.EmptyHttpRequest;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.netty.EventLoopFlow;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.BodySizeLimits;
+import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.NettyBodyAdapter;
+import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.server.netty.SmartHttpContentCompressor;
+import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoop;
-import io.netty.channel.FileRegion;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.compression.Brotli;
+import io.netty.handler.codec.compression.BrotliDecoder;
+import io.netty.handler.codec.compression.DecompressionException;
+import io.netty.handler.codec.compression.SnappyFrameDecoder;
+import io.netty.handler.codec.compression.ZlibCodecFactory;
+import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.stream.ChunkedFile;
-import io.netty.handler.stream.ChunkedInput;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.AttributeKey;
-import io.netty.util.ReferenceCountUtil;
-import io.netty.util.ResourceLeakDetector;
-import io.netty.util.ResourceLeakDetectorFactory;
-import io.netty.util.ResourceLeakTracker;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
-import reactor.util.concurrent.Queues;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Queue;
-import java.util.function.Supplier;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -86,10 +82,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
-    public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
-        SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
-
-    private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
     private final RequestHandler requestHandler;
@@ -99,6 +91,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final InboundHandler baseInboundHandler = new MessageInboundHandler();
     private final OptimisticBufferingInboundHandler optimisticBufferingInboundHandler = new OptimisticBufferingInboundHandler();
 
+    private Compressor compressor;
+    private BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
+
     /**
      * Current handler for inbound messages.
      */
@@ -107,7 +102,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Queue of outbound messages that can't be written yet.
      */
-    private final Queue<OutboundAccess> outboundQueue = new ArrayDeque<>(1);
+    private final Queue<OutboundAccessImpl> outboundQueue = new ArrayDeque<>(1);
     /**
      * Current outbound message, or {@code null} if no outbound message is waiting.
      */
@@ -120,9 +115,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private boolean reading = false;
     /**
-     * {@code true} iff we want to read more data.
+     * {@code true} iff {@code ctx.read()} has been called already.
      */
-    private boolean moreRequested = false;
+    private boolean readCalled = false;
     /**
      * {@code true} iff this handler has been removed.
      */
@@ -138,6 +133,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
+    }
+
+    public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
+        if (compressionStrategy.isEnabled()) {
+            this.compressor = new Compressor(compressionStrategy);
+        } else {
+            this.compressor = null;
+        }
+    }
+
+    public void setBodySizeLimits(BodySizeLimits bodySizeLimits) {
+        this.bodySizeLimits = bodySizeLimits;
     }
 
     public static boolean canHaveBody(HttpResponseStatus status) {
@@ -166,16 +173,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Set whether we need more input, i.e. another call to {@link #channelRead}. This is usally a
-     * {@link ChannelHandlerContext#read()} call, but it's coalesced until
-     * {@link #channelReadComplete}.
-     *
-     * @param needMore {@code true} iff we need more input
+     * Call {@code ctx.read()} if necessary.
      */
-    private void setNeedMore(boolean needMore) {
-        boolean oldMoreRequested = moreRequested;
-        moreRequested = needMore;
-        if (!oldMoreRequested && !reading && needMore) {
+    private void refreshNeedMore() {
+        // if readCalled is true, ctx.read() is already called and we haven't seen the associated readComplete yet.
+
+        // needMore is false if there is downstream backpressure.
+
+        // requestHandler itself (i.e. non-streaming request processing) does not have
+        // backpressure. For this, check whether there is a request that has been fully read but
+        // has no response yet. If there is, apply backpressure.
+        if (!readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
+            readCalled = true;
             ctx.read();
         }
     }
@@ -183,17 +192,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         this.ctx = ctx;
+        // we take control of reading now.
+        ctx.channel().config().setAutoRead(false);
+        refreshNeedMore();
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         removed = true;
         if (outboundHandler != null) {
-            outboundHandler.discard();
+            outboundHandler.discardOutbound();
         }
-        for (OutboundAccess queued : outboundQueue) {
+        for (OutboundAccessImpl queued : outboundQueue) {
             if (queued.handler != null) {
-                queued.handler.discard();
+                queued.handler.discardOutbound();
             }
         }
         outboundQueue.clear();
@@ -210,13 +222,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         inboundHandler.readComplete();
         reading = false;
+        // only unset readCalled now. This ensures no read call is done before channelReadComplete
+        readCalled = false;
         if (flushPending) {
             ctx.flush();
             flushPending = false;
         }
-        if (moreRequested) {
-            ctx.read();
-        }
+        refreshNeedMore();
     }
 
     @Override
@@ -278,10 +290,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             while (ctx.channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
-                    OutboundAccess next = outboundQueue.peek();
+                    OutboundAccessImpl next = outboundQueue.peek();
                     if (next != null && next.handler != null) {
                         outboundQueue.poll();
                         outboundHandler = next.handler;
+                        refreshNeedMore();
                     } else {
                         return;
                     }
@@ -301,7 +314,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * An inbound handler is responsible for all incoming messages.
      */
-    private abstract static class InboundHandler {
+    private abstract class InboundHandler {
+        /**
+         * @return {@code true} iff this handler can process more data. This is usually {@code true},
+         * except for streaming requests when there is downstream backpressure.
+         */
+        boolean needMore() {
+            return true;
+        }
+
         /**
          * @see #channelRead
          */
@@ -320,24 +341,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Wrapper class for a netty response with a special body type, like
-     * {@link HttpChunkedInput} or
-     * {@link FileRegion}.
-     *
-     * @param response The response
-     * @param body     The body, or {@code null} if there is no body
-     * @param needLast Whether to finish the response with a
-     *                 {@link LastHttpContent}
-     */
-    private record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
-        CustomResponse {
-            if (response instanceof FullHttpResponse) {
-                throw new IllegalArgumentException("Response must not be a FullHttpResponse to send a special body");
-            }
-        }
-    }
-
-    /**
      * Base {@link InboundHandler} that handles {@link HttpRequest}s and then determines how to
      * deal with the body.
      */
@@ -345,20 +348,84 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpRequest request = (HttpRequest) message;
-            OutboundAccess outboundAccess = new OutboundAccess();
+            OutboundAccessImpl outboundAccess = new OutboundAccessImpl(request);
             outboundQueue.add(outboundAccess);
-            if (request instanceof FullHttpRequest full) {
-                requestHandler.accept(ctx, full, outboundAccess);
+
+            HttpHeaders headers = request.headers();
+            String contentEncoding = getContentEncoding(headers);
+            EmbeddedChannel decompressionChannel;
+            if (contentEncoding == null) {
+                decompressionChannel = null;
+            } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
+                HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
+                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                    ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
+            } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
+                HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
+                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                    ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
+            } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
+                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                    ctx.channel().config(), new BrotliDecoder());
+            } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                    ctx.channel().config(), new SnappyFrameDecoder());
+            } else {
+                decompressionChannel = null;
+            }
+            if (decompressionChannel != null) {
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                headers.remove(HttpHeaderNames.CONTENT_ENCODING);
+                headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
+
+            // getClass for performance
+            boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
+            if (full && decompressionChannel == null) {
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
-                if (message instanceof HttpContent) {
+                if (full) {
                     inboundHandler.read(message);
                 }
-                requestHandler.accept(ctx, new EmptyHttpRequest(request), outboundAccess);
+                if (decompressionChannel != null) {
+                    decompressionChannel.finish();
+                }
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
-                inboundHandler = optimisticBufferingInboundHandler;
+                if (decompressionChannel == null) {
+                    inboundHandler = optimisticBufferingInboundHandler;
+                } else {
+                    inboundHandler = new DecompressingInboundHandler(decompressionChannel, optimisticBufferingInboundHandler);
+                }
+                if (full) {
+                    inboundHandler.read(new DefaultLastHttpContent(((FullHttpRequest) request).content()));
+                }
             }
+        }
+
+        private static String getContentEncoding(HttpHeaders headers) {
+            // from io.netty.handler.codec.http.HttpContentDecoder
+
+            // Determine the content encoding.
+            String contentEncoding = headers.get(HttpHeaderNames.CONTENT_ENCODING);
+            if (contentEncoding != null) {
+                contentEncoding = contentEncoding.trim();
+            } else {
+                String transferEncoding = headers.get(HttpHeaderNames.TRANSFER_ENCODING);
+                if (transferEncoding != null) {
+                    int idx = transferEncoding.indexOf(",");
+                    if (idx != -1) {
+                        contentEncoding = transferEncoding.substring(0, idx).trim();
+                    } else {
+                        contentEncoding = transferEncoding.trim();
+                    }
+                } else {
+                    contentEncoding = null;
+                }
+            }
+            return contentEncoding;
         }
 
         @Override
@@ -374,12 +441,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class OptimisticBufferingInboundHandler extends InboundHandler {
         private HttpRequest request;
-        private OutboundAccess outboundAccess;
+        private OutboundAccessImpl outboundAccess;
         private final List<HttpContent> buffer = new ArrayList<>();
 
-        void init(HttpRequest request, OutboundAccess outboundAccess) {
+        void init(HttpRequest request, OutboundAccessImpl outboundAccess) {
             assert buffer.isEmpty();
-            assert !(request instanceof HttpContent);
             this.request = request;
             this.outboundAccess = outboundAccess;
         }
@@ -392,7 +458,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 content.release();
             }
-            if (message instanceof LastHttpContent last) {
+            // exact class check to avoid interface instanceof
+            if (message.getClass() == DefaultLastHttpContent.class || message instanceof LastHttpContent) {
                 // we got the full message before readComplete
                 ByteBuf fullBody;
                 if (buffer.size() == 0) {
@@ -407,19 +474,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     fullBody = composite;
                 }
                 buffer.clear();
-                FullHttpRequest fullRequest = new DefaultFullHttpRequest(
-                    request.protocolVersion(),
-                    request.method(),
-                    request.uri(),
-                    fullBody,
-                    request.headers(),
-                    last.trailingHeaders()
-                );
-                fullRequest.setDecoderResult(request.decoderResult());
-                request = null;
+                HttpRequest request = this.request;
+                this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, fullRequest, outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }
@@ -438,99 +497,192 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void devolveToStreaming() {
-            StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler();
+            HttpRequest request = this.request;
+            OutboundAccessImpl outboundAccess = this.outboundAccess;
+            this.request = null;
+            this.outboundAccess = null;
+
+            StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(outboundAccess, HttpUtil.is100ContinueExpected(request));
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);
             }
             buffer.clear();
-            HttpRequest request = this.request;
-            OutboundAccess outboundAccess = this.outboundAccess;
-            this.request = null;
-            this.outboundAccess = null;
 
-            inboundHandler = streamingInboundHandler;
-            Flux<HttpContent> flux = streamingInboundHandler.flux();
-            if (HttpUtil.is100ContinueExpected(request)) {
-                flux = flux.doOnSubscribe(s -> outboundAccess.writeContinue());
+            if (inboundHandler == this) {
+                inboundHandler = streamingInboundHandler;
+            } else {
+                ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
             }
-            requestHandler.accept(ctx, new DelegateStreamedHttpRequest(request, flux) {
-                @Override
-                public void closeIfNoSubscriber() {
-                    streamingInboundHandler.closeIfNoSubscriber();
-                }
-            }, outboundAccess);
+            streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
+            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
     }
 
     /**
      * Handler that exposes incoming content as a {@link Flux}.
      */
-    private final class StreamingInboundHandler extends InboundHandler {
-        private final Queue<HttpContent> queue = Queues.<HttpContent>unbounded().get();
-        private final Sinks.Many<HttpContent> sink = Sinks.many().unicast().onBackpressureBuffer(queue);
-        private long requested = 0;
+    private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
+        final StreamingNettyByteBody.SharedBuffer dest;
+        final OutboundAccessImpl outboundAccess;
+        long requested = 65535; // This is the number of bytes we initially accept before any downstream demand. 65535 matches the INITIAL_WINDOW_SIZE of HTTP/2.
+        boolean sendContinue;
+
+        private StreamingInboundHandler(OutboundAccessImpl outboundAccess, boolean sendContinue) {
+            this.outboundAccess = outboundAccess;
+            this.sendContinue = sendContinue;
+            this.dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+        }
 
         @Override
         void read(Object message) {
-            requested--;
             HttpContent content = (HttpContent) message;
-            if (sink.tryEmitNext(content.touch()) != Sinks.EmitResult.OK) {
-                content.release();
-            }
+            requested -= content.content().readableBytes();
+            dest.add(content.content());
             if (message instanceof LastHttpContent) {
-                sink.tryEmitComplete();
+                dest.complete();
                 inboundHandler = baseInboundHandler;
             }
-            setNeedMore(requested > 0);
         }
 
         @Override
         void handleUpstreamError(Throwable cause) {
-            releaseQueue();
-            if (sink.tryEmitError(cause) != Sinks.EmitResult.OK) {
-                requestHandler.handleUnboundError(cause);
-            }
+            dest.error(cause);
         }
 
-        private void request(long n) {
+        @Override
+        boolean needMore() {
+            return requested > 0;
+        }
+
+        @Override
+        public void start() {
             EventLoop eventLoop = ctx.channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> request(n));
+                eventLoop.execute(this::start);
                 return;
             }
 
-            long newRequested = requested + n;
+            if (sendContinue) {
+                sendContinue = false;
+                outboundAccess.writeContinue();
+            }
+        }
+
+        @Override
+        public void onBytesConsumed(long bytesConsumed) {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
+                return;
+            }
+
+            long newRequested = requested + bytesConsumed;
             if (newRequested < requested) {
                 // overflow
                 newRequested = Long.MAX_VALUE;
             }
             requested = newRequested;
-            setNeedMore(newRequested > 0);
+            refreshNeedMore();
         }
 
-        Flux<HttpContent> flux() {
-            return sink.asFlux()
-                .doOnRequest(this::request)
-                .doOnCancel(this::releaseQueue);
-        }
-
-        void closeIfNoSubscriber() {
-            if (sink.currentSubscriberCount() == 0) {
-                releaseQueue();
-                if (inboundHandler == this) {
-                    inboundHandler = droppingInboundHandler;
-                }
+        @Override
+        public void allowDiscard() {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(this::allowDiscard);
+                return;
             }
+
+            sendContinue = false;
+            if (inboundHandler == this) {
+                inboundHandler = droppingInboundHandler;
+                refreshNeedMore();
+            } else if (inboundHandler instanceof DecompressingInboundHandler dec && dec.delegate == this) {
+                dec.dispose();
+                inboundHandler = droppingInboundHandler;
+                refreshNeedMore();
+            }
+            dest.discard();
         }
 
-        private void releaseQueue() {
+        @Override
+        public void disregardBackpressure() {
+            EventLoop eventLoop = ctx.channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(this::disregardBackpressure);
+                return;
+            }
+
+            requested = Long.MAX_VALUE;
+            refreshNeedMore();
+        }
+    }
+
+    private class DecompressingInboundHandler extends InboundHandler {
+        private final EmbeddedChannel channel;
+        private InboundHandler delegate;
+
+        public DecompressingInboundHandler(EmbeddedChannel channel, InboundHandler delegate) {
+            this.channel = channel;
+            this.delegate = delegate;
+        }
+
+        @Override
+        void read(Object message) {
+            ByteBuf compressed = ((HttpContent) message).content();
+            if (!compressed.isReadable()) {
+                delegate.read(message);
+                return;
+            }
+
+            boolean last = message instanceof LastHttpContent;
+            try {
+                channel.writeInbound(compressed);
+                if (last) {
+                    channel.finish();
+                }
+            } catch (DecompressionException e) {
+                delegate.handleUpstreamError(e);
+                channel.releaseInbound();
+                if (last) {
+                    // need to handle the last content
+                    inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
+                }
+                return;
+            }
+
             while (true) {
-                HttpContent c = queue.poll();
-                if (c == null) {
+                ByteBuf decompressed = channel.readInbound();
+                if (decompressed == null) {
                     break;
                 }
-                c.release();
+                if (!decompressed.isReadable()) {
+                    decompressed.release();
+                    continue;
+                }
+                delegate.read(new DefaultHttpContent(decompressed));
             }
+
+            if (last) {
+                delegate.read(LastHttpContent.EMPTY_LAST_CONTENT);
+            }
+        }
+
+        void dispose() {
+            try {
+                channel.finishAndReleaseAll();
+            } catch (DecompressionException ignored) {
+            }
+        }
+
+        @Override
+        void readComplete() {
+            delegate.readComplete();
+        }
+
+        @Override
+        void handleUpstreamError(Throwable cause) {
+            delegate.handleUpstreamError(cause);
         }
     }
 
@@ -540,9 +692,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class DroppingInboundHandler extends InboundHandler {
         @Override
         void read(Object message) {
-            ((HttpContent) message).release();
-            if (message instanceof LastHttpContent) {
+            if (message instanceof LastHttpContent lhc) {
+                lhc.release();
                 inboundHandler = baseInboundHandler;
+            } else {
+                ((HttpContent) message).release();
             }
         }
 
@@ -555,7 +709,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Class that allows writing the response for the request this object is associated with.
      */
-    public final class OutboundAccess implements NettyWriteContext {
+    public final class OutboundAccessImpl implements OutboundAccess {
+        /**
+         * The request that caused this response. This is used for compression decisions.
+         */
+        private final HttpRequest request;
         /**
          * The handler that will perform the actual write operation.
          */
@@ -563,12 +721,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private Object attachment = null;
         private boolean closeAfterWrite = false;
 
-        private OutboundAccess() {
-        }
-
-        @Override
-        public ByteBufAllocator alloc() {
-            return ctx.alloc();
+        private OutboundAccessImpl(HttpRequest request) {
+            this.request = request;
         }
 
         /**
@@ -577,6 +731,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param attachment The attachment to forward
          */
+        @Override
         public void attachment(Object attachment) {
             this.attachment = attachment;
         }
@@ -584,11 +739,27 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Mark this channel to be closed after this response has been written.
          */
+        @Override
         public void closeAfterWrite() {
             closeAfterWrite = true;
         }
 
         private void preprocess(HttpResponse message) {
+            if (!message.protocolVersion().equals(request.protocolVersion())) {
+                // if the response includes features not supported by http/1.0, well that's just too bad, isn't it?
+                // we'll at least handle the connection state properly.
+                message.setProtocolVersion(request.protocolVersion());
+            }
+            if (request.protocolVersion().isKeepAliveDefault()) {
+                if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
+                    closeAfterWrite();
+                }
+            } else {
+                if (!request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
+                    closeAfterWrite();
+                }
+            }
+
             if (message.protocolVersion().isKeepAliveDefault()) {
                 if (message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                     closeAfterWrite();
@@ -617,7 +788,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void writeContinue() {
             if (handler == null) {
-                write(new ContinueOutboundHandler());
+                write(new ContinueOutboundHandler(this));
             }
         }
 
@@ -648,7 +819,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public void writeFull(FullHttpResponse response, boolean headResponse) {
+        public void writeHeadResponse(@NonNull HttpResponse response) {
+            writeFull(new DefaultFullHttpResponse(
+                response.protocolVersion(),
+                response.status(),
+                Unpooled.EMPTY_BUFFER,
+                response.headers(),
+                EmptyHttpHeaders.INSTANCE
+            ), true);
+        }
+
+        private void writeFull(FullHttpResponse response, boolean headResponse) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (canHaveBody(response.status())) {
                 if (!headResponse) {
@@ -658,65 +839,113 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
             }
             preprocess(response);
-            write(new FullOutboundHandler(this, response));
-        }
-
-        @Override
-        public void writeStreamed(HttpResponse response, Publisher<HttpContent> content) {
-            response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-            if (canHaveBody(response.status())) {
-                response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-            } else {
-                response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            FullOutboundHandler oh = new FullOutboundHandler(this, response);
+            if (response.content().isReadable()) {
+                prepareCompression(response, oh);
             }
-            preprocess(response);
-            content.subscribe(new StreamingOutboundHandler(this, response));
-        }
-
-        /**
-         * Write a response with a special body
-         * ({@link io.netty.handler.codec.http.HttpChunkedInput},
-         * {@link io.micronaut.http.server.types.files.SystemFile}).
-         *
-         * @param response The response to write
-         */
-        private void writeStreamed(CustomResponse response) {
-            preprocess(response.response());
-            write(new ChunkedOutboundHandler(this, response));
+            write(oh);
         }
 
         @Override
-        public void writeChunked(HttpResponse response, HttpChunkedInput chunkedInput) {
-            writeStreamed(new CustomResponse(response, chunkedInput, false));
-        }
-
-        @Override
-        public void writeFile(HttpResponse response, RandomAccessFile randomAccessFile, long position, long contentLength) {
-            SmartHttpContentCompressor predicate = ctx.channel().attr(ZERO_COPY_PREDICATE.get()).get();
-            if (predicate != null && predicate.shouldSkip(response)) {
-                // SSL not enabled - can use zero-copy file transfer.
-                writeStreamed(new CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), true));
+        public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
+            NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
+            if (nbb instanceof AvailableNettyByteBody available) {
+                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
-                // SSL enabled - cannot use zero-copy file transfer.
-                try {
-                    // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(randomAccessFile, position, contentLength, LENGTH_8K));
-                    writeStreamed(new CustomResponse(response, chunkedInput, false));
-                } catch (IOException e) {
-                    throw new MessageBodyException("Could not read file", e);
+                OptionalLong expectedLength = body.expectedLength();
+                if (expectedLength.isPresent()) {
+                    response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                    if (canHaveBody(response.status())) {
+                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, expectedLength.getAsLong());
+                    } else {
+                        response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                } else {
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    if (canHaveBody(response.status())) {
+                        response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                    } else {
+                        response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                    }
                 }
+                preprocess(response);
+                StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
+                prepareCompression(response, oh);
+                oh.upstream = ((StreamingNettyByteBody) nbb).primary(oh);
+                write(oh);
+            }
+        }
+
+        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler) {
+            if (compressor == null) {
+                return;
+            }
+            Compressor.Session compressionSession = compressor.prepare(ctx, request, response);
+            if (compressionSession != null) {
+                // if content-length and transfer-encoding are unset, we will close anyway.
+                // if this is a full response, there's special handling below in OutboundHandler
+                if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                }
+                outboundHandler.compressionSession = compressionSession;
             }
         }
     }
 
-    private abstract static class OutboundHandler {
+    private abstract class OutboundHandler {
         /**
-         * {@link OutboundAccess} that created this handler, for metadata access.
+         * {@link OutboundAccessImpl} that created this handler, for metadata access.
          */
-        final OutboundAccess outboundAccess;
+        final OutboundAccessImpl outboundAccess;
 
-        private OutboundHandler(OutboundAccess outboundAccess) {
+        Compressor.Session compressionSession;
+
+        private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
+        }
+
+        protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean close) {
+            if (this.compressionSession == null) {
+                write(content, flush, close);
+            } else {
+                // slow path
+                writeCompressing0(content, flush, close);
+            }
+        }
+
+        private void writeCompressing0(HttpContent content, boolean flush, boolean close) {
+            Compressor.Session compressionSession = this.compressionSession;
+            compressionSession.push(content.content());
+            boolean last = content instanceof LastHttpContent;
+            if (last) {
+                compressionSession.finish();
+            }
+            if (content instanceof HttpResponse hr) {
+                assert last;
+
+                compressionSession.fixContentLength(hr);
+
+                // this can happen in FullHttpResponse, just send the full body.
+                write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
+            }
+            ByteBuf toSend = compressionSession.poll();
+            // send the compressed buffer with the flags.
+            if (toSend == null) {
+                if (last) {
+                    HttpHeaders trailingHeaders = ((LastHttpContent) content).trailingHeaders();
+                    write(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
+                } else if (flush || close) {
+                    // not sure if this can actually happen, but we need to forward a flush/close
+                    write(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close);
+                } // else just don't send anything
+            } else {
+                if (last) {
+                    write(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
+                } else {
+                    write(new DefaultHttpContent(toSend), flush, close);
+                }
+            }
         }
 
         /**
@@ -727,27 +956,34 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Discard the remaining data.
          */
-        abstract void discard();
+        void discardOutbound() {
+            Compressor.Session compressionSession = this.compressionSession;
+            if (compressionSession != null) {
+                compressionSession.discard();
+            }
+        }
     }
 
     /**
      * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
      */
-    private final class ContinueOutboundHandler extends OutboundHandler {
-        private static final FullHttpResponse CONTINUE =
+    final class ContinueOutboundHandler extends OutboundHandler {
+        static final FullHttpResponse CONTINUE_11 =
+            new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
+        private static final FullHttpResponse CONTINUE_10 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
         boolean written = false;
         OutboundHandler next;
 
-        private ContinueOutboundHandler() {
-            super(null);
+        private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
+            super(outboundAccess);
         }
 
         @Override
         void writeSome() {
             if (!written) {
-                write(CONTINUE, true, false);
+                write(outboundAccess.request.protocolVersion().equals(HttpVersion.HTTP_1_0) ? CONTINUE_10 : CONTINUE_11, true, false);
                 written = true;
             }
             if (next != null) {
@@ -756,9 +992,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        void discard() {
+        void discardOutbound() {
+            super.discardOutbound();
             if (next != null) {
-                next.discard();
+                next.discardOutbound();
                 next = null;
             }
         }
@@ -770,38 +1007,44 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class FullOutboundHandler extends OutboundHandler {
         private final FullHttpResponse message;
 
-        FullOutboundHandler(OutboundAccess outboundAccess, FullHttpResponse message) {
+        FullOutboundHandler(OutboundAccessImpl outboundAccess, FullHttpResponse message) {
             super(outboundAccess);
             this.message = message;
         }
 
         @Override
         void writeSome() {
-            write(message, true, outboundAccess.closeAfterWrite);
+            writeCompressing(message, true, outboundAccess.closeAfterWrite);
             outboundHandler = null;
             requestHandler.responseWritten(outboundAccess.attachment);
             PipeliningServerHandler.this.writeSome();
         }
 
         @Override
-        void discard() {
-            message.release();
+        void discardOutbound() {
+            super.discardOutbound();
             outboundHandler = null;
+            // pretend we wrote to clean up resources
+            requestHandler.responseWritten(outboundAccess.attachment);
+            message.release();
         }
     }
 
     /**
      * Handler that writes a {@link StreamedHttpResponse}.
      */
-    private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
-        private final OutboundAccess outboundAccess;
+    private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
+        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
+        private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;
-        private Subscription subscription;
+        private BufferConsumer.Upstream upstream;
         private boolean earlyComplete = false;
         private boolean writtenLast = false;
+        private long incompleteWrittenBytes = 0;
 
-        StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
+        StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
+            assert initialMessage != null;
             if (initialMessage instanceof FullHttpResponse) {
                 throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
             }
@@ -814,32 +1057,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (initialMessage != null) {
                 write(initialMessage, false, false);
                 initialMessage = null;
+                upstream.start();
             }
             if (earlyComplete) {
                 // onComplete has been called before the first writeSome. Trigger onComplete
                 // handling again.
-                onComplete();
+                complete();
             } else {
-                subscription.request(1);
+                long written = incompleteWrittenBytes;
+                if (written > 0) {
+                    incompleteWrittenBytes = 0;
+                    upstream.onBytesConsumed(written);
+                }
             }
         }
 
         @Override
-        public void onSubscribe(Subscription s) {
-            subscription = s;
-            // delay access.write call until the subscription is available, so that writeSome is
-            // only called then
-            outboundAccess.write(this);
+        public void add(ByteBuf buf) {
+            if (flow.executeNow(() -> add0(buf))) {
+                add0(buf);
+            }
         }
 
-        @Override
-        public void onNext(HttpContent httpContent) {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> onNext(httpContent));
-                return;
-            }
-
+        private void add0(ByteBuf buf) {
             if (outboundHandler != this) {
                 throw new IllegalStateException("onNext before request?");
             }
@@ -849,26 +1089,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
-                if (httpContent instanceof LastHttpContent) {
-                    writtenLast = true;
-                }
-                write(httpContent, true, false);
+                int n = buf.readableBytes();
+                writeCompressing(new DefaultHttpContent(buf), true, false);
+                incompleteWrittenBytes += n;
                 if (ctx.channel().isWritable()) {
-                    subscription.request(1);
+                    writeSome();
                 }
             } else {
-                httpContent.release();
+                buf.release();
             }
         }
 
         @Override
-        public void onError(Throwable t) {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> onError(t));
-                return;
+        public void error(Throwable t) {
+            if (flow.executeNow(() -> error0(t))) {
+                error0(t);
             }
+        }
 
+        private void error0(Throwable t) {
             if (!removed) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
@@ -880,13 +1119,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public void onComplete() {
-            EventLoop eventLoop = ctx.channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(this::onComplete);
-                return;
+        public void complete() {
+            if (flow.executeNow(this::complete0)) {
+                complete0();
             }
+        }
 
+        private void complete0() {
             if (outboundHandler != this) {
                 // onComplete can be called immediately after onSubscribe, before request.
                 earlyComplete = true;
@@ -901,7 +1140,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
 
                 if (!writtenLast) {
-                    write(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();
@@ -909,102 +1148,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        void discard() {
+        void discardOutbound() {
+            super.discardOutbound();
             // this is safe because:
             // - onComplete/onError cannot have been called yet, because otherwise outboundHandler
             //   would be null and discard couldn't have been called
             // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
             //   they won't call responseWritten in turn
             requestHandler.responseWritten(outboundAccess.attachment);
-            subscription.cancel();
+            upstream.allowDiscard();
             outboundHandler = null;
-        }
-    }
-
-    /**
-     * Handler that writes a files etc.
-     */
-    private final class ChunkedOutboundHandler extends OutboundHandler {
-        private final CustomResponse message;
-
-        ChunkedOutboundHandler(OutboundAccess outboundAccess, CustomResponse message) {
-            super(outboundAccess);
-            this.message = message;
-        }
-
-        @Override
-        void writeSome() {
-            boolean responseIsLast = message.body() == null && !message.needLast();
-            write(message.response(), responseIsLast, responseIsLast && outboundAccess.closeAfterWrite);
-            if (message.body() != null) {
-                boolean bodyIsLast = !message.needLast();
-                write(message.body(), bodyIsLast, bodyIsLast && outboundAccess.closeAfterWrite);
-            }
-            if (message.needLast()) {
-                write(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
-            }
-            outboundHandler = null;
-            requestHandler.responseWritten(outboundAccess.attachment);
-            PipeliningServerHandler.this.writeSome();
-        }
-
-        @Override
-        void discard() {
-            ReferenceCountUtil.release(message.response());
-            if (message.body() instanceof ChunkedInput<?> ci) {
-                try {
-                    ci.close();
-                } catch (Exception e) {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Failed to close ChunkedInput", e);
-                    }
-                }
-            } else if (message.body() instanceof FileRegion fr) {
-                fr.release();
-            }
-            outboundHandler = null;
-        }
-    }
-
-    private static class TrackedDefaultFileRegion extends DefaultFileRegion {
-        //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<TrackedDefaultFileRegion>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedDefaultFileRegion.class));
-
-        private final ResourceLeakTracker<TrackedDefaultFileRegion> tracker;
-
-        public TrackedDefaultFileRegion(FileChannel fileChannel, long position, long count) {
-            super(fileChannel, position, count);
-            this.tracker = LEAK_DETECTOR.get().track(this);
-        }
-
-        @Override
-        protected void deallocate() {
-            super.deallocate();
-            if (tracker != null) {
-                tracker.close(this);
-            }
-        }
-    }
-
-    private static class TrackedChunkedFile extends ChunkedFile {
-        //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<TrackedChunkedFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedChunkedFile.class));
-
-        private final ResourceLeakTracker<TrackedChunkedFile> tracker;
-
-        public TrackedChunkedFile(RandomAccessFile file, long offset, long length, int chunkSize) throws IOException {
-            super(file, offset, length, chunkSize);
-            this.tracker = LEAK_DETECTOR.get().track(this);
-        }
-
-        @Override
-        public void close() throws Exception {
-            super.close();
-            if (tracker != null) {
-                tracker.close(this);
-            }
         }
     }
 }

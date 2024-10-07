@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.configuration;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.util.ResourceLeakDetector;
@@ -26,9 +27,11 @@ import io.netty.util.ResourceLeakDetector;
  * @since 2.5.0
  */
 @ConfigurationProperties("netty")
+@BootstrapContextCompatible
 public class NettyGlobalConfiguration {
-
+    private static final boolean DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING = true;
     private ResourceLeakDetector.Level resourceLeakDetectorLevel;
+    private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
 
     /**
      * Sets the resource leak detection level.
@@ -49,4 +52,26 @@ public class NettyGlobalConfiguration {
         return resourceLeakDetectorLevel;
     }
 
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
+     * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
+     *
+     * @return Whether event loop threads should implement NonBlocking by default
+     */
+    public boolean isDefaultThreadFactoryReactorNonBlocking() {
+        return defaultThreadFactoryReactorNonBlocking;
+    }
+
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
+     * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
+     *
+     * @param defaultThreadFactoryReactorNonBlocking Whether event loop threads should implement
+     *                                               NonBlocking by default
+     */
+    public void setDefaultThreadFactoryReactorNonBlocking(boolean defaultThreadFactoryReactorNonBlocking) {
+        this.defaultThreadFactoryReactorNonBlocking = defaultThreadFactoryReactorNonBlocking;
+    }
 }

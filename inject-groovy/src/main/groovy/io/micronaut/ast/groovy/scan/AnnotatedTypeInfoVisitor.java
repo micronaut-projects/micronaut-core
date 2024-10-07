@@ -34,6 +34,7 @@ import java.util.Set;
  */
 @Internal
 class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo {
+
     private Set<String> annotations = new HashSet<>();
     private String className;
     private boolean isAbstract;

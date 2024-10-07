@@ -32,6 +32,7 @@ dependencies {
     compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
     compileOnly libs.managed.netty.incubator.codec.http3
+    compileOnly libs.brotli4j
 
     testImplementation libs.jmh.core
     testAnnotationProcessor libs.jmh.generator.annprocess
@@ -90,7 +91,11 @@ dependencies {
     }
     testImplementation(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
-            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+            if (Os.isFamily("mac")) {
+                classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+            } else {
+                classifier = "linux-x86_64"
+            }
         }
     }
     testImplementation libs.logback.classic
@@ -98,6 +103,13 @@ dependencies {
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
     testImplementation project(":websocket")
+
+    testImplementation(libs.mimepull)
+
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation(libs.junit.jupiter.api)
 }
 
 tasks.withType(Test).configureEach {

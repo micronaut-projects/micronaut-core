@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -46,9 +47,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     private ClassElement resolvedDeclaringClass;
 
     /**
-     * @param nativeElement             The native element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaFieldElement(JavaNativeElement.Variable nativeElement,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
@@ -58,10 +59,10 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     }
 
     /**
-     * @param owningType                The declaring element
-     * @param nativeElement             The native element
+     * @param owningType The declaring element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaFieldElement(JavaClassElement owningType,
                      JavaNativeElement.Variable nativeElement,
@@ -71,6 +72,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         this.owningType = owningType;
     }
 
+    @NonNull
     @Override
     public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
@@ -86,6 +88,11 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
+    @Override
+    public Object getConstantValue() {
+        return variableElement.getConstantValue();
+    }
+
     @NonNull
     @Override
     public ClassElement getType() {
@@ -95,6 +102,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return type;
     }
 
+    @NonNull
     @Override
     public ClassElement getGenericType() {
         if (genericType == null) {
@@ -123,8 +131,8 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         if (resolvedDeclaringClass == null) {
             Element enclosingElement = variableElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement te) {
-                String typeName = te.getQualifiedName().toString();
-                if (owningType.getName().equals(typeName)) {
+                String typeName = JavaModelUtils.getClassName(te);
+                if (owningType.getName().equals(JavaModelUtils.getClassName(te))) {
                     resolvedDeclaringClass = owningType;
                 } else {
                     TypeMirror returnType = te.asType();
@@ -139,7 +147,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     }
 
     @Override
-    public boolean hides(MemberElement hidden) {
+    public boolean hides(@NonNull MemberElement hidden) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }

@@ -24,14 +24,18 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
@@ -92,6 +96,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final MethodExecutionHandle<?, ?> messageHandler;
     protected final MethodExecutionHandle<?, ?> pongHandler;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
@@ -102,9 +107,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     /**
      * Default constructor.
      *
-     * @param ctx                        The channel handler context
      * @param binderRegistry             The request binder registry
      * @param mediaTypeCodecRegistry     The codec registry
+     * @param messageBodyHandlerRegistry The handler registry
      * @param webSocketBean              The websocket bean
      * @param request                    The originating request
      * @param uriVariables               The URI variables
@@ -114,9 +119,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param conversionService          The conversion service
      */
     protected AbstractNettyWebSocketHandler(
-            ChannelHandlerContext ctx,
             RequestBinderRegistry binderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             WebSocketBean<?> webSocketBean,
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
@@ -135,6 +140,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.conversionService = conversionService;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
     }
 
     /**
@@ -220,7 +226,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 Object target = errorMethod.getTarget();
                 Object result;
                 try {
-                    result = boundExecutable.invoke(target);
+                    result = invokeExecutable(boundExecutable, errorMethod);
                 } catch (Exception e) {
 
                     if (LOG.isErrorEnabled()) {
@@ -230,8 +236,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
-                    Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                    flowable.collectList().subscribe(objects -> fallback.accept(cause), throwable -> {
+                    Mono<?> unhandled = Mono.from(instrumentPublisher(ctx, result));
+                    unhandled.subscribe(unhandledResult -> fallback.accept(cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler {}.{}: {}", target.getClass().getSimpleName(), errorMethod.getExecutableMethod(), throwable.getMessage(), throwable);
                         }
@@ -271,7 +277,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @return The flowable
      */
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Publisher<?> actual = Publishers.convertPublisher(conversionService, result, Publisher.class);
+        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
         return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
@@ -335,10 +341,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = conversionService.convert(content, ByteBuf.class, bodyArgument);
+                Object data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
                 content.release();
 
-                if (converted.isEmpty()) {
+                if (data == null) {
                     MediaType mediaType;
                     try {
                         mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
@@ -347,19 +353,28 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         return;
                     }
                     try {
-                        converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
+                        data = mediaTypeCodecRegistry.findCodec(mediaType)
+                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
+                            .orElse(null);
                     } catch (CodecException e) {
                         messageProcessingException(ctx, e);
                         return;
                     }
+                    if (data == null) {
+                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
+                            .orElse(null);
+                        if (reader != null) {
+                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
+                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                        }
+                    }
                 }
 
-                if (converted.isPresent()) {
-                    Object v = converted.get();
+                if (data != null) {
 
                     NettyWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
-                            Collections.singletonMap(bodyArgument, v)
+                            Collections.singletonMap(bodyArgument, data)
                     );
 
                     try {
@@ -372,14 +387,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                            Object finalData = data;
                             flowable.subscribe(
                                     o -> {
                                     },
                                     error -> messageProcessingException(ctx, error),
-                                    () -> messageHandled(ctx, v)
+                                    () -> messageHandled(ctx, finalData)
                             );
                         } else {
-                            messageHandled(ctx, v);
+                            messageHandled(ctx, data);
                         }
                     } catch (Throwable e) {
                         messageProcessingException(ctx, e);
@@ -389,7 +405,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     writeCloseFrameAndTerminate(
                             ctx,
                             CloseReason.UNSUPPORTED_DATA.getCode(),
-                            CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Received data cannot be converted to target type: " + bodyArgument
+                            CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Received data cannot be data to target type: " + bodyArgument
                     );
                 }
             }

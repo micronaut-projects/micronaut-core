@@ -38,15 +38,35 @@ import io.micronaut.inject.ast.WildcardElement
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Null
+import java.sql.SQLException
+import java.util.function.Supplier
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
-import java.sql.SQLException
-import java.util.function.Supplier
-
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test package-private methods with broken different package"() {
+        when:
+        ClassElement classElement = buildClassElement('''
+package test.another;
+
+import test.Middle;
+
+class Test extends Middle {
+   private boolean testInjected;
+    void injectPackagePrivateMethod() {
+        testInjected = true;
+    }
+}
+
+''')
+
+            def elements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then: "A special case for the identical methods with package-private access and broken package access in between"
+            elements.size() == 2
+    }
 
     void "test class element generics"() {
         given:
@@ -135,7 +155,8 @@ interface One<E> {}
         ClassElement classElement = buildClassElement('''
 package ast.test;
 
-import org.jetbrains.annotations.NotNull;import java.util.*;
+import org.jetbrains.annotations.NotNull;
+import java.util.*;
 
 record Test(String constructorProp) implements Parent<String>, One<String> {
     @Override public String publicFunc(String name) {
@@ -271,6 +292,42 @@ class Test {
         PrimitiveElement.INT.withArrayDimensions(2) != element
         element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
         PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
+    }
+
+    void "test primitive nullability"() {
+        given:
+        def element = buildClassElement("""
+package test;
+
+class Test {
+    boolean test1;
+    boolean[] test2;
+    void method1() {
+    }
+    boolean method2() {
+        return true;
+    }
+}
+""")
+
+        expect:
+        element.getFields().get(0).getType().isNonNull()
+        !element.getFields().get(0).getType().isNullable()
+
+        !element.getFields().get(1).getType().isNonNull()
+        !element.getFields().get(1).getType().isNullable()
+
+        !element.getMethods().get(0).getReturnType().isNonNull()
+        !element.getMethods().get(0).getReturnType().isNullable()
+
+        !element.getMethods().get(0).getReturnType().getType().isNonNull()
+        !element.getMethods().get(0).getReturnType().getType().isNullable()
+
+        element.getMethods().get(1).getReturnType().isNonNull()
+        !element.getMethods().get(1).getReturnType().isNullable()
+
+        element.getMethods().get(1).getReturnType().getType().isNonNull()
+        !element.getMethods().get(1).getReturnType().getType().isNullable()
     }
 
     void "test resolve receiver type on method"() {
@@ -1122,6 +1179,105 @@ class MyBean {}
 
     }
 
+    void "test field type with generic in inner class"() {
+        given:
+        buildClassElement("""
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import java.util.List;
+import java.util.Locale;
+
+@Controller("/test")
+class TestController {
+    @Get
+    public HttpResponse<ResponseObject<List<Dto>>> endpoint() {
+        return null;
+    }
+
+    public static class ResponseObject<T> {
+
+        public T body;
+    }
+
+    public static class Dto {
+
+        public Locale locale;
+    }
+}
+""") { ClassElement ce ->
+
+            def responseType = ce.methods[0].returnType
+
+            responseType.type.name == 'io.micronaut.http.HttpResponse'
+            assert responseType.typeArguments
+            assert responseType.typeArguments.size() == 1
+
+            def typeArg = responseType.firstTypeArgument.orElse(null)
+            assert typeArg
+            assert typeArg.fields
+            assert typeArg.fields.size() == 1
+
+            def bodyField = typeArg.fields[0]
+            assert bodyField.name == "body"
+            assert bodyField.genericType.name == "java.util.List"
+            assert bodyField.genericType.getFirstTypeArgument().get().name == 'test.TestController$Dto'
+        }
+    }
+
+    void "test field type with generic in inner super class"() {
+        given:
+        buildClassElement("""
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import java.util.List;
+import java.util.Locale;
+
+@Controller("/test")
+class TestController {
+    @Get
+    public HttpResponse<ResponseObject<List<Dto>>> endpoint() {
+        return null;
+    }
+
+    public static class BaseResponseObject<T> {
+
+        public T body;
+    }
+
+    public static class ResponseObject<T> extends BaseResponseObject<T> {
+    }
+
+    public static class Dto {
+
+        public Locale locale;
+    }
+}
+""") { ClassElement ce ->
+
+            def responseType = ce.methods[0].returnType
+
+            responseType.type.name == 'io.micronaut.http.HttpResponse'
+            assert responseType.typeArguments
+            assert responseType.typeArguments.size() == 1
+
+            def typeArg = responseType.firstTypeArgument.orElse(null)
+            assert typeArg
+            assert typeArg.fields
+            assert typeArg.fields.size() == 1
+
+            def bodyField = typeArg.fields[0]
+            assert bodyField.name == "body"
+            assert bodyField.genericType.name == "java.util.List"
+            assert bodyField.genericType.getFirstTypeArgument().get().name == 'test.TestController$Dto'
+        }
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-openapi/issues/593')
     void 'test declaringType is the implementation and not the interface'() {
         given:
@@ -1339,7 +1495,7 @@ enum Test {
     // private static Since Java 9
     void "test inherited methods using ElementQuery"() {
         given:
-        ClassElement classElement = buildClassElement('''
+        JavaClassElement classElement = buildClassElement('''
 package elementquery;
 
 class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWithMethods {
@@ -1452,6 +1608,20 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
             assert expected.contains(name)
         }
         expected.size() == methods.size()
+        methods[0].overriddenMethods.size() == 0
+        methods[1].overriddenMethods.size() == 0
+        methods[2].overriddenMethods.size() == 0
+        methods[3].overriddenMethods.size() == 1
+        methods[4].overriddenMethods.size() == 0
+        methods[5].overriddenMethods.size() == 0
+        methods[6].overriddenMethods.size() == 0
+        methods[7].overriddenMethods.size() == 2
+        methods[8].overriddenMethods.size() == 2
+        methods[9].overriddenMethods.size() == 0
+        methods[10].overriddenMethods.size() == 0
+        methods[11].overriddenMethods.size() == 0
+        methods[12].overriddenMethods.size() == 0
+        classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods()).size() == 13 + 1 + 2 + 2
 
         when:
         List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenElements())
@@ -1956,8 +2126,8 @@ final class Test<T extends Test<?>> {
     }
 
     void "test recursive generic method return"() {
-        given:
-        ClassElement ce = buildClassElement('''\
+        expect:
+        buildClassElement('''\
 package test;
 
 import org.hibernate.SessionFactory;
@@ -1970,17 +2140,19 @@ class MyFactory {
     }
 }
 
-''')
-        expect:
-        def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
-        def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
-        def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
-        typeArguments.size() == 1
-        def typeArgument = typeArguments.get("T")
-        typeArgument.name == "org.hibernate.SessionBuilder"
-        def nextTypeArguments = typeArgument.getTypeArguments()
-        def nextTypeArgument = nextTypeArguments.get("T")
-        nextTypeArgument.name == "java.lang.Object"
+''') { ClassElement ce ->
+            def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
+            def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
+            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+            assert typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            assert typeArgument.name == "org.hibernate.SessionBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            assert nextTypeArgument.name == "java.lang.Object"
+            return ce
+        }
+
     }
 
     void "test recursive generic method return 2"() {
@@ -2955,7 +3127,8 @@ class Outer {
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method"() {
-        ClassElement ce = buildClassElement('''
+        expect:
+        buildClassElement('''
 package test;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -2985,20 +3158,20 @@ class MyBean {
     }
 }
 
-''')
-
-        when:
-        def method = ce.findMethod("findById").get()
-        def type = method.getGenericReturnType()
-        then:
-        method.getAnnotationNames().isEmpty()
-        method.getReturnType().isEmpty()
-        type.hasAnnotation(NotNull)
-        !type.hasAnnotation(Null)
+''') { ClassElement ce ->
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+            assert method.getAnnotationNames().isEmpty()
+            assert method.getReturnType().isEmpty()
+            assert type.hasAnnotation(NotNull)
+            assert !type.hasAnnotation(Null)
+            return ce
+        }
     }
 
     void "test interface with type with not inherited generic annotations and conflicting method different order"() {
-        ClassElement ce = buildClassElement('''
+        expect:
+        buildClassElement('''
 package test;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -3028,16 +3201,16 @@ class MyBean {
     }
 }
 
-''')
+''') { ClassElement ce ->
+            def method = ce.findMethod("findById").get()
+            def type = method.getGenericReturnType()
+            assert method.getAnnotationNames().isEmpty()
+            assert method.getReturnType().isEmpty()
+            assert !type.hasAnnotation(NotNull)
+            assert type.hasAnnotation(Null)
+            return ce
+        }
 
-        when:
-        def method = ce.findMethod("findById").get()
-        def type = method.getGenericReturnType()
-        then:
-        method.getAnnotationNames().isEmpty()
-        method.getReturnType().isEmpty()
-        !type.hasAnnotation(NotNull)
-        type.hasAnnotation(Null)
     }
 
     void "test interface with conflicting method having not inherited method annotations"() {
@@ -3317,6 +3490,143 @@ interface MyInterface {
         def methods = ce.getMethods();
         then:
         methods.size() == 4
+    }
+
+    void "test unrecognized default method"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package elementquery;
+
+interface MyBean extends GenericInterface, SpecificInterface {
+
+    default Specific getObject() {
+        return null;
+    }
+
+}
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {
+    Generic getObject();
+}
+interface SpecificInterface {
+    Specific getObject();
+}
+
+''')
+        when:
+        def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+        allMethods.size() == 2
+        when:
+        def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+        declaredMethods.size() == 1
+        declaredMethods.get(0).isDefault() == true
+    }
+
+    void "test overridden methods"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
+
+import java.util.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+@jakarta.inject.Singleton
+class Test implements TestBase {
+    @Override
+    public void map(Map<@NotBlank String, List<@NotNull String>> list) {
+    }
+}
+
+interface TestBase {
+    @io.micronaut.context.annotation.Executable
+    void map(Map<String, List<@NotBlank String>> list);
+}
+
+''')
+        when:
+        def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+        declaredMethods.size() == 1
+        declaredMethods.get(0).getOverriddenMethods()[0].getDeclaringType().getName() == "test.TestBase"
+        declaredMethods.get(0).getOverriddenMethods()[0].getParameters()[0].getGenericType().getTypeArguments(Map).get("V").getTypeArguments(List).get("E").getAnnotationNames().toList() == ['jakarta.validation.constraints.NotBlank$List']
+    }
+
+    void "test bean properties interfaces"() {
+        def ce = buildClassElement('''
+package test;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.visitors.data.Pageable;
+import jakarta.inject.Singleton;
+
+class TestNamed {
+    Pageable method() {
+        return null;
+    }
+}
+
+''')
+        def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
+        expect:
+            properties.stream().map {it.getName()}.sorted().toList() == [
+                    "sorted",
+                    "orderBy",
+                    "number",
+                    "size",
+                    "offset",
+                    "sort",
+                    "unpaged"
+            ].sort()
+    }
+
+    void "test bean properties 2"() {
+        def ce = buildClassElement('''
+package test;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.visitors.data.Pageable;
+import jakarta.inject.Singleton;
+
+class TestNamed {
+    Pageable method() {
+        return null;
+    }
+}
+
+''')
+        def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
+                .stream()
+                .filter {it.getName() == "orderBy"}.findFirst()
+                .get()
+                .getGenericType()
+                .getFirstTypeArgument()
+                .get()
+                .getBeanProperties()
+        expect:
+            properties.stream().map {it.getName()}.sorted().toList() == [
+                    "ignoreCase",
+                    "direction",
+                    "property",
+                    "ascending"
+            ].sort()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType()
+                    .isEnum()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType() instanceof EnumElement
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

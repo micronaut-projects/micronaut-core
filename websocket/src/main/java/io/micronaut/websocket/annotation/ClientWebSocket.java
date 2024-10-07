@@ -16,7 +16,10 @@
 package io.micronaut.websocket.annotation;
 
 import io.micronaut.aop.Introduction;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Type;
 import io.micronaut.websocket.WebSocketVersion;
 import io.micronaut.websocket.interceptor.ClientWebSocketInterceptor;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;

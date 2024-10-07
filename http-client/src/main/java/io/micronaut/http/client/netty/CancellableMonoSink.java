@@ -24,6 +24,8 @@ import org.reactivestreams.Subscription;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * Version of {@link Sinks#one()} where cancellation of the {@link Mono} will make future emit
  * calls fail.
@@ -34,12 +36,15 @@ import reactor.core.publisher.Sinks;
 final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscription, PoolSink<T> {
     private static final Object EMPTY = new Object();
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     @Nullable
     private final BlockHint blockHint;
 
     private T value;
     private Throwable failure;
     private boolean complete = false;
+    private boolean cancelled = false;
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
 
@@ -54,16 +59,21 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public synchronized void subscribe(Subscriber<? super T> s) {
-        if (this.subscriber != null) {
-            s.onError(new IllegalStateException("Only one subscriber allowed"));
+    public void subscribe(Subscriber<? super T> s) {
+        lock.lock();
+        try {
+            if (this.subscriber != null) {
+                s.onError(new IllegalStateException("Only one subscriber allowed"));
+            }
+            subscriber = s;
+            subscriber.onSubscribe(this);
+        } finally {
+            lock.unlock();
         }
-        subscriber = s;
-        subscriber.onSubscribe(this);
     }
 
     private void tryForward() {
-        if (subscriberWaiting && complete) {
+        if (subscriberWaiting && complete && !cancelled) {
             if (failure == null) {
                 if (value != EMPTY) {
                     subscriber.onNext(value);
@@ -77,14 +87,19 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
 
     @NonNull
     @Override
-    public synchronized Sinks.EmitResult tryEmitValue(T value) {
-        if (complete) {
-            return Sinks.EmitResult.FAIL_OVERFLOW;
-        } else {
-            this.value = value;
-            complete = true;
-            tryForward();
-            return Sinks.EmitResult.OK;
+    public Sinks.EmitResult tryEmitValue(T value) {
+        lock.lock();
+        try {
+            if (complete) {
+                return Sinks.EmitResult.FAIL_OVERFLOW;
+            } else {
+                this.value = value;
+                complete = true;
+                tryForward();
+                return Sinks.EmitResult.OK;
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -102,14 +117,19 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
 
     @NonNull
     @Override
-    public synchronized Sinks.EmitResult tryEmitError(@NonNull Throwable error) {
-        if (complete) {
-            return Sinks.EmitResult.FAIL_OVERFLOW;
-        } else {
-            this.failure = error;
-            complete = true;
-            tryForward();
-            return Sinks.EmitResult.OK;
+    public Sinks.EmitResult tryEmitError(@NonNull Throwable error) {
+        lock.lock();
+        try {
+            if (complete) {
+                return Sinks.EmitResult.FAIL_OVERFLOW;
+            } else {
+                this.failure = error;
+                complete = true;
+                tryForward();
+                return Sinks.EmitResult.OK;
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -124,8 +144,13 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public synchronized int currentSubscriberCount() {
-        return subscriber == null ? 0 : 1;
+    public int currentSubscriberCount() {
+        lock.lock();
+        try {
+            return subscriber == null ? 0 : 1;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @NonNull
@@ -140,15 +165,26 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public synchronized void request(long n) {
-        if (n > 0 && !subscriberWaiting) {
-            subscriberWaiting = true;
-            tryForward();
+    public void request(long n) {
+        lock.lock();
+        try {
+            if (n > 0 && !subscriberWaiting) {
+                subscriberWaiting = true;
+                tryForward();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
-    public synchronized void cancel() {
-        complete = true;
+    public void cancel() {
+        lock.lock();
+        try {
+            complete = true;
+            cancelled = true;
+        } finally {
+            lock.unlock();
+        }
     }
 }

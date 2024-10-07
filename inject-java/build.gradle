@@ -14,6 +14,7 @@ dependencies {
     testImplementation project(":context")
     testImplementation project(':aop')
     testImplementation projects.injectJavaHelper
+    testCompileOnly projects.injectJavaHelper2
 
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
@@ -47,6 +48,7 @@ dependencies {
     testImplementation libs.junit.jupiter.api
     testImplementation libs.javax.annotation.api
     testImplementation libs.javax.inject
+    testImplementation libs.graal
     testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.jakarta.el.impl
     testRuntimeOnly libs.jakarta.el

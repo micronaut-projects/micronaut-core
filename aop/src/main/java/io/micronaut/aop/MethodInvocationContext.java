@@ -15,17 +15,15 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
  *
- *  @param <T> The declaring type
- *  @param <R> The result of the method call
- *
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,7 +34,8 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      *
      * @return The underlying method reference.
      */
-    @NonNull ExecutableMethod<T, R> getExecutableMethod();
+    @NonNull
+    ExecutableMethod<T, R> getExecutableMethod();
 
     @Override
     default boolean isSuspend() {
@@ -48,6 +47,7 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return getExecutableMethod().isAbstract();
     }
 
+    @NonNull
     @Override
     default Class<T> getDeclaringType() {
         return getExecutableMethod().getDeclaringType();

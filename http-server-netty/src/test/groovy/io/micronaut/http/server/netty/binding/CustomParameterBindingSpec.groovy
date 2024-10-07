@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.*
@@ -20,7 +21,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
         HttpRequest<?> req = HttpRequest.create(HttpMethod.CUSTOM, uri, httpMethod)
-        Publisher<HttpResponse<?>> exchange = rxClient.exchange(req, String)
+        Publisher<HttpResponse<?>> exchange = httpClient.exchange(req, String)
         HttpResponse<?> response = Flux.from(exchange).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -74,7 +75,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
 
     void "test exploded with no default constructor"() {
         when:
-        Flux<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.create(HttpMethod.CUSTOM, "/parameter/exploded?title=The%20Stand", "REPORT"), String)
+        Flux<HttpResponse<String>> exchange = httpClient.exchange(HttpRequest.create(HttpMethod.CUSTOM, "/parameter/exploded?title=The%20Stand", "REPORT"), String)
         HttpResponse<String> response = exchange.blockFirst()
 
         then:
@@ -83,6 +84,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
         response.getBody().get() == "Parameter Value: The Stand"
     }
 
+    @Requires(property = 'spec.name', value = 'CustomParameterBindingSpec')
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
         @CustomHttpMethod(method="REPORT")

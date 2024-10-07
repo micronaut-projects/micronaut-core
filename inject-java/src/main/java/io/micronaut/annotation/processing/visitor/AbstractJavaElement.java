@@ -15,17 +15,19 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
@@ -39,6 +41,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.IntersectionType;
 import javax.lang.model.type.NoType;
 import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.UnionType;
@@ -49,6 +52,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -72,9 +76,9 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
     private final JavaNativeElement nativeElement;
 
     /**
-     * @param nativeElement             The {@link Element}
+     * @param nativeElement The {@link Element}
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The Java visitor context
+     * @param visitorContext The Java visitor context
      */
     AbstractJavaElement(JavaNativeElement nativeElement, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
         super(annotationMetadataFactory);
@@ -109,23 +113,29 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
 
     @Override
     public boolean isPackagePrivate() {
-        Set<Modifier> modifiers = nativeElement.element().getModifiers();
-        return !(modifiers.contains(PUBLIC)
-                || modifiers.contains(PROTECTED)
-                || modifiers.contains(PRIVATE));
+        var element = nativeElement.element();
+        Set<Modifier> modifiers = element != null ? element.getModifiers() : Collections.emptySet();
+        return !modifiers.contains(PUBLIC)
+            && !modifiers.contains(PROTECTED)
+            && !modifiers.contains(PRIVATE);
     }
 
+    @NonNull
     @Override
     public String getName() {
-        return nativeElement.element().getSimpleName().toString();
+        var element = nativeElement.element();
+        return element != null ? element.getSimpleName().toString() : StringUtils.EMPTY_STRING;
     }
 
     @Override
     public Set<ElementModifier> getModifiers() {
-        return nativeElement.element()
-                .getModifiers().stream()
-                .map(m -> ElementModifier.valueOf(m.name()))
-                .collect(Collectors.toSet());
+        var element = nativeElement.element();
+        if (element == null) {
+            return Collections.emptySet();
+        }
+        return element.getModifiers().stream()
+            .map(m -> ElementModifier.valueOf(m.name()))
+            .collect(Collectors.toSet());
     }
 
     @Override
@@ -164,6 +174,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         return hasModifier(Modifier.PROTECTED);
     }
 
+    @NonNull
     @Override
     public JavaNativeElement getNativeType() {
         return nativeElement;
@@ -171,14 +182,14 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
 
     @Override
     public String toString() {
-        return nativeElement.element().toString();
+        return Objects.requireNonNull(nativeElement.element()).toString();
     }
 
     /**
      * Obtain the ClassElement for the given mirror.
      *
-     * @param owner                        The owner
-     * @param type                         The type
+     * @param owner The owner
+     * @param type The type
      * @param declaredElementTypeArguments The type arguments of the declaring element (method, class)
      * @return The class element
      */
@@ -192,7 +203,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
     /**
      * Obtain the ClassElement for the given mirror.
      *
-     * @param type                         The type
+     * @param type The type
      * @param declaredElementTypeArguments The type arguments of the declaring element (method, class)
      * @return The class element
      */
@@ -239,7 +250,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                     ClassElement objectElement = visitorContext.getClassElement(Object.class.getName())
                         .orElseThrow(() -> new IllegalStateException("java.lang.Object element not found"));
                     List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
-                    Map<String, ClassElement> resolved = CollectionUtils.newHashMap(typeMirrorArguments.size());
+                    var resolved = CollectionUtils.<String, ClassElement>newHashMap(typeMirrorArguments.size());
                     for (TypeParameterElement typeParameter : typeParameters) {
                         String variableName = typeParameter.getSimpleName().toString();
                         resolved.put(variableName, objectElement);
@@ -249,21 +260,24 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                     visitedTypes.add(dt);
                     resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
                 }
+                if (type.getKind() == TypeKind.ERROR) {
+                    throw new PostponeToNextRoundException(typeElement, getName() + " " + typeElement);
+                }
                 if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
-                            new JavaNativeElement.Class(typeElement, type, owner),
-                            elementAnnotationMetadataFactory,
-                            visitorContext
+                        new JavaNativeElement.Class(typeElement, type, owner),
+                        elementAnnotationMetadataFactory,
+                        visitorContext
                     );
                 }
                 return new JavaClassElement(
-                        new JavaNativeElement.Class(typeElement, type, owner),
-                        elementAnnotationMetadataFactory,
-                        visitorContext,
-                        typeMirrorArguments,
-                        resolvedTypeArguments,
-                        0,
-                        isTypeVariable
+                    new JavaNativeElement.Class(typeElement, type, owner),
+                    elementAnnotationMetadataFactory,
+                    visitorContext,
+                    typeMirrorArguments,
+                    resolvedTypeArguments,
+                    0,
+                    isTypeVariable
                 );
             }
             return PrimitiveElement.VOID;
@@ -274,7 +288,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         if (type instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
             return newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable)
-                    .toArray();
+                .toArray();
         }
         if (type instanceof PrimitiveType pt) {
             return PrimitiveElement.valueOf(pt.getKind().name());
@@ -307,11 +321,11 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             upperBounds = Stream.of(extendsBound);
         }
         List<ClassElement> upperBoundsAsElements = upperBounds
-                .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
-                .toList();
+            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
+            .toList();
         List<ClassElement> lowerBoundsAsElements = lowerBounds
-                .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
-                .toList();
+            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
+            .toList();
         ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals(Object.class.getName())) {
             // Not bounded wildcard: <?>
@@ -328,11 +342,11 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             return upperType;
         }
         return new JavaWildcardElement(
-                elementAnnotationMetadataFactory,
-                wt,
-                (JavaClassElement) upperType,
-                upperBoundsAsElements.stream().map(JavaClassElement.class::cast).toList(),
-                lowerBoundsAsElements.stream().map(JavaClassElement.class::cast).toList()
+            elementAnnotationMetadataFactory,
+            wt,
+            (JavaClassElement) upperType,
+            upperBoundsAsElements.stream().map(JavaClassElement.class::cast).toList(),
+            lowerBoundsAsElements.stream().map(JavaClassElement.class::cast).toList()
         );
     }
 
@@ -354,15 +368,15 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         if (typeParameters.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<String, ClassElement> resolved = CollectionUtils.newLinkedHashMap(typeParameters.size());
+        var resolved = CollectionUtils.<String, ClassElement>newLinkedHashMap(typeParameters.size());
         if (typeMirrorArguments != null && typeMirrorArguments.size() == typeParameters.size()) {
             Iterator<? extends TypeMirror> i = typeMirrorArguments.iterator();
             for (TypeParameterElement typeParameter : typeParameters) {
                 TypeMirror typeParameterMirror = i.next();
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
-                        variableName,
-                        newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter)
+                    variableName,
+                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter)
                 );
             }
         } else {
@@ -372,8 +386,8 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             for (TypeParameterElement typeParameter : typeParameters) {
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
-                        variableName,
-                        newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null)
+                    variableName,
+                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null)
                 );
             }
         }
@@ -385,7 +399,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                                              Set<TypeMirror> visitedTypes,
                                              TypeVariable tv,
                                              boolean isRawType) {
-        String variableName = tv.toString();
+        String variableName = tv.asElement().getSimpleName().toString();
         ClassElement resolvedBound = parentTypeArguments.get(variableName);
         List<JavaClassElement> bounds = null;
         io.micronaut.inject.ast.Element declaredElement = this;
@@ -416,17 +430,17 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             TypeMirror upperBound = tv.getUpperBound();
             // type variable is still free.
             List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType it ?
-                    it.getBounds() :
-                    Collections.singletonList(upperBound);
+                it.getBounds() :
+                Collections.singletonList(upperBound);
             boundsUnresolved.stream()
-                    .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true))
-                    .forEach(bounds::add);
+                .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true))
+                .forEach(bounds::add);
         }
         return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType);
     }
 
     private boolean hasModifier(Modifier modifier) {
-        return nativeElement.element().getModifiers().contains(modifier);
+        return Objects.requireNonNull(nativeElement.element()).getModifiers().contains(modifier);
     }
 
     @Override
@@ -446,11 +460,11 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             return false;
         }
         // We allow to match different subclasses like JavaClassElement, JavaPlaceholder, JavaWildcard etc
-        return nativeElement.element().equals(abstractJavaElement.getNativeType().element());
+        return Objects.equals(nativeElement.element(), abstractJavaElement.getNativeType().element());
     }
 
     @Override
     public int hashCode() {
-        return nativeElement.element().hashCode();
+        return Objects.requireNonNull(nativeElement.element()).hashCode();
     }
 }

@@ -16,8 +16,10 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
@@ -52,7 +54,7 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         operand.compile(ctx);
         pattern.compile(ctx);
@@ -65,7 +67,7 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (!operand.resolveType(ctx).equals(STRING)) {
             throw new ExpressionCompilationException(
                 "Operator 'matches' can only be applied to String operand");

@@ -22,7 +22,6 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
@@ -54,7 +53,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @since 1.0
  */
 @Singleton
-@Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
+@Requires(condition = RefreshScopeCondition.class)
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
 
     public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;

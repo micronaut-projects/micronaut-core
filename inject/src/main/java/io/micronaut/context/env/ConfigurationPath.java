@@ -190,6 +190,7 @@ public sealed interface ConfigurationPath
     /**
      * remove last entry.
      *
+     * @return the last element from this path
      * @throws java.util.NoSuchElementException if there isn't any remaining elements.
      */
     @NonNull ConfigurationSegment removeLast();

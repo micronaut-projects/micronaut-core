@@ -24,12 +24,53 @@ import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
- * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.
+ * An interface representing a Cookie. See .
+ * @see <a href="https://tools.ietf.org/html/rfc6265">RFC6265</a>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface Cookie extends Comparable<Cookie>, Serializable {
+
+    /**
+     * Constant for undefined MaxAge attribute value.
+     */
+    long UNDEFINED_MAX_AGE = Long.MIN_VALUE;
+
+    /**
+     * @see <a href="https://tools.ietf.org/html/rfc6265#section-4.1.1">The Secure Attribute</a>.
+     */
+    String ATTRIBUTE_SECURE = "Secure";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.6">The HttpOnly Attribute</a>.
+     */
+    String ATTRIBUTE_HTTP_ONLY = "HttpOnly";
+
+    /**
+     * Controls whether a cookie is sent with cross-site requests.
+     */
+    String ATTRIBUTE_SAME_SITE = "SameSite";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.3">The Domain Attribute</a>
+     */
+    String ATTRIBUTE_DOMAIN = "Domain";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.4">The Path Attribute</a>.
+     */
+    String ATTRIBUTE_PATH = "Path";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.1">The Expires Attribute</a>.
+     */
+    String ATTRIBUTE_EXPIRES = "Expires";
+
+    /**
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2">The Max-Age Attribute</a>
+     */
+    String ATTRIBUTE_MAX_AGE = "Max-Age";
 
     /**
      * @return The name of the cookie
@@ -74,6 +115,10 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     boolean isSecure();
 
     /**
+     * Gets the maximum age of the cookie in seconds. If the max age has not been explicitly set,
+     * then the value returned will be {@link #UNDEFINED_MAX_AGE}, indicating that the Max-Age
+     * Attribute should not be written.
+     *
      * @return The maximum age of the cookie in seconds
      */
     long getMaxAge();
@@ -100,7 +145,8 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     }
 
     /**
-     * Sets the max age of the cookie in seconds.
+     * Sets the max age of the cookie in seconds. When not explicitly set, the max age will default
+     * to {@link #UNDEFINED_MAX_AGE} and cause the Max-Age Attribute not to be encoded.
      *
      * @param maxAge The max age
      * @return This cookie
@@ -140,12 +186,33 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     @NonNull Cookie secure(boolean secure);
 
     /**
+     * Sets this cookie as secure.
+     * @return This Cookie
+     * @since 4.3.0
+     */
+    @NonNull
+    default Cookie secure() {
+        return secure(true);
+    }
+
+    /**
      * Sets whether the cookie is HTTP-Only.
      *
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
      */
     @NonNull Cookie httpOnly(boolean httpOnly);
+
+    /**
+     * Sets this cookie as HTTP-Only.
+     *
+     * @return This cookie
+     * @since 4.3.0
+     */
+    @NonNull
+    default Cookie httpOnly() {
+        return httpOnly(true);
+    }
 
     /**
      * Configure the Cookie with the given configuration.

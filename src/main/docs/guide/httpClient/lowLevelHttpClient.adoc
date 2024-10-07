@@ -3,3 +3,5 @@ The api:http.client.HttpClient[] interface forms the basis for the low-level API
 The majority of the methods in the api:http.client.HttpClient[] interface return Reactive Streams rs:Publisher[] instances, which is not always the most useful interface to work against.
 
 Micronaut's Reactor HTTP Client dependency ships with a sub-interface named link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient]. It provides a variation of the api:http.client.HttpClient[] interface that returns https://projectreactor.io[Project Reactor] reactor:Flux[] types.
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-http-client.html[Micronaut HTTP Client] to learn more.

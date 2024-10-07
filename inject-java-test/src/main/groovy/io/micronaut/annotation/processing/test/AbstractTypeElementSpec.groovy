@@ -18,11 +18,11 @@ package io.micronaut.annotation.processing.test
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
-import io.micronaut.annotation.processing.AnnotationUtils
-import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaNativeElementsHelper
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
+import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
@@ -56,7 +56,6 @@ import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.intellij.lang.annotations.Language
@@ -70,7 +69,6 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
-
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -84,7 +82,9 @@ abstract class AbstractTypeElementSpec extends Specification {
      * Builds a class element for the given source code.
      * @param cls The source
      * @return The class element
+     * @deprecated Use closure equivalent and supply assertions
      */
+    @Deprecated
     ClassElement buildClassElement(@Language("java") String cls) {
         TypeElementInfo typeElementInfo = buildTypeElementInfo(cls)
         TypeElement typeElement = typeElementInfo.typeElement
@@ -94,24 +94,45 @@ abstract class AbstractTypeElementSpec extends Specification {
         def processingEnv = typeElementInfo.javaParser.processingEnv
         def messager = processingEnv.messager
         ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
-        }
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(
                 processingEnv,
                 messager,
                 elements,
-                annotationUtils,
                 types,
                 modelUtils,
-                genericUtils,
                 processingEnv.filer,
                 new MutableConvertibleValuesMap<Object>(),
                 TypeElementVisitor.VisitorKind.ISOLATING
         )
 
         return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
+    }
+
+    <T> T buildClassElement(@Language("java") String cls, Closure<T> closure) {
+        buildTypeElementInfo(cls) { TypeElementInfo typeElementInfo ->
+            TypeElement typeElement = typeElementInfo.typeElement
+            def lastTask = typeElementInfo.javaParser.lastTask.get()
+            def elements = lastTask.elements
+            def types = lastTask.types
+            def processingEnv = typeElementInfo.javaParser.processingEnv
+            def messager = processingEnv.messager
+            ModelUtils modelUtils = new ModelUtils(elements, types) {}
+
+            JavaVisitorContext visitorContext = new JavaVisitorContext(
+                    processingEnv,
+                    messager,
+                    elements,
+                    types,
+                    modelUtils,
+                    processingEnv.filer,
+                    new MutableConvertibleValuesMap<Object>(),
+                    TypeElementVisitor.VisitorKind.ISOLATING
+            )
+
+            def classElement = new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
+            return closure.call(classElement)
+        }
     }
 
     /**
@@ -199,7 +220,9 @@ class Test {
      * @throws IOException
      */
     public @Nullable Reader readGenerated(@NonNull String filePath, String className, @Language("java") String code) throws IOException {
-        return newJavaParser().readGenerated(filePath, className, code)
+        try (def parser = newJavaParser()) {
+            return parser.readGenerated(filePath, className, code)
+        }
     }
 
     /**
@@ -241,38 +264,40 @@ class Test {
      * @return The context. Should be shutdown after use
      */
     ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
-        def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new JavaFileObjectClassLoader(files)
+        try (def parser = newJavaParser()) {
+            def files = parser.generate(className, cls)
+            ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
-        def builder = ApplicationContext.builder()
-        builder.classLoader(classLoader)
-        builder.environments("test")
-        builder.properties(properties)
-        configureContext(builder)
-        def env = builder.build().environment
-        def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
-            @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = StreamSupport.stream(files.spliterator(), false)
-                        .filter({ JavaFileObject jfo ->
-                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
-                        })
-                        .map({ JavaFileObject jfo ->
-                            def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
-                            name = name.replace('/', '.') - '.class'
-                            return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
-                        })
-                        .collect(Collectors.toList())
+            def builder = ApplicationContext.builder()
+            builder.classLoader(classLoader)
+            builder.environments("test")
+            builder.properties(properties)
+            configureContext(builder)
+            def env = builder.build().environment
+            def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
+                @Override
+                protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+                    def references = StreamSupport.stream(files.spliterator(), false)
+                            .filter({ JavaFileObject jfo ->
+                                jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + '$Reference' + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
+                            })
+                            .map({ JavaFileObject jfo ->
+                                def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                                name = name.replace('/', '.') - '.class'
+                                return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
+                            })
+                            .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
+                    return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
+                }
+
+                @Override
+                protected Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+                    return env
+                }
             }
-
-            @Override
-            protected Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-                return env
-            }
+            return context.start()
         }
-        return context.start()
     }
 
     /**
@@ -298,6 +323,7 @@ class Test {
                 @Override
                 protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
                     return new TypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors
@@ -308,6 +334,7 @@ class Test {
                 @Override
                 protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
                     return new AggregatingTypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors
@@ -338,9 +365,11 @@ class Test {
     protected TypeElement buildTypeElement(@Language('java') String cls) {
         List<Element> elements = []
 
-        newJavaParser().parseLines("",
-                cls
-        ).each { elements.add(it) }
+        try (def parser = newJavaParser()) {
+            parser.parseLines("",
+                    cls
+            ).each { elements.add(it) }
+        }
 
         def element = elements ? elements[0] : null
         return (TypeElement) element
@@ -349,17 +378,34 @@ class Test {
     protected TypeElementInfo buildTypeElementInfo(@Language("java") String cls) {
         List<Element> elements = []
 
+        try (def parser = newJavaParser()) {
+            parser.parseLines("",
+                    cls
+            ).each { elements.add(it) }
+            def element = elements ? elements[0] : null
+            return new TypeElementInfo(
+                    typeElement: element,
+                    javaParser: parser
+            )
+        }
 
-        def parser = newJavaParser()
-        parser.parseLines("",
-                cls
-        ).each { elements.add(it) }
+    }
 
-        def element = elements ? elements[0] : null
-        return new TypeElementInfo(
-                typeElement: element,
-                javaParser: parser
-        )
+    protected <T> T buildTypeElementInfo(@Language("java") String cls, Closure<T> callable) {
+        List<Element> elements = []
+
+        try (def parser = newJavaParser()) {
+            parser.parseLines("",
+                    cls
+            ).each { elements.add(it) }
+            def element = elements ? elements[0] : null
+
+            return callable.call( new TypeElementInfo(
+                    typeElement: element,
+                    javaParser: parser
+            ))
+        }
+
     }
 
     protected String buildAndReadResourceAsString(String resourceName, @Language("java") String cls) {
@@ -459,7 +505,7 @@ class Test {
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, @Language("java") String cls) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -469,7 +515,7 @@ class Test {
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, @Language("java") String cls) {
         def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -485,8 +531,10 @@ class Test {
     @CompileStatic
     protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
         AbstractAnnotationMetadataBuilder.clearMutated()
-        Iterable<? extends JavaFileObject> files = newJavaParser().generate(className, cls)
-        return new JavaFileObjectClassLoader(files)
+        try (def parser = newJavaParser()) {
+            Iterable<? extends JavaFileObject> files = parser.generate(className, cls)
+            return new JavaFileObjectClassLoader(files)
+        }
     }
 
     @CompileStatic
@@ -511,58 +559,63 @@ class Test {
     }
 
     protected JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
-        JavaParser parser = newJavaParser()
-        JavacTask javacTask = parser.getJavacTask()
-        def elements = javacTask.elements
-        def types = javacTask.types
-        def processingEnv = parser.processingEnv
-        def messager = processingEnv.messager
-        ModelUtils modelUtils = new ModelUtils(elements, types) {}
-        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, parser.filer) {
-            @Override
-            JavaAnnotationMetadataBuilder newAnnotationBuilder() {
-                return super.newAnnotationBuilder()
-            }
-        }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils) {
-            @Override
-            protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
-                def loadedMappers = super.getAnnotationMappers(annotationName)
-                def localMappers = getLocalAnnotationMappers(annotationName)
-                if (localMappers) {
-                    def newList = []
-                    if (loadedMappers) {
-                        newList.addAll(loadedMappers)
-                    }
-                    newList.addAll(localMappers)
-                    return newList
-                } else {
+        try (JavaParser parser = newJavaParser()) {
+            JavacTask javacTask = parser.getJavacTask()
+            def elements = javacTask.elements
+            def types = javacTask.types
+            def processingEnv = parser.processingEnv
+            def messager = processingEnv.messager
+            ModelUtils modelUtils = new ModelUtils(elements, types) {}
+            JavaVisitorContext visitorContext = new JavaVisitorContext(
+                    processingEnv,
+                    messager,
+                    elements,
+                    types,
+                    modelUtils,
+                    parser.filer,
+                    new MutableConvertibleValuesMap<>(),
+                    TypeElementVisitor.VisitorKind.ISOLATING
+            );
+            JavaNativeElementsHelper helper = new JavaNativeElementsHelper(elements, modelUtils.getTypeUtils())
+            JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, modelUtils, helper, visitorContext) {
+                @Override
+                protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
+                    def loadedMappers = super.getAnnotationMappers(annotationName)
+                    def localMappers = getLocalAnnotationMappers(annotationName)
                     if (localMappers) {
-                        return loadedMappers
+                        def newList = []
+                        if (loadedMappers) {
+                            newList.addAll(loadedMappers)
+                        }
+                        newList.addAll(localMappers)
+                        return newList
                     } else {
-                        return Collections.emptyList()
+                        if (localMappers) {
+                            return loadedMappers
+                        } else {
+                            return Collections.emptyList()
+                        }
                     }
                 }
-            }
 
-            @Override
-            protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
-                def loadedTransformers = super.getAnnotationTransformers(annotationName)
-                def localTransfomers = getLocalAnnotationTransformers(annotationName)
-                if (localTransfomers) {
-                    def newList = []
-                    if (loadedTransformers) {
-                        newList.addAll(loadedTransformers)
+                @Override
+                protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
+                    def loadedTransformers = super.getAnnotationTransformers(annotationName)
+                    def localTransformers = getLocalAnnotationTransformers(annotationName)
+                    if (localTransformers) {
+                        def newList = []
+                        if (loadedTransformers) {
+                            newList.addAll(loadedTransformers)
+                        }
+                        newList.addAll(localTransformers)
+                        return newList
+                    } else {
+                        return loadedTransformers
                     }
-                    newList.addAll(localTransfomers)
-                    return newList
-                } else {
-                    return loadedTransformers
                 }
             }
+            return builder
         }
-        return builder
     }
 
     /**

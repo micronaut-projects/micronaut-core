@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 
 /**
@@ -44,6 +46,17 @@ public interface NettyClientCustomizer {
      */
     @NonNull
     default NettyClientCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
+        return this;
+    }
+
+    /**
+     * @param bootstrap The bootstrap that will be used to connect
+     * @return The new customizer, or {@code this} if no specialization needs to take place.
+     * @since 4.7.0
+     */
+    @Experimental
+    @NonNull
+    default NettyClientCustomizer specializeForBootstrap(@NonNull Bootstrap bootstrap) {
         return this;
     }
 

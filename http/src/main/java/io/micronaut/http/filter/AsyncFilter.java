@@ -17,6 +17,7 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.HttpRequest;
 
 import java.util.concurrent.Executor;
 import java.util.function.Function;
@@ -35,6 +36,11 @@ import java.util.function.Function;
 record AsyncFilter(InternalHttpFilter actual, Executor executor) implements InternalHttpFilter {
 
     @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        return actual.isEnabled(request);
+    }
+
+    @Override
     public boolean isFiltersRequest() {
         return actual.isFiltersRequest();
     }
@@ -42,6 +48,19 @@ record AsyncFilter(InternalHttpFilter actual, Executor executor) implements Inte
     @Override
     public boolean isFiltersResponse() {
         return actual.isFiltersResponse();
+    }
+
+    @Override
+    public boolean hasContinuation() {
+        return actual.hasContinuation();
+    }
+
+    @Override
+    public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+        if (isFiltersRequest()) {
+            return ExecutionFlow.async(executor, () -> actual.processRequestFilter(context));
+        }
+        return InternalHttpFilter.super.processRequestFilter(context);
     }
 
     @Override

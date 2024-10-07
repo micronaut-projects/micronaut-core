@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.HttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,7 +155,7 @@ public class AccessLogFormatParser {
                 // constants
                 constantElements.add(indexedLogElement);
                 // pre-fill log values with constant
-                elements[i] = element.onRequestHeaders(null, null, null, null, null);
+                elements[i] = element.onRequestHeaders(ConnectionMetadata.empty(), "", EmptyHttpHeaders.INSTANCE, "", "");
                 continue;
             }
             if (element.events().contains(LogElement.Event.ON_LAST_RESPONSE_WRITE)) {
@@ -291,8 +293,8 @@ public class AccessLogFormatParser {
         }
 
         @Override
-        public String onRequestHeaders(SocketChannel channel, String method, io.netty.handler.codec.http.HttpHeaders headers, String uri, String protocol) {
-            return delegate.onRequestHeaders(channel, method, headers, uri, protocol);
+        public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+            return delegate.onRequestHeaders(metadata, method, headers, uri, protocol);
         }
 
         @Override

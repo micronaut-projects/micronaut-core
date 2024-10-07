@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -25,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
@@ -48,6 +50,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     private final HttpMethod httpMethod;
     private final UriMatchTemplate uriMatchTemplate;
+    private final UriTemplateMatcher uriTemplateMatcher;
     private final Charset defaultCharset;
     private final Integer port;
     private final ConversionService conversionService;
@@ -71,6 +74,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.httpMethod = httpMethod;
         this.uriMatchTemplate = uriMatchTemplate;
+        this.uriTemplateMatcher = new UriTemplateMatcher(uriMatchTemplate.getTemplateString());
         this.defaultCharset = defaultCharset;
         this.port = port;
         this.conversionService = conversionService;
@@ -89,12 +93,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public Optional<UriRouteMatch<T, R>> match(String uri) {
-        return uriMatchTemplate.match(uri).map(info -> new DefaultUriRouteMatch<>(info, this, defaultCharset, conversionService));
+        return Optional.ofNullable(tryMatch(uri));
     }
 
     @Override
-    public UriRouteMatch<T, R> tryMatch(String uri) {
-        UriMatchInfo matchInfo = uriMatchTemplate.tryMatch(uri);
+    public UriRouteMatch<T, R> tryMatch(@NonNull String uri) {
+        UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
         }
@@ -107,22 +111,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public int compareTo(UriRouteInfo o) {
-        return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+    public int compareTo(@NonNull UriRouteInfo o) {
+        return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
     }
 
     @Override
     public String toString() {
-        return new StringBuilder(getHttpMethodName()).append(' ')
-                .append(uriMatchTemplate)
-                .append(" -> ")
-                .append(getTargetMethod().getDeclaringType().getSimpleName())
-                .append('#')
-                .append(getTargetMethod().getName())
-                .append(" (")
-                .append(String.join(",", consumesMediaTypes))
-                .append(")")
-                .toString();
+        return getHttpMethodName() + ' '
+                + uriMatchTemplate + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
+                + '#' + getTargetMethod().getName()
+                + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 
     @Override

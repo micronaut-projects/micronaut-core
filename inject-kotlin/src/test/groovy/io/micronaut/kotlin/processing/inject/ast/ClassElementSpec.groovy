@@ -5,11 +5,13 @@ import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.GenericElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
@@ -20,10 +22,100 @@ import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.kotlin.processing.visitor.AllElementsVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinEnumElement
+import io.micronaut.runtime.context.env.ConfigurationAdvice
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
+
+    void "test Java Record compile"() {
+        def ce  = buildClassElementJava('test.Product2', '''
+package test;
+
+record Product2(Double price, String name) {
+}
+''')
+        def methods = ce.getMethods()
+        def properties = ce.getBeanProperties()
+        expect:
+            methods.size() == 2
+            methods.get(0).name == "price"
+            !methods.get(0).getReturnType().isPrimitive()
+            methods.get(1).name == "name"
+            properties.size() == 2
+            properties.get(0).name == "price"
+            !properties.get(0).getType().isPrimitive()
+            properties.get(1).name == "name"
+    }
+
+    void "test Java annotations"() {
+        def ce  = buildClassElementJava('test.Product', '''
+package test;
+
+class Product {
+
+    private final Double price;
+    @javax.persistence.Id
+    private final String name;
+
+    public Product(Double price, String name) {
+        this.price = price;
+        this.name = name;
+    }
+
+    public Double getPrice() {
+        return price;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def properties = ce.getBeanProperties()
+        expect:
+            properties.size() == 2
+            properties.get(0).name == "price"
+            !properties.get(0).getType().isPrimitive()
+            properties.get(1).name == "name"
+            properties.get(1).hasStereotype(javax.persistence.Id)
+    }
+
+    void "test Java Bean compile"() {
+        def ce  = buildClassElementJava('test.Product', '''
+package test;
+
+class Product {
+
+    public Product(Double price, String name) {
+        this.price = price;
+        this.name = name;
+    }
+
+    private final Double price;
+    private final String name;
+
+    public Double getPrice() {
+        return price;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def methods = ce.getMethods()
+        def properties = ce.getBeanProperties()
+        expect:
+            methods.size() == 2
+            methods.get(0).name == "getPrice"
+            !methods.get(0).getReturnType().isPrimitive()
+            methods.get(1).name == "getName"
+            properties.size() == 2
+            properties.get(0).name == "price"
+            !properties.get(0).getType().isPrimitive()
+            properties.get(1).name == "name"
+    }
 
     void "test visit enum"() {
 
@@ -694,6 +786,30 @@ class Test<T : Test<*>>
         then:
             def e = thrown(RuntimeException)
             e.message.contains "This type parameter violates the Finite Bound Restriction"
+    }
+
+    void "test nested configurations"() {
+        when:
+            def ce = (BeanDefinition) KotlinCompiler.buildAndLoad('test.ConfigurationLevel1', 'test.$ConfigurationLevel1$ConfigurationLevel2$ConfigurationLevel3$Intercepted$Definition', '''\
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("level1")
+interface ConfigurationLevel1 {
+    val foo: String
+    @ConfigurationProperties("level2")
+    interface ConfigurationLevel2 {
+        val bar: String
+        @ConfigurationProperties("level3")
+        interface ConfigurationLevel3 {
+            val baz: String
+        }
+    }
+}
+''')
+        then:
+            ce.hasDeclaredAnnotation(ConfigurationAdvice)
     }
 
     void "test recursive generic type parameter 3"() {
@@ -2164,7 +2280,6 @@ interface MyInterface {
             result
     }
 
-    @PendingFeature
     void "test abstract and interface and overridden methods"() {
         when:
             def result = buildClassElementMapped('test.MyBean2', '''
@@ -2270,6 +2385,55 @@ class TestNamed {
         expect:
             ce.findMethod("method1").get().getReturnType().canonicalName == "int"
             ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
+    }
+
+    void "test enum with inner companion"() {
+        when:
+        ClassElement enumEl = buildClassElement('test.ColorEnum', '''
+package test
+
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonValue
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class ColorEnum (
+    @get:JsonValue val value: String
+) {
+
+    @JsonProperty("red")
+    RED("red"),
+    @JsonProperty("blue")
+    BLUE("blue"),
+    @JsonProperty("green")
+    GREEN("green"),
+    @JsonProperty("light-blue")
+    LIGHT_BLUE("light-blue"),
+    @JsonProperty("dark-green")
+    DARK_GREEN("dark-green");
+
+    override fun toString(): String {
+        return value
+    }
+
+    companion object {
+
+        @JvmField
+        val VALUE_MAPPING = entries.associateBy { it.value }
+
+        @JsonCreator
+        @JvmStatic
+        fun fromValue(value: String): ColorEnum {
+            require(VALUE_MAPPING.containsKey(value)) { "Unexpected value '$value'" }
+            return VALUE_MAPPING[value]!!
+        }
+    }
+}
+
+''')
+        then:
+        ((EnumElement) enumEl).elements().size() == 5
     }
 
     void "test conf with inner companion"() {
@@ -2404,6 +2568,167 @@ data class TestEntity3(val firstName: String = "Denis",
             !result.component2().component2().messages.contains("@Nullable on primitive types")
     }
 
+    void "test bean properties interfaces"() {
+        def properties = buildClassElementMapped('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import jakarta.inject.Singleton
+
+class TestNamed {
+    fun method() : Pageable? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getBeanProperties()})
+        expect:
+            properties.stream().map {it.getName()}.toList() == [
+                    "sorted",
+                    "orderBy",
+                    "number",
+                    "size",
+                    "offset",
+                    "sort",
+                    "unpaged"
+            ]
+    }
+
+    void "test bean properties 2"() {
+        def properties = buildClassElementMapped('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import jakarta.inject.Singleton
+
+class TestNamed {
+    fun method() : Pageable? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getBeanProperties()
+                .stream()
+                .filter {it.getName() == "orderBy"}.findFirst()
+                .get()
+                .getGenericType()
+                .getFirstTypeArgument()
+                .get()
+                .getBeanProperties()})
+        expect:
+            properties.stream().map {it.getName()}.toList() == [
+                    "ignoreCase",
+                    "direction",
+                    "property",
+                    "ascending"
+            ]
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType()
+                    .isEnum()
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType() instanceof EnumElement
+            properties.stream()
+                    .filter { it.getName() == "direction" }
+                    .findFirst()
+                    .get()
+                    .getGenericType()
+                    .isEnum()
+    }
+
+    void "test nested enum"() {
+        def returnType = buildClassElementMapped('test.TestNamed2', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import io.micronaut.kotlin.processing.Sort.Order.Direction
+import jakarta.inject.Singleton
+
+class TestNamed2 {
+    fun method() : Direction? {
+        return null
+    }
+
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType()})
+        expect:
+            returnType.isEnum()
+            returnType instanceof EnumElement
+            returnType.getType().isEnum()
+            returnType.getType() instanceof EnumElement
+            returnType.getGenericType().isEnum()
+            returnType.getType() instanceof EnumElement
+    }
+
+    void "test overridden accessor in properties"() {
+        def properties = buildClassElementMapped('test.EngineConfiguration', '''
+package test
+
+import io.micronaut.core.util.Toggleable
+
+class EngineConfiguration : Toggleable {
+
+    var enabled = true
+
+    val cylinders: Int? = null
+
+    override fun isEnabled(): Boolean {
+        return enabled
+    }
+}
+
+''', {ce -> ce.getBeanProperties()})
+        expect:
+            properties.size() == 2
+    }
+
+    void "test inner class not failing"() {
+        def field = buildClassElementMapped('test.TestNamed3', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import io.micronaut.kotlin.processing.Pageable
+import io.micronaut.kotlin.processing.Sort.Order
+import io.micronaut.kotlin.processing.Sort.Order.Direction
+import jakarta.inject.Singleton
+
+class TestNamed3 {
+    fun method() : SomeInner? {
+        return null
+    }
+
+}
+
+class SomeInner {
+    private val xyz = object {}
+}
+
+''', {ce -> ce.findMethod("method").get().getReturnType().getFields().get(0)})
+        expect:
+            field.getType().getName() == "java.lang.Object"
+            field.getGenericType().getName() == "java.lang.Object"
+            field.getType().getType().getName() == "java.lang.Object"
+            field.getGenericType().getType().getName() == "java.lang.Object"
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
@@ -2422,6 +2747,7 @@ data class TestEntity3(val firstName: String = "Denis",
             return
         }
         type.getAnnotationNames()
+        type.getTypeAnnotationMetadata().getAnnotationNames()
         initializeAllTypeArguments0(type.getType(), level + 1)
         initializeAllTypeArguments0(type.getGenericType(), level + 1)
         type.getAllTypeArguments().entrySet().forEach { e1 ->

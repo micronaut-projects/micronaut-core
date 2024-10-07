@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -66,19 +67,35 @@ import java.util.function.Consumer;
 @Singleton
 @BootstrapContextCompatible
 public final class JacksonDatabindMapper implements JsonMapper {
+
+    /**
+     * Property used to specify whether JSON view is enabled.
+     */
+    public static final String PROPERTY_JSON_VIEW_ENABLED = "jackson.json-view.enabled";
+
     private final ObjectMapper objectMapper;
     private final JsonStreamConfig config;
     private final JsonNodeTreeCodec treeCodec;
     private final ObjectReader specializedReader;
     private final ObjectWriter specializedWriter;
+    private final boolean allowViews;
+
+    private TypeCache<ObjectReader> cachedReader;
+    private TypeCache<ObjectWriter> cachedWriter;
+
+    @Internal
+    public JacksonDatabindMapper(ObjectMapper objectMapper) {
+        this(objectMapper, false);
+    }
 
     @Inject
     @Internal
-    public JacksonDatabindMapper(ObjectMapper objectMapper) {
+    public JacksonDatabindMapper(ObjectMapper objectMapper, @Value("${" + JacksonDatabindMapper.PROPERTY_JSON_VIEW_ENABLED + ":false}") boolean allowViews) {
         this.objectMapper = objectMapper;
+        this.allowViews = allowViews;
         this.config = JsonStreamConfig.DEFAULT
-                .withUseBigDecimalForFloats(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
-                .withUseBigIntegerForInts(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
+            .withUseBigDecimalForFloats(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
+            .withUseBigIntegerForInts(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
         this.specializedReader = null;
         this.specializedWriter = null;
@@ -86,19 +103,20 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Internal
     public JacksonDatabindMapper() {
-        this(createDefaultMapper());
+        this(createDefaultMapper(), false);
     }
 
-    private JacksonDatabindMapper(JacksonDatabindMapper from, Argument<?> type) {
+    private JacksonDatabindMapper(JacksonDatabindMapper from, Argument<?> type, boolean allowViews) {
         this.objectMapper = from.objectMapper;
         this.config = from.config;
         this.treeCodec = from.treeCodec;
         this.specializedReader = from.createReader(type);
         this.specializedWriter = from.createWriter(type);
+        this.allowViews = allowViews;
     }
 
     private static ObjectMapper createDefaultMapper() {
-        ObjectMapperFactory objectMapperFactory = new ObjectMapperFactory();
+        var objectMapperFactory = new ObjectMapperFactory();
         objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
         objectMapperFactory.setSerializers(new JsonNodeSerializer());
         return objectMapperFactory.objectMapper(null, null);
@@ -110,13 +128,24 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public JsonMapper createSpecific(Argument<?> type) {
-        return new JacksonDatabindMapper(this, type);
+    public @NonNull JsonMapper createSpecific(@NonNull Argument<?> type) {
+        JacksonDatabindMapper jacksonDatabindMapper = new JacksonDatabindMapper(this, type, allowViews);
+        if (allowViews) {
+            Class<?> viewClass = type.getAnnotationMetadata().classValue(JsonView.class).orElse(null);
+            if (viewClass != null) {
+                return jacksonDatabindMapper.cloneWithViewClass(viewClass);
+            }
+        }
+        return jacksonDatabindMapper;
     }
 
     private ObjectReader createReader(@NonNull Argument<?> type) {
         if (specializedReader != null) {
             return specializedReader;
+        }
+        TypeCache<ObjectReader> cachedReader = this.cachedReader;
+        if (cachedReader != null && cachedReader.type == type) {
+            return cachedReader.cachedValue;
         }
         ObjectReader reader = objectMapper.readerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
         @SuppressWarnings("rawtypes")
@@ -124,6 +153,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (view.isPresent()) {
             reader = reader.withView(view.get());
         }
+        this.cachedReader = new TypeCache<>(type, reader);
         return reader;
     }
 
@@ -131,12 +161,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedWriter != null) {
             return specializedWriter;
         }
+        TypeCache<ObjectWriter> cachedWriter = this.cachedWriter;
+        if (cachedWriter != null && cachedWriter.type == type) {
+            return cachedWriter.cachedValue;
+        }
         ObjectWriter writer = objectMapper.writerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
         @SuppressWarnings("rawtypes")
         Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
         if (view.isPresent()) {
             writer = writer.withView(view.get());
         }
+        this.cachedWriter = new TypeCache<>(type, writer);
         return writer;
     }
 
@@ -172,7 +207,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException {
+    public <T> T readValue(byte @NonNull [] byteArray, @NonNull Argument<T> type) throws IOException {
         try {
             return createReader(type).readValue(byteArray);
         } catch (JsonParseException pe) {
@@ -181,7 +216,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
+    public <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
         try (JsonParser parser = JacksonCoreParserFactory.createJsonParser(objectMapper.getFactory(), byteBuffer)) {
             return createReader(type).readValue(parser);
         } catch (JsonParseException pe) {
@@ -225,7 +260,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
             objectMapper.registerModule(InstantiationUtils.instantiate(moduleClass));
         }
 
-        return new JacksonDatabindMapper(objectMapper);
+        return new JacksonDatabindMapper(objectMapper, allowViews);
     }
 
     @NonNull
@@ -235,7 +270,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         objectMapper.setConfig(objectMapper.getSerializationConfig().withView(viewClass));
         objectMapper.setConfig(objectMapper.getDeserializationConfig().withView(viewClass));
 
-        return new JacksonDatabindMapper(objectMapper);
+        return new JacksonDatabindMapper(objectMapper, allowViews);
     }
 
     @NonNull
@@ -259,12 +294,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public Optional<JsonFeatures> detectFeatures(@NonNull AnnotationMetadata annotations) {
         return Optional.ofNullable(annotations.getAnnotation(io.micronaut.jackson.annotation.JacksonFeatures.class))
-                .map(JacksonFeatures::fromAnnotation);
+            .map(JacksonFeatures::fromAnnotation);
     }
 
     private JsonParser treeAsTokens(@NonNull JsonNode tree) {
         JsonParser parser = treeCodec.treeAsTokens(tree);
         parser.setCodec(objectMapper);
         return parser;
+    }
+
+    private record TypeCache<T>(Argument<?> type, T cachedValue) {
     }
 }

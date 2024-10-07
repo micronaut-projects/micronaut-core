@@ -158,6 +158,14 @@ public class Qualifiers {
                 }
             }
         }
+        if (qualifier instanceof FilteringCompositeQualifier<?> compositeQualifier) {
+            for (Qualifier<?> composite : compositeQualifier.getQualifiers()) {
+                String name = findName(composite);
+                if (name != null) {
+                    return name;
+                }
+            }
+        }
         return null;
     }
 

@@ -60,7 +60,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
 
             ModuleNode moduleNode = source.getAST()
             SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, TypeElementVisitorStart.classLoader)
-            for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
+            for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
                 if (definition.isPresent()) {
                     TypeElementVisitor visitor = definition.load()
 
@@ -82,7 +82,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
                         }
                     }
                     try {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, compilationUnit, visitor)
+                        def newLoadedVisitor = new LoadedVisitor(source, compilationUnit, visitor)
                         loadedVisitors.put(definition.getName(), newLoadedVisitor)
                     } catch (TypeNotPresentException e) {
                         // skip, all classes not on classpath
@@ -96,9 +96,9 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
 
 
             def visitorContext = new GroovyVisitorContext(source, compilationUnit)
-            List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
+            def values = new ArrayList<LoadedVisitor>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
-            for(loadedVisitor in (values)) {
+            for (loadedVisitor in (values)) {
                 try {
                     loadedVisitor.start(visitorContext)
                 } catch (Throwable e) {

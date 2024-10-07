@@ -23,4 +23,4 @@ snippet::io.micronaut.docs.config.converters.MapToLocalDateConverter[tags="impor
 <3> The implementation delegates to the injected conversion service to convert the values from the Map used to create a `LocalDate`
 <4> If an exception occurs during binding, call `reject(..)` which propagates additional information to the container
 
-NOTE: Register new type converters by declaring a bean of type api:core.convert.TypeConverter[]. `ConversionService.SHARED` is deprecated,  and it will be removed in a future version of the Micronaut Framework.
+NOTE: It's possible to add a custom type converter into `ConversionService.SHARED` by registering it in a api:core.convert.TypeConverterRegistrar[] via the service loader.

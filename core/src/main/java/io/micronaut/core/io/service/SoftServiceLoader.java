@@ -46,14 +46,12 @@ import java.util.stream.Stream;
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
-    private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
-    private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
-
-    private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
+    static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
             StaticOptimizations.get(Optimizations.class)
                     .map(Optimizations::getServiceLoaders)
                     .orElse(Collections.emptyMap());
-
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
+    private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
     private final Class<S> serviceType;
     private final ClassLoader classLoader;
     private Collection<ServiceDefinition<S>> servicesForIterator;

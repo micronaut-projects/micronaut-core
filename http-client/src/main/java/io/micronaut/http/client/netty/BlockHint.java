@@ -24,7 +24,8 @@ import io.netty.channel.EventLoop;
 /**
  * Information about what threads are blocked waiting for a request to complete. This is used to
  * detect deadlocks when the user does a {@link io.micronaut.http.client.BlockingHttpClient} on the
- * event loop.
+ * event loop.<br>
+ * Note: This class is public for use in micronaut-oracle-cloud.
  *
  * @param blockedThread Thread that is blocked
  * @param next Next node in the linked list of blocked threads
@@ -32,7 +33,7 @@ import io.netty.channel.EventLoop;
  * @since 4.0.0
  */
 @Internal
-record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
+public record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
     public static BlockHint willBlockThisThread() {
         return new BlockHint(Thread.currentThread(), null);
     }

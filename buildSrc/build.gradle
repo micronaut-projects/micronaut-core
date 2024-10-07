@@ -8,16 +8,10 @@ repositories {
 }
 
 dependencies {
-    implementation "org.aim42:htmlSanityCheck:1.1.6"
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:6.6.1"
+    implementation libs.htmlsanitycheck
+    implementation libs.micronaut.build.plugins
 
-    implementation "org.tomlj:tomlj:1.1.0"
-    implementation "me.champeau.gradle:japicmp-gradle-plugin:0.4.2"
-    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.28"
-
-    // Kotlin plugins
-    implementation "org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.managed.kotlin.asProvider().get()}"
-    implementation "org.jetbrains.kotlin:kotlin-allopen:${libs.versions.managed.kotlin.asProvider().get()}"
-    implementation "org.jetbrains.kotlin:kotlin-noarg:${libs.versions.managed.kotlin.asProvider().get()}"
-    implementation "com.google.devtools.ksp:symbol-processing-gradle-plugin:${libs.versions.managed.ksp.get()}"
+    implementation libs.tomlj
+    implementation libs.japicmp.gradle.plugin
+    implementation libs.native.gradle.plugin
 }

@@ -28,7 +28,7 @@ import java.io.File
 import java.io.OutputStream
 import java.util.*
 
-internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): AbstractClassWriterOutputVisitor(false) {
+internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment, private val context: KotlinVisitorContext): AbstractClassWriterOutputVisitor(false) {
 
     override fun visitClass(classname: String, vararg originatingElements: Element): OutputStream {
         return environment.codeGenerator.createNewFile(
@@ -86,6 +86,6 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
         } else {
             emptyArray()
         }
-        return Dependencies(aggregating = originatingElements.size > 1, sources = sources)
+        return Dependencies(aggregating = context.aggregating || originatingElements.size > 1, sources = sources)
     }
 }

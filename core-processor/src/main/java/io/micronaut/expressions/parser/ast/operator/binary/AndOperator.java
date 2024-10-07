@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -37,7 +37,7 @@ public final class AndOperator extends LogicalOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Label falseLabel = new Label();
         Label trueLabel = new Label();
@@ -54,7 +54,7 @@ public final class AndOperator extends LogicalOperator {
         mv.visitLabel(trueLabel);
     }
 
-    private void pushOperand(ExpressionVisitorContext ctx, ExpressionNode operand, Label falseLabel) {
+    private void pushOperand(ExpressionCompilationContext ctx, ExpressionNode operand, Label falseLabel) {
         if (operand instanceof AndOperator andOperator) {
             pushOperand(ctx, andOperator.leftOperand, falseLabel);
             pushOperand(ctx, andOperator.rightOperand, falseLabel);

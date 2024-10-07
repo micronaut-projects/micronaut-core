@@ -19,8 +19,8 @@ import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.retry.intercept.DefaultRetryInterceptor;
-
 import jakarta.validation.constraints.Digits;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -46,12 +46,12 @@ public @interface Retryable {
     /**
      * @return The exception types to include (defaults to all)
      */
+    @AliasFor(member = "includes")
     Class<? extends Throwable>[] value() default {};
 
     /**
      * @return The exception types to include (defaults to all)
      */
-    @AliasFor(member = "value")
     Class<? extends Throwable>[] includes() default {};
 
     /**

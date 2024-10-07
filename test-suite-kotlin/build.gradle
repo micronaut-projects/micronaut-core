@@ -1,7 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-test-library"
-    id "org.jetbrains.kotlin.jvm"
-    id "org.jetbrains.kotlin.kapt"
+    alias libs.plugins.managed.kotlin.jvm
+    alias libs.plugins.managed.kotlin.kapt
 }
 
 micronautBuild {
@@ -10,10 +10,6 @@ micronautBuild {
         usesMicronautTestSpock()
         usesMicronautTestKotest()
     }
-}
-
-repositories {
-    mavenCentral()
 }
 
 dependencies {

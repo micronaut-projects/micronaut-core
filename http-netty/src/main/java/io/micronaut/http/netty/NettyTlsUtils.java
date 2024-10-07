@@ -35,17 +35,19 @@ import java.util.Optional;
  */
 @Internal
 public final class NettyTlsUtils {
-    private static boolean useOpenssl() {
-        return SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT);
+    private static boolean useOpenssl(SslConfiguration sslConfiguration) {
+        return sslConfiguration.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT);
     }
 
     /**
      * The SSL provider to use.
      *
+     * @param sslConfiguration The ssl configuration
+     *
      * @return The provider
      */
-    public static SslProvider sslProvider() {
-        return useOpenssl() ? SslProvider.OPENSSL_REFCNT : SslProvider.JDK;
+    public static SslProvider sslProvider(SslConfiguration sslConfiguration) {
+        return useOpenssl(sslConfiguration) ? SslProvider.OPENSSL_REFCNT : SslProvider.JDK;
     }
 
     /**
@@ -61,7 +63,7 @@ public final class NettyTlsUtils {
     @NonNull
     public static KeyManagerFactory storeToFactory(@NonNull SslConfiguration ssl, @Nullable KeyStore keyStore) throws Exception {
         KeyManagerFactory keyManagerFactory;
-        if (useOpenssl()) {
+        if (useOpenssl(ssl)) {
             // I don't understand why, but netty uses this logic, so we will too.
             if (keyStore == null || keyStore.aliases().hasMoreElements()) {
                 keyManagerFactory = new OpenSslX509KeyManagerFactory();

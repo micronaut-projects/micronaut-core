@@ -24,9 +24,10 @@ import static io.micronaut.management.health.indicator.discovery.DiscoveryClient
 
 /**
  * Enables the user to enable or disable the health indicator.
- * 
+ * <p>
  * The default value is true. If you want to disable the indicator add the
  * configuration value discovery-client.indicator.enabled = false
+ *
  * @author rvanderwerf
  * @since 1.1.0
  */
@@ -40,6 +41,7 @@ public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
 
     /**
      * Health indicator is enabled. Default is true.
+     *
      * @return {@code true} If health indicator should be enabled. Default is true.
      */
     @Override

@@ -17,8 +17,6 @@ package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;
@@ -35,7 +33,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Experimental
 public final class BodyAssertion<T, E> {
-    private static final Logger LOG = LoggerFactory.getLogger(BodyAssertion.class);
+
+    public static final BodyAssertion<?, ?> IS_MISSING = new BodyAssertion<>(Object.class, Object.class, null, new BodyEvaluator<>() {
+        @Override
+        public EvaluatorType type() {
+            return EvaluatorType.EQUAL;
+        }
+
+        @Override
+        public boolean test(Object o, Object o2) {
+            return o == null && o2 == null;
+        }
+
+        @Override
+        public String message(Object expected, Object actual) {
+            return "Body not expected. Got: " + actual;
+        }
+    });
 
     private final Class<T> bodyType;
     private final Class<E> errorType;
@@ -66,8 +80,8 @@ public final class BodyAssertion<T, E> {
      * @param body The HTTP Response Body
      */
     @SuppressWarnings("java:S5960") // Assertion is the whole point of this method
-    public void evaluate(T body) {
-        assertTrue(this.evaluator.test(expected, body), () -> this.evaluator.message(expected, body));
+    public void evaluate(Object body) {
+        assertTrue(this.evaluator.test(expected, (T) body), () -> this.evaluator.message(expected, (T) body));
     }
 
     /**
@@ -85,6 +99,7 @@ public final class BodyAssertion<T, E> {
     private enum EvaluatorType {
         EQUAL,
         CONTAIN,
+        DOESNT_CONTAIN
     }
 
     /**
@@ -94,6 +109,11 @@ public final class BodyAssertion<T, E> {
      * @param <E> The error type
      */
     public interface AssertionBuilder<T, E> {
+
+        /**
+         * @return a body assertion which verifiers the HTTP Response's body doesn't contain the expected body
+         */
+        BodyAssertion<T, E> doesntContain();
 
         /**
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
@@ -152,6 +172,11 @@ public final class BodyAssertion<T, E> {
             this.body = expected;
         }
 
+        @Override
+        public BodyAssertion<String, String> doesntContain() {
+            return new BodyAssertion<>(String.class, String.class, this.body, new StringEvaluator(EvaluatorType.DOESNT_CONTAIN));
+        }
+
         /**
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
@@ -180,6 +205,11 @@ public final class BodyAssertion<T, E> {
             this.body = expected;
         }
 
+        @Override
+        public BodyAssertion<byte[], byte[]> doesntContain() {
+            return new BodyAssertion<>(byte[].class, byte[].class, this.body, new ByteArrayEvaluator(EvaluatorType.DOESNT_CONTAIN));
+        }
+
         /**
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
@@ -204,6 +234,7 @@ public final class BodyAssertion<T, E> {
             return switch (type) {
                 case EQUAL -> received.equals(expected);
                 case CONTAIN -> received.contains(expected);
+                case DOESNT_CONTAIN -> !received.contains(expected);
             };
         }
     }
@@ -217,7 +248,7 @@ public final class BodyAssertion<T, E> {
             }
             String firstTen = IntStream.range(0, value.length)
                 .map(i -> value[i] & 0xff)
-                .mapToObj(i -> "%02x".formatted(i))
+                .mapToObj("%02x"::formatted)
                 .limit(10)
                 .collect(Collectors.joining(", ", "", "..."));
             return "ByteArray(length=" + value.length + ", [" + firstTen + "])";
@@ -227,7 +258,7 @@ public final class BodyAssertion<T, E> {
         public boolean test(byte[] expected, byte[] received) {
             return switch (type) {
                 case EQUAL -> Arrays.equals(received, expected);
-                case CONTAIN -> throw new AssertionError("Not implemented yet!");
+                case CONTAIN, DOESNT_CONTAIN -> throw new AssertionError("Not implemented yet!");
             };
         }
     }

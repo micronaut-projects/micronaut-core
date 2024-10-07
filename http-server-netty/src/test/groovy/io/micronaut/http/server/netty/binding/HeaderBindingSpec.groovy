@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -23,7 +24,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -53,7 +53,7 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.toBlocking().retrieve(request) == result
+        httpClient.toBlocking().retrieve(request) == result
 
         where:
         uri                       | result                       | headers
@@ -68,6 +68,7 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         '/header/with-value'      | "Header: application/json"   | ['Content-Type': 'application/json']
     }
 
+    @Requires(property = 'spec.name', value = 'HeaderBindingSpec')
     @Controller("/header")
     static class HeaderController {
 

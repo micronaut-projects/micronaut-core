@@ -57,7 +57,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static io.micronaut.core.expressions.EvaluatedExpressionReference.EXPR_SUFFIX;
 import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PATTERN;
 
 /**
@@ -75,6 +74,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
      */
+    protected static final AnnotatedElementValidator ELEMENT_VALIDATOR;
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
@@ -131,6 +131,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 // mapper, missing dependencies, continue
             }
         }
+        ELEMENT_VALIDATOR = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
     }
 
     private boolean validating = true;
@@ -439,7 +440,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Nullable
     protected AnnotatedElementValidator getElementValidator() {
-        return null;
+        return ELEMENT_VALIDATOR;
     }
 
     /**
@@ -522,7 +523,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return Return the name or null
      */
     @Nullable
-    protected abstract String getRepeatableNameForType(T annotationType);
+    protected abstract String getRepeatableContainerNameForType(T annotationType);
 
     /**
      * @param annotationElement The annotation element
@@ -533,6 +534,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return readNestedAnnotationValue(annotationElement, annotationType, new HashMap<>());
     }
 
+    /**
+     * @param annotationElement The annotation element
+     * @param annotationType    The annotation type
+     * @param resolvedDefaults resoldved defaults
+     * @return The annotation value
+     */
     protected AnnotationValue<?> readNestedAnnotationValue(T annotationElement, A annotationType, Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         final String annotationTypeName = getAnnotationTypeName(annotationType);
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);
@@ -627,9 +634,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (originatingClassName != null) {
             String packageName = NameUtils.getPackageName(originatingClassName);
             String simpleClassName = NameUtils.getSimpleName(originatingClassName);
-            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
+            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EvaluatedExpressionReferenceCounter.EXPR_SUFFIX);
 
-            Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
+            Integer expressionIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName);
 
             return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
         } else {
@@ -676,11 +683,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Creates the visitor context for this implementation.
+     * Returns the visitor context for this implementation.
      *
      * @return The visitor context
      */
-    protected abstract VisitorContext createVisitorContext();
+    protected abstract VisitorContext getVisitorContext();
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement,
                                                             String annotationName,
@@ -972,7 +979,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 boolean isDeclared,
                                 boolean alwaysIncludeAnnotation) {
 
-        ProcessingContext processingContext = new ProcessingContext(createVisitorContext());
+        ProcessingContext processingContext = new ProcessingContext(getVisitorContext());
 
         List<AnnotationValue<?>> annotationValues = stream
                 .flatMap(processedAnnotation -> processAnnotation(processingContext, processedAnnotation))
@@ -983,14 +990,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Map.entry(
                         List.of(), annotationValues
                 )
-        ));
+        ), processingContext.repeatableToContainer);
     }
 
     private void addAnnotations(@NonNull MutableAnnotationMetadata annotationMetadata,
                                 boolean isDeclared,
                                 boolean isStereotype,
                                 boolean alwaysIncludeAnnotation,
-                                @NonNull List<Map.Entry<List<String>, List<AnnotationValue<?>>>> annotations) {
+                                @NonNull List<Map.Entry<List<String>, List<AnnotationValue<?>>>> annotations,
+                                @NonNull Map<String, String> repeatableToContainer) {
 
         // We need to add annotations by their levels:
         // 1. The annotation
@@ -1013,7 +1021,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             parentAnnotations,
                             isDeclared,
                             isStereotype,
-                            annotationValue);
+                            annotationValue,
+                            repeatableToContainer);
 
                     List<String> newParentAnnotations = CollectionUtils.concat(parentAnnotations, annotationValue.getAnnotationName());
 
@@ -1030,7 +1039,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         if (!stereotypes.isEmpty()) {
-            addAnnotations(annotationMetadata, isDeclared, true, alwaysIncludeAnnotation, stereotypes);
+            addAnnotations(annotationMetadata, isDeclared, true, alwaysIncludeAnnotation, stereotypes, repeatableToContainer);
         }
     }
 
@@ -1049,6 +1058,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationValue.getAnnotationName()) || context.isProcessed(annotationValue)) {
             return Stream.empty();
         }
+        if (processedAnnotation.getAnnotationType() != null) {
+            String repeatableContainer = getRepeatableContainerNameForType(processedAnnotation.getAnnotationType());
+            if (repeatableContainer != null) {
+                // Collect the repeatable container from the annotation mirror for later
+                context.repeatableToContainer.put(annotationValue.getAnnotationName(), repeatableContainer);
+            }
+        }
+
         // Add annotation default values
         processedAnnotation = addDefaults(processedAnnotation);
         // Check if the annotation has the stereotypes set manually, before adding alias stereotypes
@@ -1200,13 +1217,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private Stream<ProcessedAnnotation> flattenRepeatable(@NonNull ProcessedAnnotation processedAnnotation) {
         // In a case of a repeatable container process it as a stream of repeatable annotation values
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
-        List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-        boolean isRepeatableAnnotationContainer = !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
-                .allMatch(value -> {
-                    T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
-                    return annotationMirror != null && getRepeatableNameForType(annotationMirror) != null;
-                });
-        if (isRepeatableAnnotationContainer) {
+        if (isRepeatableAnnotationContainer(annotationValue)) {
             // Repeatable annotations container is being added with values
             // We will add every repeatable annotation separately to properly detect its container and run transformations
             Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
@@ -1220,10 +1231,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     containerValues,
                                     getRetentionPolicy(annotationValue.getAnnotationName())))
                     ),
-                    repeatableAnnotations.stream().map(this::toProcessedAnnotation)
+                    annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream().map(this::toProcessedAnnotation)
             );
         }
         return Stream.of(processedAnnotation);
+    }
+
+    /**
+     * @param annotationValue The annotation value
+     * @return true if the annotation is a repeatable container
+     */
+    protected boolean isRepeatableAnnotationContainer(AnnotationValue<?> annotationValue) {
+        List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+        return !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
+                .allMatch(value -> {
+                    T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
+                    return annotationMirror != null && getRepeatableContainerNameForType(annotationMirror) != null;
+                });
     }
 
     @NonNull
@@ -1261,7 +1285,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                @NonNull List<String> parentAnnotations,
                                boolean isDeclared,
                                boolean isStereotype,
-                               @NonNull AnnotationValue<?> annotationValue) {
+                               @NonNull AnnotationValue<?> annotationValue,
+                               @NonNull Map<String, String> repeatableToContainer) {
 
         String annotationName = annotationValue.getAnnotationName();
         Map<CharSequence, Object> annotationDefaults = annotationValue.getDefaultValues();
@@ -1271,8 +1296,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             throw new IllegalStateException("Annotation should contain default values and an empty list " + annotationValue.getAnnotationName());
         }
 
-        T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-        String repeatableContainer = annotationMirror != null ? getRepeatableNameForType(annotationMirror) : null;
+        String repeatableContainer = repeatableToContainer.get(annotationName);
+        if (repeatableContainer == null) {
+            repeatableContainer = AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().get(annotationName);
+        }
+        if (repeatableContainer == null) {
+            repeatableContainer = findRepeatableContainerNameForType(annotationName);
+        }
         if (isStereotype) {
             if (repeatableContainer != null) {
                 if (isDeclared) {
@@ -1328,6 +1358,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+    }
+
+    /**
+     * Find the repeatable container for given annotation type.
+     * @param annotationName The repeatable annotation
+     * @return The repeatable container if exists
+     */
+    @Nullable
+    protected String findRepeatableContainerNameForType(@NonNull String annotationName) {
+        T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
+        return annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
     }
 
     /**
@@ -1595,7 +1636,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return modify(annotationMetadata, metadata -> {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
-                String repeatableName = getRepeatableNameForType(annotationMirror);
+                String repeatableName = getRepeatableContainerNameForType(annotationMirror);
                 if (repeatableName != null) {
                     metadata.removeAnnotation(repeatableName);
                 } else {
@@ -1621,7 +1662,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return modify(annotationMetadata, metadata -> {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
-                String repeatableName = getRepeatableNameForType(annotationMirror);
+                String repeatableName = getRepeatableContainerNameForType(annotationMirror);
                 if (repeatableName != null) {
                     metadata.removeStereotype(repeatableName);
                 } else {
@@ -1676,14 +1717,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param visitorContext    The visitor context
      * @param parentAnnotations The parent annotations
      * @param processedVisitors The processed visitors
+     * @param repeatableToContainer The repeatable to container
      * @since 4.0.0
      */
     private record ProcessingContext(@NonNull VisitorContext visitorContext,
                                      @NonNull Set<String> parentAnnotations,
-                                     @NonNull Set<Class<?>> processedVisitors) {
+                                     @NonNull Set<Class<?>> processedVisitors,
+                                     @NonNull Map<String, String> repeatableToContainer) {
 
         ProcessingContext(@NonNull VisitorContext visitorContext) {
-            this(visitorContext, Collections.emptySet(), Collections.emptySet());
+            this(visitorContext, Collections.emptySet(), Collections.emptySet(), new HashMap<>());
         }
 
         boolean isProcessed(@NonNull AnnotationValue<?> annotationValue) {
@@ -1693,19 +1736,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @NonNull
         ProcessingContext withParent(@NonNull AnnotationValue<?> parent) {
             Set<String> parents = CollectionUtils.concat(parentAnnotations, parent.getAnnotationName());
-            return new ProcessingContext(visitorContext, Collections.unmodifiableSet(parents), processedVisitors);
+            return new ProcessingContext(visitorContext, Collections.unmodifiableSet(parents), processedVisitors, repeatableToContainer);
         }
 
         @NonNull
         ProcessingContext withParents(@NonNull List<String> newParents) {
             Set<String> parents = CollectionUtils.concat(parentAnnotations, newParents);
-            return new ProcessingContext(visitorContext, Collections.unmodifiableSet(parents), processedVisitors);
+            return new ProcessingContext(visitorContext, Collections.unmodifiableSet(parents), processedVisitors, repeatableToContainer);
         }
 
         @NonNull
         public ProcessingContext withProcessedVisitor(@NonNull Class<?> processedVisitor) {
             Set<Class<?>> visitors = CollectionUtils.concat(processedVisitors, processedVisitor);
-            return new ProcessingContext(visitorContext, parentAnnotations, Collections.unmodifiableSet(visitors));
+            return new ProcessingContext(visitorContext, parentAnnotations, Collections.unmodifiableSet(visitors), repeatableToContainer);
         }
     }
 

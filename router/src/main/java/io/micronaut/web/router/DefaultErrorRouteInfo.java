@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -92,6 +93,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
+    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         return super.findStatus(defaultStatus == null ? HttpStatus.INTERNAL_SERVER_ERROR : defaultStatus);
     }
@@ -119,12 +121,8 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
 
     @Override
     public String toString() {
-        return new StringBuilder().append(' ')
-                .append(exceptionType.getSimpleName())
-                .append(" -> ")
-                .append(getTargetMethod().getDeclaringType().getSimpleName())
-                .append('#')
-                .append(getTargetMethod())
-                .toString();
+        return ' ' + exceptionType.getSimpleName()
+                + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
+                + '#' + getTargetMethod();
     }
 }

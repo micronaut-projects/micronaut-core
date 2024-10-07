@@ -103,6 +103,13 @@ public interface HttpHeaders extends Headers {
     String ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
 
     /**
+     * {@code "Access-Control-Allow-Private-Network"}.
+     * @see <a href="https://developer.chrome.com/blog/private-network-access-preflight">Private Network Access</a>
+     * @since 4.3.0
+     */
+    String ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK = "Access-Control-Allow-Private-Network";
+
+    /**
      * {@code "Access-Control-Expose-Headers"}.
      */
     String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
@@ -121,6 +128,13 @@ public interface HttpHeaders extends Headers {
      * {@code "Access-Control-Request-Method"}.
      */
     String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+
+    /**
+     * {@code "Access-Control-Request-Private-Network"}.
+     * @see <a href="https://developer.chrome.com/blog/private-network-access-preflight">Private Network Access</a>
+     * @since 4.3.0
+     */
+    String ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK = "Access-Control-Request-Private-Network";
 
     /**
      * {@code "Age"}.
@@ -528,6 +542,7 @@ public interface HttpHeaders extends Headers {
         ACCESS_CONTROL_MAX_AGE,
         ACCESS_CONTROL_REQUEST_HEADERS,
         ACCESS_CONTROL_REQUEST_METHOD,
+        ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK,
         AGE,
         ALLOW,
         AUTHORIZATION,
@@ -707,6 +722,16 @@ public interface HttpHeaders extends Headers {
      */
     @Nullable
     default Charset acceptCharset() {
+        return findAcceptCharset().orElse(null);
+    }
+
+    /**
+     * The {@code Accept-Charset} header, or empty if unset.
+     *
+     * @return The {@code Accept-Charset} header
+     * @since 4.3.0
+     */
+    default Optional<Charset> findAcceptCharset() {
         return findFirst(HttpHeaders.ACCEPT_CHARSET)
             .map(text -> {
                 text = HttpHeadersUtil.splitAcceptHeader(text);
@@ -718,8 +743,7 @@ public interface HttpHeaders extends Headers {
                 }
                 // default to UTF-8
                 return StandardCharsets.UTF_8;
-            })
-            .orElse(null);
+            });
     }
 
     /**
@@ -730,12 +754,21 @@ public interface HttpHeaders extends Headers {
      */
     @Nullable
     default Locale acceptLanguage() {
+        return findAcceptLanguage().orElse(null);
+    }
+
+    /**
+     * The {@code Accept-Language} header, or empty if unset.
+     *
+     * @return The {@code Accept-Language} header
+     * @since 4.3.0
+     */
+    default Optional<Locale> findAcceptLanguage() {
         return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
             .map(text -> {
                 String part = HttpHeadersUtil.splitAcceptHeader(text);
                 return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
-            })
-            .orElse(null);
+            });
     }
 
     /**

@@ -12,6 +12,14 @@ The Micronaut framework ships with several built-in handlers:
 | api:http.server.exceptions.DuplicateRouteHandler[]
 | api:http.exceptions.HttpStatusException[]
 | api:http.server.exceptions.HttpStatusHandler[]
+| api:http.server.exceptions.UnsupportedMediaException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.server.exceptions.NotFoundException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.server.exceptions.NotAcceptableException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| api:http.server.exceptions.NotAllowedException[]
+| api:http.server.exceptions.NotAllowedExceptionHandler[]
 | `com.fasterxml.jackson.core.JsonProcessingException`
 | api:http.server.exceptions.JsonExceptionHandler[]
 | `java.net.URISyntaxException`
@@ -20,6 +28,4 @@ The Micronaut framework ships with several built-in handlers:
 | api:http.server.exceptions.UnsatisfiedArgumentHandler[]
 | api:web.router.exceptions.UnsatisfiedRouteException[]
 | api:http.server.exceptions.UnsatisfiedRouteHandler[]
-| `org.grails.datastore.mapping.validation.ValidationException`
-| link:{micronautgroovyapi}/io/micronaut/configuration/gorm/validation/ValidationExceptionHandler.html[ValidationExceptionHandler]
 |===

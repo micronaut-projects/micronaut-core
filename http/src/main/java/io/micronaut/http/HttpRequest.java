@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookies;
 
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
@@ -169,7 +171,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
     @Override
     default Optional<Locale> getLocale() {
-        return Optional.ofNullable(getHeaders().acceptLanguage());
+        return getHeaders().findAcceptLanguage();
     }
 
     /**
@@ -179,7 +181,28 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     @SuppressWarnings("deprecation")
     default Optional<Certificate> getCertificate() {
-        return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+        Optional<Certificate> attribute = this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+        if (attribute.isPresent()) {
+            return attribute;
+        }
+        Optional<SSLSession> session = getSslSession();
+        if (session.isPresent()) {
+            try {
+                return Optional.of(session.get().getPeerCertificates()[0]);
+            } catch (SSLPeerUnverifiedException e) {
+                // won't return unverified cert
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Get the SSL session used for the connection to the client, if available.
+     *
+     * @return The session
+     */
+    default Optional<SSLSession> getSslSession() {
+        return Optional.empty();
     }
 
     /**
@@ -421,5 +444,25 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(httpMethodName, "Argument [httpMethodName] is required");
         return HttpRequestFactory.INSTANCE.create(httpMethod, uri, httpMethodName);
+    }
+
+    /**
+     * Returns a mutable request based on this request.
+     * @return the mutable request
+     * @since 4.7
+     */
+    default MutableHttpRequest<B> toMutableRequest() {
+        if (this instanceof MutableHttpRequest<B> mutableHttpRequest) {
+            return mutableHttpRequest;
+        }
+        MutableHttpRequest<B> mutableHttpRequest = HttpRequest.create(getMethod(), getUri().toString());
+        getBody().ifPresent(mutableHttpRequest::body);
+        getHeaders().forEach((name, value) -> {
+            for (String val : value) {
+                mutableHttpRequest.header(name, val);
+            }
+        });
+        mutableHttpRequest.getAttributes().putAll(getAttributes());
+        return mutableHttpRequest;
     }
 }

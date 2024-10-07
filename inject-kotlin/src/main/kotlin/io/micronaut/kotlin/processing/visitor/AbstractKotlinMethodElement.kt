@@ -33,13 +33,12 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
     private val name: String,
-    private val owningType: ClassElement,
+    private val owningType: KotlinClassElement,
     annotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<T>(nativeType, annotationMetadataFactory, visitorContext), MethodElement {
 
     abstract val declaration: KSDeclaration?
-    abstract val overridee: KSDeclaration?
     abstract val internalDeclaringType: ClassElement
     abstract val internalDeclaredTypeArguments: Map<String, ClassElement>
     abstract val internalReturnType: ClassElement
@@ -111,23 +110,17 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         if (name != overridden.getName() || parameters.size != overridden.parameters.size) {
             return false // Fast escape
         }
-        if (nativeType == overridden.nativeType) {
-            return false // The same method
+        if (declaration != null && overridden.declaration != null) {
+            return visitorContext.resolver.overrides(declaration!!, overridden.declaration!!)
         }
-        val thisType = getDeclaringType()
-        val thatType = overridden.getDeclaringType()
-        if (thisType.getName() == thatType.getName()) {
-            // The same type
-            return false
-        }
-        if (!thisType.isAssignable(thatType)) {
-            // not a parent class
-            return false
-        }
-        return overridee == overridden.declaration
+        return false
     }
 
     override fun hides(memberElement: MemberElement?) =
+        // not sure how to implement this correctly for Kotlin
+        false
+
+    override fun hides(hiddenMethod: MethodElement?) =
         // not sure how to implement this correctly for Kotlin
         false
 

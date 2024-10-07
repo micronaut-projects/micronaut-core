@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.CookieValue
@@ -22,7 +23,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 /**
@@ -37,7 +37,7 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.toBlocking().retrieve(request) == result
+        httpClient.toBlocking().retrieve(request) == result
 
         where:
         uri                | result              | headers
@@ -70,10 +70,12 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         result == "Cookie Value: foo"
     }
 
+    @Requires(property = "spec.name", value = "CookieBindingSpec")
     @Client('/cookie')
     static interface CookieClient extends CookieApi {
     }
 
+    @Requires(property = "spec.name", value = "CookieBindingSpec")
     @Controller("/cookie")
     static class CookieController implements CookieApi {
 

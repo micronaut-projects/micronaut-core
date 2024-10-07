@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -52,15 +53,16 @@ import java.util.function.Predicate;
 @Internal
 class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final GroovyVisitorContext visitorContext;
+    private final GroovyAnnotationMetadataBuilder annotationBuilder;
 
     /**
      * Default constructor.
      *
-     * @param originatingElement               The originating element
-     * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @param metadataBuilder the metadata builder
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
-     * @param visitorContext                   the visitor context
+     * @param visitorContext the visitor context
      */
     GroovyBeanDefinitionBuilder(
         Element originatingElement,
@@ -73,10 +75,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             visitorContext.addBeanDefinitionBuilder(this);
         }
         this.visitorContext = visitorContext;
+        this.annotationBuilder = visitorContext.getAnnotationMetadataBuilder();
     }
 
     @Override
-    protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
+    protected @NonNull AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
@@ -86,12 +89,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
-            public Element getProducingElement() {
+            public @NonNull Element getProducingElement() {
                 return producerField;
             }
 
             @Override
-            public ClassElement getDeclaringElement() {
+            public @NonNull ClassElement getDeclaringElement() {
                 return producerField.getDeclaringType();
             }
 
@@ -112,7 +115,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
+    protected @NonNull AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
@@ -124,12 +127,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             BeanParameterElement[] parameters;
 
             @Override
-            public Element getProducingElement() {
+            public @NonNull Element getProducingElement() {
                 return producerMethod;
             }
 
             @Override
-            public ClassElement getDeclaringElement() {
+            public @NonNull ClassElement getDeclaringElement() {
                 return producerMethod.getDeclaringType();
             }
 
@@ -164,66 +167,35 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
             consumer.accept(builder);
             AnnotationValue<T> av = builder.build();
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.annotate(
-                annotationMetadata,
-                av
-            );
+            annotationBuilder.annotate(annotationMetadata, av);
         }
     }
 
     @Override
-    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+    protected <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue) {
         ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-
-        final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-            visitorContext.getSourceUnit(),
-            visitorContext.getCompilationUnit());
-        annotationBuilder.annotate(
-            annotationMetadata,
-            annotationValue
-        );
+        annotationBuilder.annotate(annotationMetadata, annotationValue);
     }
 
     @Override
     protected void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeStereotype(
-                annotationMetadata,
-                annotationType
-            );
+            annotationBuilder.removeStereotype(annotationMetadata, annotationType);
         }
     }
 
     @Override
     protected <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate) {
         if (annotationMetadata != null && predicate != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeAnnotationIf(
-                annotationMetadata,
-                predicate
-            );
+            annotationBuilder.removeAnnotationIf(annotationMetadata, predicate);
         }
     }
 
     @Override
     protected void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
-            final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
-            annotationBuilder.removeAnnotation(
-                annotationMetadata,
-                annotationType
-            );
+            annotationBuilder.removeAnnotation(annotationMetadata, annotationType);
         }
     }
 
@@ -236,7 +208,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
+    protected @NonNull BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
         AnnotationValue<?>[] interceptorTypes =
             InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
         return new AopProxyWriter(
@@ -248,8 +220,8 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
-        AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
+    protected @NonNull BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
+        var aopProxyWriter = (AopProxyWriter) aopWriter;
         return (bean, method) -> {
             AnnotationValue<?>[] newTypes =
                 InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);

@@ -15,8 +15,10 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyAccessor
+import com.google.devtools.ksp.symbol.Visibility
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
@@ -26,7 +28,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 internal class KotlinSimplePropertyElement(
-    ownerType: ClassElement,
+    ownerType: KotlinClassElement,
     private val type: ClassElement,
     name: String,
     private val internalFieldElement: FieldElement?,
@@ -64,15 +66,21 @@ internal class KotlinSimplePropertyElement(
     override val resolvedType = type
 
     override val resolvedGenericType: ClassElement by lazy {
-        if (type is KotlinClassElement) {
-            val newCE = newClassElement(
-                nativeType,
-                type.kotlinType,
-                declaringType.typeArguments
-            ) as ArrayableClassElement
-            newCE.withArrayDimensions(type.arrayDimensions)
-        } else {
-            type
+        when (type) {
+            is KotlinEnumElement -> {
+                type
+            }
+            is KotlinClassElement -> {
+                val newCE = newClassElement(
+                    nativeType,
+                    type.kotlinType,
+                    declaringType.typeArguments
+                ) as ArrayableClassElement
+                newCE.withArrayDimensions(type.arrayDimensions)
+            }
+            else -> {
+                type
+            }
         }
     }
     override val setter = Optional.ofNullable(setterMethod)
@@ -96,5 +104,18 @@ internal class KotlinSimplePropertyElement(
         visitorContext,
         isExcluded
     )
+
+    override fun isPublic(): Boolean {
+        if (fieldElement.isPresent && fieldElement.get().isPublic) {
+            return true
+        }
+        if (readMethod.isPresent && readMethod.get().isPublic) {
+            return true
+        }
+        if (writeMethod.isPresent && writeMethod.get().isPublic) {
+            return true
+        }
+        return false
+    }
 
 }

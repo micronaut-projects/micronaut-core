@@ -17,13 +17,10 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -34,7 +31,6 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 
@@ -71,7 +67,7 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String[] ANNOTATION_STEREOTYPES = new String[]{
+    private static final String[] ANNOTATION_STEREOTYPES = new String[] {
         AnnotationUtil.POST_CONSTRUCT,
         AnnotationUtil.PRE_DESTROY,
         "jakarta.annotation.PreDestroy",
@@ -111,23 +107,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
         }
-    }
-
-    @NonNull
-    @Override
-    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
-        return new JavaVisitorContext(
-            processingEnv,
-            messager,
-            elementUtils,
-            annotationUtils,
-            typeUtils,
-            modelUtils,
-            genericUtils,
-            filer,
-            visitorAttributes,
-            getVisitorKind()
-        );
     }
 
     @Override
@@ -191,7 +170,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // process remaining
             int count = beanDefinitions.size();
             if (count > 0) {
-                note("Creating bean classes for %s type elements", count);
                 ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
                 for (String className : beanDefinitions) {
                     if (processed.add(className)) {
@@ -208,10 +186,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             BeanDefinitionCreator beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, javaVisitorContext);
                             for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
-                                if (processed.add(writer.getBeanDefinitionName())) {
-                                    processBeanDefinitions(writer);
-                                } else {
+                                if (processed.contains(writer.getBeanDefinitionName())) {
                                     throw new IllegalStateException("Already processed: " + writer.getBeanDefinitionName());
+                                } else {
+                                    processBeanDefinitions(writer);
+                                    processed.add(writer.getBeanDefinitionName());
                                 }
                             }
                         } catch (ProcessingException ex) {
@@ -282,16 +261,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
-                BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanDefinitionWriter, this.javaVisitorContext);
-                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
-
-                String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
-                processed.add(className);
-                beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
-
-                beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
             }
         } catch (IOException e) {
             // raise a compile error

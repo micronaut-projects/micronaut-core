@@ -3,11 +3,6 @@ plugins {
     id("org.graalvm.buildtools.native")
 }
 
-
-repositories {
-    mavenCentral()
-}
-
 micronautBuild {
     enableBom = false
     enableProcessing = false
@@ -15,6 +10,7 @@ micronautBuild {
 
 dependencies {
     implementation(projects.httpServerTck)
+    implementation(projects.jacksonDatabind)
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
@@ -23,7 +19,6 @@ dependencies {
     testImplementation(libs.micronaut.validation) {
         exclude(group: "io.micronaut")
     }
-
 }
 
 configurations {
@@ -49,6 +44,13 @@ graalvmNative {
     }
     binaries {
         all {
+            buildArgs.add("-H:+ReportExceptionStackTraces")
+            println("Java version of GraalVM: " + org.apache.tools.ant.util.JavaEnvUtils.getJavaVersion())
+
+            if (System.getenv("GRAALVM_HOME")?.contains("graalvm-jdk-21")) {
+                println("Enabling strict image heap!")
+                buildArgs.add("--strict-image-heap")
+            }
             resources.autodetect()
         }
     }

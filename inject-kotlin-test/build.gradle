@@ -1,6 +1,6 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
-    id "org.jetbrains.kotlin.jvm"
+    alias libs.plugins.managed.kotlin.jvm
 }
 
 dependencies {
@@ -12,8 +12,8 @@ dependencies {
     api(libs.managed.ksp.api)
     api(libs.managed.ksp)
     implementation(libs.managed.kotlin.compiler.embeddable)
-    implementation "com.squareup.okio:okio:3.6.0"
-    implementation "io.github.classgraph:classgraph:4.8.149"
+    implementation "com.squareup.okio:okio:3.9.1"
+    implementation "io.github.classgraph:classgraph:4.8.177"
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     api libs.blaze.persistence.core

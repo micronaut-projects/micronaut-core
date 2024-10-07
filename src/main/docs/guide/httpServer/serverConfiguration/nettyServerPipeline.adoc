@@ -11,3 +11,5 @@ snippet::io.micronaut.docs.netty.LogbookNettyServerCustomizer[tags="imports,clas
 <3> The actual customizer implements api:http.server.netty.NettyServerCustomizer[]
 <4> When a new channel is created, a new, specialized customizer is created for that channel
 <5> When the server signals that the stream pipeline has been fully constructed, the logbook handler is registered
+
+WARNING: As of version 4.5.0, the Micronaut netty HTTP server does not use per-request channels for HTTP/2 anymore. This makes many pipeline modifications (including logbook) difficult or impossible to implement. To revert to the old behavior, use the `micronaut.server.netty.legacy-multiplex-handlers=true` property.

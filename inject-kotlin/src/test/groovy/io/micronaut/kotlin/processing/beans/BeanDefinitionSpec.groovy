@@ -1,6 +1,8 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.annotation.Mapper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
@@ -99,7 +101,10 @@ class ExampleTest(private val application: EmbeddedApplication<*>): StringSpec({
 
         then:
         def e = thrown(NoSuchBeanException)
-        e.message.contains("Bean of type [test.ExampleTest] is disabled")
+        def lines = e.message.lines().toList()
+        lines[0] == 'No bean of type [test.ExampleTest] exists. '
+        lines[1] == '* [ExampleTest] is disabled because:'
+        lines[2] == ' - Custom condition [class io.micronaut.test.condition.TestActiveCondition] failed evaluation'
     }
 
     void "test jvm field"() {
@@ -124,6 +129,67 @@ class F
         expect:
         definition.injectedMethods.size() == 0
         definition.injectedFields.size() == 1
+    }
+
+    void "test abstract mapper singleton"() {
+        given:
+        def definition = KotlinCompiler.buildIntroducedBeanDefinition('test.ProductMappers', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Mapper.Mapping
+import jakarta.inject.Singleton
+
+@Singleton
+abstract class ProductMappers {
+    @Mapping(to = "price", from = "#{product.price * 2}", format = "$#.00")
+    @Mapping(to = "distributor", from = "#{this.getDistributor()}")
+    abstract fun toProductDTO(product: Product): ProductDTO
+    fun getDistributor() : String = "Great Product Company"
+}
+
+@Introspected
+data class Product(val name: String, val price: Double, val manufacturer: String)
+
+@Introspected
+data class ProductDTO(val name: String, val price: String, val distributor: String)
+''')
+
+        expect:
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
+    }
+
+    void "test interface bean"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test
+
+import io.micronaut.http.annotation.Controller
+
+@Controller
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
+    void "test interface bean 2"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test
+
+import jakarta.inject.Singleton
+
+@Singleton
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
     }
 
     @PendingFeature(reason = "difficult to achieve with current design without a significant rewrite or how native properties are handled")
@@ -415,6 +481,7 @@ class Test
         then:
         defaults["num"] == 10
         defaults["bool"] == false
+        defaults["value"] == null
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
         defaults["intArray3"] == null
@@ -1212,5 +1279,75 @@ annotation class NotNull
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+    }
+
+    void "test java class value annotation"() {
+        given:
+            AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+            AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.banner.MicronautBanner
+import jakarta.inject.Singleton
+
+@Requires(classes = [ColorEnum::class], bean = ColorEnum::class)
+@Singleton
+class Test
+
+
+enum class ColorEnum {
+    BLUE
+}
+''').getAnnotationMetadata()
+
+        when:
+            def requires = metadata.getAnnotation(Requires)
+            def classes = requires.annotationClassValues("classes")
+            def bean = requires.annotationClassValue("bean").get()
+
+        then:
+            classes[0].name == "test.ColorEnum"
+            bean.name == "test.ColorEnum"
+    }
+
+    void "test Jakarta Generated bean is created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+@jakarta.annotation.Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition
+    }
+
+    void "test Micronaut Generated bean is not created"() {
+        when:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test
+
+import io.micronaut.core.annotation.Generated
+
+@Generated
+@jakarta.inject.Singleton
+class Test {
+
+    fun method1() {
+    }
+
+}
+        ''')
+
+        then:
+            definition == null
     }
 }

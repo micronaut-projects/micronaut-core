@@ -163,19 +163,27 @@ public interface NettyEmbeddedServices {
 
     /**
      * Gets the server socket channel instance.
+     *
      * @param workerConfig The worker config
      * @return The {@link io.netty.channel.socket.ServerSocketChannel}
+     * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
-    @NonNull ServerSocketChannel getServerSocketChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig);
+    @Deprecated(since = "4.5.0", forRemoval = true)
+    @NonNull
+    default ServerSocketChannel getServerSocketChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig) {
+        return (ServerSocketChannel) getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
+    }
 
     /**
      * Gets the domain server socket channel instance.
      * @param workerConfig The worker config
      * @return The {@link io.netty.channel.unix.DomainSocketChannel}
      * @throws UnsupportedOperationException if domain sockets are not supported.
+     * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
+    @Deprecated(since = "4.5.0", forRemoval = true)
     @NonNull default ServerChannel getDomainServerChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig) {
-        throw new UnsupportedOperationException("Domain sockets not supported");
+        return (ServerChannel) getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig);
     }
 
     /**
@@ -191,6 +199,19 @@ public interface NettyEmbeddedServices {
             case DOMAIN_SERVER_SOCKET -> getDomainServerChannelInstance(workerConfig);
             default -> throw new UnsupportedOperationException("Unsupported netty channel type");
         };
+    }
+
+    /**
+     * Gets the domain server socket channel instance.
+     * @param type The channel type to return
+     * @param workerConfig The worker config
+     * @param parent The parent channel, or {@code null} for no parent channel
+     * @param fd The pre-defined file descriptor
+     * @return The channel
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+        throw new UnsupportedOperationException("File descriptor channels not supported");
     }
 
     /**

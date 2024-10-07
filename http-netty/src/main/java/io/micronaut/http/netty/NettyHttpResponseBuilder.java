@@ -86,7 +86,7 @@ public interface NettyHttpResponseBuilder {
      */
     static @NonNull HttpResponse toHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
-        while (response instanceof HttpResponseWrapper wrapper) {
+        while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
         }
         HttpResponse fullHttpResponse;
@@ -117,11 +117,34 @@ public interface NettyHttpResponseBuilder {
     /**
      * Convert the given response to a full http response.
      * @param response The response
+     * @param byteBuf The byteBuf
+     * @return The full response.
+     * @since 4.3.0
+     * @deprecated Unused
+     */
+    @Deprecated
+    static @NonNull FullHttpResponse toFullHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response, @NonNull ByteBuf byteBuf) {
+        while (response instanceof HttpResponseWrapper<?> wrapper) {
+            response = wrapper.getDelegate();
+        }
+        DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
+            HttpVersion.HTTP_1_1,
+            HttpResponseStatus.valueOf(response.code(), response.reason()),
+            byteBuf
+        );
+        response.getHeaders()
+            .forEach((s, strings) -> httpResponse.headers().add(s, strings));
+        return httpResponse;
+    }
+
+    /**
+     * Convert the given response to a full http response.
+     * @param response The response
      * @return The full response.
      */
     static @NonNull StreamedHttpResponse toStreamResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
-        while (response instanceof HttpResponseWrapper wrapper) {
+        while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
         }
         if (response instanceof NettyHttpResponseBuilder builder) {

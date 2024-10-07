@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -62,7 +63,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
      * @param environment   The environment
      * @param loggingSystems The logging systems
      */
-    public PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {
+    PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {
         this.environment = environment;
         this.loggingSystems = loggingSystems;
         initLogging();
@@ -108,8 +109,9 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         }
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
+        } else if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
         }
-        LOGGER.info("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
         for (LoggingSystem loggingSystem : loggingSystems) {
             loggingSystem.setLogLevel(loggerPrefix, newLevel);
         }
@@ -118,12 +120,11 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     private static LogLevel toLogLevel(String logLevel) {
         if (StringUtils.isEmpty(logLevel)) {
             return LogLevel.NOT_SPECIFIED;
-        } else {
-            try {
-                return Enum.valueOf(LogLevel.class, logLevel);
-            } catch (IllegalArgumentException ex) {
-                return null;
-            }
+        }
+        try {
+            return Enum.valueOf(LogLevel.class, logLevel.toUpperCase(Locale.ENGLISH));
+        } catch (IllegalArgumentException ex) {
+            return null;
         }
     }
 

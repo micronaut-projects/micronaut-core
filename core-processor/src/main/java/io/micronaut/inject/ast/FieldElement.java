@@ -27,6 +27,30 @@ import io.micronaut.core.annotation.NonNull;
 public interface FieldElement extends TypedElement, MemberElement {
 
     /**
+     * Returns the value of this variable if this is a {@code final}
+     * field initialized to a compile-time constant.  Returns {@code
+     * null} otherwise.  The value will be of a primitive type or a
+     * {@code String}.  If the value is of a primitive type, it is
+     * wrapped in the appropriate wrapper class (such as {@link
+     * Integer}).
+     *
+     * <p>Note that not all {@code final} fields will have
+     * constant values. In particular, {@code enum} constants are
+     * <em>not</em> considered to be compile-time constants. To have a
+     * constant value, a field's type must be either a primitive type
+     * or {@code String}.
+     *
+     * @return the value of this variable if this is a {@code final}
+     * field initialized to a compile-time constant, or {@code null}
+     * otherwise
+     *
+     * @since 4.5.0
+     */
+    default Object getConstantValue() {
+        return null;
+    }
+
+    /**
      * Obtain the generic type with the associated annotation metadata for the field.
      *
      * @return The generic field

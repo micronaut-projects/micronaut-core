@@ -29,8 +29,8 @@ import io.micronaut.core.order.Ordered;
  * allocator once from system properties, so once this is loaded it cannot be altered again
  * for the lifecycle of the JVM.
  *
- * @see io.netty.buffer.ByteBufAllocator
  * @author graemerocher
+ * @see io.netty.buffer.ByteBufAllocator
  * @since 3.3.0
  */
 @ConfigurationProperties(ByteBufAllocatorConfiguration.DEFAULT_ALLOCATOR)
@@ -39,7 +39,7 @@ import io.micronaut.core.order.Ordered;
 @BootstrapContextCompatible
 @Internal
 @Order(Ordered.HIGHEST_PRECEDENCE)
-final class DefaultByteBufAllocatorConfiguration implements ByteBufAllocatorConfiguration {
+public final class DefaultByteBufAllocatorConfiguration implements ByteBufAllocatorConfiguration {
 
     private static final String PROP_PREFIX = "io.netty.allocator.";
 

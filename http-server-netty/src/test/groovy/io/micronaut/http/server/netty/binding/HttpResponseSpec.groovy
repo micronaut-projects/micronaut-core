@@ -18,9 +18,12 @@ package io.micronaut.http.server.netty.binding
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMessage
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
@@ -43,7 +46,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test custom HTTP response for java action #action"() {
 
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
+        HttpResponse<?> response = Flux.from(httpClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -85,7 +88,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
+        HttpResponse<?> response = Flux.from(httpClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -121,7 +124,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test content encoding"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String))
+        HttpResponse<String> response = Flux.from(httpClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -138,7 +141,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test custom headers"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
+        HttpResponse<?> response = Flux.from(httpClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -297,5 +300,82 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.server.date-header': false]
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpResponseSpec')
+    @Controller("/java/response")
+    static class ResponseController {
+
+        @Get("/disallow")
+        public HttpResponse disallow() {
+            return HttpResponse.notAllowed(HttpMethod.DELETE);
+        }
+
+        @Get("/accepted")
+        public HttpResponse accepted() {
+            return HttpResponse.accepted();
+        }
+
+        @Get("/accepted-uri")
+        public HttpResponse acceptedUri() {
+            return HttpResponse.accepted(HttpResponse.uri("http://example.com"));
+        }
+
+        @Get("/created-uri")
+        public HttpResponse createdUri() {
+            return HttpResponse.created(HttpResponse.uri("http://test.com"));
+        }
+
+        @Get("/created-body")
+        public HttpResponse createdBody() {
+            return HttpResponse.created(new io.micronaut.http.server.netty.java.Foo("blah", 10));
+        }
+
+        @Get("/created-body-uri")
+        public HttpResponse createdBodyUri() {
+            return HttpResponse.created(new io.micronaut.http.server.netty.java.Foo("blah", 10), HttpResponse.uri("http://test.com"));
+        }
+
+        @Get("/ok")
+        public HttpResponse ok() {
+            return HttpResponse.ok();
+        }
+
+        @Get(value = "/ok-with-body", produces = MediaType.TEXT_PLAIN)
+        public HttpResponse okWithBody() {
+            return HttpResponse.ok("some text");
+        }
+
+        @Get(value = "/error-with-body", produces = MediaType.TEXT_PLAIN)
+        public HttpResponse errorWithBody() {
+            return HttpResponse.serverError().body("some text");
+        }
+
+        @Get("/ok-with-body-object")
+        public HttpResponse<io.micronaut.http.server.netty.java.Foo> okWithBodyObject() {
+            return HttpResponse.ok(new io.micronaut.http.server.netty.java.Foo("blah", 10))
+                    .headers((headers)->
+                            headers.contentType(MediaType.APPLICATION_JSON_TYPE)
+                    );
+        }
+
+        @Get("/status")
+        public HttpMessage status() {
+            return HttpResponse.status(HttpStatus.MOVED_PERMANENTLY);
+        }
+
+        @Get("/custom-headers")
+        public HttpResponse customHeaders() {
+            return HttpResponse.ok("abc").contentType("text/plain").contentLength(7);
+        }
+
+        @Get("/optional-response/{empty}")
+        public Optional<HttpResponse> optionalResponse(Boolean empty) {
+            if (empty) {
+                return Optional.empty();
+            } else {
+                return Optional.of(HttpResponse.ok());
+            }
+        }
     }
 }

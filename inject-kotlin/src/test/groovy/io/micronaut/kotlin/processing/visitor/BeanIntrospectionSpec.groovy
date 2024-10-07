@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.fasterxml.jackson.annotation.JsonClassDescription
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.annotation.Executable
@@ -19,6 +20,7 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.kotlin.processing.elementapi.SomeEnum
 import io.micronaut.kotlin.processing.elementapi.TestClass
+import spock.lang.Issue
 
 import javax.persistence.Column
 import javax.persistence.Entity
@@ -49,6 +51,55 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void "test enum introspection with a creator"() {
+        given:
+        def introspection = buildBeanIntrospection("test.StateEnum", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonCreator
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class StateEnum (
+    val value: String
+) {
+
+    STARTING("starting"),
+    RUNNING("running"),
+    STOPPED("stopped"),
+    DELETED("deleted");
+
+    override fun toString(): String {
+        return value
+    }
+
+    companion object {
+
+        @JvmField
+        val VALUE_MAPPING = entries.associateBy { it.value }
+
+        @JsonCreator
+        @JvmStatic
+        fun fromValue(value: String): StateEnum {
+            require(VALUE_MAPPING.containsKey(value)) { "Unexpected value " + value }
+            return VALUE_MAPPING[value]!!
+        }
+    }
+}
+""")
+
+
+        when:
+            def instance = introspection.instantiate("starting")
+        then:
+            instance.class.name == "test.StateEnum"
+        when:
+            introspection.instantiate("STARTING")
+        then:
+            def e = thrown(Exception)
+            e.message == 'Unexpected value STARTING'
+    }
+
     void "test default introspection"() {
         when:
             def introspection = buildBeanIntrospection("test.Test", """
@@ -75,6 +126,43 @@ data class Test(val firstName: String = "Denis",
             !introspection.getProperty("lastName").get().isNullable()
             introspection.getProperty("job").get().isNullable()
             !introspection.getProperty("age").get().isNullable()
+    }
+
+    void "test default introspection instantiate failure"() {
+        when:
+            def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(val firstName: String = "Denis",
+               val lastName: String,
+               val job: String? = "IT",
+               val age: Int)
+""")
+            introspection.instantiate()
+        then:
+            def e = thrown(Exception)
+            e.message == "No default constructor exists"
+    }
+
+    void "test default introspection instantiate no failure"() {
+        when:
+            def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(val firstName: String = "Denis",
+               val lastName: String = "Stepanov",
+               val job: String? = "IT",
+               val age: Int = 99)
+""")
+            def bean = introspection.instantiate()
+        then:
+            bean.getFirstName() == "Denis"
     }
 
     void "test data class introspection"() {
@@ -604,7 +692,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OuterBean$InnerBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerBean"
         def innerType = classLoader.loadClass(className)
@@ -648,7 +736,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OuterBean$InnerInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerInterface"
 
@@ -900,7 +988,7 @@ interface GroupOne
 interface GroupTwo
 interface GroupThree
 ''')
-        def clazz = classLoader.loadClass('test.$Address$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Address$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         expect:
@@ -923,7 +1011,7 @@ class Book(val title: String) {
     }
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -985,7 +1073,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1024,7 +1112,7 @@ class Book {
         introspectionMapField.set(introspector, null)
     }
 
-    void "test default constructor "() {
+    void "test default constructor"() {
         given:
         def classLoader = buildClassLoader('test.Book', '''
 package test
@@ -1034,7 +1122,7 @@ class Book {
     var title: String? = null
 }
 ''')
-        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class clazz = classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1102,7 +1190,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1150,7 +1238,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1206,7 +1294,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1261,7 +1349,7 @@ class Test(
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1329,7 +1417,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1357,7 +1445,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1405,7 +1493,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_kotlin_processing_elementapi_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is generated"
@@ -1424,7 +1512,7 @@ class Test
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('test.$io_micronaut_inject_beans_visitor_MappedSuperClassIntrospectionMapper$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1463,7 +1551,7 @@ open class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2169,7 +2257,7 @@ class MyImpl: MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -2201,7 +2289,7 @@ class MyImpl: MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -2265,6 +2353,53 @@ class Holder<A : Animal>(
             animal.isTypeVariable()
     }
 
+    void "test package private property introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.visitor.MySuperclass
+
+@Introspected
+class Test(val name: String) : MySuperclass()
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test package private property introspection in same package"() {
+        when:
+        def introspection = buildBeanIntrospection('io.micronaut.kotlin.processing.visitor.Test', '''
+package io.micronaut.kotlin.processing.visitor
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test(val name: String) : MySuperclass()
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is introspected, as we are in the same package'
+        introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
     void "test list property"() {
         given:
             BeanIntrospection introspection = buildBeanIntrospection('test.Cart', '''
@@ -2295,5 +2430,63 @@ data class Cart(
             bean = introspection.getProperty("items").get().withValue(bean, new ArrayList())
         expect:
             bean
+    }
+
+    void "test ignored problem"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.ClassificationAndStats', '''
+package test
+
+import com.fasterxml.jackson.annotation.JsonGetter
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonValue
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class Aggregation(@get:JsonValue val fieldName: String) {
+    FIELD_1("SomeField1"),
+    FIELD_2("SomeField2");
+}
+
+interface StatsEntry {
+    val shouldNotAppearInJson: MutableMap<Aggregation, Int>
+}
+
+@Introspected
+data class ClassificationVars(
+    val regionKode: String
+)
+
+@Introspected
+data class ClassificationAndStats<out T : StatsEntry>(
+    val klassifisering: ClassificationVars,
+    /** Ignore field to avoid double wrapping of values in resulting JSON */
+    @JsonIgnore
+    val stats: T
+) {
+    @JsonGetter("stats")
+    fun getValues(): Map<Aggregation, Int> = stats.shouldNotAppearInJson
+}
+
+        ''')
+            def statsProp = introspection.getProperty("stats").get()
+        expect:
+            statsProp.hasAnnotation(JsonIgnore)
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10647")
+    void 'handles generic definitions as generated by protobuf'() {
+        when:
+        buildBeanIntrospection('test.MyMessage', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.visitor.Message
+
+@Introspected
+class MyMessage: Message()
+''')
+        then:
+        noExceptionThrown()
     }
 }

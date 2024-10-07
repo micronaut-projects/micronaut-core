@@ -32,7 +32,6 @@ import io.micronaut.management.health.indicator.HealthResult;
  *
  * @author graemerocher
  * @since 1.0
- *
  */
 @ServerFilter({
     HealthResultFilter.DEFAULT_MAPPING,
@@ -47,9 +46,9 @@ public class HealthResultFilter {
      * Configurable default mapping for filter.
      */
     public static final String DEFAULT_MAPPING =
-            "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
-                    EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
-                    HealthEndpoint.PREFIX + ".id:health}";
+        "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
+            EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
+            HealthEndpoint.PREFIX + ".id:health}";
     public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/liveness";
     public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/readiness";
 
@@ -76,9 +75,9 @@ public class HealthResultFilter {
             HealthStatus status = healthResult.getStatus();
 
             HttpStatus httpStatus = healthEndpoint
-                                        .getStatusConfiguration()
-                                        .getHttpMapping()
-                                        .get(status.getName());
+                .getStatusConfiguration()
+                .getHttpMapping()
+                .get(status.getName());
             if (httpStatus != null) {
                 response.status(httpStatus);
             } else {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket.errors;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
@@ -23,6 +24,7 @@ import io.micronaut.websocket.annotation.OnError;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 
+@Requires(property = "spec.name", value = "WebSocketErrorsSpec")
 @ClientWebSocket
 public abstract class ErrorsClient implements AutoCloseable {
 

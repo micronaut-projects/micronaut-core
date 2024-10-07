@@ -15,19 +15,18 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.
@@ -48,20 +47,24 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
                 this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
         if (!enabled) {
-            if (ConditionLog.LOG.isDebugEnabled()) {
-                if (this instanceof BeanConfiguration) {
-                    ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
-                } else {
-                    ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
-                }
-                for (Failure failure : conditionContext.getFailures()) {
-                    ConditionLog.LOG.debug("* {}", failure.getMessage());
-                }
-            }
-            defaultBeanContext.trackDisabledComponent(conditionContext);
+            onFail(conditionContext, defaultBeanContext);
         }
 
         return enabled;
+    }
+
+    protected final void onFail(DefaultConditionContext<AbstractBeanContextConditional> conditionContext, DefaultBeanContext defaultBeanContext) {
+        if (ConditionLog.LOG.isDebugEnabled()) {
+            if (this instanceof BeanConfiguration) {
+                ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
+            } else {
+                ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
+            }
+            for (Failure failure : conditionContext.getFailures()) {
+                ConditionLog.LOG.debug("* {}", failure.getMessage());
+            }
+        }
+        defaultBeanContext.trackDisabledComponent(conditionContext);
     }
 
     @SuppressWarnings("java:S3416")

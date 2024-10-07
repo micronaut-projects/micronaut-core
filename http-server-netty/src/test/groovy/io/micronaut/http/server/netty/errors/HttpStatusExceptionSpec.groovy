@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -36,7 +37,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test HttpStatusException'() {
         when:
-        HttpResponse response = Flux.from(rxClient
+        HttpResponse response = Flux.from(httpClient
             .exchange(HttpRequest.GET('/errors')))
                 .onErrorResume( t -> {
                     if (t instanceof HttpClientResponseException) {
@@ -59,7 +60,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test returning an arbitrary POGO'() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient
+        HttpResponse<String> response = Flux.from(httpClient
             .exchange((HttpRequest.GET('/errors/book')), String)).blockFirst()
 
         then:
@@ -73,6 +74,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         json.title == 'The title'
     }
 
+    @Requires(property = "spec.name", value = "HttpStatusExceptionSpec")
     @Controller('/errors')
     static class BookController {
         @Get

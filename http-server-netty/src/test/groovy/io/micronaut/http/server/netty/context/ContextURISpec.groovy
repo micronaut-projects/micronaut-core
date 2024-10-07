@@ -23,11 +23,25 @@ class ContextURISpec extends Specification {
     void "test getContextURI returns the base URI when context path is not set"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.server.port': 60006
+                'micronaut.server.port': 60007
         ])
 
         then:
-        embeddedServer.getContextURI().toString() == 'http://localhost:60006'
+        embeddedServer.getContextURI().toString() == 'http://localhost:60007'
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test getContextURI returns the base URI when context path is set to an empty string"() {
+        when:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.context-path': '',
+                'micronaut.server.port': 60008
+        ])
+
+        then:
+        embeddedServer.getContextURI().toString() == 'http://localhost:60008'
 
         cleanup:
         embeddedServer.close()

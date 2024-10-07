@@ -27,12 +27,12 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.uri.UriBuilder;
@@ -47,7 +47,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
@@ -80,19 +79,6 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     private ConversionService conversionService = ConversionService.SHARED;
 
     /**
-     * This constructor is actually required for the case of non-standard http methods.
-     *
-     * @param httpMethod     The http method. CUSTOM value is used for non-standard
-     * @param uri            The uri
-     * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
-     */
-    NettyClientHttpRequest(HttpMethod httpMethod, URI uri, String httpMethodName) {
-        this.httpMethod = httpMethod;
-        this.uri = uri;
-        this.httpMethodName = httpMethodName;
-    }
-
-    /**
      * @param httpMethod The Http method
      * @param uri        The URI
      */
@@ -104,11 +90,13 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
      * This constructor is actually required for the case of non-standard http methods.
      *
      * @param httpMethod     The http method. CUSTOM value is used for non-standard
-     * @param uri            The uri
+     * @param url            The uri
      * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
      */
-    NettyClientHttpRequest(HttpMethod httpMethod, String uri, String httpMethodName) {
-        this(httpMethod, URI.create(uri), httpMethodName);
+    NettyClientHttpRequest(HttpMethod httpMethod, String url, String httpMethodName) {
+        this.httpMethod = httpMethod;
+        this.uri = URI.create(url);
+        this.httpMethodName = httpMethodName;
     }
 
     @Override
@@ -123,19 +111,16 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie nettyCookie) {
-            String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-            cookies.put(cookie.getName(), value);
-            String headerValue;
-            if (cookies.size() > 1) {
-                headerValue = String.join(";", cookies.values());
-            } else {
-                headerValue = value;
-            }
-            headers.set(HttpHeaderNames.COOKIE, headerValue);
+        String value = ClientCookieEncoder.INSTANCE.encode(cookie);
+        cookies.put(cookie.getName(), value);
+        String headerValue;
+        if (cookies.size() > 1) {
+            // this has to include a space, the spec says so.
+            headerValue = String.join("; ", cookies.values());
         } else {
-            throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+            headerValue = value;
         }
+        headers.set(HttpHeaderNames.COOKIE, headerValue);
         return this;
     }
 
@@ -143,12 +128,8 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
         if (cookies.size() > 1) {
             for (Cookie cookie: cookies) {
-                if (cookie instanceof NettyCookie nettyCookie) {
-                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                    this.cookies.put(cookie.getName(), value);
-                } else {
-                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
-                }
+                String value = ClientCookieEncoder.INSTANCE.encode(cookie);
+                this.cookies.put(cookie.getName(), value);
             }
             headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies.values()));
         } else if (!cookies.isEmpty()) {

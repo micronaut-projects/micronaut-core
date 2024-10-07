@@ -27,14 +27,16 @@ internal class KotlinEnumElement(
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
     resolvedTypeArguments: Map<String, ClassElement>?
-) :
+) : KotlinClassElement(
+    nativeType,
+    elementAnnotationMetadataFactory,
+    resolvedTypeArguments,
+    visitorContext
+), EnumElement {
 
-    KotlinClassElement(
-        nativeType,
-        elementAnnotationMetadataFactory,
-        resolvedTypeArguments,
-        visitorContext
-    ), EnumElement {
+    override val asType: KotlinClassElement by lazy {
+        this
+    }
 
     override fun values() = declaration.declarations
         .filterIsInstance<KSClassDeclaration>()
@@ -43,6 +45,7 @@ internal class KotlinEnumElement(
 
     override fun elements() = declaration.declarations
         .filterIsInstance<KSClassDeclaration>()
+        .filter { ksClassDeclaration -> !ksClassDeclaration.isCompanionObject }
         .map { ksClassDeclaration ->
             KotlinEnumConstantElement(
                 this,
@@ -55,8 +58,13 @@ internal class KotlinEnumElement(
 
     override fun getDefaultConstructor(): Optional<MethodElement> = Optional.empty()
 
-    override fun getPrimaryConstructor(): Optional<MethodElement> =
-        Optional.of(KotlinEnumConstructorElement(this))
+    override fun getPrimaryConstructor(): Optional<MethodElement> {
+        val primaryConstructor = super<KotlinClassElement>.getPrimaryConstructor()
+        if (primaryConstructor.isPresent) {
+            return primaryConstructor
+        }
+        return Optional.of(KotlinEnumConstructorElement(this))
+    }
 
     override fun copyThis() = KotlinEnumElement(
         nativeType,

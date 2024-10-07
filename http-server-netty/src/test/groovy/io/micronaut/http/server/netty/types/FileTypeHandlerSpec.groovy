@@ -1,20 +1,4 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.server.netty.types
-
 
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
@@ -28,15 +12,19 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.types.files.FileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import jakarta.inject.Inject
 import jakarta.inject.Named
+import reactor.core.publisher.Mono
 import spock.lang.IgnoreIf
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -67,7 +55,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test/html', String)
+        def response = httpClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -84,7 +72,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
         request.headers.ifModifiedSince(tempFile.lastModified())
-        def response = rxClient.toBlocking().exchange(request, String)
+        def response = httpClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
@@ -95,7 +83,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
         request.headers.add(RANGE, range)
-        def response = rxClient.toBlocking().exchange(request, String)
+        def response = httpClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == expectedStatus
@@ -122,7 +110,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
     void "test cache control can be overridden"() {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/custom-cache-control')
-        def response = rxClient.toBlocking().exchange(request, String)
+        def response = httpClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -132,7 +120,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        rxClient.toBlocking().exchange('/test/not-found', String)
+        httpClient.toBlocking().exchange('/test/not-found', String)
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -148,7 +136,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached file is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test/download', String)
+        def response = httpClient.toBlocking().exchange('/test/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -163,7 +151,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-system/download', String)
+        def response = httpClient.toBlocking().exchange('/test-system/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -207,21 +195,53 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached streamed file is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-stream/download', String)
+        def response = httpClient.toBlocking().exchange('/test-stream/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/html"
         response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"fileTypeHandlerSpec")
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.body() == tempFileContents
     }
 
+    void "test when an reactive attached streamed file is returned"() {
+        when:
+        def response = httpClient.toBlocking().exchange('/test-stream/reactive-stream', byte[].class)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.TEXT_PLAIN
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == "My file content".bytes
+    }
+
+    void "test when an reactive attached system file is returned"() {
+        given:
+        def file = Files.createTempFile("test", ".txt").toFile().tap {
+            it << "System file!"
+        }
+
+        when:
+        def response = httpClient.toBlocking().exchange("/test-stream/reactive-system?path=$file.absolutePath", byte[].class)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.TEXT_PLAIN
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == "System file!".bytes
+
+        cleanup:
+        file.delete()
+    }
+
     void "test when an attached file is returned with a name"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test/different-name', String)
+        def response = httpClient.toBlocking().exchange('/test/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -236,7 +256,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned with a name"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-system/different-name', String)
+        def response = httpClient.toBlocking().exchange('/test-system/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -251,7 +271,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when an attached file response is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test/custom-content-type', String)
+        def response = httpClient.toBlocking().exchange('/test/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -266,7 +286,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a system file response is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-system/custom-content-type', String)
+        def response = httpClient.toBlocking().exchange('/test-system/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -281,13 +301,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a streamed file response is returned"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-stream/custom-content-type', String)
+        def response = httpClient.toBlocking().exchange('/test-stream/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/plain"
         response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"temp.html\"")
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.body() == tempFileContents
@@ -295,12 +314,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test using a piped stream"() {
         when:
-        def response = rxClient.toBlocking().exchange('/test-stream/piped-stream', String)
+        def response = httpClient.toBlocking().exchange('/test-stream/piped-stream', String)
 
         then:
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/plain"
-        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.body() == ("a".."z").join('')
     }
 
@@ -393,6 +411,16 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
             return new StreamedFile(input, MediaType.TEXT_PLAIN_TYPE)
         }
 
+        @Get('/reactive-stream')
+        Mono<FileCustomizableResponseType> reactiveStream() {
+            def stream = new ByteArrayInputStream("My file content".bytes)
+            Mono.just(new StreamedFile(stream, MediaType.TEXT_PLAIN_TYPE))
+        }
+
+        @Get('/reactive-system')
+        Mono<FileCustomizableResponseType> reactiveStream(@QueryValue Path path) {
+            Mono.just(new SystemFile(path.toFile(), MediaType.TEXT_PLAIN_TYPE))
+        }
     }
 
     @CompileStatic

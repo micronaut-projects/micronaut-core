@@ -48,7 +48,7 @@ public class GitInfoSource implements PropertiesInfoSource {
     private final Supplier<Optional<PropertySource>> supplier;
 
     /**
-     * @param resourceResolver  A {@link ResourceResolver}
+     * @param resourceResolver A {@link ResourceResolver}
      * @param gitPropertiesPath The path for the git properties file
      */
     public GitInfoSource(

@@ -6,10 +6,15 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '6.6.1'
+    id 'io.micronaut.build.shared.settings' version '7.2.1'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
 
 rootProject.name = 'micronaut'
 
@@ -43,6 +48,7 @@ include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
 include "inject-java-helper"
+include "inject-java-helper2"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
 include "inject-test-utils"
@@ -59,7 +65,6 @@ include "websocket"
 
 // test suites
 include "test-suite"
-include "test-suite-geb"
 include "test-suite-helper"
 include "test-suite-http-client-jdk-ssl"
 include "test-suite-http-client-tck-netty"
@@ -68,6 +73,7 @@ include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
 include "test-suite-http-server-tck-jdk"
 include "test-suite-http-server-tck-netty"
+include "test-suite-http2-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-kotlin-ksp"
 include "test-suite-groovy"
@@ -76,7 +82,10 @@ include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
 include "test-suite-netty-ssl-graalvm"
+include "test-suite-kotlin-graalvm"
 include "test-utils"
+include "test-suite-annotation-remapper"
+include "test-suite-annotation-remapper-visitor"
 
 // benchmarks
 include "benchmarks"

@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
@@ -335,6 +336,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
         private ReturnType<R> returnType;
+        private final Argument<?>[] arguments;
+        private final boolean argumentsAnnotationsWithExpressions;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
@@ -344,6 +347,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.index = index;
             this.methodReference = methodReference;
             this.annotationMetadata = annotationMetadata;
+            MethodArguments methodArguments = methodArguments(methodReference);
+            this.arguments = methodArguments.arguments;
+            this.argumentsAnnotationsWithExpressions = methodArguments.argumentsAnnotationsWithExpressions;
         }
 
         @Override
@@ -358,6 +364,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
                 eam.configure(beanContext);
+            }
+            if (argumentsAnnotationsWithExpressions) {
+                for (Argument<?> argument : arguments) {
+                    AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
+                    if (argumentAnnotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+                        eam.configure(beanContext);
+                    }
+                }
             }
         }
 
@@ -393,7 +407,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public Argument<?>[] getArguments() {
-            return methodReference.arguments;
+            return arguments;
         }
 
         @Override
@@ -475,6 +489,30 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
         }
 
+        private record MethodArguments(Argument<?>[] arguments, boolean argumentsAnnotationsWithExpressions) {
+        }
+
+        private MethodArguments methodArguments(MethodReference methodReference) {
+            final Argument<?>[] arguments= new Argument[methodReference.arguments.length];
+            boolean foundExpressions = false;
+            Argument<?>[] methodArguments = methodReference.arguments;
+            for (int i = 0; i < methodArguments.length; i++) {
+                Argument<?> argument = methodArguments[i];
+                AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
+                AnnotationMetadata wrappedArgumentAnnotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argumentAnnotationMetadata);
+                if (argumentAnnotationMetadata == wrappedArgumentAnnotationMetadata) {
+                    arguments[i] = argument;
+                } else {
+                    foundExpressions = true;
+                    if (argument instanceof GenericPlaceholder<?> genericPlaceholder) {
+                        arguments[i] = Argument.ofTypeVariable(argument.getType(), argument.getName(), genericPlaceholder.getVariableName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    } else {
+                        arguments[i] = Argument.of(argument.getType(), argument.getName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    }
+                }
+            }
+            return new MethodArguments(arguments, foundExpressions);
+        }
     }
 
     /**

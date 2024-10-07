@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -49,13 +50,13 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final ElementAnnotationMetadata annotationMetadata;
+    private final PropertyElementAnnotationMetadata annotationMetadata;
 
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
-                        MethodElement getter,
-                        MethodElement setter,
-                        FieldElement field,
+                        @Nullable MethodElement getter,
+                        @Nullable MethodElement setter,
+                        @Nullable FieldElement field,
                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                         String name,
                         AccessKind readAccessKind,
@@ -73,6 +74,16 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.owningElement = owningElement;
         this.excluded = excluded;
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getReadAnnotationMetadata());
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
     }
 
     @Override
@@ -111,12 +122,12 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     @Override
-    public ClassElement getType() {
+    public @NonNull ClassElement getType() {
         return type;
     }
 
     @Override
-    public ClassElement getGenericType() {
+    public @NonNull ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -151,7 +162,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return name;
     }
 
@@ -172,26 +183,18 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
 
     @Override
     public boolean isReadOnly() {
-        switch (writeAccessKind) {
-            case METHOD:
-                return setter == null;
-            case FIELD:
-                return field == null || field.isFinal();
-            default:
-                throw new IllegalStateException();
-        }
+        return switch (writeAccessKind) {
+            case METHOD -> setter == null;
+            case FIELD -> field == null || field.isFinal();
+        };
     }
 
     @Override
     public boolean isWriteOnly() {
-        switch (readAccessKind) {
-            case METHOD:
-                return getter == null;
-            case FIELD:
-                return field == null;
-            default:
-                throw new IllegalStateException();
-        }
+        return switch (readAccessKind) {
+            case METHOD -> getter == null;
+            case FIELD -> field == null;
+        };
     }
 
     @Override

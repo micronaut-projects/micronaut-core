@@ -30,9 +30,9 @@ import io.micronaut.http.client.sse.SseClientFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientFactory;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URI;
 
 /**
  * A factory to create Netty HTTP clients.
@@ -125,10 +125,10 @@ public class NettyHttpClientFactory implements
     }
 
     private DefaultHttpClient createNettyClient(URI uri) {
-        return new DefaultHttpClient(uri);
+        return DefaultHttpClient.builder().uri(uri).build();
     }
 
     private DefaultHttpClient createNettyClient(URI uri, HttpClientConfiguration configuration) {
-        return new DefaultHttpClient(uri, configuration);
+        return DefaultHttpClient.builder().uri(uri).configuration(configuration).build();
     }
 }

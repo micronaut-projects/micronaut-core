@@ -38,7 +38,7 @@ import java.util.Arrays;
  * @since 1.0
  */
 @Internal
-class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
+final class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     private ByteBuf delegate;
 

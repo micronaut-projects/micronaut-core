@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -20,7 +21,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
 
     void "test certificate extraction"() {
         when:
-        def response = Flux.from(rxClient
+        def response = Flux.from(httpClient
                 .exchange('/ssl', String))
                 .blockFirst()
         then:
@@ -71,6 +72,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
         ]
     }
 
+    @Requires(property = 'spec.name', value = 'RequestCertificateSpec')
     @Controller
     static class TestController {
 

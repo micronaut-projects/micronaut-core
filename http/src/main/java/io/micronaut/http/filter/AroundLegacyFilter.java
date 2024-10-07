@@ -43,6 +43,14 @@ import java.util.function.Function;
 record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements InternalHttpFilter, Toggleable {
 
     @Override
+    public boolean isEnabled(HttpRequest<?> request) {
+        if (bean instanceof ConditionalFilter conditionalFilter) {
+            return conditionalFilter.isEnabled(request);
+        }
+        return true;
+    }
+
+    @Override
     public boolean isFiltersRequest() {
         return true;
     }
@@ -50,6 +58,11 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
     @Override
     public boolean isFiltersResponse() {
         return false;
+    }
+
+    @Override
+    public boolean hasContinuation() {
+        return true;
     }
 
     @Override

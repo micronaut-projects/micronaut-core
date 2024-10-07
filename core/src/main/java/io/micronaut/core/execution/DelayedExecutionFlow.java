@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.execution;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 /**
@@ -41,4 +42,20 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @param exc The exception
      */
     void completeExceptionally(Throwable exc);
+
+    /**
+     * Complete this flow from the given flow.
+     *
+     * @param flow The input flow
+     * @since 4.7.0
+     */
+    default void completeFrom(@NonNull ExecutionFlow<T> flow) {
+        flow.onComplete((o, t) -> {
+            if (t != null) {
+                completeExceptionally(t);
+            } else {
+                complete(o);
+            }
+        });
+    }
 }

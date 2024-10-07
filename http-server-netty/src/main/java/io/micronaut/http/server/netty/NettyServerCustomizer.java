@@ -115,10 +115,18 @@ public interface NettyServerCustomizer {
         CONNECTION,
         /**
          * The channel is a channel representing an individual HTTP2 stream.
+         * <p>
+         * Note: As of 4.5.0, there is no separate channel for each request anymore for performance
+         * reasons. You can revert to the old behavior using the
+         * {@code micronaut.server.netty.legacy-multiplex-handlers=true} configuration property.
          */
         REQUEST_STREAM,
         /**
          * The channel is a channel representing an individual HTTP2 stream, created for a push promise.
+         * <p>
+         * Note: As of 4.5.0, there is no separate channel for each request anymore for performance
+         * reasons. You can revert to the old behavior using the
+         * {@code micronaut.server.netty.legacy-multiplex-handlers=true} configuration property.
          */
         PUSH_PROMISE_STREAM,
     }

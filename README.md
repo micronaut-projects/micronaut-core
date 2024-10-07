@@ -6,7 +6,7 @@
 
 [Micronaut Framework](https://micronaut.io) is a modern, JVM-based, full stack Java framework designed for building modular, easily testable JVM applications with support for Java, Kotlin and the Groovy language.
 
-Micronaut Framework is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
+The Micronaut framework was originally created by a team who had also worked on the Grails framework. The Micronaut framework takes inspiration from lessons learned over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and the Grails framework. The core team continues to develop and maintain the Micronaut project through the support of the Micronaut Foundation.
 
 Micronaut Framework aims to provide all the tools necessary to build JVM applications including:
 
@@ -54,11 +54,4 @@ If you wish to contribute to the development of Micronaut Framework please read 
 
 ## Versioning
 
-Micronaut Framework is using Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut Framework's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.
-
-## CI
-
-[GitHub Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut Framework. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html).
-
-
-
+Micronaut Framework uses Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut Framework's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.

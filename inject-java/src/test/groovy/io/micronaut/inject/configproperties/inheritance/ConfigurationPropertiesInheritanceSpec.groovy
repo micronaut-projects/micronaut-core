@@ -194,4 +194,57 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         managers[0].is(teams[0].manager)
         managers.size() == 1
     }
+
+    void "test EachProperty with overridden abstract class method"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams.one.value': 'My value',
+                'teams.one.not-thing': 'First not thing',
+                'teams.one.thing': 'This is the thing',
+                'teams.one.child-thing': 'My child thing',
+
+                'teams.two.value': 'My second value',
+                'teams.two.thing': 'This is the big thing',
+                'teams.two.not-thing': 'Second not thing',
+        ])
+
+        when:
+        def teamOne = context.getBean(AbstractConfigImpl, Qualifiers.byName("one"))
+        def teamTwo = context.getBean(AbstractConfigImpl, Qualifiers.byName("two"))
+
+        then:
+        teamOne.name == 'one'
+        teamOne.value == 'My value'
+        teamOne.notThing == 'First not thing'
+        teamOne.thing == 'This is the thing'
+        teamOne.childThing == 'My child thing'
+
+        teamTwo.name == 'two'
+        teamTwo.value == 'My second value'
+        teamTwo.notThing == 'Second not thing'
+        teamTwo.thing == 'This is the big thing'
+        teamTwo.childThing == 'def childThing'
+    }
+
+    void "test EachProperty with overridden non-abstract class method"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams.one.value': 'My value',
+                'teams.one.super-value': 'My super value',
+                'teams.one.super-value-with-override': 'My super overridden value',
+                'teams.one.thing': 'This is the thing',
+                'teams.one.child-thing': 'My child thing',
+        ])
+
+        when:
+        def teamOne = context.getBean(NotAbstractConfigImpl, Qualifiers.byName("one"))
+
+        then:
+        teamOne.name == 'one'
+        teamOne.value == 'My value'
+        teamOne.superValue == 'My super value'
+        teamOne.superValueWithOverride == 'My super overridden value'
+        teamOne.thing == 'This is the thing'
+        teamOne.childThing == 'My child thing'
+    }
 }

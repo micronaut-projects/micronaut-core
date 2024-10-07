@@ -19,12 +19,12 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
-import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
+import io.micronaut.core.annotation.Vetoed
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -35,8 +35,9 @@ import java.io.IOException
 
 internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
-    private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
+    private val beanDefinitionMap = mutableMapOf<String, List<BeanDefinitionVisitor>>()
     private var visitorContext : KotlinVisitorContext? = null
+    private val processed = HashSet<String>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         visitorContext = KotlinVisitorContext(environment, resolver)
@@ -48,7 +49,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration: KSClassDeclaration ->
                 declaration.annotations.none { ksAnnotation ->
-                    ksAnnotation.shortName.getQualifier() == Generated::class.simpleName
+                    ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
                 }
             }
             .toList()
@@ -60,6 +61,9 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         }
         return emptyList()
     }
+
+    private fun isVetoed(ksAnnotation: KSAnnotation) =
+        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Vetoed::class.java.name
 
     private fun processClassDeclarations(
         elements: List<KSClassDeclaration>,
@@ -73,13 +77,26 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     classDeclaration.declarations
                         .filter { it is KSClassDeclaration }
                         .map { it as KSClassDeclaration }
+                        .filter { declaration: KSClassDeclaration ->
+                            declaration.annotations.none { ksAnnotation ->
+                                isVetoed(ksAnnotation)
+                            }
+                        }
                         .filter { !it.modifiers.contains(Modifier.INNER) }
                         .toList()
                 if (innerClasses.isNotEmpty()) {
                     processClassDeclarations(innerClasses, visitorContext)
                 }
                 beanDefinitionMap.computeIfAbsent(classElement.name) {
-                    BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
+                    val produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
+                    val list = ArrayList<BeanDefinitionVisitor>()
+                    for (writer in produce.build()) {
+                        if (processed.add(writer.beanDefinitionName)) {
+                            writer.visitBeanDefinitionEnd()
+                            list.add(writer)
+                        }
+                    }
+                    list
                 }
             }
         }
@@ -87,15 +104,12 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
 
     override fun finish() {
         try {
-            val outputVisitor = KotlinOutputVisitor(environment)
-            val processed = HashSet<String>()
+            val outputVisitor = KotlinOutputVisitor(environment, visitorContext!!)
             var count = 0
-            for (beanDefinitionCreator in beanDefinitionMap.values) {
-                for (writer in beanDefinitionCreator.build()) {
-                    if (processed.add(writer.beanDefinitionName)) {
-                        processBeanDefinitions(writer, outputVisitor, visitorContext!!, processed)
-                        count++
-                    }
+            for (writers in beanDefinitionMap.values) {
+                for (writer in writers) {
+                    processBeanDefinitions(writer, outputVisitor)
+                    count++
                 }
             }
             if (count > 0) {
@@ -135,21 +149,10 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
     private fun processBeanDefinitions(
         beanDefinitionWriter: BeanDefinitionVisitor,
         outputVisitor: KotlinOutputVisitor,
-        visitorContext: KotlinVisitorContext,
-        processed: HashSet<String>
     ) {
         try {
-            beanDefinitionWriter.visitBeanDefinitionEnd()
             if (beanDefinitionWriter.isEnabled) {
                 beanDefinitionWriter.accept(outputVisitor)
-                val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter, visitorContext)
-                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
-                val className = beanDefinitionReferenceWriter.beanDefinitionQualifiedClassName
-                processed.add(className)
-                beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.annotationMetadata.hasDeclaredAnnotation(Context::class.java)
-                )
-                beanDefinitionReferenceWriter.accept(outputVisitor)
             }
         } catch (e: IOException) {
             // raise a compile error

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.util.Toggleable;
+import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.http.HttpResponse;
 
 /**
@@ -24,8 +26,7 @@ import io.netty.handler.codec.http.HttpResponse;
  * @author James Kleeh
  * @since 1.2.0
  */
-public interface HttpCompressionStrategy {
-
+public interface HttpCompressionStrategy extends Toggleable {
     /**
      * @param response The HTTP response
      * @return True if the response should be compressed
@@ -36,6 +37,6 @@ public interface HttpCompressionStrategy {
      * @return The compression level (0-9)
      */
     default int getCompressionLevel() {
-        return 6;
+        return StandardCompressionOptions.gzip().compressionLevel();
     }
 }

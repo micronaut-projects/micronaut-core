@@ -28,6 +28,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -45,13 +46,17 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.qualifiers.EachBeanQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,13 +64,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Creates a default implementation of the {@link ApplicationContext} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
+public class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext {
 
     private final ClassPathResourceLoader resourceLoader;
     private final ApplicationContextConfiguration configuration;
@@ -126,6 +133,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
+    }
+
+    @Override
+    @Internal
+    final void configureContextInternal() {
+        super.configureContextInternal();
+        configuration.getContextConfigurer().ifPresent(configurer ->
+            configurer.configure(this)
+        );
     }
 
     @Override
@@ -292,65 +308,73 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
+    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext,
+                                                             Argument<T> beanType,
+                                                             @Nullable Qualifier<T> qualifier,
+                                                             @Nullable String message) {
         if (message == null) {
-            message = super.resolveDisabledBeanMessage(resolutionContext, beanType, qualifier);
-        }
-
-        if (message == null) {
-            message = resolveIterableBeanMissingMessage(resolutionContext, beanType, qualifier, message);
+            StringBuilder stringBuilder = new StringBuilder();
+            String ls = CachedEnvironment.getProperty("line.separator");
+            appendBeanMissingMessage("", stringBuilder, ls, resolutionContext, beanType, qualifier);
+            message = stringBuilder.toString();
         }
 
         return super.newNoSuchBeanException(resolutionContext, beanType, qualifier, message);
     }
 
-    private <T> String resolveIterableBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
-        BeanDefinition<T> definition = findAnyBeanDefinition(resolutionContext, beanType);
-        if (definition != null && definition.isIterable()) {
-            if (definition.hasDeclaredAnnotation(EachProperty.class)) {
-                message = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, definition);
-            } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
-                message = resolveEachBeanMissingMessage(resolutionContext, beanType, qualifier, definition);
+    private <T> void appendBeanMissingMessage(String linePrefix,
+                                              StringBuilder messageBuilder,
+                                              String lineSeparator,
+                                              @Nullable BeanResolutionContext resolutionContext,
+                                              Argument<T> beanType,
+                                              @Nullable Qualifier<T> qualifier) {
+
+        if (linePrefix.length() == 10) {
+            // Break possible cyclic dependencies
+            return;
+        }
+
+        Collection<BeanDefinition<T>> beanCandidates = findBeanCandidates(resolutionContext, beanType, false, definition -> !definition.isAbstract())
+            .stream().sorted(Comparator.comparing(BeanDefinition::getName)).toList();
+        for (BeanDefinition<T> definition : beanCandidates) {
+            if (definition != null && definition.isIterable()) {
+                if (definition.hasDeclaredAnnotation(EachProperty.class)) {
+                    appendEachPropertyMissingBeanMessage(linePrefix, messageBuilder, lineSeparator, resolutionContext, beanType, qualifier, definition);
+                } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
+                    appendMissingEachBeanMessage(linePrefix, messageBuilder, lineSeparator, resolutionContext, beanType, qualifier, definition);
+                }
             }
         }
-        return message;
+        resolveDisabledBeanMessage(linePrefix, messageBuilder, lineSeparator, resolutionContext, beanType, qualifier);
     }
 
-    @NonNull
-    private <T> String resolveEachBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
-        String message;
-        List<BeanDefinition<?>> dependencyChain = calculateEachBeanChain(resolutionContext, definition);
-        StringBuilder messageBuilder = new StringBuilder();
-        Argument<?> requiredBeanType = beanType;
-        Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
-        String ls = CachedEnvironment.getProperty("line.separator");
-        while (i.hasNext()) {
-            messageBuilder.append(ls);
-            BeanDefinition<?> beanDefinition = i.next();
-            Argument<?> nextBeanType = beanDefinition.asArgument();
-            messageBuilder.append("* [").append(requiredBeanType.getTypeString(true))
-                .append("] requires the presence of a bean of type [")
-                .append(nextBeanType.getTypeString(false))
-                .append("]");
-            if (qualifier != null) {
-                messageBuilder.append(" with qualifier [").append(qualifier).append("]");
-            }
-            messageBuilder.append(" which does not exist.");
-            if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
-                messageBuilder.append(ls);
-                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, beanDefinition);
-                messageBuilder.append("* ")
-                    .append("[")
-                    .append(nextBeanType.getTypeString(true))
-                    .append("] requires the presence of configuration. ")
-                    .append(propertyMissingMessage);
-                break;
-            }
-            requiredBeanType = nextBeanType;
-        }
+    private <T> void appendMissingEachBeanMessage(String linePrefix,
+                                                  StringBuilder messageBuilder,
+                                                  String lineSeparator,
+                                                  @Nullable BeanResolutionContext resolutionContext,
+                                                  Argument<T> beanType,
+                                                  @Nullable Qualifier<T> qualifier,
+                                                  BeanDefinition<T> definition) {
+        Class<?> dependentBean = definition.classValue(EachBean.class).orElseThrow();
 
-        message = messageBuilder.toString();
-        return message;
+        messageBuilder
+            .append(lineSeparator)
+            .append(linePrefix)
+            .append("* [").append(beanType.getTypeString(true))
+            .append("] requires the presence of a bean of type [")
+            .append(dependentBean.getName())
+            .append("]");
+        if (qualifier != null) {
+            messageBuilder.append(" with qualifier [").append(qualifier).append("]");
+        }
+        messageBuilder.append(".");
+
+        appendBeanMissingMessage(linePrefix + " ",
+            messageBuilder,
+            lineSeparator,
+            resolutionContext,
+            Argument.of(dependentBean),
+            (Qualifier) qualifier);
     }
 
     @Nullable
@@ -361,23 +385,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             definition = existing.iterator().next();
         }
         return definition;
-    }
-
-    private <T> List<BeanDefinition<?>> calculateEachBeanChain(
-        BeanResolutionContext resolutionContext,
-        BeanDefinition<T> definition) {
-        Class<?> dependentBean = definition.classValue(EachBean.class).orElse(null);
-        List<BeanDefinition<?>> chain = new ArrayList<>();
-        while (dependentBean != null) {
-            BeanDefinition<?> dependent = findAnyBeanDefinition(resolutionContext, Argument.of(dependentBean));
-            if (dependent == null) {
-                break;
-            }
-            chain.add(dependent);
-            dependentBean = dependent.classValue(EachBean.class).orElse(null);
-        }
-
-        return chain;
     }
 
     private List<BeanDefinition<?>> calculateEachPropertyChain(
@@ -400,9 +407,36 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return chain;
     }
 
-
     @NonNull
-    private String resolveEachPropertyMissingBeanMessage(BeanResolutionContext resolutionContext, Qualifier<?> qualifier, BeanDefinition<?> definition) {
+    private <T> void appendEachPropertyMissingBeanMessage(String linePrefix,
+                                                          StringBuilder messageBuilder,
+                                                          String lineSeparator,
+                                                          @Nullable BeanResolutionContext resolutionContext,
+                                                          Argument<T> beanType,
+                                                          @Nullable Qualifier<T> qualifier,
+                                                          BeanDefinition<?> definition) {
+        String prefix = calculatePrefix(resolutionContext, qualifier, definition);
+
+        messageBuilder
+            .append(lineSeparator)
+            .append(linePrefix)
+            .append("* [")
+            .append(definition.asArgument().getTypeString(true));
+        if (!definition.getBeanType().equals(beanType.getType())) {
+            messageBuilder.append("] a candidate of [")
+                .append(beanType.getTypeString(true));
+        }
+        messageBuilder.append("] is disabled because:")
+            .append(lineSeparator);
+        messageBuilder
+            .append(linePrefix)
+            .append(" - ")
+            .append("Configuration requires entries under the prefix: [")
+            .append(prefix)
+            .append("]");
+    }
+
+    private <T> String calculatePrefix(BeanResolutionContext resolutionContext, Qualifier<T> qualifier, BeanDefinition<?> definition) {
         List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
         String prefix;
         if (chain.size() > 1) {
@@ -410,7 +444,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             ConfigurationPath path = ConfigurationPath.of(chain.toArray(BeanDefinition[]::new));
             prefix = path.path();
         } else {
-
             prefix = definition.stringValue(EachProperty.class).orElse("");
             if (qualifier != null) {
                 if (qualifier instanceof Named named) {
@@ -422,18 +455,19 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
             }
         }
-
-
-        return "No configuration entries found under the prefix: [" + prefix + "]. Provide the necessary configuration to resolve this issue.";
+        return prefix;
     }
 
     @Override
-    protected <T> void collectIterableBeans(BeanResolutionContext resolutionContext, BeanDefinition<T> iterableBean, Set<BeanDefinition<T>> targetSet) {
-        try(BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
+    protected <T> void collectIterableBeans(@Nullable BeanResolutionContext resolutionContext,
+                                            @NonNull BeanDefinition<T> iterableBean,
+                                            @NonNull Set<BeanDefinition<T>> targetSet,
+                                            @NonNull Argument<T> beanType) {
+        try (BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
             if (iterableBean.hasDeclaredStereotype(EachProperty.class)) {
                 transformEachPropertyBeanDefinition(rc, iterableBean, targetSet);
             } else if (iterableBean.hasDeclaredStereotype(EachBean.class)) {
-                transformEachBeanBeanDefinition(rc, iterableBean, targetSet);
+                transformEachBeanBeanDefinition(rc, iterableBean, targetSet, beanType);
             } else {
                 transformConfigurationReaderBeanDefinition(rc, iterableBean, targetSet);
             }
@@ -512,13 +546,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                     BeanDefinition<T> candidate,
-                                                     Set<BeanDefinition<T>> transformedCandidates) {
-        Class dependentType = candidate.classValue(EachBean.class).orElse(null);
-        if (dependentType == null) {
-            transformedCandidates.add(candidate);
+                                                     BeanDefinition<T> originBeanDefinition,
+                                                     Set<BeanDefinition<T>> transformedCandidates,
+                                                     @NonNull Argument<T> beanType) {
+        AnnotationValue<EachBean> annotationValue = originBeanDefinition.getAnnotation(EachBean.class);
+        if (annotationValue == null) {
+            transformedCandidates.add(originBeanDefinition);
             return;
         }
+        Class dependentType = annotationValue.getRequiredValue(Class.class);
+        List<AnnotationValue<Annotation>> remapGenerics = annotationValue.getAnnotations("remapGenerics");
 
         Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, null);
 
@@ -529,16 +566,36 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     dependentPath = delegate.getConfigurationPath().orElse(null);
                 }
                 if (dependentPath != null) {
-                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
+                    createAndAddDelegate(resolutionContext, originBeanDefinition, transformedCandidates, dependentPath);
                 } else {
                     Qualifier<?> qualifier = dependentCandidate.getDeclaredQualifier();
-                    if (qualifier == null && dependentCandidate.isPrimary()) {
-                        // Backwards compatibility, `getDeclaredQualifier` strips @Primary
-                        // This should be removed if @Primary is no longer qualifier
-                        qualifier = PrimaryQualifier.INSTANCE;
+                    if (qualifier == null) {
+                        if (dependentCandidate.isPrimary()) {
+                            // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                            // This should be removed if @Primary is no longer qualifier
+                            qualifier = PrimaryQualifier.INSTANCE;
+                        } else {
+                            // @EachBean needs to have something of qualifier to find its origin
+                            qualifier = new EachBeanQualifier<>(dependentCandidate);
+                        }
                     }
-                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
-                    if (delegate.isEnabled(this, resolutionContext)) {
+                    Map<String, List<Argument<?>>> delegateTypeArguments = Map.of();
+                    if (remapGenerics != null) {
+                        Map<String, List<Argument<?>>> typeArguments = new LinkedHashMap<>();
+                        List<Argument<?>> dependentArguments = dependentCandidate.getTypeArguments(dependentType);
+                        for (AnnotationValue<Annotation> remapGeneric : remapGenerics) {
+                            Class<?> type = remapGeneric.getRequiredValue("type", Class.class);
+                            String name = remapGeneric.getRequiredValue("name", String.class);
+                            String to = remapGeneric.stringValue("to").orElse(name);
+                            dependentArguments.stream()
+                                .filter(argument -> argument.getName().equals(name))
+                                .findFirst()
+                                .ifPresent(argument -> typeArguments.computeIfAbsent(type.getName(), k -> new ArrayList<>()).add(argument.withName(to)));
+                        }
+                        delegateTypeArguments = typeArguments;
+                    }
+                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(originBeanDefinition, (Qualifier<T>) qualifier, delegateTypeArguments);
+                    if (delegate.isEnabled(this, resolutionContext) && delegate.isCandidateBean(beanType)) {
                         transformedCandidates.add((BeanDefinition<T>) delegate);
                     }
                 }
@@ -547,8 +604,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                         BeanDefinition<T> candidate,
-                                                         Set<BeanDefinition<T>> transformedCandidates) {
+                                                         @NonNull BeanDefinition<T> candidate,
+                                                         @NonNull Set<BeanDefinition<T>> transformedCandidates) {
         try {
             final String prefix = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
             if (prefix != null) {
@@ -634,6 +691,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
+    }
+
+    @Override
+    protected <T> void destroyLifeCycleBean(LifeCycle<?> cycle, BeanDefinition<T> definition) {
+        if (cycle != environment) { // handle environment separately, see stop() method
+            super.destroyLifeCycleBean(cycle, definition);
+        }
     }
 
     /**
@@ -830,6 +894,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected void startEnvironment() {
             registerSingleton(Environment.class, bootstrapEnvironment, null, false);
+            registerSingleton(BootstrapContextAccess.class, () -> DefaultApplicationContext.this, null, false);
         }
 
         @Override
@@ -885,7 +950,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         public Environment start() {
             if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
                 startBootstrapEnvironment();
             }
             return super.start();
@@ -899,7 +964,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                 refreshablePropertySources.addAll(bootstrapEnvironment.getRefreshablePropertySources());
 
-                String[] environmentNamesArray = getActiveNames().toArray(new String[0]);
+                String[] environmentNamesArray = getActiveNames().toArray(EMPTY_STRING_ARRAY);
                 BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
                 for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {

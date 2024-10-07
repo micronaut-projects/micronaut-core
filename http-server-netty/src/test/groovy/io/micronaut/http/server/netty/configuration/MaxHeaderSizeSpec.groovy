@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.configuration
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -35,6 +36,7 @@ class MaxHeaderSizeSpec extends Specification {
     void "test that the max header size can be configured"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'MaxHeaderSizeSpec',
                 'micronaut.server.netty.maxHeaderSize':10
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
@@ -54,6 +56,7 @@ class MaxHeaderSizeSpec extends Specification {
         client.stop()
     }
 
+    @Requires(property = "spec.name", value = "MaxHeaderSizeSpec")
     @Controller('/max-header')
     static class TestController {
         @Get

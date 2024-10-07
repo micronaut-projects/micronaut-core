@@ -815,7 +815,7 @@ interface MyBean extends GenericInterface, SpecificInterface {
         when:
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
-            allMethods.size() == 1
+            allMethods.size() == 2
         when:
             def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
         then:
@@ -1917,6 +1917,7 @@ class UserController implements MyApi {
 ''')
         expect:
             ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
+            ce.getMethods().get(0).overriddenMethods.size() == 1
     }
 
     void "test how the annotations from the type are propagated"() {

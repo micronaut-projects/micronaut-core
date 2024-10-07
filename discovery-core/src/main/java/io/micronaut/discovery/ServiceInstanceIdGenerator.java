@@ -29,7 +29,7 @@ public interface ServiceInstanceIdGenerator {
     /**
      * Generates a service ID.
      *
-     * @param environment     The environment
+     * @param environment The environment
      * @param serviceInstance The service instance
      * @return The generated ID. Never null
      */

@@ -15,33 +15,43 @@
  */
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyBodyWriter;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.micronaut.scheduling.TaskExecutors;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
+import java.util.OptionalLong;
+import java.util.concurrent.ExecutorService;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 
@@ -54,16 +64,14 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 @Singleton
 @Experimental
 @Internal
-public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<SystemFile> {
+public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<SystemFile> {
     private static final String UNIT_BYTES = "bytes";
 
-    public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
-        super(configuration);
-    }
+    private final ExecutorService ioExecutor;
 
-    @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> outgoingResponse, Argument<SystemFile> type, MediaType mediaType, SystemFile object, NettyWriteContext nettyContext) throws CodecException {
-        writeTo(request, outgoingResponse, object, nettyContext);
+    public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
+        super(configuration);
+        this.ioExecutor = ioExecutor;
     }
 
     @Override
@@ -71,73 +79,60 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         throw new UnsupportedOperationException("Can only be used in a Netty context");
     }
 
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile, NettyWriteContext nettyContext) throws CodecException {
-        if (response instanceof NettyMutableHttpResponse<?> nettyResponse) {
-            if (!systemFile.getFile().canRead()) {
-                throw new MessageBodyException("Could not find file");
-            }
-            if (handleIfModifiedAndHeaders(request, response, systemFile, nettyResponse)) {
-                nettyContext.writeFull(notModified(response));
-            } else {
+    @Override
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
+        return write(request, httpResponse, object);
+    }
 
-                // Parse the range headers (if any), and determine the position and content length
-                // Only `bytes` ranges are supported. Only single ranges are supported. Invalid ranges fall back to returning the full response.
-                // See https://httpwg.org/specs/rfc9110.html#field.range
-                long fileLength = systemFile.getLength();
-                long position = 0;
-                long contentLength = fileLength;
-                if (fileLength > -1) {
-                    String rangeHeader = request.getHeaders().get(HttpHeaders.RANGE);
-                    if (rangeHeader != null
-                        && request.getMethod() == HttpMethod.GET // A server MUST ignore a Range header field received with a request method that is unrecognized or for which range handling is not defined.
-                        && rangeHeader.startsWith(UNIT_BYTES) // An origin server MUST ignore a Range header field that contains a range unit it does not understand.
-                        && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
-                    ) {
-                        IntRange range = parseRangeHeader(rangeHeader, fileLength);
-                        if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
-                            && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
-                            && range.firstPos < fileLength
-                            && range.lastPos < fileLength
-                        ) {
-                            position = range.firstPos;
-                            contentLength = range.lastPos + 1 - range.firstPos;
-                            response.status(HttpStatus.PARTIAL_CONTENT);
-                            response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
-                        }
-                    }
-                    response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
-                    response.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
-                } else {
-                    response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                }
-
-                // Write the request data
-                final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-                writeFile(systemFile, nettyContext, position, contentLength, finalResponse);
-            }
-        } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
+    public ByteBodyHttpResponse<?> write(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
+        if (!systemFile.getFile().canRead()) {
+            throw new MessageBodyException("Could not find file");
         }
-    }
+        if (handleIfModifiedAndHeaders(request, response, systemFile, response)) {
+            return notModified(response);
+        } else {
 
-    private static void writeFile(SystemFile systemFile, NettyWriteContext context, long position, long contentLength, DefaultHttpResponse finalResponse) {
-        // Write the content.
-        File file = systemFile.getFile();
-        RandomAccessFile randomAccessFile = open(file);
+            // Parse the range headers (if any), and determine the position and content length
+            // Only `bytes` ranges are supported. Only single ranges are supported. Invalid ranges fall back to returning the full response.
+            // See https://httpwg.org/specs/rfc9110.html#field.range
+            long fileLength = systemFile.getLength();
+            long position = 0;
+            long contentLength = fileLength;
+            if (fileLength > -1) {
+                String rangeHeader = request.getHeaders().get(HttpHeaders.RANGE);
+                if (rangeHeader != null
+                    && request.getMethod() == HttpMethod.GET // A server MUST ignore a Range header field received with a request method that is unrecognized or for which range handling is not defined.
+                    && rangeHeader.startsWith(UNIT_BYTES) // An origin server MUST ignore a Range header field that contains a range unit it does not understand.
+                    && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
+                ) {
+                    IntRange range = parseRangeHeader(rangeHeader, fileLength);
+                    if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
+                        && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
+                        && range.firstPos < fileLength
+                        && range.lastPos < fileLength
+                    ) {
+                        position = range.firstPos;
+                        contentLength = range.lastPos + 1 - range.firstPos;
+                        response.status(HttpStatus.PARTIAL_CONTENT);
+                        response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
+                    }
+                }
+                response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
+                response.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
+            } else {
+                response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
 
-        context.writeFile(
-            finalResponse,
-            randomAccessFile,
-            position,
-            contentLength
-        );
-    }
+            File file = systemFile.getFile();
+            InputStream is;
+            try {
+                is = new FileInputStream(file);
+            } catch (FileNotFoundException e) {
+                throw new MessageBodyException("Could not find file", e);
+            }
 
-    private static RandomAccessFile open(File file) {
-        try {
-            return new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException e) {
-            throw new MessageBodyException("Could not find file", e);
+            @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
+            return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
         }
     }
 
@@ -175,4 +170,72 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         }
     }
 
+    private static final class RangeInputStream extends InputStream {
+        private final InputStream delegate;
+        private final long toSkip;
+        private long remainingLength;
+        private boolean skipped = false;
+        private boolean skipSuccess = false;
+
+        private RangeInputStream(InputStream delegate, long toSkip, long length) {
+            this.delegate = delegate;
+            this.toSkip = toSkip;
+            this.remainingLength = length;
+
+            if (toSkip == 0) {
+                skipped = true;
+                skipSuccess = true;
+            }
+        }
+
+        private boolean doSkip() throws IOException {
+            if (!skipped) {
+                skipped = true;
+                try {
+                    delegate.skipNBytes(toSkip);
+                    skipSuccess = true;
+                } catch (EOFException ignored) {
+                }
+            }
+            return skipSuccess;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (!doSkip()) {
+                return -1;
+            }
+            if (remainingLength <= 0) {
+                return -1;
+            }
+            int read = delegate.read();
+            if (read != -1) {
+                remainingLength--;
+            }
+            return read;
+        }
+
+        @Override
+        public int read(@NonNull byte[] b, int off, int len) throws IOException {
+            if (!doSkip()) {
+                return -1;
+            }
+            if (remainingLength <= 0) {
+                return -1;
+            }
+            if (len > remainingLength) {
+                len = (int) remainingLength;
+            }
+            int n = delegate.read(b, off, len);
+            if (n != -1) {
+                remainingLength -= n;
+            }
+            return n;
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+    }
 }

@@ -63,6 +63,21 @@ public class AccessLog {
         onLastResponseWriteElements.forEach(this::resetIndexedLogElement);
     }
 
+    /**
+     * Triggers LogElements for the ON_REQUEST_HEADERS event.
+     *
+     * @param metadata The connection metadata.
+     * @param method The http method.
+     * @param headers The request headers.
+     * @param uri The uri.
+     * @param protocol The protocol.
+     */
+    public void onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
+        for (IndexedLogElement element: onRequestHeadersElements) {
+            elements[element.index] = element.onRequestHeaders(metadata, method, headers, uri, protocol);
+        }
+    }
+
    /**
     * Triggers LogElements for the ON_REQUEST_HEADERS event.
     *
@@ -71,11 +86,11 @@ public class AccessLog {
     * @param headers The request headers.
     * @param uri The uri.
     * @param protocol The protocol.
+    * @deprecated Use {@link #onRequestHeaders(ConnectionMetadata, String, HttpHeaders, String, String)} instead
     */
+    @Deprecated
     public void onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        for (IndexedLogElement element: onRequestHeadersElements) {
-            elements[element.index] = element.onRequestHeaders(channel, method, headers, uri, protocol);
-        }
+        onRequestHeaders(new ConnectionMetadataImpl.SocketChannelMetadata(channel), method, headers, uri, protocol);
     }
 
     /**

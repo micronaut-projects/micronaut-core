@@ -15,6 +15,7 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.server.cors.CrossOrigin
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -69,7 +70,7 @@ class CorsVersionSpec extends Specification {
 
         when:
         MutableHttpRequest<?> request = HttpRequest.OPTIONS("/new")
-        preflightHeaders("x-api-version").each { k, v -> request.header(k, v)}
+        preflightHeaders("x-api-version", false).each { k, v -> request.header(k, v)}
         client.exchange(request)
 
         then:
@@ -82,7 +83,7 @@ class CorsVersionSpec extends Specification {
 
         when:
         MutableHttpRequest<?> request = HttpRequest.OPTIONS("/common")
-        preflightHeaders(null).each { k, v -> request.header(k, v)}
+        preflightHeaders(null, false).each { k, v -> request.header(k, v)}
         client.exchange(request)
 
         then:
@@ -90,7 +91,7 @@ class CorsVersionSpec extends Specification {
 
         when:
         request = HttpRequest.OPTIONS("/new")
-        preflightHeaders(null).each { k, v -> request.header(k, v)}
+        preflightHeaders(null, false).each { k, v -> request.header(k, v)}
         client.exchange(request)
 
         then:
@@ -98,7 +99,29 @@ class CorsVersionSpec extends Specification {
         ex.status == HttpStatus.NOT_FOUND
     }
 
-    static Map<String, String> preflightHeaders(String accessControlRequestHeaders) {
+    void "preflight for version routed from private network"() {
+        given:
+        BlockingHttpClient client = httpClient.toBlocking()
+
+        when:
+        MutableHttpRequest<?> request = HttpRequest.OPTIONS("/common")
+        preflightHeaders(null, true).each { k, v -> request.header(k, v)}
+        client.exchange(request)
+
+        then:
+        noExceptionThrown()
+
+        when:
+        request = HttpRequest.OPTIONS("/new-not-allowed-from-private")
+        preflightHeaders(null, true).each { k, v -> request.header(k, v)}
+        client.exchange(request)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    static Map<String, String> preflightHeaders(String accessControlRequestHeaders, boolean accessControlRequestPrivateNetwork) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Host", "localhost:8080")
         headers.put("Sec-Fetch-Site", "same-site")
@@ -109,6 +132,9 @@ class CorsVersionSpec extends Specification {
         headers.put("Origin", "http://localhost:8000")
         if (accessControlRequestHeaders) {
             headers.put("Access-Control-Request-Headers", accessControlRequestHeaders)
+        }
+        if (accessControlRequestPrivateNetwork) {
+            headers.put("Access-Control-Request-Private-Network", "true")
         }
         headers.put("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15")
         headers.put("Referer", "http://localhost:8000/")
@@ -153,6 +179,13 @@ class CorsVersionSpec extends Specification {
         @Get( "/new")
         @Version("2")
         Map<String, String> newEndpointV2() {
+            return Collections.singletonMap(MESSAGE, "new from v2");
+        }
+
+        @CrossOrigin(allowPrivateNetwork = false)
+        @Get("/new-not-allowed-from-private")
+        @Version("2")
+        Map<String, String> newPrivateEndpointV2() {
             return Collections.singletonMap(MESSAGE, "new from v2");
         }
 

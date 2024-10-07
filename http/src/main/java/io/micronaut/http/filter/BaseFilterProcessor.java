@@ -23,22 +23,22 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -50,7 +50,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -64,12 +63,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
-    private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
-        Body.class.getName(),
-        Header.class.getName(),
-        QueryValue.class.getName(),
-        CookieValue.class.getName()
-    );
     @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
@@ -82,32 +75,29 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
-                Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
-                if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
-                    if (annotation == Body.class) {
-                        return Optional.of((RequiresRequestBodyBinder<T>) (context, source) -> {
-                            if (source instanceof FullHttpRequest<?> fullHttpRequest) {
-                                ByteBuffer<?> contents = fullHttpRequest.contents();
-                                if (contents != null) {
-                                    Argument<T> t = context.getArgument();
-                                    if (t.isAssignableFrom(ByteBuffer.class)) {
-                                        return () -> Optional.of((T) contents);
-                                    } else if (t.isAssignableFrom(byte[].class)) {
-                                        byte[] bytes = contents.toByteArray();
-                                        return () -> Optional.of((T) bytes);
-                                    } else if (t.isAssignableFrom(String.class)) {
-                                        String str = contents.toString(StandardCharsets.UTF_8);
-                                        return () -> Optional.of((T) str);
-                                    }
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
+                        if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
+                            return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
+                                Argument<T> t = context.getArgument();
+                                if (t.isAssignableFrom(ByteBuffer.class)) {
+                                    return () -> Optional.of((T) imm.toByteBuffer());
+                                } else if (t.isAssignableFrom(byte[].class)) {
+                                    byte[] bytes = imm.toByteArray();
+                                    return () -> Optional.of((T) bytes);
+                                } else if (t.isAssignableFrom(String.class)) {
+                                    String str = imm.toString(StandardCharsets.UTF_8);
+                                    return () -> Optional.of((T) str);
+                                } else {
+                                    return ArgumentBinder.BindingResult.unsatisfied();
                                 }
-                            }
-                            return ArgumentBinder.BindingResult.UNSATISFIED;
-                        });
-                    } else {
-                        return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
-                    }
+                            });
+                        }
+                        return ExecutionFlow.just(ArgumentBinder.BindingResult.unsatisfied());
+                    });
+                } else {
+                    return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
                 }
-                return Optional.empty();
             }
         };
     }
@@ -168,7 +158,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                 .toList();
         }
 
-        if (patterns != null) {
+        if (patterns != null && (beanLevel.appendContextPath == null || beanLevel.appendContextPath)) {
             patterns = prependContextPath(patterns);
         }
 
@@ -189,7 +179,9 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             order,
             methodLevel.executeOn == null ? beanLevel.executeOn : methodLevel.executeOn,
             beanLevel.serviceId, // only present on bean level
-            beanLevel.excludeServiceId // only present on bean level
+            beanLevel.excludeServiceId, // only present on bean level
+            beanLevel.appendContextPath, // Define if contextPath is appended,
+            methodLevel.isPreMatching
         );
     }
 
@@ -224,6 +216,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         OptionalInt order = annotationMetadata.intValue(Order.class);
         String[] serviceId = annotationMetadata.stringValues(annotationType, "serviceId"); // only on ClientFilter
         String[] excludeServiceId = annotationMetadata.stringValues(annotationType, "excludeServiceId"); // only on ClientFilter
+        Optional<Boolean> appendContextPath = annotationMetadata.booleanValue(annotationType, "appendContextPath");
         return new FilterMetadata(
             annotationMetadata.enumValue(annotationType, "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT),
             ArrayUtils.isNotEmpty(patterns) ? Arrays.asList(patterns) : null,
@@ -231,7 +224,9 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : null,
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
-            ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null
+            ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
+            appendContextPath.orElse(null),
+            annotationMetadata.hasStereotype("io.micronaut.http.server.annotation.PreMatching")
         );
     }
 
@@ -242,7 +237,9 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         @Nullable FilterOrder order,
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
-        @Nullable List<String> excludeServiceId
+        @Nullable List<String> excludeServiceId,
+        @Nullable Boolean appendContextPath,
+        boolean isPreMatching
     ) {
     }
 
@@ -252,6 +249,12 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
      *
      * @param <T> Arg type
      */
-    public interface RequiresRequestBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+    public interface AsyncBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+        @Override
+        default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+            throw new UnsupportedOperationException();
+        }
+
+        ExecutionFlow<BindingResult<T>> bindAsync(ArgumentConversionContext<T> context, HttpRequest<?> source);
     }
 }

@@ -18,10 +18,12 @@ package io.micronaut.http.simple;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
@@ -45,7 +47,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
     private final SimpleHttpParameters parameters = new SimpleHttpParameters(ConversionService.SHARED);
 
-    private HttpMethod method;
+    private final HttpMethod method;
     private URI uri;
     private Object body;
 
@@ -53,13 +55,13 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
      * Simple {@link MutableHttpRequest} implementation.
      *
      * @param method the HTTP method
-     * @param uri    the URI of the request
+     * @param url    the URI of the request
      * @param body   the optional body of the request
      */
-    public SimpleHttpRequest(HttpMethod method, String uri, B body) {
+    public SimpleHttpRequest(HttpMethod method, String url, B body) {
         this.method = method;
         try {
-            this.uri = new URI(uri);
+            this.uri = new URI(url);
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException("Wrong URI", e);
         }
@@ -69,14 +71,23 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
         this.cookies.put(cookie.getName(), cookie);
+        updateCookies();
         return this;
+    }
+
+    private void updateCookies() {
+        headers.remove(HttpHeaders.COOKIE);
+        for (Cookie cookie : cookies.getAll()) {
+            headers.add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+        }
     }
 
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
         for (Cookie cookie: cookies) {
-            cookie(cookie);
+            this.cookies.put(cookie.getName(), cookie);
         }
+        updateCookies();
         return this;
     }
 

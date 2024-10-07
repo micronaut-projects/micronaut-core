@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -41,7 +41,7 @@ public sealed class EqOperator extends BinaryOperator permits NeqOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type lefType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);

@@ -46,7 +46,7 @@ public class InfoEndpoint {
 
     /**
      * @param infoAggregator The {@link InfoAggregator}
-     * @param infoSources    The {@link InfoSource}
+     * @param infoSources The {@link InfoSource}
      */
     public InfoEndpoint(InfoAggregator infoAggregator, InfoSource[] infoSources) {
         this.infoAggregator = infoAggregator;

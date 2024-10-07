@@ -17,7 +17,9 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -31,6 +33,7 @@ import io.micronaut.http.annotation.Status;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
@@ -59,6 +62,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     protected final HttpStatus definedStatus;
     protected final boolean isWebSocketRoute;
     private final boolean isVoid;
+    private final boolean imperative;
     private final boolean suspended;
     private final boolean reactive;
     private final boolean single;
@@ -89,8 +93,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.annotationMetadata = annotationMetadata;
         this.returnType = returnType;
         this.bodyType = resolveBodyType(returnType);
-        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes)
-            .map(w -> w.createSpecific((Argument<R>) bodyType))
+        var argBodyType = (Argument<R>) bodyType;
+        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
+            .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
@@ -141,6 +146,13 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             this.consumesMediaTypes = consumesMediaTypes;
             consumesMediaTypesContainsAll = this.consumesMediaTypes.contains(MediaType.ALL_TYPE);
         }
+        this.imperative =
+            (returnType.getType() == void.class && !suspended)
+            || !suspended
+            && !reactive
+            && !async
+            && !returnType.getType().equals(Object.class)
+            && (returnType.getType().getPackageName().startsWith("java.") || BeanIntrospector.SHARED.findIntrospection(returnType.getType()).isPresent());
     }
 
     @Override
@@ -150,19 +162,32 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     private static Argument<?> resolveBodyType(ReturnType<?> returnType) {
         if (returnType.isAsyncOrReactive()) {
-            Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (HttpResponse.class.isAssignableFrom(reactiveType.getType())) {
-                reactiveType = reactiveType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (HttpResponse.class.isAssignableFrom(unwrappedType.getType())) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return reactiveType;
+            return appendAnnotations(returnType, unwrappedType);
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
-            Argument<?> responseType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (responseType.isAsyncOrReactive()) {
-                return responseType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (unwrappedType.isAsyncOrReactive()) {
+                unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return responseType;
+            return appendAnnotations(returnType, unwrappedType);
+        } else if (returnType.isOptional()) {
+            Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            return appendAnnotations(returnType, unwrappedType);
         }
         return returnType.asArgument();
+    }
+
+    private static Argument<?> appendAnnotations(ReturnType<?> returnType, Argument<?> unwrappedType) {
+        if (unwrappedType.getAnnotationMetadata().isEmpty()) {
+            return unwrappedType.withAnnotationMetadata(returnType.getAnnotationMetadata());
+        }
+        MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
+        mutableAnnotationMetadata.addAnnotationMetadata(MutableAnnotationMetadata.of(unwrappedType.getAnnotationMetadata()));
+        mutableAnnotationMetadata.addAnnotationMetadata(MutableAnnotationMetadata.of(returnType.getAnnotationMetadata()));
+        return unwrappedType.withAnnotationMetadata(mutableAnnotationMetadata);
     }
 
     @Override
@@ -176,6 +201,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public Argument<?> getResponseBodyType() {
         return bodyType;
     }
@@ -196,8 +222,18 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    public boolean consumesAll() {
+        return consumesMediaTypesContainsAll;
+    }
+
+    @Override
     public boolean doesConsume(MediaType contentType) {
         return contentType == null || consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
+    }
+
+    @Override
+    public boolean producesAll() {
+        return producesMediaTypesContainsAll;
     }
 
     @Override
@@ -238,6 +274,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    public boolean isImperative() {
+        return imperative;
+    }
+
+    @Override
     public boolean isReactive() {
         return reactive;
     }
@@ -273,6 +314,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         if (definedStatus != null) {
             return definedStatus;
@@ -304,6 +346,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

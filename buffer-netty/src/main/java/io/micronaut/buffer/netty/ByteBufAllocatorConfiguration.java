@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Nullable;
 /**
  * Interface for the Netty bytebuf allocator configuration.
  *
- * @since 3.3.0
  * @author graemerocher
+ * @since 3.3.0
  */
 public interface ByteBufAllocatorConfiguration {
     String DEFAULT_ALLOCATOR = "netty.default.allocator";

@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
@@ -61,8 +62,13 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class MaxRequestSizeSpec extends Specification {
 
+    static final String SPEC_NAME = 'MaxRequestSizeSpec'
+
     void "test max request size default processor"() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'spec.name': SPEC_NAME
+        ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
@@ -86,7 +92,10 @@ class MaxRequestSizeSpec extends Specification {
     }
 
     void "test max request size json processor"() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'spec.name': SPEC_NAME
+        ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
@@ -111,7 +120,10 @@ class MaxRequestSizeSpec extends Specification {
 
     @Ignore("Whether or not the exception is thrown is inconsistent. I don't think there is anything we can do to ensure its consistency")
     void "test max request size multipart processor"() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'spec.name': SPEC_NAME
+        ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
@@ -149,7 +161,8 @@ class MaxRequestSizeSpec extends Specification {
 
     void "test max part size multipart processor"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.server.multipart.maxFileSize': '1KB'
+                'micronaut.server.multipart.maxFileSize': '1KB',
+                'spec.name': SPEC_NAME
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -188,7 +201,8 @@ class MaxRequestSizeSpec extends Specification {
 
     void "test max part size multipart body binder"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.server.multipart.maxFileSize': '1KB'
+                'micronaut.server.multipart.maxFileSize': '1KB',
+                'spec.name': SPEC_NAME
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -228,7 +242,8 @@ class MaxRequestSizeSpec extends Specification {
     void "test content length exceeded with different disk storage"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.maxRequestSize': '10KB',
-                'micronaut.server.multipart.disk': true
+                'micronaut.server.multipart.disk': true,
+                'spec.name': SPEC_NAME
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -254,7 +269,8 @@ class MaxRequestSizeSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.maxRequestSize': '10KB',
-                'micronaut.server.port': -1
+                'micronaut.server.port': -1,
+                'spec.name': SPEC_NAME
         ])
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
@@ -334,7 +350,8 @@ class MaxRequestSizeSpec extends Specification {
                 'micronaut.server.ssl.enabled': true,
                 'micronaut.server.netty.log-level': 'TRACE',
                 'micronaut.server.ssl.port': -1,
-                'micronaut.server.ssl.buildSelfSigned': true
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'spec.name': SPEC_NAME
         ])
 
         def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/multipart-body')
@@ -432,11 +449,65 @@ class MaxRequestSizeSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test max buffer"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestBufferSize': '10KB',
+                'spec.name': SPEC_NAME
+        ])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        byte[] kb10 = new byte[10240]
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", kb10).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        byte[] kb101 = new byte[10241]
+        result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/ignored", kb101).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", kb101).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.startsWith("The content length [10241] exceeds the maximum allowed bufferable length [10240]")
+
+        when:
+        byte[] mb1 = new byte[1024000]
+        result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/ignored", mb1).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        result == "OK"
+
+        when:
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", mb1).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.matches("The content length \\[\\d+] exceeds the maximum allowed bufferable length \\[10240].*")
+
+        cleanup:
+        client.close()
+        embeddedServer.close()
+    }
+
     @Controller("/test-max-size")
+    @Requires(property = "spec.name", value = "MaxRequestSizeSpec")
     static class TestController {
 
         @Post(uri = "/text", consumes = MediaType.TEXT_PLAIN)
         String text(@Body String body) {
+            "OK"
+        }
+
+        // this endpoint ignores the body so it wont trigger the max buffer size
+        @Post(uri = "/ignored", consumes = MediaType.TEXT_PLAIN)
+        String ignored() {
             "OK"
         }
 

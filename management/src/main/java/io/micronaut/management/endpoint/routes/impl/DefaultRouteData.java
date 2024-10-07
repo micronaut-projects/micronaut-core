@@ -47,18 +47,15 @@ public class DefaultRouteData implements RouteData<Map<String, String>> {
      * @return A String with the target method
      */
     protected String getMethodString(MethodExecutionHandle<?, ?> targetMethod) {
-        return new StringBuilder()
-            .append(targetMethod.getReturnType().asArgument().getTypeString(false))
-            .append(" ")
-            .append(targetMethod.getDeclaringType().getName())
-            .append('.')
-            .append(targetMethod.getMethodName())
-            .append("(")
-            .append(Arrays
-                .stream(targetMethod.getArguments())
+        return targetMethod.getReturnType().asArgument().getTypeString(false) +
+            " " +
+            targetMethod.getDeclaringType().getName() +
+            '.' +
+            targetMethod.getMethodName() +
+            "(" +
+            Arrays.stream(targetMethod.getArguments())
                 .map(argument -> argument.getType().getName() + " " + argument.getName())
-                .collect(Collectors.joining(", ")))
-            .append(")")
-            .toString();
+                .collect(Collectors.joining(", ")) +
+            ")";
     }
 }

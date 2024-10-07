@@ -30,6 +30,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Nullability
 import com.google.devtools.ksp.symbol.Variance
 import com.google.devtools.ksp.symbol.Visibility
 import io.micronaut.aop.Around
@@ -132,12 +133,17 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         false
     }
 
-    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata) = annotationMetadata.declaredMetadata.hasDeclaredStereotype(
-        Around::class.java,
-        Introduction::class.java,
-        InterceptorBinding::class.java,
-        InterceptorBindingDefinitions::class.java
-    )
+    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata): Boolean {
+        if (extraOpenAnnotations != null && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
+            return true
+        }
+        return annotationMetadata.declaredMetadata.hasDeclaredStereotype(
+            Around::class.java,
+            Introduction::class.java,
+            InterceptorBinding::class.java,
+            InterceptorBindingDefinitions::class.java
+        )
+    }
 
     override fun isAbstract(): Boolean {
         return if (annotatedInfo is KSModifierListOwner) {
@@ -278,7 +284,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = type.declaration.typeParameters
-        if (type.arguments.isEmpty()) {
+        if (type.arguments.isEmpty() || type.arguments.size != typeParameters.size) {
             typeParameters.forEach {
                 typeArguments[it.name.asString()] =
                     resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
@@ -524,28 +530,31 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 )
             }
         }
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val primitiveArray = primitiveArrays[qualifiedName]
-        if (primitiveArray != null) {
-            return primitiveArray
-        }
-        val canBePrimitive =
-            type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
-        if (allowPrimitive && canBePrimitive) {
-            val element = primitives[qualifiedName]
-            if (element != null) {
-                return element
+        val qualifiedName = declaration.qualifiedName
+        if (qualifiedName != null) {
+            val qualifiedNameString = qualifiedName.asString()
+            val primitiveArray = primitiveArrays[qualifiedNameString]
+            if (primitiveArray != null) {
+                return primitiveArray
             }
-        }
-        if (type != null && qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            return newTypeArgument(
-                owner,
-                component,
-                parentTypeArguments,
-                visitedTypes,
-                false
-            ).toArray()
+            val canBePrimitive =
+                type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
+            if (allowPrimitive && canBePrimitive && type?.nullability != Nullability.PLATFORM) {
+                val element = primitives[qualifiedNameString]
+                if (element != null) {
+                    return element
+                }
+            }
+            if (type != null && qualifiedNameString == "kotlin.Array") {
+                val component = type.arguments[0].type!!.resolve()
+                return newTypeArgument(
+                    owner,
+                    component,
+                    parentTypeArguments,
+                    visitedTypes,
+                    false
+                ).toArray()
+            }
         }
         val typeArguments = if (stripTypeArguments) {
             resolveEmptyTypeArguments(declaration)
@@ -602,6 +611,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     companion object {
+        val extraOpenAnnotations = System.getProperty("kotlin.allopen.annotations")?.split(",")?.toTypedArray()
+
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
             "kotlin.Char" to PrimitiveElement.CHAR,

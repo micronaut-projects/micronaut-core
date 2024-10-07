@@ -1,0 +1,44 @@
+This example adds a filter that will log the body bytes as they come in.
+
+snippet::io.micronaut.docs.server.body.BodyLogController[tags="imports,clazz", indent=0, title="A simple controller"]
+
+snippet::io.micronaut.docs.server.body.BodyLogFilter[tags="imports,clazz", indent=0, title="Logging filter"]
+
+<1> The `@Body Person person` parameter is the final consumer of the `ServerHttpRequest.byteBody()`. The argument
+binder will internally perform a primary operation on the body, parse the JSON, and convert it to the `Person` object.
+<2> The `logBody` filter will be called before the controller. However, it is programmed asynchronously, so the actual
+logging may happen later as data is received.
+<3> `split` the body so that we can work with it without interfering with the argument binder in <1>. We use `SLOWEST`
+mode to prevent buffering: We don't want to overwhelm the controller with data because the logging is usually very
+fast, but at the same time we don't want to overwhelm the logging if it is unexpectedly slower than the controller.
+<4> The newly split body is in a try-with-resources statement to ensure that it is properly closed and there is no data
+leak.
+<5> We call `allowDiscard()` to signal that if the controller does not need the body after all, the logging filter is
+fine with dropping it entirely. Without this call, the full body would always be logged, even if the body is discarded.
+<6> Convert our copy of the body to a project reactor stream of `byte[]`.
+<7> Since we called `allowDiscard()`, there may be a `BodyDiscardedException` if the upstream decides that the body can
+be dropped. We ignore that exception.
+<8> Finally, subscribe to the reactive stream, and log any incoming data. Note that `subscribe` is asynchronous: It
+will return immediately and then call the lambda with the log statement as data comes in.
+
+If you run this example, you should see log output like this:
+
+[source]
+----
+16:29:30.562 [default-nioEventLoopGroup-1-3] INFO  i.m.docs.server.body.BodyLogFilter - Received body: eyJmaXJzdE5hbWUiOiAiSm9uYXMiLCAibGFzdE5hbWUiOiAiS29ucmFkIn0=
+16:29:30.604 [default-nioEventLoopGroup-1-3] INFO  i.m.d.server.body.BodyLogController - Creating person Person[firstName=Jonas, lastName=Konrad]
+----
+
+With a short body like this, the log will only show one "packet". With more packets, the log statement will be called
+multiple times:
+
+[source]
+----
+16:29:30.562 [default-nioEventLoopGroup-1-3] INFO  i.m.docs.server.body.BodyLogFilter - Received body: ...
+16:29:30.584 [default-nioEventLoopGroup-1-3] INFO  i.m.docs.server.body.BodyLogFilter - Received body: ...
+16:29:30.642 [default-nioEventLoopGroup-1-3] INFO  i.m.docs.server.body.BodyLogFilter - Received body: ...
+16:29:30.773 [default-nioEventLoopGroup-1-3] INFO  i.m.d.server.body.BodyLogController - Creating person Person[firstName=..., lastName=...]
+16:29:30.708 [default-nioEventLoopGroup-1-3] INFO  i.m.docs.server.body.BodyLogFilter - Received body: ...
+----
+
+Note that the logging in the above example is asynchronous, so the log statements may be interleaved as shown.

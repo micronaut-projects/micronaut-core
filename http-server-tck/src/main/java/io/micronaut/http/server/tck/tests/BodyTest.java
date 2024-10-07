@@ -20,21 +20,27 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
@@ -142,6 +148,42 @@ public class BodyTest {
                     .build()));
     }
 
+    @Test
+    void testEmptyFuture() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-body/empty-future")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build()));
+    }
+
+    @Test
+    void testEmptySingleResultPublisher() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-body/empty-single-result")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build()));
+    }
+
+    @Test
+    void testRedirectFuture() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-body/redirect-future"))
+            .configuration(Map.of("micronaut.http.client.follow-redirects", false))
+            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.FOUND)
+                    .header("Location", "https://example.com")
+                    .build()))
+            .run();
+    }
+
     @Controller("/response-body")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -194,6 +236,22 @@ public class BodyTest {
         @Status(HttpStatus.CREATED)
         String postBytes(@Body byte[] bytes) {
             return new String(bytes);
+        }
+
+        @Get(uri = "/empty-future")
+        CompletableFuture<HttpResponse<?>> emptyFuture() {
+            return CompletableFuture.completedFuture(HttpResponse.ok());
+        }
+
+        @Get(uri = "/empty-single-result")
+        @SingleResult
+        Publisher<HttpResponse<?>> emptySingleResult() {
+            return Mono.just(HttpResponse.ok());
+        }
+
+        @Get(uri = "/redirect-future")
+        CompletableFuture<HttpResponse<?>> redirectFuture() {
+            return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.FOUND).header("Location", "https://example.com"));
         }
     }
 

@@ -131,7 +131,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaMethodElement newSourceMethodElement(ClassElement declaringClass,
+    public JavaMethodElement newSourceMethodElement(@NonNull ClassElement declaringClass,
                                                     @NonNull ExecutableElement method,
                                                     @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(declaringClass);
@@ -158,7 +158,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaMethodElement newMethodElement(ClassElement owningType,
+    public JavaMethodElement newMethodElement(@NonNull ClassElement owningType,
                                               @NonNull ExecutableElement method,
                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(owningType);
@@ -173,7 +173,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaConstructorElement newConstructorElement(ClassElement owningType,
+    public JavaConstructorElement newConstructorElement(@NonNull ClassElement owningType,
                                                         @NonNull ExecutableElement constructor,
                                                         @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(owningType);
@@ -188,7 +188,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaEnumConstantElement newEnumConstantElement(ClassElement owningType,
+    public JavaEnumConstantElement newEnumConstantElement(@NonNull ClassElement owningType,
                                                           @NonNull VariableElement enumConstant,
                                                           @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(owningType instanceof JavaEnumElement)) {
@@ -205,7 +205,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaFieldElement newFieldElement(ClassElement owningType,
+    public JavaFieldElement newFieldElement(@NonNull ClassElement owningType,
                                             @NonNull VariableElement field,
                                             @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         failIfPostponeIsNeeded(owningType, field);

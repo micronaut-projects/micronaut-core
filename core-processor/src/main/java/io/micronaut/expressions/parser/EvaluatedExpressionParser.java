@@ -27,8 +27,8 @@ import io.micronaut.expressions.parser.exception.ExpressionParsingException;
  * @since 4.0.0
  */
 @Internal
-public sealed interface EvaluatedExpressionParser permits SingleEvaluatedEvaluatedExpressionParser,
-                                                          CompoundEvaluatedEvaluatedExpressionParser {
+public sealed interface EvaluatedExpressionParser permits SingleEvaluatedExpressionParser,
+    CompoundEvaluatedExpressionParser {
     /**
      * Parse expression into AST.
      *

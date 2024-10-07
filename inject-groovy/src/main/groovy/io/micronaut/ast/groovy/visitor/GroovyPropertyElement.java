@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -38,6 +39,7 @@ import java.util.Optional;
  */
 @Internal
 final class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
+
     private final ClassElement type;
     private final String name;
     private final AccessKind readAccessKind;
@@ -50,14 +52,14 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final ElementAnnotationMetadata annotationMetadata;
+    private final PropertyElementAnnotationMetadata annotationMetadata;
 
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
                           ClassElement owningElement,
                           ClassElement type,
-                          MethodElement getter,
-                          MethodElement setter,
-                          FieldElement field,
+                          @Nullable MethodElement getter,
+                          @Nullable MethodElement setter,
+                          @Nullable FieldElement field,
                           ElementAnnotationMetadataFactory annotationMetadataFactory,
                           String name,
                           AccessKind readAccessKind,
@@ -77,7 +79,17 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
+    }
+
+    @Override
+    public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        return Optional.of(annotationMetadata.getReadAnnotationMetadata());
+    }
+
+    @Override
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyPropertyElement(visitorContext, owningElement, type, getter, setter, field,
             elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded);
     }
@@ -88,8 +100,8 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     private static GroovyNativeElement selectNativeType(MethodElement getter,
-                                                  MethodElement setter,
-                                                  FieldElement field) {
+                                                        MethodElement setter,
+                                                        FieldElement field) {
         if (getter instanceof AbstractGroovyElement) {
             return (GroovyNativeElement) getter.getNativeType();
         }
@@ -113,12 +125,12 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public ClassElement getType() {
+    public @NonNull ClassElement getType() {
         return type;
     }
 
     @Override
-    public ClassElement getGenericType() {
+    public @NonNull ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -153,7 +165,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return name;
     }
 

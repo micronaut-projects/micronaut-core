@@ -45,6 +45,7 @@ class CrossOriginUtilSpec extends Specification {
         config.exposedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.allowedMethods == [ HttpMethod.GET, HttpMethod.POST ]
         !config.allowCredentials
+        !config.allowPrivateNetwork
         config.maxAge == -1L
 
         cleanup:
@@ -65,6 +66,7 @@ class CrossOriginUtilSpec extends Specification {
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
         config.allowCredentials
+        config.allowPrivateNetwork
         config.maxAge == 1800L
 
         cleanup:
@@ -84,6 +86,7 @@ class CrossOriginUtilSpec extends Specification {
         config.exposedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.allowedMethods == [ HttpMethod.GET, HttpMethod.POST, HttpMethod.DELETE ]
         !config.allowCredentials
+        !config.allowPrivateNetwork
         config.maxAge == 3600L
 
         cleanup:
@@ -103,6 +106,7 @@ class CrossOriginUtilSpec extends Specification {
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
         config.allowCredentials
+        config.allowPrivateNetwork
         config.maxAge == 1800L
 
         cleanup:
@@ -123,6 +127,7 @@ class CrossOriginUtilSpec extends Specification {
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
         config.allowCredentials
+        config.allowPrivateNetwork
         config.maxAge == 1800L
 
         cleanup:
@@ -172,6 +177,7 @@ class CrossOriginUtilSpec extends Specification {
                 exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 allowedMethods = [ HttpMethod.GET, HttpMethod.POST ],
                 allowCredentials = false,
+                allowPrivateNetwork = false,
                 maxAge = -1L
         )
         @Produces(MediaType.TEXT_PLAIN)
@@ -219,6 +225,7 @@ class CrossOriginUtilSpec extends Specification {
             exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
             allowedMethods = [ HttpMethod.GET, HttpMethod.POST, HttpMethod.DELETE ],
             allowCredentials = false,
+            allowPrivateNetwork = false,
             maxAge = 3600L
     )
     static class TestClassController{

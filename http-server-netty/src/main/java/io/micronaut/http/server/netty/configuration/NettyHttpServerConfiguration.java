@@ -163,6 +163,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
+    /**
+     * Default value for {@link #formMaxFields}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_FIELDS = 128;
+
+    /**
+     * Default value for {@link #formMaxBufferedBytes}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -196,6 +210,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
+    private boolean legacyMultiplexHandlers = false;
+    private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
+    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
 
     /**
      * Default empty constructor.
@@ -437,6 +454,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * The default compression threshold. Defaults to 1024.
+     * <p>
+     * A value {@code < 0} indicates compression should never be enabled.
      *
      * @return The compression threshold.
      */
@@ -726,6 +745,81 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    /**
+     * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
+     * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
+     * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
+     * handling and any {@link io.micronaut.http.server.netty.NettyServerCustomizer}s.
+     * <p>
+     * As of 4.4.0, this approach was replaced with a more performant HTTP/2-specific
+     * implementation. This means worse compatibility with HTTP/1.1-based code paths and
+     * customizers, however. Setting this option to {@code true} returns to the old behavior.
+     *
+     * @return Whether to enable the legacy multi-pipeline multiplex handlers for HTTP/2 connections
+     */
+    public boolean isLegacyMultiplexHandlers() {
+        return legacyMultiplexHandlers;
+    }
+
+    /**
+     * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
+     * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
+     * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
+     * handling and any {@link io.micronaut.http.server.netty.NettyServerCustomizer}s.
+     * <p>
+     * As of 4.4.0, this approach was replaced with a more performant HTTP/2-specific
+     * implementation. This means worse compatibility with HTTP/1.1-based code paths and
+     * customizers, however. Setting this option to {@code true} returns to the old behavior.
+     *
+     * @param legacyMultiplexHandlers  Whether to enable the legacy multi-pipeline multiplex
+     *                                 handlers for HTTP/2 connections
+     */
+    public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
+        this.legacyMultiplexHandlers = legacyMultiplexHandlers;
+    }
+
+    /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @return The maximum number of form fields
+     * @since 4.6.0
+     */
+    public int getFormMaxFields() {
+        return formMaxFields;
+    }
+
+    /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @param formMaxFields The maximum number of form fields
+     * @since 4.6.0
+     */
+    public void setFormMaxFields(int formMaxFields) {
+        this.formMaxFields = formMaxFields;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @return The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public int getFormMaxBufferedBytes() {
+        return formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @param formMaxBufferedBytes The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+        this.formMaxBufferedBytes = formMaxBufferedBytes;
     }
 
     /**
@@ -1227,7 +1321,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
-         * Sets the name of the executor.
+         * A named executor service to use for event loop threads
+         * (optional). This property is very specialized. In particular,
+         * it will <i>not</i> solve read timeouts or fix blocking
+         * operations on the event loop, in fact it may do the opposite.
+         * Don't use unless you really know what this does.
+         *
          * @param executor The executor
          */
         public void setExecutor(String executor) {
@@ -1324,6 +1423,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private int port;
         private String path;
         private boolean exposeDefaultRoutes = true;
+        private Integer fd = null;
+        private Integer acceptedFd = null;
+        private boolean bind = true;
+        private boolean serverSocket = true;
 
         /**
          * Create a TCP listener configuration.
@@ -1443,6 +1546,84 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Internal
         public void setExposeDefaultRoutes(boolean exposeDefaultRoutes) {
             this.exposeDefaultRoutes = exposeDefaultRoutes;
+        }
+
+        /**
+         * The fixed file descriptor for this listener, or {@code null} if a new file descriptor
+         * should be opened (the default).
+         *
+         * @return The file descriptor
+         */
+        public Integer getFd() {
+            return fd;
+        }
+
+        /**
+         * The fixed file descriptor for this listener, or {@code null} if a new file descriptor
+         * should be opened (the default).
+         *
+         * @param fd The file descriptor
+         */
+        public void setFd(Integer fd) {
+            this.fd = fd;
+        }
+
+        /**
+         * Whether the server should bind to the socket. {@code true} by default. If set to
+         * {@code false}, the socket must already be bound and listening.
+         *
+         * @return Whether to bind to the socket
+         */
+        public boolean isBind() {
+            return bind;
+        }
+
+        /**
+         * Whether the server should bind to the socket. {@code true} by default. If set to
+         * {@code false}, the socket must already be bound and listening.
+         *
+         * @param bind Whether to bind to the socket
+         */
+        public void setBind(boolean bind) {
+            this.bind = bind;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @return {@code true} iff a server socket should be created
+         */
+        public boolean isServerSocket() {
+            return serverSocket;
+        }
+
+        /**
+         * Whether to create a server socket. This is on by default. Turning it off only makes sense
+         * in combination with {@link #acceptedFd}.
+         *
+         * @param serverSocket {@code true} iff a server socket should be created
+         */
+        public void setServerSocket(boolean serverSocket) {
+            this.serverSocket = serverSocket;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @return The fd to register
+         */
+        public Integer getAcceptedFd() {
+            return acceptedFd;
+        }
+
+        /**
+         * An already accepted socket fd that should be registered to this listener.
+         *
+         * @param acceptedFd The fd to register
+         */
+        public void setAcceptedFd(Integer acceptedFd) {
+            this.acceptedFd = acceptedFd;
         }
 
         /**

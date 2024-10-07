@@ -20,7 +20,7 @@ endpoints:
 
 - `details-visible` is one of api:management.endpoint.health.DetailsVisibility[]
 
-The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated.
+The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated. If the details-visible parameter is configured as ANONYMOUS, while the sensitive flag is set to true, the resulting outcome will be 401 Unauthorized.
 
 For example, setting:
 
@@ -142,3 +142,5 @@ The JDBC health indicator determines the health of your application based on the
 === Discovery Client
 
 If your application uses service discovery, a health indicator is included to monitor the health of the discovery client. The data returned can include a list of the services available.
+
+TIP: See the guide for https://guides.micronaut.io/latest/micronaut-health-endpoint.html[Exposing a Health Endpoint for your Micronaut Application] to learn more.

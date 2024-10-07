@@ -25,9 +25,6 @@ import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-// Netty + HTTP/2 on JDKs less than 9 require tcnative setup
-// which is not included in this test suite
-//@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2AccessLoggerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'micronaut.server.ssl.enabled': true,

@@ -12,17 +12,20 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.EnumBeanIntrospection
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.core.value.OptionalMultiValues
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
@@ -36,9 +39,7 @@ import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import spock.lang.IgnoreIf
 import spock.lang.Issue
-import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -50,6 +51,376 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test annotations"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A5 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+    @A4
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A4 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A5 {
+}
+
+''')
+        def property = introspection.getBeanProperties().iterator().next()
+        def readProperty = introspection.getBeanReadProperties()[0]
+        def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        !property.hasAnnotation("test.A3")
+        property.hasAnnotation("test.A4")
+        !property.hasAnnotation("test.A5")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A5")
+        readProperty.hasAnnotation("test.A1")
+        readProperty.hasAnnotation("test.A2")
+        !readProperty.hasAnnotation("test.A3")
+        readProperty.hasAnnotation("test.A4")
+        !readProperty.hasAnnotation("test.A5")
+        writeProperty.hasAnnotation("test.A1")
+        writeProperty.hasAnnotation("test.A2")
+        !writeProperty.hasAnnotation("test.A3")
+        writeProperty.hasAnnotation("test.A4")
+        !writeProperty.hasAnnotation("test.A5")
+    }
+
+    void "test TYPE_USE annotations"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private String foo;
+
+    Test(@A4 String foo) {
+        this.foo = foo;
+    }
+
+    @A2
+    public String getFoo() {
+        return foo;
+    }
+
+    public void setFoo(@A3 String foo) {
+    }
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+@Target({ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A4 {
+}
+
+''')
+        def property = introspection.getBeanProperties()[0]
+        def readProperty = introspection.getBeanReadProperties()[0]
+        def writeProperty = introspection.getBeanWriteProperties()[0]
+        then:
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        property.hasAnnotation("test.A3")
+        !property.hasAnnotation("test.A4")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A1")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A2")
+        property.asArgument().getAnnotationMetadata().hasAnnotation("test.A3")
+        !property.asArgument().getAnnotationMetadata().hasAnnotation("test.A4")
+        readProperty.hasAnnotation("test.A1")
+        readProperty.hasAnnotation("test.A2")
+        readProperty.hasAnnotation("test.A3")
+        !readProperty.hasAnnotation("test.A4")
+        writeProperty.hasAnnotation("test.A1")
+        writeProperty.hasAnnotation("test.A2")
+        writeProperty.hasAnnotation("test.A3")
+        !writeProperty.hasAnnotation("test.A4")
+    }
+
+    void "test different setter / getter"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @A1
+    private Map<CharSequence, List<String>> foo;
+    @A2
+    public OptionalMultiValues<String> getFoo() {
+        return OptionalMultiValues.of(foo);
+    }
+    public void setFoo(@A3 Map<String, Object> foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+''')
+        def property = introspection.getBeanProperties().iterator().next()
+        then:
+        property.asArgument().getType() == OptionalMultiValues
+        property.getType() == OptionalMultiValues
+//            property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+//            property.hasAnnotation("test.A3")
+        property.isReadOnly()
+        introspection.getBeanReadProperties().size() == 1
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+        introspection.getBeanReadProperties().iterator().next().getType() == OptionalMultiValues
+        introspection.getBeanWriteProperties().size() == 0
+    }
+
+    void "test different setter / getter - ignoreSettersWithDifferingType"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected(ignoreSettersWithDifferingType = false)
+class Test {
+    @A1
+    private Map<CharSequence, List<String>> foo;
+    @A2
+    public OptionalMultiValues<String> getFoo() {
+        return OptionalMultiValues.of(foo);
+    }
+    public void setFoo(@A3 Map<String, Object> foo) {
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A1 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A2 {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface A3 {
+}
+
+''')
+        def property = introspection.getBeanProperties().iterator().next()
+        then:
+        property.asArgument().getType() == Map // The property is defined by it's writer type
+        property.hasAnnotation("test.A1")
+        property.hasAnnotation("test.A2")
+        !property.hasAnnotation("test.A3")
+        property.getType() == Map
+        !property.isReadOnly()
+        introspection.getBeanReadProperties().size() == 1
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanReadProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanReadProperties()[0].hasAnnotation("test.A3")
+        introspection.getBeanReadProperties()[0].getType() == OptionalMultiValues
+        introspection.getBeanWriteProperties().size() == 1
+        introspection.getBeanWriteProperties()[0].getType() == Map
+        introspection.getBeanWriteProperties()[0].hasAnnotation("test.A1")
+        introspection.getBeanWriteProperties()[0].hasAnnotation("test.A2")
+        !introspection.getBeanWriteProperties()[0].hasAnnotation("test.A3")
+    }
+
+    void "test bytes[] in a constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			byte[] bytes
+	) {
+		super(bytes);
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final byte[] bytes;
+
+    public FormulaCreationDto(byte[] bytes) {
+        this.bytes = bytes;
+    }
+
+    public byte[] getBytes() {
+        return this.bytes;
+    }
+
+}
+''')
+        expect:
+        introspection.instantiate(true, List.of(), new byte[] {123}).getBytes()
+    }
+
+    void "test Boolean in a constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.FormulaDto', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Introspected
+class FormulaDto extends FormulaCreationDto {
+
+	private final List<String> otherColumns;
+
+	public FormulaDto(
+			List<String> otherColumns,
+			Boolean percent
+	) {
+		super(Optional.of(percent));
+		this.otherColumns = Collections.unmodifiableList(otherColumns);
+	}
+
+	public List<String> getOtherColumns() {
+		return this.otherColumns;
+	}
+}
+
+@Introspected
+class FormulaCreationDto {
+    private final boolean percent;
+
+    public FormulaCreationDto(Optional<Boolean> percent) {
+        this.percent = percent.orElse(false);
+    }
+
+    public boolean isPercent() {
+        return this.percent;
+    }
+
+}
+''')
+        expect:
+        introspection.instantiate(true, List.of(), true).isPercent()
+    }
+
     void "test expressions in introspection properties with type use"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
@@ -215,6 +586,37 @@ class Test {
         prop.isReadOnly()
     }
 
+    void "test mix optional getter with setter - different order"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", Optional)
+        test.foo = 'value'
+
+        then: 'the write method is not considered to match the getter/setter pair'
+        prop.get(test).get() == 'value'
+        prop.type == Optional
+        prop.isReadOnly()
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8657")
     void "test executable method on abstract class with introspection"() {
         when:
@@ -277,7 +679,7 @@ public class Test {
         introspection.getProperty("name").isPresent()
 
         when:
-        def introspectionRefName = 'test.introspections.$Test$IntrospectionRef'
+        def introspectionRefName = 'test.introspections.$Test$Introspection'
         def introspectionRef = classLoader.loadClass(introspectionRefName).newInstance() as BeanIntrospectionReference
 
         then:
@@ -311,7 +713,7 @@ class Test<T extends CharSequence> {
 ''')
         expect:
         introspection.getRequiredProperty("array", CharSequence[].class)
-            .type == CharSequence[].class
+                .type == CharSequence[].class
         introspection.beanMethods.first().returnType.type == CharSequence[].class
     }
 
@@ -342,7 +744,7 @@ class Test {
 
     void "test optional property type is defined by its setter"() {
         given:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -396,16 +798,16 @@ class Test {
 }
 ''')
         expect:
-            introspection.getPropertyNames().length == 4
-            introspection.getProperty("foo").get().type == Optional.class
-            introspection.getProperty("lng").get().type == OptionalLong.class
-            introspection.getProperty("dbl").get().type == OptionalDouble.class
-            introspection.getProperty("ingr").get().type == OptionalInt.class
+        introspection.getPropertyNames().length == 4
+        introspection.getProperty("foo").get().type == Optional.class
+        introspection.getProperty("lng").get().type == OptionalLong.class
+        introspection.getProperty("dbl").get().type == OptionalDouble.class
+        introspection.getProperty("ingr").get().type == OptionalInt.class
 
-            introspection.getProperty("foo").get().isReadOnly()
-            introspection.getProperty("lng").get().isReadOnly()
-            introspection.getProperty("dbl").get().isReadOnly()
-            introspection.getProperty("ingr").get().isReadOnly()
+        introspection.getProperty("foo").get().isReadOnly()
+        introspection.getProperty("lng").get().isReadOnly()
+        introspection.getProperty("dbl").get().isReadOnly()
+        introspection.getProperty("ingr").get().isReadOnly()
     }
 
     void "test property type is not defined by its not accessible field"() {
@@ -1197,7 +1599,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = applicationContext.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1235,7 +1637,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def reference = classLoader.loadClass('test.micronaut.intro.$Test$IntrospectionRef0').newInstance() as BeanIntrospectionReference
+        def reference = classLoader.loadClass('test.micronaut.intro.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection').newInstance() as BeanIntrospectionReference
 
         then:"the reference is valid"
         notThrown(ClassNotFoundException)
@@ -1281,7 +1683,7 @@ class MyImpl implements MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -1315,7 +1717,7 @@ class MyImpl implements MyInterface {
 }
 ''')
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('itfcetest.$itfcetest_MyInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
         BeanIntrospection introspection = reference.load()
 
@@ -1340,7 +1742,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = applicationContext.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OuterBean$InnerInterface$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -1367,11 +1769,11 @@ class Test {}
 
     void "test introspection class member configuration works 2"() {
         when:
-            BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+        BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
 
         then:
-            noExceptionThrown()
-            introspection != null
+        noExceptionThrown()
+        introspection != null
     }
 
     void "test bean introspection with property of generic interface"() {
@@ -1557,7 +1959,7 @@ interface Foo {
 
         then:
         introspection.getRequiredProperty("bar", String)
-                     .get(test) == 'good'
+                .get(test) == 'good'
     }
 
     void "test generate bean introspection for @ConfigurationProperties interface"() {
@@ -2259,7 +2661,7 @@ interface GroupOne {}
 interface GroupTwo {}
 interface GroupThree {}
 ''')
-        def clazz = context.classLoader.loadClass('test.$Address$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Address$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
 
@@ -2306,7 +2708,7 @@ class Book {
     }
 }
 ''')
-        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2368,7 +2770,7 @@ class Book {
     }
 }
 ''')
-        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$Introspection')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2445,7 +2847,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2497,7 +2899,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2548,7 +2950,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2606,7 +3008,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2697,7 +3099,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2797,7 +3199,7 @@ class Test {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2830,7 +3232,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -2864,7 +3266,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        context.classLoader.loadClass('test.$Test$Introspection')
 
         then:"The reference is not written"
         thrown(ClassNotFoundException)
@@ -2888,7 +3290,7 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        def clazz = context.classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_OtherTestBean$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is generated"
@@ -2993,7 +3395,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -3182,7 +3584,7 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        def clazz = context.classLoader.loadClass('test.$Test$Introspection')
         BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
@@ -3618,6 +4020,55 @@ public enum Test {
 
         then:
         thrown(ClassNotFoundException)
+    }
+
+    void "test enum bean with annotations"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+import io.micronaut.core.annotation.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
+@Introspected
+public enum Test {
+    @JsonProperty("X")
+    A(0),
+    @JsonProperty("Y")
+    B(1),
+    @JsonProperty("Z")
+    C(2);
+    private final int number;
+    Test(int number) {
+        this.number = number;
+    }
+    public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+        introspection instanceof EnumBeanIntrospection
+
+        when:
+        def enumIntrospection = introspection as EnumBeanIntrospection
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        def annotationMetadata = enumIntrospection.constants.find { it.value == instance }.annotationMetadata
+
+        then:
+        annotationMetadata.stringValue(JsonProperty).get() == "X"
+
+        and:
+        enumIntrospection.constants[0].stringValue(JsonProperty).get() == "X"
+        enumIntrospection.constants[1].stringValue(JsonProperty).get() == "Y"
+        enumIntrospection.constants[2].stringValue(JsonProperty).get() == "Z"
     }
 
     void "test enum bean properties with custom getter"() {
@@ -4695,7 +5146,7 @@ class Book {
 
     void "test type_use annotations"() {
         given:
-            def introspection = buildBeanIntrospection('test.Test', '''
+        def introspection = buildBeanIntrospection('test.Test', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.*;
@@ -4720,22 +5171,22 @@ class Test {
     }
 }
 ''')
-            def nameField = introspection.getProperty("name").orElse(null)
-            def secondNameField = introspection.getProperty("secondName").orElse(null)
+        def nameField = introspection.getProperty("name").orElse(null)
+        def secondNameField = introspection.getProperty("secondName").orElse(null)
 
         expect:
-            nameField
-            secondNameField
+        nameField
+        secondNameField
 
-            nameField.hasStereotype(TypeUseRuntimeAnn)
-            nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
-            !secondNameField.hasStereotype(TypeUseClassAnn)
-            !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
+        nameField.hasStereotype(TypeUseRuntimeAnn)
+        nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
+        !secondNameField.hasStereotype(TypeUseClassAnn)
+        !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
     }
 
     void "test subtypes"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import java.util.List;
@@ -4771,18 +5222,87 @@ class Holder<A extends Animal> {
         ''')
 
         expect:
-            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
-            animalListArgument instanceof GenericPlaceholder
-            animalListArgument.isTypeVariable()
+        def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+        animalListArgument instanceof GenericPlaceholder
+        animalListArgument.isTypeVariable()
 
-            def animal = introspection.getProperty("animal").get().asArgument()
-            animal instanceof GenericPlaceholder
-            animal.isTypeVariable()
+        def animal = introspection.getProperty("animal").get().asArgument()
+        animal instanceof GenericPlaceholder
+        animal.isTypeVariable()
+    }
+
+    void "test package private property introspection"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.MySuperclass;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test package private property introspection in same package"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('io.micronaut.inject.visitor.beans.Test', '''
+package io.micronaut.inject.visitor.beans;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is introspected, as we are in the same package'
+        introspection.getProperty("packagePrivateProperty").orElse(null)
     }
 
     void "test private property 1"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.DecimalMin;
@@ -4802,12 +5322,13 @@ class OptionalDoubleHolder {
         ''')
 
         expect:
-            introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
-            introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
+        introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
+        introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
     }
+
     void "test private property 2"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.NotBlank;
@@ -4826,8 +5347,8 @@ class OptionalStringHolder {
         ''')
 
         expect:
-            introspection.getProperty("optionalString").get().getType() == Optional.class
-            introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
+        introspection.getProperty("optionalString").get().getType() == Optional.class
+        introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
 
     }
 
@@ -4854,6 +5375,23 @@ class Massive {
         introspection.getBeanProperties().size() == count
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10647")
+    void 'handles generic definitions as generated by protobuf'() {
+        when:
+        buildBeanIntrospection('test.MyMessage', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.Message;
+
+@Introspected
+class MyMessage extends Message {
+}
+''')
+        then:
+        noExceptionThrown()
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
@@ -4866,6 +5404,7 @@ class Massive {
 
     @SupportedAnnotationTypes("*")
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
+        @NonNull
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new io.micronaut.validation.visitor.IntrospectedValidationIndexesVisitor(), new IntrospectedTypeElementVisitor()]
@@ -4883,5 +5422,4 @@ class Massive {
         }
     }
 }
-
 

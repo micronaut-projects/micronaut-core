@@ -35,11 +35,13 @@ import java.util.List;
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Experimental
 @Named(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME)
 @Singleton
 @BootstrapContextCompatible
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
@@ -51,13 +53,14 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
         MediaType.APPLICATION_JSON_FEED_TYPE,
         MediaType.APPLICATION_JSON_PATCH_TYPE,
         MediaType.APPLICATION_JSON_MERGE_PATCH_TYPE,
-        MediaType.APPLICATION_JSON_PROBLEM_TYPE
+        MediaType.APPLICATION_JSON_PROBLEM_TYPE,
+        MediaType.APPLICATION_JSON_SCHEMA_TYPE
     );
 
     /**
-     * @param jsonMapper                To read/write JSON
+     * @param jsonMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonMediaTypeCodec(JsonMapper jsonMapper,
                               ApplicationConfiguration applicationConfiguration,
@@ -66,9 +69,9 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
     }
 
     /**
-     * @param jsonCodec                To read/write JSON
+     * @param jsonCodec To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     @Inject
     public JsonMediaTypeCodec(BeanProvider<JsonMapper> jsonCodec,

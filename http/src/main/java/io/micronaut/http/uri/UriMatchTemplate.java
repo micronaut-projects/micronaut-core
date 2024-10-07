@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +32,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
+
 /**
  * Extends {@link UriTemplate} and adds the ability to match a URI to a given template using the
  * {@link #match(java.net.URI)} method.
@@ -40,7 +43,8 @@ import java.util.stream.Collectors;
  */
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
-    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#(?!\\{)&;\\+]";
+    protected static final String VARIABLE_MATCH_PATTERN = "([^/?#(?!{)&;+]";
+
     protected StringBuilder pattern;
     protected List<UriMatchVariable> variables;
     private final Pattern matchPattern;
@@ -57,7 +61,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @param templateString The template string
      */
     public UriMatchTemplate(CharSequence templateString) {
-        this(templateString, new Object[0]);
+        this(templateString, EMPTY_OBJECT_ARRAY);
     }
 
     /**
@@ -68,7 +72,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
-        if (variables.isEmpty() && Pattern.quote(templateString.toString()).equals(pattern.toString())) {
+        if (variables.isEmpty() && Pattern.quote(templateString.toString()).contentEquals(pattern)) {
             // if there are no variables and a match pattern matches template we can assume it matches exactly
             this.matchPattern = null;
             this.exactMatch = true;
@@ -136,7 +140,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             final Optional<String> var = pathSegment.getVariable();
             if (var.isPresent()) {
                 final Optional<UriMatchVariable> umv = variables.stream()
-                        .filter(v -> v.getName().equals(var.get())).findFirst();
+                        .filter(v -> v.getName().equals(var.get()))
+                        .findFirst();
                 if (umv.isPresent()) {
                     return !umv.get().isQuery();
                 }
@@ -387,17 +392,16 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
             matchTemplate.variables.add(new UriMatchVariable(variable, modifierChar, operator));
-            StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
             boolean hasModifier = modifierChar == ':' && modLen > 0;
-            String operatorPrefix = "";
-            String operatorQuantifier = "";
+            String operatorPrefix = StringUtils.EMPTY_STRING;
+            String operatorQuantifier = StringUtils.EMPTY_STRING;
             String variableQuantifier = "+?)";
-            String variablePattern = getVariablePattern(variable, operator);
+            String variablePattern = null;
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
-                    operatorQuantifier = "";
+                    operatorQuantifier = StringUtils.EMPTY_STRING;
                 } else if (modifierStr.chars().allMatch(Character::isDigit)) {
                     variableQuantifier = "{1," + modifierStr + "})";
                 } else {
@@ -407,43 +411,47 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                         (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen - 2) == '+'))) {
                         operatorQuantifier = "?";
                     }
+                    String s = firstChar == '^' ? modifierStr.substring(1) : modifierStr;
                     if (operator == '/' || operator == '.') {
-                        variablePattern = "(" + ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = "(" + s + ')';
                     } else {
                         operatorPrefix = "(";
-                        variablePattern = ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
+                        variablePattern = s + ')';
                     }
-                    variableQuantifier = "";
+                    variableQuantifier = StringUtils.EMPTY_STRING;
                 }
             }
 
             boolean operatorAppended = false;
-
+            StringBuilder pattern = matchTemplate.pattern;
             switch (operator) {
                 case '.':
                 case '/':
-                    pattern.append("(")
+                    pattern.append('(')
                         .append(operatorPrefix)
-                        .append("\\")
-                        .append(String.valueOf(operator))
+                        .append('\\')
+                        .append(operator)
                         .append(operatorQuantifier);
                     operatorAppended = true;
                     // fall through
                 case '+':
                 case '0': // no active operator
                     if (!operatorAppended) {
-                        pattern.append("(").append(operatorPrefix);
+                        pattern.append('(').append(operatorPrefix);
+                    }
+                    if (variablePattern == null) {
+                        variablePattern = getVariablePattern(variable, operator);
                     }
                     pattern.append(variablePattern)
                         .append(variableQuantifier)
-                        .append(")");
+                        .append(')');
                     break;
                 default:
                     // no-op
             }
 
             if (operator == '/' || modifierStr.equals("?")) {
-                pattern.append("?");
+                pattern.append('?');
             }
             super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter, isQuerySegment);
         }

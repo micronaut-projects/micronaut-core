@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.type.Argument
@@ -65,9 +66,11 @@ import java.time.Instant
  */
 class ErrorSpec extends AbstractMicronautSpec {
 
+    static final String SPEC = "ErrorSpec"
+
     void "test 500 server error"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/server-error')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -84,7 +87,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 500 server error IOException"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/io-error')
 
         )).onErrorResume(t -> {
@@ -102,7 +105,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test an error route throwing the same exception it handles"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/loop')
 
         )).onErrorResume(t -> {
@@ -120,7 +123,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test an exception handler throwing the same exception it handles"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/loop/handler')
 
         )).onErrorResume(t -> {
@@ -138,7 +141,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 404 error"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/blah')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -161,7 +164,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 405 error"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/errors/server-error', 'blah')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -184,7 +187,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test content type for error handler"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/handler-content-type-error')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -201,7 +204,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test encoding error"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/encoding-error')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -219,7 +222,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7786')
     void "test encoding error with handler"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/encoding-error/handled')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -236,7 +239,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test encoding error with handler loop"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/encoding-error/handled/loop')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -253,7 +256,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test calling a controller that fails to inject with a local error handler"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/injection')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -270,7 +273,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6526')
     def 'test bad request from incorrect use of array'() {
         when:
-        rxClient.toBlocking().exchange(HttpRequest.POST('/errors/feedBirds', '[ { "name": "eagle" }, { "name": "hen" } ]').contentType(MediaType.APPLICATION_JSON))
+        httpClient.toBlocking().exchange(HttpRequest.POST('/errors/feedBirds', '[ { "name": "eagle" }, { "name": "hen" } ]').contentType(MediaType.APPLICATION_JSON))
         then:
         def e = thrown HttpClientResponseException
         e.status == HttpStatus.BAD_REQUEST
@@ -324,7 +327,7 @@ X-Long-Header: $longString\r
 
     def 'missing writer'() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/errors/media-type')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
@@ -338,6 +341,7 @@ X-Long-Header: $longString\r
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors')
     static class ErrorController {
 
@@ -391,6 +395,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/loop')
     static class ErrorLoopController {
 
@@ -405,6 +410,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/loop/handler')
     static class ErrorLoopHandlerController {
 
@@ -414,6 +420,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/injection')
     static class ErrorInjectionController {
 
@@ -430,6 +437,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/encoding-error/handled')
     static class ErrorEncodingHandlerController {
         @Get
@@ -443,6 +451,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/encoding-error/handled/loop')
     static class ErrorEncodingHandlerLoopController {
         @Get
@@ -456,6 +465,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Controller('/errors/media-type')
     static class MediaTypeErrorController {
         @Get
@@ -464,6 +474,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Singleton
     @Produces("my/mediatype")
     static class ThrowingWriter implements MessageBodyWriter<Instant> {
@@ -473,6 +484,7 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Produces(value = MediaType.TEXT_HTML)
     @Singleton
     static class ContentTypeExceptionHandler implements ExceptionHandler<ContentTypeExceptionHandlerException, HttpResponse<String>> {
@@ -487,6 +499,7 @@ X-Long-Header: $longString\r
 
     static class LoopingException extends RuntimeException {}
 
+    @Requires(property = 'spec.name', value = SPEC)
     @Singleton
     static class LoopingExceptionHandler implements ExceptionHandler<LoopingException, String> {
         @Override

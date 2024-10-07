@@ -3,6 +3,13 @@ plugins {
     id "me.champeau.jmh" version "0.7.2"
 }
 
+sourceSets {
+    create("typeCheckTest") {
+        compileClasspath += sourceSets.jmh.output
+        runtimeClasspath += sourceSets.jmh.output
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     jmhAnnotationProcessor project(":inject-java")
@@ -33,7 +40,19 @@ dependencies {
     }
 
     jmh libs.jmh.core
+
+    typeCheckTestImplementation libs.junit.jupiter
+    typeCheckTestImplementation libs.micronaut.test.type.pollution
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.14.19")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.14.19")
+    typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
+
+configurations {
+    typeCheckTestImplementation.extendsFrom(jmhImplementation, implementation)
+    typeCheckTestRuntimeOnly.extendsFrom(jmhRuntimeOnly, runtimeOnly)
+}
+
 jmh {
     includes = ['io.micronaut.http.server.StartupBenchmark']
     duplicateClassesStrategy = DuplicatesStrategy.WARN
@@ -42,6 +61,19 @@ jmh {
 tasks.named("processJmhResources") {
     duplicatesStrategy = DuplicatesStrategy.WARN
 }
+
+tasks.register('typeCheckTest', Test) {
+    description = "Runs type check tests."
+    group = "verification"
+
+    testClassesDirs = sourceSets.typeCheckTest.output.classesDirs
+    classpath = sourceSets.typeCheckTest.runtimeClasspath
+
+    useJUnitPlatform()
+}
+
+check.dependsOn typeCheckTest
+
 ['spotlessJavaCheck', 'checkstyleMain', 'checkstyleJmh'].each {
     tasks.named(it) {
         enabled = false

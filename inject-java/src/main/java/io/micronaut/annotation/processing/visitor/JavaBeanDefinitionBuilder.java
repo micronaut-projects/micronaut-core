@@ -15,7 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
@@ -24,14 +24,15 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -53,15 +54,16 @@ import java.util.function.Predicate;
 @Internal
 class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final JavaVisitorContext javaVisitorContext;
+    private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
 
     /**
      * Default constructor.
      *
-     * @param originatingElement               The originating element
-     * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @param metadataBuilder the metadata builder
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
-     * @param visitorContext                   the visitor context
+     * @param visitorContext the visitor context
      */
     JavaBeanDefinitionBuilder(Element originatingElement,
                               ClassElement beanType,
@@ -77,8 +79,10 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         } else {
             visitorContext.fail("Cannot add bean definition using addAssociatedBean(..) from a AGGREGATING TypeElementVisitor, consider overriding getVisitorKind()", originatingElement);
         }
+        this.annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();
     }
 
+    @NonNull
     @Override
     protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
         final ClassElement parentType = getBeanType();
@@ -90,12 +94,12 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
-            public Element getProducingElement() {
+            public @NonNull Element getProducingElement() {
                 return producerField;
             }
 
             @Override
-            public ClassElement getDeclaringElement() {
+            public @NonNull ClassElement getDeclaringElement() {
                 return producerField.getDeclaringType();
             }
 
@@ -114,6 +118,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         };
     }
 
+    @NonNull
     @Override
     protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
         AnnotationValue<?>[] interceptorTypes =
@@ -126,6 +131,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         );
     }
 
+    @NonNull
     @Override
     protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
         AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
@@ -139,6 +145,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         };
     }
 
+    @NonNull
     @Override
     protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
         final ClassElement parentType = getBeanType();
@@ -151,11 +158,13 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         ) {
             BeanParameterElement[] parameters;
 
+            @NonNull
             @Override
             public Element getProducingElement() {
                 return producerMethod;
             }
 
+            @NonNull
             @Override
             public ClassElement getDeclaringElement() {
                 return producerMethod.getDeclaringType();
@@ -187,60 +196,38 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+    protected <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue) {
         ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, annotationValue);
+        annotationMetadataBuilder.annotate(annotationMetadata, annotationValue);
     }
 
     @Override
     protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
-
         final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         consumer.accept(builder);
         final AnnotationValue<T> av = builder.build();
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, av);
+        annotationMetadataBuilder.annotate(annotationMetadata, av);
     }
 
     @Override
     protected void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeStereotype(annotationMetadata, annotationType);
+        annotationMetadataBuilder.removeStereotype(annotationMetadata, annotationType);
     }
 
     @Override
     protected <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate) {
         ArgumentUtils.requireNonNull("predicate", predicate);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeAnnotationIf(annotationMetadata, predicate);
+        annotationMetadataBuilder.removeAnnotationIf(annotationMetadata, predicate);
     }
 
     @Override
     protected void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        AnnotationUtils annotationUtils = javaVisitorContext
-            .getAnnotationUtils();
-        annotationUtils
-            .newAnnotationBuilder()
-            .removeAnnotation(annotationMetadata, annotationType);
+        annotationMetadataBuilder.removeAnnotation(annotationMetadata, annotationType);
     }
 
 }

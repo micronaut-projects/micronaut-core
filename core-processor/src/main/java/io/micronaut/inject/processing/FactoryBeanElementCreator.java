@@ -109,15 +109,15 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
-            buildProducedBeanDefinition(producedType, producingElement, producingElement.getAnnotationMetadata());
+            buildProducedBeanDefinition(producedType, producedType, producingElement, producingElement.getAnnotationMetadata());
         } else {
             AnnotationMetadata producedTypeAnnotationMetadata = createProducedTypeAnnotationMetadata(producedType, producingElement);
-            producedType = producedType.withAnnotationMetadata(producedTypeAnnotationMetadata);
+            ClassElement newProducedType = producedType.withAnnotationMetadata(producedTypeAnnotationMetadata);
             AnnotationMetadata producingElementAnnotationMetadata = createProducingElementAnnotationMetadata(producedTypeAnnotationMetadata);
             producingElement = producingElement.withAnnotationMetadata(producingElementAnnotationMetadata);
 
 //            producingElement = producingElement.withAnnotationMetadata(producedTypeAnnotationMetadata);
-            buildProducedBeanDefinition(producedType, producingElement, producedType.getAnnotationMetadata());
+            buildProducedBeanDefinition(newProducedType, producedType, producingElement, newProducedType.getAnnotationMetadata());
 
             if (producingElement instanceof MethodElement methodElement) {
                 if (isAopProxy && visitAopMethod(visitor, methodElement)) {
@@ -161,6 +161,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
     }
 
     private void buildProducedBeanDefinition(ClassElement producedType,
+                                             ClassElement originalProducedType,
                                              MemberElement producingElement,
                                              AnnotationMetadata producedAnnotationMetadata) {
 
@@ -206,7 +207,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             if (producedType.isPrimitive()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to primitive beans");
             }
-            if (producedType.isFinal()) {
+            if (originalProducedType.isFinal()) { // Test on the original type to avoid KSP annotations isFinal bypass, because of the new merged annotations
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
             }
 
@@ -283,7 +284,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 if (StringUtils.isNotEmpty(destroyMethodName)) {
                     final Optional<MethodElement> destroyMethod = producedType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyAccessible(classElement)
                         .onlyInstance()
-                        .named(destroyMethodName)
+                        .named(destroyMethodName) // Named filtering should avoid processing all method and fail on possible missing classes and compilation errors
                         .filter((e) -> !e.hasParameters()));
                     if (destroyMethod.isPresent()) {
                         MethodElement destroyMethodElement = destroyMethod.get();

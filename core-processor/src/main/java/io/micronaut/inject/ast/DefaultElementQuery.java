@@ -49,6 +49,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     private final boolean includeOverriddenMethods;
     private final boolean includeHiddenElements;
     private final boolean excludePropertyElements;
+    private final int hashcode;
 
     DefaultElementQuery(Class<T> elementType) {
         this(elementType, null, false, false, false, false, false, false, false, false, false, false, null, null, null, null, null);
@@ -89,6 +90,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         this.includeHiddenElements = includeHiddenElements;
         this.excludePropertyElements = excludePropertyElements;
         this.typePredicates = typePredicates;
+        this.hashcode = Objects.hash(elementType, onlyAccessibleType, onlyDeclared, onlyAbstract, onlyConcrete, onlyInjected, namePredicates, annotationPredicates, modifiersPredicates, elementPredicates, typePredicates, onlyInstance, onlyStatic, includeEnumConstants, includeOverriddenMethods, includeHiddenElements, excludePropertyElements);
     }
 
     @Override
@@ -556,9 +558,48 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
+    @Override
+    public Result<T> withoutPredicates() {
+        return new DefaultElementQuery<>(
+            elementType,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            includeEnumConstants,
+            includeOverriddenMethods,
+            includeHiddenElements,
+            false,
+            null,
+            null,
+            null,
+            namePredicates, // Keep this to allow selecting only specific element
+            null);
+    }
+
     @NonNull
     @Override
     public Result<T> result() {
         return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DefaultElementQuery<?> that = (DefaultElementQuery<?>) o;
+        return onlyDeclared == that.onlyDeclared && onlyAbstract == that.onlyAbstract && onlyConcrete == that.onlyConcrete && onlyInjected == that.onlyInjected && onlyInstance == that.onlyInstance && onlyStatic == that.onlyStatic && includeEnumConstants == that.includeEnumConstants && includeOverriddenMethods == that.includeOverriddenMethods && includeHiddenElements == that.includeHiddenElements && excludePropertyElements == that.excludePropertyElements && Objects.equals(elementType, that.elementType) && Objects.equals(onlyAccessibleType, that.onlyAccessibleType) && Objects.equals(namePredicates, that.namePredicates) && Objects.equals(annotationPredicates, that.annotationPredicates) && Objects.equals(modifiersPredicates, that.modifiersPredicates) && Objects.equals(elementPredicates, that.elementPredicates) && Objects.equals(typePredicates, that.typePredicates);
+    }
+
+    @Override
+    public int hashCode() {
+        return hashcode;
     }
 }

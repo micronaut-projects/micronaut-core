@@ -43,3 +43,81 @@ micronaut:
 - `unixListener` is a listener name, and can be an arbitrary value
 
 NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`
+
+== systemd socket activation support
+
+The HTTP server can be configured to use an existing file descriptor. With this feature, you can use socket created by systemd and passed to the micronaut process:
+
+[configuration]
+----
+micronaut:
+  netty:
+    event-loops:
+      # use epoll
+      parent:
+        prefer-native-transport: true
+      default:
+        prefer-native-transport: true
+    listeners:
+      systemd:
+        fd: 3 # systemd passes the server socket as fd 3
+        bind: false # do not bind again, systemd already did this
+----
+
+Example `app.service` file:
+
+----
+[Unit]
+Description=Micronaut HTTP server with socket activation
+After=network.target app.socket
+Requires=app.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/java -jar /app.jar
+----
+
+Example `app.socket` file:
+
+----
+[Socket]
+ListenStream=127.0.0.1:8080
+
+[Install]
+WantedBy=sockets.target
+----
+
+Now your Micronaut application can be started by a client connecting to `http://127.0.0.1:8080`.
+
+NOTE: The nio transport only supports `fd: 0` ("inetd style"), through the JDK `System.inheritedChannel()` API. If you
+wish to use the default `fd: 3` recommended by systemd, you must use the epoll transport.
+
+=== inetd-style socket activation
+
+systemd also supports inetd-style socket activation. In that mode, instead of passing a listening socket fd
+(`ServerSocketChannel`), systemd will pass an already accepted fd (`SocketChannel`) representing an individual TCP
+connection. systemd will start a new instance of the service for each new TCP connection.
+
+The Micronaut HTTP server supports this mode through the `accepted-fd` config option. An `accepted-fd` will be
+registered with the listener it is declared on, and essentially treated like a connection that was accepted by the
+listener. The netty parent channel will be set to the listener server socket, which is important to avoid a
+https://github.com/netty/netty/pull/12546[netty bug] in connection with HTTP/2.
+
+WARNING: Epoll does not support setting the parent channel, so HTTP/2 may not work with `accepted-fd` and epoll.
+
+[configuration]
+----
+micronaut:
+  netty:
+    listeners:
+      systemd:
+        accepted-fd: 0 # inetd-style socket activation typically uses fd 0 (stdin)
+        bind: false # do not bind, we only use the server channel as the parent
+----
+
+By setting `server-socket: false`, you can disable the parent channel entirely. This may save some slight startup time,
+but may cause problems with HTTP/2.
+
+WARNING: Because inetd-style socket activation typically uses fd 0, it hijacks stdin and stdout. You must take care to
+never emit any output on stdout, as this may corrupt the HTTP response, or even show up for the user. In particular,
+you must configure logback to log to `System.err` instead, and disable the Micronaut startup banner.

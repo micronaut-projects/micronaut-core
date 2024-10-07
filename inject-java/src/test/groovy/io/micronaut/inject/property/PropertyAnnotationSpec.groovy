@@ -17,7 +17,6 @@ package io.micronaut.inject.property
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import spock.lang.Specification
 
 class PropertyAnnotationSpec extends AbstractTypeElementSpec {
 

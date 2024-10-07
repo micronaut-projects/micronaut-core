@@ -43,6 +43,7 @@ import spock.lang.Specification
  */
 @MicronautTest
 @Property(name = 'spec.name', value = "HttpFilterSpec")
+@Property(name = 'tests', value = "io.micronaut.http.server.netty.interceptor")
 class HttpFilterSpec extends Specification {
 
     @Inject

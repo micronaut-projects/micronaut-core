@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
@@ -32,12 +33,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+
+import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 
 /**
  * <p>Main entry point for running a Micronaut application.</p>
@@ -90,7 +92,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URI uri = embeddedServer.getContextURI();
+                                Object uri;
+                                try {
+                                    uri = embeddedServer.getContextURI();
+                                } catch (UnsupportedOperationException e) {
+                                    uri = "<URI display not available: " + e.getMessage() + ">";
+                                }
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
@@ -215,6 +222,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
+    public Micronaut beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        return (Micronaut) super.beanDefinitions(definitions);
+    }
+
+    @Override
     public @NonNull Micronaut propertySources(@Nullable PropertySource... propertySources) {
         return (Micronaut) super.propertySources(propertySources);
     }
@@ -294,7 +306,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(String... args) {
-        return run(new Class<?>[0], args);
+        return run(EMPTY_CLASS_ARRAY, args);
     }
 
     /**

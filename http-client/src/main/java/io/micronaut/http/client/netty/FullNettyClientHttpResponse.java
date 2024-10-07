@@ -18,7 +18,6 @@ package io.micronaut.http.client.netty;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -55,7 +54,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completable, NettyHttpResponseBuilder {
+public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHttpResponseBuilder {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
@@ -67,7 +66,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
     private final MessageBodyHandlerRegistry handlerRegistry;
     private final B body;
-    private boolean complete;
     private final ConversionService conversionService;
 
     /**
@@ -89,8 +87,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         this.nettyHttpResponse = fullHttpResponse;
         // this class doesn't really have lifecycle management (we don't make the user release()
         // it), so we have to copy the data to a non-refcounted buffer.
-        this.unpooledContent = Unpooled.buffer(fullHttpResponse.content().readableBytes());
-        unpooledContent.writeBytes(fullHttpResponse.content());
+        this.unpooledContent = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer(fullHttpResponse.content()));
         this.handlerRegistry = handlerRegistry;
         this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
@@ -170,7 +167,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
             Optional<T> converted;
             try {
-                converted = convertByteBuf(unpooledContent, finalArgument);
+                converted = convertByteBuf(finalArgument);
             } catch (RuntimeException e) {
                 if (code() < 400) {
                     throw e;
@@ -189,7 +186,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         );
-        if (LOG.isTraceEnabled() && !result.isPresent()) {
+        if (LOG.isTraceEnabled() && result.isEmpty()) {
             LOG.trace("Unable to convert response body to target type {}", type.getType());
         }
         return result;
@@ -199,8 +196,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         return CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType);
     }
 
-    private <T> Optional<T> convertByteBuf(ByteBuf content, Argument<T> type) {
-        if (content.refCnt() == 0 || content.readableBytes() == 0) {
+    private <T> Optional<T> convertByteBuf(Argument<T> type) {
+        if (unpooledContent.refCnt() == 0 || unpooledContent.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
             }
@@ -214,6 +211,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             }
             return Optional.empty();
         }
+        // All content operation should call slice to prevent reading the buffer completely
         Optional<MediaType> contentType = getContentType();
         if (contentType.isPresent()) {
             Optional<MessageBodyReader<T>> reader = handlerRegistry.findReader(type, List.of(contentType.get()));
@@ -221,19 +219,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                 MessageBodyReader<T> r = reader.get();
                 MediaType ct = contentType.get();
                 if (r.isReadable(type, ct)) {
-                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(content.retainedSlice())));
+                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
                 }
             }
         } else if (LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
-        return conversionService.convert(content, ByteBuf.class, type);
-    }
-
-    @Override
-    public void onComplete() {
-        this.complete = true;
+        return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
     @NonNull

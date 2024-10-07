@@ -25,7 +25,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     nativeType: T,
     private val accessor: KSPropertyAccessor,
     private val visibility: Visibility,
-    owningType: ClassElement,
+    owningType: KotlinClassElement,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
 ) : AbstractKotlinMethodElement<T>(
@@ -38,10 +38,6 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
 
     override val declaration: KSDeclaration? by lazy {
         accessor.receiver
-    }
-
-    override val overridee: KSDeclaration? by lazy {
-        accessor.receiver.findOverridee()
     }
 
     override val internalDeclaringType: ClassElement by lazy {
@@ -63,6 +59,10 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     override fun isPrivate() = visibility == Visibility.PRIVATE
 
     override fun hides(memberElement: MemberElement?) =
+        // not sure how to implement this correctly for Kotlin
+        false
+
+    override fun hides(hiddenMethod: MethodElement?) =
         // not sure how to implement this correctly for Kotlin
         false
 

@@ -23,12 +23,14 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -105,18 +107,20 @@ abstract class AbstractJdkHttpClient {
     protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     /**
-     * @param log                    the logger to use
-     * @param loadBalancer           The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion            The {@link HttpVersionSelection} to prefer
-     * @param configuration          The {@link HttpClientConfiguration} to use
-     * @param contextPath            The base URI to prepend to request uris
-     * @param mediaTypeCodecRegistry The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param requestBinderRegistry  The request binder registry
-     * @param clientId               The client id
-     * @param conversionService      The {@link ConversionService}
-     * @param sslBuilder             The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
+     * @param log                        the logger to use
+     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
+     * @param httpVersion                The {@link HttpVersionSelection} to prefer
+     * @param configuration              The {@link HttpClientConfiguration} to use
+     * @param contextPath                The base URI to prepend to request uris
+     * @param mediaTypeCodecRegistry     The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry} to use for encoding and decoding objects
+     * @param requestBinderRegistry      The request binder registry
+     * @param clientId                   The client id
+     * @param conversionService          The {@link ConversionService}
+     * @param sslBuilder                 The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
      */
     @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     protected AbstractJdkHttpClient(
@@ -128,6 +132,7 @@ abstract class AbstractJdkHttpClient {
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService,
@@ -140,6 +145,7 @@ abstract class AbstractJdkHttpClient {
         this.httpVersion = httpVersion;
         this.configuration = configuration;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
         this.conversionService = conversionService;
@@ -288,6 +294,20 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
+     * @return The {@link MessageBodyHandlerRegistry}
+     */
+    public MessageBodyHandlerRegistry getMessageBodyHandlerRegistry() {
+        return messageBodyHandlerRegistry;
+    }
+
+    /**
+     * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry}
+     */
+    public void setMessageBodyHandlerRegistry(MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
+    }
+
+    /**
      * Convert the Micronaut request to a JDK request.
      *
      * @param request  The Micronaut request object
@@ -295,7 +315,7 @@ abstract class AbstractJdkHttpClient {
      * @param <I>      The body type
      * @return A JDK request object
      */
-    protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
+    protected <I> Mono<HttpRequest> mapToHttpRequest(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
                 cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
@@ -303,7 +323,7 @@ abstract class AbstractJdkHttpClient {
                     cookieManager.getCookieStore().add(uri, newCookie);
                 }));
 
-                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build();
+                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
             });
     }
 
@@ -348,10 +368,10 @@ abstract class AbstractJdkHttpClient {
      */
     @NonNull
     protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
-        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
+        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
     }
 
-    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType) {
+    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         var defaultPublisher = responsePublisher(request, bodyType);
         return resolveRequestUri(request)
             .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
@@ -371,15 +391,25 @@ abstract class AbstractJdkHttpClient {
             filterResolver.resolveFilters(request, clientFilterEntries);
 
         FilterRunner.sortReverse(filters);
-        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
-        FilterRunner runner = new FilterRunner(filters);
-        return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
+        FilterRunner runner = new FilterRunner(filters) {
+            @Override
+            protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
+                try {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                        return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
+                    }
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
+                }
+            }
+        };
+        return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
     }
 
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
-        io.micronaut.http.HttpRequest<?> request,
-        Argument<O> bodyType
+        @NonNull io.micronaut.http.HttpRequest<?> request,
+        @Nullable Argument<O> bodyType
     ) {
         return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
             .map(httpRequest -> {

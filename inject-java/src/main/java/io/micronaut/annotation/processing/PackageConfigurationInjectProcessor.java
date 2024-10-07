@@ -81,14 +81,14 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
         @Override
         public Object visitPackage(PackageElement packageElement, Object p) {
             Object aPackage = super.visitPackage(packageElement, p);
-            JavaPackageElement javaPackageElement = new JavaPackageElement(
+            var javaPackageElement = new JavaPackageElement(
                 packageElement,
                 javaVisitorContext.getElementAnnotationMetadataFactory(),
                 javaVisitorContext
             );
             if (javaPackageElement.hasStereotype(Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
-                BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                var writer = new BeanConfigurationWriter(
                     packageName,
                     javaPackageElement,
                     javaPackageElement.getAnnotationMetadata(),

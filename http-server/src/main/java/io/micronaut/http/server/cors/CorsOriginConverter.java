@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -23,7 +24,6 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.Map;
@@ -36,7 +36,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@Internal
 public class CorsOriginConverter implements TypeConverter<Map<String, Object>, CorsOriginConfiguration> {
 
     private static final String ALLOWED_ORIGINS = "allowed-origins";
@@ -45,6 +45,7 @@ public class CorsOriginConverter implements TypeConverter<Map<String, Object>, C
     private static final String ALLOWED_HEADERS = "allowed-headers";
     private static final String EXPOSED_HEADERS = "exposed-headers";
     private static final String ALLOW_CREDENTIALS = "allow-credentials";
+    private static final String ALLOW_PRIVATE_NETWORK = "allow-private-network";
     private static final String MAX_AGE = "max-age";
 
     private static final ArgumentConversionContext<List<HttpMethod>> CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD = ImmutableArgumentConversionContext.of(Argument.listOf(HttpMethod.class));
@@ -77,6 +78,10 @@ public class CorsOriginConverter implements TypeConverter<Map<String, Object>, C
         convertibleValues
             .get(ALLOW_CREDENTIALS, ConversionContext.BOOLEAN)
             .ifPresent(configuration::setAllowCredentials);
+
+        convertibleValues
+                .get(ALLOW_PRIVATE_NETWORK, ConversionContext.BOOLEAN)
+                .ifPresent(configuration::setAllowPrivateNetwork);
 
         convertibleValues
             .get(MAX_AGE, ConversionContext.LONG)

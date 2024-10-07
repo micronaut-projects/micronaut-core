@@ -23,6 +23,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.NettyChannelType
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
@@ -45,6 +46,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -256,7 +258,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         option == EpollChannelOption.TCP_QUICKACK
-        eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
+        eventLoopGroupFactory.channelClass(NettyChannelType.SERVER_SOCKET) == EpollServerSocketChannel.class
 
         when:
         NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
@@ -343,6 +345,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
                  'micronaut.server.cors.configurations.bar.allowedHeaders'  : ['Content-Type', 'Accept'],
                  'micronaut.server.cors.configurations.bar.exposedHeaders'  : ['x', 'y'],
                  'micronaut.server.cors.configurations.bar.maxAge'          : 150,
+                 'micronaut.server.cors.configurations.bar.allowPrivateNetwork'  : false,
                  'micronaut.server.cors.configurations.bar.allowCredentials': false]
 
         ))
@@ -363,6 +366,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.cors.configurations.get('foo').allowedHeaders == ['*']
         !config.cors.configurations.get('foo').exposedHeaders
         config.cors.configurations.get('foo').allowCredentials
+        config.cors.configurations.get('foo').allowPrivateNetwork
         config.cors.configurations.get('foo').maxAge == -1
         config.cors.configurations.containsKey('bar')
         config.cors.configurations.get('bar') instanceof CorsOriginConfiguration
@@ -371,6 +375,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.cors.configurations.get('bar').allowedHeaders == ['Content-Type', 'Accept']
         config.cors.configurations.get('bar').exposedHeaders == ['x', 'y']
         !config.cors.configurations.get('bar').allowCredentials
+        !config.cors.configurations.get('bar').allowPrivateNetwork
         config.cors.configurations.get('bar').maxAge == 150
 
         cleanup:

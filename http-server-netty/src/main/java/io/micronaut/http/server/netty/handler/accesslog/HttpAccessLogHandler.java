@@ -18,14 +18,13 @@ package io.micronaut.http.server.netty.handler.accesslog;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
+import io.micronaut.http.server.netty.handler.accesslog.element.ConnectionMetadata;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -56,8 +55,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      */
     public static final String HTTP_ACCESS_LOGGER = "HTTP_ACCESS_LOGGER";
 
+    static final String H2_PROTOCOL_NAME = "HTTP/2.0";
     private static final AttributeKey<AccessLogHolder> ACCESS_LOGGER = AttributeKey.valueOf("ACCESS_LOGGER");
-    private static final String H2_PROTOCOL_NAME = "HTTP/2.0";
 
     private final Logger logger;
     private final AccessLogFormatParser accessLogFormatParser;
@@ -108,21 +107,9 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         this.uriInclusion = uriInclusion;
     }
 
-    private SocketChannel findSocketChannel(Channel channel) {
-        if (channel instanceof SocketChannel socketChannel) {
-            return socketChannel;
-        }
-        Channel parent = channel.parent();
-        if (parent == null) {
-            throw new IllegalArgumentException("No socket channel available");
-        }
-        return findSocketChannel(parent);
-    }
-
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Http2Exception {
         if (logger.isInfoEnabled() && msg instanceof HttpRequest request) {
-            final SocketChannel channel = findSocketChannel(ctx.channel());
             AccessLogHolder accessLogHolder = getAccessLogHolder(ctx, true);
             assert accessLogHolder != null; // can only return null when createIfMissing is false
             if (uriInclusion == null || uriInclusion.test(request.uri())) {
@@ -134,7 +121,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                 } else {
                     protocol = request.protocolVersion().text();
                 }
-                accessLogHolder.createLogForRequest().onRequestHeaders(channel, request.method().name(), request.headers(), request.uri(), protocol);
+                accessLogHolder.createLogForRequest().onRequestHeaders(ConnectionMetadata.ofNettyChannel(ctx.channel()), request.method().name(), request.headers(), request.uri(), protocol);
             } else {
                 accessLogHolder.excludeRequest();
             }
@@ -151,10 +138,11 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         }
     }
 
-    private void log(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, AccessLog accessLog) {
+    private void log(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, AccessLog accessLog, AccessLogHolder accessLogHolder) {
         ctx.write(msg, promise.unvoid()).addListener(future -> {
             if (future.isSuccess()) {
                 accessLog.log(logger);
+                accessLogHolder.logForReuse = accessLog;
             }
         });
     }
@@ -171,7 +159,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                 }
                 if (msg instanceof LastHttpContent content) {
                     accessLogger.onLastResponseWrite(content.content().readableBytes());
-                    log(ctx, msg, promise, accessLogger);
+                    log(ctx, msg, promise, accessLogger, accessLogHolder);
                     return;
                 } else if (msg instanceof ByteBufHolder holder) {
                     accessLogger.onResponseWrite(holder.content().readableBytes());
@@ -224,9 +212,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         @Nullable
         AccessLog getLogForResponse(boolean finishResponse) {
             if (finishResponse) {
-                AccessLog accessLog = liveLogs.poll();
-                logForReuse = accessLog;
-                return accessLog;
+                return liveLogs.poll();
             } else {
                 return liveLogs.peek();
             }

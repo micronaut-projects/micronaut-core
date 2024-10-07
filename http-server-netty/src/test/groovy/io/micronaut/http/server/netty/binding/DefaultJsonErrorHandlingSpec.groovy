@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.binding
 
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -16,14 +17,14 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         when:
         def json = '{"title":"The Stand"'
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.POST('/errors/map', json), String
         )).blockFirst()
 
         then:
         HttpClientResponseException e = thrown()
-        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input: expected close marker for Object (start marker at [Source: (io.netty.buffer.ByteBufInputStream); line: 1, column: 1])
- at [Source: (io.netty.buffer.ByteBufInputStream); line: 1, column: 21]"""
+        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1])
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -36,6 +37,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
     }
 
     @Controller("/errors")
+    @Requires(property = "spec.name", value = "DefaultJsonErrorHandlingSpec")
     static class ErrorsController {
         @Post("/string")
         String string(@Body String text) {

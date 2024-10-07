@@ -150,7 +150,7 @@ public interface Router {
      * @return A match or null, throws {@link DuplicateRouteException} on multiple routes.
      * @since 4.0.0
      */
-    @NonNull
+    @Nullable
     default <T, R> UriRouteMatch<T, R> findClosest(@NonNull HttpRequest<?> request) throws DuplicateRouteException {
         List<UriRouteMatch<T, R>> uriRoutes = findAllClosest(request);
         if (uriRoutes.size() > 1) {
@@ -315,14 +315,38 @@ public interface Router {
     }
 
     /**
-     * Build a filtered {@link org.reactivestreams.Publisher} for an action.
+     * Find filters for the request.
      *
      * @param request The request
-     * @return A new filtered publisher
+     * @return filters
      */
-    @NonNull List<GenericHttpFilter> findFilters(
-            @NonNull HttpRequest<?> request
-    );
+    @NonNull
+    List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request);
+
+    /**
+     * Find filters for the request and a route match.
+     *
+     * @param request    The request
+     * @param routeMatch The route match
+     * @return filters
+     * @since 4.6
+     */
+    @NonNull
+    default List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
+        return findFilters(request);
+    }
+
+    /**
+     * Find pre-matching filters for the request.
+     *
+     * @param request The request
+     * @return filters
+     * @since 4.6
+     */
+    @NonNull
+    default List<GenericHttpFilter> findPreMatchingFilters(@NonNull HttpRequest<?> request) {
+        return List.of();
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI.

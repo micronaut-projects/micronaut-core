@@ -24,12 +24,10 @@ import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
-import io.micronaut.context.annotation.Context
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanConfigurationWriter
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
@@ -47,6 +45,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
+
 /**
  * An AST transformation that produces metadata for use by the injection container
  *
@@ -79,10 +78,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode classNode = classes[0]
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
-                GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
-                GroovyPackageElement groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
+                def visitorContext = new GroovyVisitorContext(source, unit)
+                def groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
                 if (groovyPackageElement.hasStereotype(Configuration)) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                    def writer = new BeanConfigurationWriter(
                             classNode.packageName,
                             groovyPackageElement,
                             groovyPackageElement.getAnnotationMetadata(),
@@ -99,7 +98,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit)
+        def groovyVisitorContext = new GroovyVisitorContext(source, unit)
         def elementAnnotationMetadataFactory = groovyVisitorContext
                 .getElementAnnotationMetadataFactory()
                 .readOnly()
@@ -127,15 +126,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
-                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanDefWriter, groovyVisitorContext)
-                beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
-                    beanReferenceWriter.accept(outputVisitor)
                     beanDefWriter.accept(outputVisitor)
                 } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
-                    beanReferenceWriter.accept(outputVisitor)
                     beanDefWriter.accept(outputVisitor)
                 }
             } catch (Throwable e) {

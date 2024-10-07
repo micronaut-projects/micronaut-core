@@ -36,7 +36,7 @@ public final class ExtendedParameter extends AnnotatedNode {
 
     /**
      * @param methodNode The method node that contains the parameter
-     * @param parameter  The parameter
+     * @param parameter The parameter
      */
     public ExtendedParameter(MethodNode methodNode, Parameter parameter) {
         this.methodNode = methodNode;
@@ -69,6 +69,6 @@ public final class ExtendedParameter extends AnnotatedNode {
     @Override
     public boolean equals(Object o) {
         return (o instanceof ExtendedParameter ep) &&
-                (this.parameter == ep.parameter);
+            (this.parameter == ep.parameter);
     }
 }

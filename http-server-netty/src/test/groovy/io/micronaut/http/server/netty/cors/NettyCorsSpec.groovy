@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.cors
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -36,10 +37,12 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK
 import static io.micronaut.http.HttpHeaders.ORIGIN
 import static io.micronaut.http.HttpHeaders.VARY
 
@@ -47,7 +50,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test non cors request"() {
         when:
-        HttpResponse response = rxClient.toBlocking().exchange('/test')
+        HttpResponse response = httpClient.toBlocking().exchange('/test')
         Set<String> headerNames = response.getHeaders().names()
 
         then:
@@ -58,7 +61,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request without configuration"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                            .header(ORIGIN, 'fooBar.com')
         )).blockFirst()
@@ -73,7 +76,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with a controller that returns map"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -89,12 +92,13 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
     void "test cors request with controlled method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -110,12 +114,13 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
     void "test cors request with controlled headers"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCEPT, 'application/json')
@@ -134,11 +139,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
     }
 
     void "test cors request with invalid method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/test', [:])
                         .header(ORIGIN, 'foo.com')
 
@@ -159,7 +165,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with invalid header"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
@@ -171,7 +177,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid header"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'bar.com')
@@ -189,7 +195,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'foo.com')
@@ -206,7 +212,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled method"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'foo.com')
@@ -220,6 +226,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['Foo', 'Bar']
         !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
@@ -228,10 +235,11 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled headers"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).blockFirst()
 
@@ -244,15 +252,17 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_MAX_AGE) == '150'
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'bar.com'
         response.header(VARY) == ORIGIN
+        response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) == StringUtils.TRUE
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     void "test preflight request with controlled headers but http method doesn't exists"() {
         given:
-        HttpResponse response = Flux.from(rxClient.exchange(
+        HttpResponse response = Flux.from(httpClient.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
+                        .header(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE)
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         )).onErrorResume(t -> {
@@ -268,7 +278,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error response routes"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -282,7 +292,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error responses with no handler"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error-checked')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -296,7 +306,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to http error responses"() {
         when:
-        Flux.from(rxClient.exchange(
+        Flux.from(httpClient.exchange(
                 HttpRequest.GET('/test/error-response')
                         .header(ORIGIN, 'foo.com')
         )).blockFirst()
@@ -320,6 +330,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
         'micronaut.server.cors.configurations.bar.maxAge': 150,
         'micronaut.server.cors.configurations.bar.allowCredentials': false,
+        'micronaut.server.cors.configurations.bar.allowPrivateNetwork': true,
         'micronaut.server.dateHeader': false]
     }
 
@@ -354,7 +365,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
         @Get("/error")
         String error() {
-            throw new RuntimeException("error")
+            throw new CustomRuntimeException("error")
         }
 
         @Get("/error-checked")
@@ -367,9 +378,15 @@ class NettyCorsSpec extends AbstractMicronautSpec {
             HttpResponse.badRequest()
         }
 
-        @Error(exception = RuntimeException)
+        @Error(exception = CustomRuntimeException)
         HttpResponse onError() {
             HttpResponse.badRequest()
+        }
+    }
+
+    static class CustomRuntimeException extends RuntimeException {
+        CustomRuntimeException(String message) {
+            super(message);
         }
     }
 }

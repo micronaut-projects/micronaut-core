@@ -38,7 +38,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -49,6 +48,8 @@ import java.util.Optional;
  * @since 1.0
  */
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
+
+    private static final Element[] ELEMENTS_EMPTY_ARRAY = new Element[0];
 
     private final Filer filer;
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
@@ -76,7 +77,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return visitClass(classname, new io.micronaut.inject.ast.Element[]{originatingElement});
+        return visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 
     @Override
@@ -89,23 +90,23 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                 final io.micronaut.inject.ast.Element e = originatingElements[0];
                 final Object nativeType = e.getNativeType();
                 if (nativeType instanceof JavaNativeElement javaNativeElement) {
-                    nativeOriginatingElements = new Element[] { javaNativeElement.element() };
+                    nativeOriginatingElements = new Element[] {javaNativeElement.element()};
                 } else {
-                    nativeOriginatingElements = new Element[0];
+                    nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
                 }
             } else {
                 // other compilers like the IntelliJ compiler support multiple
-                List<Element> list = new ArrayList<>(originatingElements.length);
+                var list = new ArrayList<Element>(originatingElements.length);
                 for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
                     Object nativeType = originatingElement.getNativeType();
                     if (nativeType instanceof JavaNativeElement javaNativeElement) {
                         list.add(javaNativeElement.element());
                     }
                 }
-                nativeOriginatingElements = list.toArray(new Element[0]);
+                nativeOriginatingElements = list.toArray(ELEMENTS_EMPTY_ARRAY);
             }
         } else {
-            nativeOriginatingElements = new Element[0];
+            nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
         }
         javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
         return javaFileObject.openOutputStream();
@@ -117,10 +118,10 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
             final FileObject fileObject = filer.createResource(
-                    StandardLocation.CLASS_OUTPUT,
-                    "",
-                    path,
-                    ((JavaNativeElement) originatingElement.getNativeType()).element()
+                StandardLocation.CLASS_OUTPUT,
+                "",
+                path,
+                ((JavaNativeElement) originatingElement.getNativeType()).element()
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");
@@ -141,7 +142,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.Element[] originatingElements) {
         return Arrays.stream(originatingElements)
-                .map(e -> ((JavaNativeElement) e.getNativeType()).element()).toArray(Element[]::new);
+            .map(e -> ((JavaNativeElement) e.getNativeType()).element()).toArray(Element[]::new);
     }
 
     @Override
@@ -177,7 +178,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         /**
          * @param packageName The package of the generated source file
-         * @param fileName  The name of the source file, without extension
+         * @param fileName The name of the source file, without extension
          * @param originatingElements the originating elements
          */
         GeneratedFileObject(String packageName, String fileName, Element... originatingElements) {
@@ -189,7 +190,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         }
 
         /**
-         * @param path                The path for the generated file
+         * @param path The path for the generated file
          * @param originatingElements the originating elements
          */
         GeneratedFileObject(String path, Element... originatingElements) {
@@ -201,8 +202,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         }
 
         /**
-         * @param path                The path for the generated file
-         * @param location            The location
+         * @param path The path for the generated file
+         * @param location The location
          * @param originatingElements The originating elements
          */
         GeneratedFileObject(String path, StandardLocation location, Element... originatingElements) {

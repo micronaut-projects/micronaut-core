@@ -56,6 +56,7 @@ import io.netty.handler.codec.http2.Http2FrameStream
 import io.netty.handler.codec.http2.Http2FrameStreamEvent
 import io.netty.handler.codec.http2.Http2Headers
 import io.netty.handler.codec.http2.Http2HeadersFrame
+import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
@@ -93,8 +94,9 @@ class ConnectionManagerSpec extends Specification {
             int i = 0
 
             @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
+            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer) {
                 try {
+                    channelInitializer.bootstrappedCustomizer = clientCustomizer
                     def connection = connections[i++]
                     connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
                         def loop
@@ -444,7 +446,6 @@ class ConnectionManagerSpec extends Specification {
 
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.channel == conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -502,7 +503,6 @@ class ConnectionManagerSpec extends Specification {
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req1Channel.channel !== conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -1141,6 +1141,80 @@ class ConnectionManagerSpec extends Specification {
 
         where:
         http2 << [false, true]
+    }
+
+    def 'automated ping, writes only'(String prop, boolean ping) {
+        given:
+        def props = ['micronaut.http.client.ssl.insecure-trust-all-certificates': true]
+        props.put(prop, '1s')
+        def ctx = ApplicationContext.run(props)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+
+        conn.clientChannel.unfreezeTime()
+        for (int i = 0; i < 8; i++) {
+            conn.testExchangeRequest(client)
+            TimeUnit.MILLISECONDS.sleep(250)
+        }
+        conn.advance()
+
+        def msgs = conn.serverChannel.inboundMessages().toList()
+
+        expect:
+        msgs.size() >= (ping ? 9 : 8)
+        msgs.any { it instanceof Http2PingFrame } == ping
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        prop                                              | ping
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | false
+        'micronaut.http.client.http2.ping-interval-idle'  | false
+    }
+
+    def 'automated ping, no traffic'(String prop, boolean ping) {
+        given:
+        def props = ['micronaut.http.client.ssl.insecure-trust-all-certificates': true]
+        props.put(prop, '1s')
+        def ctx = ApplicationContext.run(props)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+
+        conn.clientChannel.unfreezeTime()
+        TimeUnit.SECONDS.sleep(2)
+        conn.advance()
+
+        expect:
+        conn.serverChannel.readInbound() instanceof Http2PingFrame == ping
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        prop                                              | ping
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | true
+        'micronaut.http.client.http2.ping-interval-idle'  | true
     }
 
     void assertPoolConnections(DefaultHttpClient client, int count) {

@@ -34,9 +34,9 @@ import java.util.function.Supplier;
 @Internal
 final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecutionFlow<Object> {
 
-    private CompletableFuture<Object> stage;
+    private CompletionStage<Object> stage;
 
-    CompletableFutureExecutionFlowImpl(CompletableFuture<Object> stage) {
+    CompletableFutureExecutionFlowImpl(CompletionStage<Object> stage) {
         this.stage = stage;
     }
 
@@ -106,9 +106,10 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
     @Nullable
     @Override
     public ImperativeExecutionFlow<Object> tryComplete() {
-        if (stage.isDone()) {
+        CompletableFuture<Object> completableFuture = stage.toCompletableFuture();
+        if (completableFuture.isDone()) {
             try {
-                return new ImperativeExecutionFlowImpl(stage.getNow(null), null);
+                return new ImperativeExecutionFlowImpl(completableFuture.getNow(null), null);
             } catch (Throwable throwable) {
                 if (throwable instanceof CompletionException completionException) {
                     throwable = completionException.getCause();
@@ -122,7 +123,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Override
     public CompletableFuture<Object> toCompletableFuture() {
-        return stage;
+        return stage.toCompletableFuture();
     }
 
 }

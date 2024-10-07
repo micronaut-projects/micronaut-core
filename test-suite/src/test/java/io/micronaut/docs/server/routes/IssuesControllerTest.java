@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
 
-// tag::class[]
+// tag::startclass[]
 class IssuesControllerTest {
 
     private static EmbeddedServer server;
@@ -53,7 +53,9 @@ class IssuesControllerTest {
             client.stop();
         }
     }
+    // end::startclass[]
 
+    // tag::normal[]
     @Test
     void testIssue() {
         String body = client.toBlocking().retrieve("/issues/12"); // <3>
@@ -63,11 +65,19 @@ class IssuesControllerTest {
     }
 
     @Test
+    void testIssueFromId() {
+        String body = client.toBlocking().retrieve("/issues/issue/13");
+
+        assertNotNull(body);
+        assertEquals("Issue # 13!", body); // <5>
+    }
+
+    @Test
     void testShowWithInvalidInteger() {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/hello"));
 
-        assertEquals(400, e.getStatus().getCode()); // <5>
+        assertEquals(400, e.getStatus().getCode()); // <6>
     }
 
     @Test
@@ -75,7 +85,28 @@ class IssuesControllerTest {
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/"));
 
-        assertEquals(404, e.getStatus().getCode()); // <6>
+        assertEquals(404, e.getStatus().getCode()); // <7>
     }
+    // end::normal[]
+
+    // tag::defaultvalue[]
+    @Test
+    void testDefaultIssue() {
+        String body = client.toBlocking().retrieve("/issues/default");
+
+        assertNotNull(body);
+        assertEquals("Issue # 0!", body); // <1>
+    }
+
+    @Test
+    void testNotDefaultIssue() {
+        String body = client.toBlocking().retrieve("/issues/default/1");
+
+        assertNotNull(body);
+        assertEquals("Issue # 1!", body); // <2>
+    }
+    // end::defaultvalue[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

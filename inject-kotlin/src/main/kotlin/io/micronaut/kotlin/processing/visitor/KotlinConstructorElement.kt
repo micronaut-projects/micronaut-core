@@ -27,7 +27,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 internal class KotlinConstructorElement(
-    owningType: ClassElement,
+    owningType: KotlinClassElement,
     method: KSFunctionDeclaration,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
@@ -47,6 +47,10 @@ internal class KotlinConstructorElement(
     }
 
     override fun hides(memberElement: MemberElement?): Boolean {
+        return false
+    }
+
+    override fun hides(hiddenMethod: MethodElement?): Boolean {
         return false
     }
 

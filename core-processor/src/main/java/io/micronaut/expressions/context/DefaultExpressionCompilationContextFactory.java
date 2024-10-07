@@ -25,7 +25,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -41,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DefaultExpressionCompilationContextFactory implements ExpressionCompilationContextFactory {
 
     private static final Collection<ClassElement> CONTEXT_TYPES = ConcurrentHashMap.newKeySet();
-    private ExtensibleExpressionCompilationContext sharedContext;
+    private ExtensibleExpressionEvaluationContext sharedContext;
     private final VisitorContext visitorContext;
 
     public DefaultExpressionCompilationContextFactory(VisitorContext visitorContext) {
@@ -49,39 +48,40 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         this.visitorContext = visitorContext;
     }
 
-    @NotNull
-    private DefaultExpressionCompilationContext recreateContext() {
-        return new DefaultExpressionCompilationContext(CONTEXT_TYPES.toArray(ClassElement[]::new));
+    @NonNull
+    private DefaultExpressionEvaluationContext recreateContext() {
+        return new DefaultExpressionEvaluationContext(CONTEXT_TYPES.toArray(ClassElement[]::new));
     }
 
     @Override
     @NonNull
-    public ExpressionCompilationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
-                                                              @NonNull MethodElement methodElement) {
+    public ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
+                                                             @NonNull MethodElement methodElement) {
         return buildForExpression(expression, null)
                  .extendWith(methodElement);
     }
 
     @Override
     @NonNull
-    public ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
         return buildForExpression(expression, thisElement);
     }
 
+    @NonNull
     @Override
-    public ExpressionCompilationContextFactory registerContextClass(ClassElement contextClass) {
+    public ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass) {
         CONTEXT_TYPES.add(contextClass);
         this.sharedContext = recreateContext();
         return this;
     }
 
-    private ExtensibleExpressionCompilationContext buildForExpression(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    private ExtensibleExpressionEvaluationContext buildForExpression(EvaluatedExpressionReference expression, ClassElement thisElement) {
         String annotationName = expression.annotationName();
         String memberName = expression.annotationMember();
 
         ClassElement annotation = visitorContext.getClassElement(annotationName).orElse(null);
 
-        ExtensibleExpressionCompilationContext evaluationContext = sharedContext;
+        ExtensibleExpressionEvaluationContext evaluationContext = sharedContext;
         if (annotation != null) {
             evaluationContext = addAnnotationEvaluationContext(evaluationContext, annotation);
             evaluationContext = addAnnotationMemberEvaluationContext(evaluationContext, annotation, memberName);
@@ -93,8 +93,8 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         return evaluationContext;
     }
 
-    private ExtensibleExpressionCompilationContext addAnnotationEvaluationContext(
-        ExtensibleExpressionCompilationContext currentEvaluationContext,
+    private ExtensibleExpressionEvaluationContext addAnnotationEvaluationContext(
+        ExtensibleExpressionEvaluationContext currentEvaluationContext,
         ClassElement annotation) {
 
         return annotation.findAnnotation(AnnotationExpressionContext.class)
@@ -105,8 +105,8 @@ public final class DefaultExpressionCompilationContextFactory implements Express
                    .orElse(currentEvaluationContext);
     }
 
-    private ExtensibleExpressionCompilationContext addAnnotationMemberEvaluationContext(
-        ExtensibleExpressionCompilationContext currentEvaluationContext,
+    private ExtensibleExpressionEvaluationContext addAnnotationMemberEvaluationContext(
+        ExtensibleExpressionEvaluationContext currentEvaluationContext,
         ClassElement annotation,
         String annotationMember) {
 
@@ -121,7 +121,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
                    .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER).stream())
                    .map(AnnotationClassValue::getName)
                    .flatMap(className -> visitorContext.getClassElement(className).stream())
-                   .reduce(currentEvaluationContext, ExtensibleExpressionCompilationContext::extendWith, (a, b) -> a);
+                   .reduce(currentEvaluationContext, ExtensibleExpressionEvaluationContext::extendWith, (a, b) -> a);
     }
 
     /**

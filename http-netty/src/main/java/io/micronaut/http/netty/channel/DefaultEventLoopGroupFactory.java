@@ -17,16 +17,11 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.ServerChannel;
-import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.unix.ServerDomainSocketChannel;
 import io.netty.util.ResourceLeakDetector;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -107,30 +102,8 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
-        return nativeFactory.serverSocketChannelClass();
-    }
-
-    @Override
-    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
-        return nativeFactory.domainServerSocketChannelClass();
-    }
-
-    @Override
     public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
         return nativeFactory.channelClass(type);
-    }
-
-    @NonNull
-    @Override
-    public Class<? extends ServerSocketChannel> serverSocketChannelClass(EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).serverSocketChannelClass(configuration);
-    }
-
-    @NonNull
-    @Override
-    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).domainServerSocketChannelClass(configuration);
     }
 
     @Override
@@ -139,24 +112,13 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public ServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).serverSocketChannelInstance(configuration);
-    }
-
-    @Override
-    public ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).domainServerSocketChannelInstance(configuration);
-    }
-
-    @Override
     public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
         return getFactory(configuration).channelInstance(type, configuration);
     }
 
-    @NonNull
     @Override
-    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).clientSocketChannelClass(configuration);
+    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+        return getFactory(configuration).channelInstance(type, configuration, parent, fd);
     }
 
     private EventLoopGroupFactory getFactory(@Nullable EventLoopGroupConfiguration configuration) {
@@ -165,12 +127,6 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         } else {
             return this.defaultFactory;
         }
-    }
-
-    @NonNull
-    @Override
-    public SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
-        return getFactory(configuration).clientSocketChannelInstance(configuration);
     }
 
 }

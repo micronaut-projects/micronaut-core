@@ -16,11 +16,11 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -32,8 +32,13 @@ import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Abstract annotation processor base class.
@@ -65,12 +70,11 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected Filer filer;
     protected Elements elementUtils;
     protected Types typeUtils;
-    protected AnnotationUtils annotationUtils;
-    protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
+    protected Set<String> postponedTypes = new LinkedHashSet<>();
     private boolean incremental = false;
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
@@ -98,7 +102,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     }
 
     /**
-     *
      * @return The incremental processor type.
      * @see #GRADLE_PROCESSING_AGGREGATING
      * @see #GRADLE_PROCESSING_ISOLATING
@@ -118,6 +121,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
      * Return whether the given annotation is processed.
+     *
      * @param annotationName The annotation name
      * @return True if it is
      */
@@ -142,6 +146,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
      * The list of patterns that represent the processed annotation types.
+     *
      * @return A set of patterns
      */
     @NonNull
@@ -149,9 +154,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         if (processedTypes == null) {
 
             final Set<String> types = CollectionUtils.setOf(
-                    "javax.inject.*",
-                    "jakarta.inject.*",
-                    "io.micronaut.*"
+                "javax.inject.*",
+                "jakarta.inject.*",
+                "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);
             Set<String> mappedAnnotationNames = AbstractAnnotationMetadataBuilder.getMappedAnnotationNames();
@@ -184,22 +189,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
-        this.genericUtils = new GenericUtils(
-                elementUtils,
-                typeUtils,
-                modelUtils
-        );
-
-        this.annotationUtils = new AnnotationUtils(
-                processingEnv,
-                elementUtils,
-                messager,
-                typeUtils,
-                modelUtils,
-                genericUtils,
-                filer,
-                visitorAttributes
-        );
 
         this.javaVisitorContext = newVisitorContext(processingEnv);
 
@@ -222,21 +211,21 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @NonNull
     protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
         return new JavaVisitorContext(
-                processingEnv,
-                messager,
-                elementUtils,
-                annotationUtils,
-                typeUtils,
-                modelUtils,
-                genericUtils,
-                filer,
-                visitorAttributes,
-                getVisitorKind()
+            processingEnv,
+            messager,
+            elementUtils,
+            typeUtils,
+            modelUtils,
+            filer,
+            visitorAttributes,
+            getVisitorKind(),
+            postponedTypes
         );
     }
 
     /**
      * obtains the visitor kind.
+     *
      * @return The visitor kind
      */
     @NonNull
@@ -247,8 +236,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile error for the given element and message.
      *
-     * @param e    The element
-     * @param msg  The message
+     * @param e The element
+     * @param msg The message
      * @param args The string format args
      */
     protected final void error(Element e, String msg, Object... args) {
@@ -262,7 +251,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile error for the given message.
      *
-     * @param msg  The message
+     * @param msg The message
      * @param args The string format args
      */
     protected final void error(String msg, Object... args) {
@@ -275,8 +264,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile warning for the given element and message.
      *
-     * @param e    The element
-     * @param msg  The message
+     * @param e The element
+     * @param msg The message
      * @param args The string format args
      */
     protected final void warning(Element e, String msg, Object... args) {
@@ -289,7 +278,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile warning for the given message.
      *
-     * @param msg  The message
+     * @param msg The message
      * @param args The string format args
      */
     @SuppressWarnings("WeakerAccess")
@@ -303,8 +292,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile note for the given element and message.
      *
-     * @param e    The element
-     * @param msg  The message
+     * @param e The element
+     * @param msg The message
      * @param args The string format args
      */
     protected final void note(Element e, String msg, Object... args) {
@@ -317,7 +306,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     /**
      * Produce a compile note for the given element and message.
      *
-     * @param msg  The message
+     * @param msg The message
      * @param args The string format args
      */
     protected final void note(String msg, Object... args) {
@@ -333,6 +322,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
      * Whether incremental compilation is enabled.
+     *
      * @param processingEnv The processing environment.
      * @return True if it is
      */

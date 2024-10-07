@@ -22,7 +22,6 @@ import io.micronaut.inject.qualifiers.Qualified;
  * A {@link Intercepted} that proxies another instance.
  *
  * @param <T> The declaring type
- *
  * @author Graeme Rocher
  * @since 1.0
  */

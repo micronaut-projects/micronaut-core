@@ -18,7 +18,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
-import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -86,7 +86,7 @@ public final class AddOperator extends BinaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
 
@@ -113,7 +113,7 @@ public final class AddOperator extends BinaryOperator {
         }
     }
 
-    private void concatStrings(ExpressionVisitorContext ctx) {
+    private void concatStrings(ExpressionCompilationContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         initStringBuilder(mv);
         pushOperand(ctx, leftOperand);
@@ -127,7 +127,7 @@ public final class AddOperator extends BinaryOperator {
         mv.invokeConstructor(STRING_BUILDER_TYPE, STRING_BUILD_CONSTRUCTOR);
     }
 
-    private void pushOperand(ExpressionVisitorContext ctx, ExpressionNode operand) {
+    private void pushOperand(ExpressionCompilationContext ctx, ExpressionNode operand) {
         GeneratorAdapter mv = ctx.methodVisitor();
         if (operand instanceof AddOperator addOperator) {
             Type operatorType = addOperator.resolveType(ctx);

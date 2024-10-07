@@ -23,8 +23,10 @@ import io.micronaut.core.annotation.Internal;
  * but not necessarily started yet.
  *
  * @since 3.2.2
+ * @deprecated Use {@link ConfigurableBeanContext} instead
  */
 @Internal
+@Deprecated(forRemoval = true, since = "4.5.0")
 public interface InitializableBeanContext extends BeanContext {
     /**
      * Performs operations required before starting the application

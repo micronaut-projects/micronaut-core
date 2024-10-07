@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Order;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
@@ -32,6 +34,7 @@ import jakarta.inject.Singleton;
 @Singleton
 @Internal
 @Requires(classes = ServiceInstance.class)
+@Order(Ordered.LOWEST_PRECEDENCE)
 final class NettyServiceDiscovery {
     private final ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher;
     private final ApplicationEventPublisher<ServiceStoppedEvent> serviceStoppedEventApplicationEventPublisher;

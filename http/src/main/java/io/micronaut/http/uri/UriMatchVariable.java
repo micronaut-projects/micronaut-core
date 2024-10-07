@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.uri;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,7 +26,7 @@ import java.util.Objects;
  */
 public class UriMatchVariable {
 
-    private static final List<Character> OPTIONAL_OPERATORS = Arrays.asList('/', '#', '?', '&');
+    private static final List<Character> OPTIONAL_OPERATORS = List.of('/', '#', '?', '&');
 
     private final String name;
     private final char modifier;

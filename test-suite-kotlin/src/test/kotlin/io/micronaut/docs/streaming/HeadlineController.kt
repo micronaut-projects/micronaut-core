@@ -34,9 +34,9 @@ class HeadlineController {
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
     internal fun streamHeadlines(): Flux<Headline> {
         return Mono.fromCallable { // <2>
-            val headline = Headline()
-            headline.text = "Latest Headline at ${ZonedDateTime.now()}"
-            headline
+            Headline().apply {
+                text = "Latest Headline at ${ZonedDateTime.now()}"
+            }
         }.repeat(100) // <3>
          .delayElements(Duration.of(1, ChronoUnit.SECONDS)) // <4>
     }

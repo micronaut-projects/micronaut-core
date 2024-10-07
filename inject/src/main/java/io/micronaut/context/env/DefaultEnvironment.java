@@ -453,7 +453,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         propertySources.addAll(this.propertySources.values());
-        OrderUtil.sort(propertySources);
+        OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             log.debug("Processing property source: {}", propertySource.getName());
             processPropertySource(propertySource, propertySource.getConvention());
@@ -743,6 +743,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
             environments.add(Environment.GAE);
             environments.add(Environment.GOOGLE_COMPUTE);
+            environments.add(Environment.CLOUD);
             deduceComputePlatform = false;
         }
 

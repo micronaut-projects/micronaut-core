@@ -11,6 +11,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import spock.lang.Specification
 
 class HttpProxySpec extends Specification {
@@ -66,6 +68,7 @@ class HttpProxySpec extends Specification {
         }
 
         @Get
+        @ExecuteOn(TaskExecutors.BLOCKING)
         String get(HttpRequest<?> request) {
             "Proxied " + ctx.createBean(HttpClient, "http://localhost:${ctx.getBean(TargetPort).port}".toURI())
                     .toBlocking()

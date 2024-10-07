@@ -1,5 +1,5 @@
-import me.champeau.gradle.japicmp.JapicmpTask
 import io.micronaut.build.internal.japicmp.RemovedPackages
+import me.champeau.gradle.japicmp.JapicmpTask
 
 plugins {
     id "io.micronaut.build.internal.convention-core-library"
@@ -15,6 +15,7 @@ dependencies {
     compileOnly libs.managed.jakarta.annotation.api
     compileOnly libs.graal
     compileOnly libs.managed.kotlin.stdlib
+    compileOnly libs.managed.netty.common
 }
 
 spotless {

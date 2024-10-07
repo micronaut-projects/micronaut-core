@@ -12,7 +12,15 @@
   "packageRules": [
     {
       "matchPackagePatterns": ["actions.*"],
-      "dependencyDashboardApproval": true
+      "dependencyDashboardApproval": true,
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
     }
   ]
 }

@@ -30,6 +30,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
@@ -68,6 +69,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
 
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
+    private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
+    private final ServiceHttp2ClientConfiguration http2Configuration;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
@@ -97,6 +100,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         } else {
             this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
         }
+        this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
+        this.http2Configuration = new ServiceHttp2ClientConfiguration();
     }
 
     /**
@@ -106,11 +111,53 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param connectionPoolConfiguration The connection pool configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     */
+    @Deprecated(since = "4.3.0")
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, new ServiceWebSocketCompressionConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param sslConfiguration The SSL configuration
+     * @param defaultHttpClientConfiguration The default HTTP client configuration
+     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     */
+    @Deprecated(since = "4.6.0")
+    public ServiceHttpClientConfiguration(
+        @Parameter String serviceId,
+        @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+        @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+        @Nullable ServiceSslClientConfiguration sslConfiguration,
+        HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param http2Configuration The HTTP/2 configuration
+     * @param sslConfiguration The SSL configuration
+     * @param defaultHttpClientConfiguration The default HTTP client configuration
      */
     @Inject
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+            @Nullable ServiceHttpClientConfiguration.ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
@@ -118,11 +165,9 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
         }
-        if (connectionPoolConfiguration != null) {
-            this.connectionPoolConfiguration = connectionPoolConfiguration;
-        } else {
-            this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
-        }
+        this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
+        this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
+        this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2ClientConfiguration::new);
     }
 
     /**
@@ -248,11 +293,35 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         return connectionPoolConfiguration;
     }
 
+    @Override
+    public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
+        return webSocketCompressionConfiguration;
+    }
+
+    @Override
+    public ServiceHttp2ClientConfiguration getHttp2Configuration() {
+        return http2Configuration;
+    }
+
     /**
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
+    /**
+     * The default WebSocket compression configuration.
+     */
+    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    public static class ServiceWebSocketCompressionConfiguration extends WebSocketCompressionConfiguration {
+    }
+
+    /**
+     * The service HTTP/2 configuration.
+     */
+    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    public static class ServiceHttp2ClientConfiguration extends Http2ClientConfiguration {
     }
 
     /**

@@ -1,0 +1,57 @@
+Because the framework will not buffer the whole body in memory by default, after an ByteBody has been claimed (a
+primary operation has been performed), the data is "gone", and the same ByteBody cannot be claimed again. That
+means that if a filter were to claim the `ServerHttpRequest.byteBody()` directly (e.g. to print it to a log),
+controllers could not access it anymore. The argument binder for the `@Body` argument would throw an exception.
+
+To resolve this exclusivity problem, an `ByteBody` can be _split_ before it is claimed. The split operation
+essentially duplicates the body stream so that the two consumers (logging and argument binding) can process it
+independently. A body can be `split` any number of times, but only before the primary operation.
+
+While `ServerHttpRequest.byteBody()` returns a normal `ByteBody` -- cleanup is done by the HTTP server if the
+body is not consumed--the body returned by `split` is a `CloseableByteBody`. The caller *must* ensure that the
+new instance is closed, otherwise there can be resource and memory leaks, stalled connections, or other issues.
+
+==== Backpressure
+
+When there are two consumers of the same stream of input data, the problem of backpressure coordination necessarily
+comes up.
+
+Backpressure in an HTTP server describes the behavior when the "downstream" consumers cannot consume data as fast as
+the "upstream" supplier (i.e. the HTTP client sending the request) is sending it. To avoid having to buffer large
+amounts of incoming data, the server will apply backpressure (make the client send its data more slowly) when
+downstream consumers cannot keep up.
+
+A `split` operation now introduces two consumers. Depending on use case, different approaches of dealing with the
+backpressure of each downstream consumer may be appropriate. For example, if the two consumers write the body data to
+two separate files at the same time, it's best to use the backpressure of the slowest consumer to avoid buffering data.
+But in another example, when one consumer is a filter that needs access to all the body data, and the other consumer
+is the controller, the filter needs to complete before the controller even reads any data, so we should instead be
+guided by the fastest of the two consumers.
+
+These two approaches are already the two most important
+api:io.micronaut.http.body.ByteBody.SplitBackpressureMode[]s. The full list of options is as follows:
+
+* `SplitBackpressureMode.SLOWEST` uses the backpressure of the _slowest_ of the two consumers (first example)
+* `SplitBackpressureMode.FASTEST` uses the backpressure of the _fastest_ of the two consumers (second example)
+* `SplitBackpressureMode.ORIGINAL` uses the backpressure of the original consumer (the one `split()` was called on)
+* `SplitBackpressureMode.NEW` uses the backpressure of the new consumer (the one `split()` returns)
+
+The argument-less `split()` method uses `SLOWEST`, but you should pick the mode that is most appropriate for your use
+case.
+
+==== Discarding
+
+Some consumers end up not needing the body after all. For example, if a `POST` request cannot be matched to a
+controller route, the body is not needed and can be discarded. How discarding is implemented in the server depends on
+HTTP version. For HTTP/1, the server might close the connection or simply drop the data (which can still save some
+decompression overhead). For HTTP/2 the server can close the input of the request stream, instructing the client to
+send no more data.
+
+When there are multiple consumers, discard behavior is dependent on use case. In the above scenario of an unmatched
+request, when there is a filter that is also subscribed to the body data, it may be appropriate to drop the request in
+some cases (e.g. for logging) but may be necessary to still receive all the data in others.
+
+To signal that the upstream may discard the body, you can call `ByteBody.allowDiscard()`. Only if all consumers
+call `allowDiscard()` (or `close()` without a primary operation) may the remaining data actually be discarded. Before
+that, _all_ consumers, even those that called `allowDiscard()`, will still receive all data. For the logging use case,
+you can call `allowDiscard()` and be assured that you will still log the full body if the controller needs it.

@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
+
 /**
  * Used to store a reference to an underlying {@link TypeElementVisitor} and
  * optionally invoke the visit methods on the visitor if it matches the
@@ -89,7 +90,7 @@ class LoadedVisitor implements Ordered {
 
         LoadedVisitor that = (LoadedVisitor) o
 
-        if (visitor.getClass() != that.getClass() ) return false
+        if (visitor.getClass() != that.getClass()) return false
 
         return true
     }

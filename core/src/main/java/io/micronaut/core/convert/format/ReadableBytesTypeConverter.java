@@ -30,6 +30,9 @@ import java.util.Optional;
  */
 public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharSequence, Number, ReadableBytes> {
 
+    private static final String KILOBYTES = "KB";
+    private static final String MEGABYTES = "MB";
+    private static final String GIGABYTES = "GB";
     private static final int KB_UNIT = 1024;
 
     @Override
@@ -44,13 +47,15 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
         }
         String value = object.toString().toUpperCase(Locale.ENGLISH);
         try {
-            long numberPart = Long.parseLong(value.substring(0, value.length() - 2));
             long size;
-            if (value.endsWith("KB")) {
+            if (value.endsWith(KILOBYTES)) {
+                long numberPart = parseSizeWithUnit(value);
                 size = numberPart * KB_UNIT;
-            } else if (value.endsWith("MB")) {
+            } else if (value.endsWith(MEGABYTES)) {
+                long numberPart = parseSizeWithUnit(value);
                 size = numberPart * KB_UNIT * KB_UNIT;
-            } else if (value.endsWith("GB")) {
+            } else if (value.endsWith(GIGABYTES)) {
+                long numberPart = parseSizeWithUnit(value);
                 size = numberPart * KB_UNIT * KB_UNIT * KB_UNIT;
             } else {
                 size = Long.parseLong(value);
@@ -60,5 +65,9 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
             context.reject(value, e);
             return Optional.empty();
         }
+    }
+
+    private long parseSizeWithUnit(String value) {
+        return Long.parseLong(value.substring(0, value.length() - 2));
     }
 }

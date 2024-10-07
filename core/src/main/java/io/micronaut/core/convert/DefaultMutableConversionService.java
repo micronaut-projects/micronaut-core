@@ -93,6 +93,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
+
 /**
  * The default conversion service. Handles basic type conversion operations.
  *
@@ -484,7 +486,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                     }
                 }
             }
-            return Optional.of(classes.toArray(new Class<?>[0]));
+            return Optional.of(classes.toArray(EMPTY_CLASS_ARRAY));
         });
 
         // URI -> URL

@@ -4,7 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
 import spock.lang.PendingFeature
 
 class ThisExpressionSpec extends AbstractEvaluatedExpressionsSpec {
-    @PendingFeature(reason = "At some point it would be nice to support resolving this in injection points but requires signficant changes")
+    @PendingFeature(reason = "At some point it would be nice to support resolving this in injection points but requires significant changes")
     void "test this access for field"() {
         given:
         def ctx = buildContext("""

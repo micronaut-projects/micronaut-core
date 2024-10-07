@@ -16,7 +16,9 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 
@@ -53,7 +55,7 @@ public abstract sealed class RelationalOperator extends ExpressionNode permits G
     protected abstract Integer nonIntComparisonOpcode();
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
 
@@ -70,7 +72,7 @@ public abstract sealed class RelationalOperator extends ExpressionNode permits G
     }
 
     @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
+    public void generateBytecode(ExpressionCompilationContext ctx) {
         comparisonOperation.compile(ctx);
     }
 }

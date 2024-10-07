@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -46,11 +47,13 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         super(isReadOnly, metadataBuilder);
     }
 
+    @NonNull
     @Override
     public ElementAnnotationMetadataFactory readOnly() {
         return new JavaElementAnnotationMetadataFactory(true, (JavaAnnotationMetadataBuilder) metadataBuilder);
     }
 
+    @NonNull
     @Override
     public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element) {
         AbstractJavaElement javaElement = (AbstractJavaElement) element;
@@ -71,7 +74,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
-        JavaNativeElement.Class clazz = (JavaNativeElement.Class) classElement.getNativeType();
+        var clazz = (JavaNativeElement.Class) classElement.getNativeType();
         TypeMirror typeMirror = clazz.typeMirror();
         if (typeMirror == null) {
             return super.lookupTypeAnnotationsForClass(classElement);
@@ -81,10 +84,10 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
-        JavaNativeElement.Placeholder genericNativeType = (JavaNativeElement.Placeholder) placeholderElement.getGenericNativeType();
+        var genericNativeType = (JavaNativeElement.Placeholder) placeholderElement.getGenericNativeType();
         Element placeholderJavaElement;
         TypeVariable placeholderTypeVariable = genericNativeType.typeVariable();
-        if (placeholderTypeVariable.getAnnotationMirrors().size() > 0) {
+        if (!placeholderTypeVariable.getAnnotationMirrors().isEmpty()) {
             placeholderJavaElement = new AnnotationsElement(placeholderTypeVariable);
         } else {
             placeholderJavaElement = genericNativeType.element();
@@ -94,7 +97,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
-        WildcardType wildcard = (WildcardType) wildcardElement.getGenericNativeType();
+        var wildcard = (WildcardType) wildcardElement.getGenericNativeType();
         return metadataBuilder.lookupOrBuild(wildcard, new AnnotationsElement(wildcard));
     }
 

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binding
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -31,6 +32,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Issue
+import spock.lang.Unroll
 
 /**
  * @author Graeme Rocher
@@ -40,10 +42,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -53,11 +55,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test pojo body parsing"() {
         when:
-        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/pojo', [
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/pojo', [
                 name:"Fred",
                 age:"10",
                 something: "else"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -67,13 +69,116 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing with missing data"() {
         when:
-        Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
+        client.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body is parsed to #parsedMapString"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body            | parsedMapString
+        "a=1"           | "[a:1]"
+        "a=1&b=2"       | "[a:1, b:2]"
+
+        //nothing
+        "&a=1&b=2"      | "[a:1, b:2]"
+        "a=1&&b=2"      | "[a:1, b:2]"
+        "a=1&b=2&"      | "[a:1, b:2]"
+
+        //key equals empty value
+        "z=&a=1&b=2"    | "[z:, a:1, b:2]"
+        "a=1&z=&b=2"    | "[a:1, z:, b:2]"
+        "a=1&b=2&z="    | "[a:1, b:2, z:]"
+
+        //empty key equals value
+        "=0&a=1&b=2"    | "[:0, a:1, b:2]"
+        "a=1&=0&b=2"    | "[a:1, :0, b:2]"
+        "a=1&b=2&=0"    | "[a:1, b:2, :0]"
+
+        //empty key equals empty value
+        "=&a=1&b=2"     | "[:, a:1, b:2]"
+        "a=1&=&b=2"     | "[a:1, :, b:2]"
+        "a=1&b=2&="     | "[a:1, b:2, :]"
+
+        //just key
+        "z&a=1&b=2"     | "[z:, a:1, b:2]"
+        "a=1&z&b=2"     | "[a:1, z:, b:2]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body with single key fails to parse"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body            | parsedMapString
+        //just key
+        "a"             | "[a:]"
+        "&a"            | "[a:]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded String #body with single key as the last attribute fails to parse to #parsedMapString"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body            | parsedMapString
+        //just key
+        "a=1&b=2&z"     | "[a:1, b:2, z:]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
+    @Unroll
+    void "test application/x-www-form-urlencoded Map #body is parsed to #parsedMapString"() {
+        //NOTE - Netty does not allow setting an http data attribute with an empty string key, which seems reasonable, thus fewer
+        // scenarios are exercised than the above that uses a raw String body. The key with empty value works here because it is
+        // sent as key= instead of just key, and Netty parses that correctly on the server end.
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/map', body)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).getBody(String.class).get()
+
+        then:
+        result == parsedMapString
+
+        where:
+        body                    | parsedMapString
+        [a:"1"]                 | "[a:1]"
+        [a:"1", b:"2"]          | "[a:1, b:2]"
+
+        //key equals empty value
+        [z:"",a:"1",b:"2"]      | "[z:, a:1, b:2]"
+        [a:"1",z:"",b:"2"]      | "[a:1, z:, b:2]"
+        [a:"1",b:"2",z:""]      | "[a:1, b:2, z:]"
+
+        //just key
+        [z:"",a:"1",b:"2"]      | "[z:, a:1, b:2]"
+        [a:"1",z:"",b:"2"]      | "[a:1, z:, b:2]"
+        [a:""]                  | "[a:]"
+        [a:"1",b:"2",z:""]      | "[a:1, b:2, z:]"
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1032')
@@ -89,8 +194,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test POST SAML form multipart form data"() {
         given:
         MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
-        String data = Flux.from(rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)).blockFirst()
+        String data = client.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)
 
         expect:
         data == SAML_DATA
@@ -131,10 +236,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2263")
     void "test binding directly to a string"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/string', [
+        HttpResponse<String> response = client.exchange(HttpRequest.POST('/form/string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -144,10 +249,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test binding directly to a reactive string"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
+        HttpResponse<String> response = client.exchange(HttpRequest.POST('/form/maybe-string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)
 
         then:
         response.status == HttpStatus.OK
@@ -156,6 +261,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+    @Requires(property = "spec.name", value = "FormDataBindingSpec")
     static class FormController {
 
         @Post('/string')
@@ -179,6 +285,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             "name: $person.name, age: $person.age"
         }
 
+        @Post('/map')
+        String map(@Body Map<String, String> formData) {
+            formData.toMapString()
+        }
+
         @EqualsAndHashCode
         static class Person {
             String name
@@ -187,6 +298,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Controller('/form/saml/test')
+    @Requires(property = "spec.name", value = "FormDataBindingSpec")
     static class MainController {
 
         @Post(consumes = MediaType.APPLICATION_FORM_URLENCODED)

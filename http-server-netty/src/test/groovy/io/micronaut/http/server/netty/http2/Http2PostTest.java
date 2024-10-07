@@ -20,6 +20,7 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.support.TestPropertyProvider;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.HttpClientResponse;
 import io.vertx.core.http.HttpMethod;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
@@ -27,13 +28,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @MicronautTest
+@Property(name = "spec.name", value = "Http2PostTest")
 @Property(name = "micronaut.server.http-version", value = "2.0")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
@@ -85,33 +87,37 @@ public class Http2PostTest implements TestPropertyProvider {
                 .setDefaultHost("localhost")
                 .setDefaultPort(embeddedServer.getPort());
         io.vertx.core.http.HttpClient client = vertx.createHttpClient(options);
-        CompletableFuture<String> result = new CompletableFuture<>();
         // Going to send 2 POST requests. 2nd request will not be succeessful
-        client.request(HttpMethod.POST, "/vertx/demo/testPost", response -> {
-            System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
-            response.bodyHandler(buffer -> result.complete(new String(buffer.getBytes())));
-        })
-                .putHeader("content-length", "9")
-                .write("Request-1")
-                .end();
+        HttpClientResponse response1 = client.request(HttpMethod.POST, "/vertx/demo/testPost")
+            .toCompletionStage().toCompletableFuture().get()
+            .putHeader("content-length", "9")
+            .send("Request-1")
+            .onSuccess(resp -> {
+                // trigger loading body
+                resp.body();
+            })
+            .toCompletionStage().toCompletableFuture().get();
+        System.out.println("Received response with status code " + response1.statusCode() + " " + response1.version());
 
         Assertions.assertEquals(
                 "Test succeeded on POST. Received : Request-1",
-                result.get()
+            response1.body().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS).toString(StandardCharsets.UTF_8)
         );
 
-        CompletableFuture<String> result2 = new CompletableFuture<>();
-        client.request(HttpMethod.POST, "/vertx/demo/testPost", response -> {
-            System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
-            response.bodyHandler(buffer -> result2.complete(new String(buffer.getBytes())));
-        })
-        .putHeader("content-length", "9")
-        .write("Request-2")
-        .end();
+        HttpClientResponse response2 = client.request(HttpMethod.POST, "/vertx/demo/testPost")
+            .toCompletionStage().toCompletableFuture().get()
+            .putHeader("content-length", "9")
+            .send("Request-2")
+            .onSuccess(resp -> {
+                // trigger loading body
+                resp.body();
+            })
+            .toCompletionStage().toCompletableFuture().get();
+        System.out.println("Received response with status code " + response2.statusCode() + " " + response2.version());
 
         Assertions.assertEquals(
-                "Test succeeded on POST. Received : Request-2",
-                result2.get(2, TimeUnit.SECONDS)
+            "Test succeeded on POST. Received : Request-2",
+            response2.body().toCompletionStage().toCompletableFuture().get(5, TimeUnit.SECONDS).toString(StandardCharsets.UTF_8)
         );
     }
 
@@ -126,6 +132,7 @@ public class Http2PostTest implements TestPropertyProvider {
         );
     }
 
+    @Requires(property = "spec.name", value = "Http2PostTest")
     @Controller("/vertx/demo")
     public static class DemoController {
         @Get("/testGet")

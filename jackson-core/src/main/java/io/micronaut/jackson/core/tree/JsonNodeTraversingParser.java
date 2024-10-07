@@ -35,6 +35,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 
+import static io.micronaut.core.util.ArrayUtils.EMPTY_CHAR_ARRAY;
+
 /**
  * {@link JsonParser} implementation that iterates over a {@link JsonNode}.
  *
@@ -173,7 +175,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         if (text != null) {
             return text.toCharArray();
         } else {
-            return new char[0];
+            return EMPTY_CHAR_ARRAY;
         }
     }
 
@@ -301,7 +303,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         } else if (node.isNumber()) {
             Number numberValue = node.getNumberValue();
             return numberValue instanceof Float || numberValue instanceof Double || numberValue instanceof BigDecimal ?
-                    JsonToken.VALUE_NUMBER_FLOAT : JsonToken.VALUE_NUMBER_INT;
+                JsonToken.VALUE_NUMBER_FLOAT : JsonToken.VALUE_NUMBER_INT;
         } else if (node.isNull()) {
             return JsonToken.VALUE_NULL;
         } else if (node.isArray()) {
@@ -415,8 +417,10 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
     private static class ObjectContext extends Context {
         final Iterator<Map.Entry<String, JsonNode>> iterator;
-        @Nullable String currentName = null;
-        @Nullable JsonNode currentValue = null;
+        @Nullable
+        String currentName = null;
+        @Nullable
+        JsonNode currentValue = null;
 
         boolean inFieldName = false;
 

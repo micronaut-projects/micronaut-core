@@ -19,12 +19,11 @@ class SslStaticCertSpec extends Specification {
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
-    ApplicationContext context
     EmbeddedServer embeddedServer
     HttpClient client
 
     void setup() {
-        context = ApplicationContext.run([
+        embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'SslStaticCertSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.keyStore.path': 'classpath:keystore.p12',
@@ -42,13 +41,12 @@ class SslStaticCertSpec extends Specification {
                                           'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384'],
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
-        embeddedServer = context.getBean(EmbeddedServer).start()
-        client = context.createBean(HttpClient, embeddedServer.getURL())
+        client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
     }
 
     void cleanup() {
         client.close()
-        context.close()
+        embeddedServer.close()
     }
 
     void "expect the url to be https"() {

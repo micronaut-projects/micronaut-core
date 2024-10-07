@@ -36,6 +36,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Validates route parameters are nullable or optional for optional
  * template variables.
@@ -103,7 +105,7 @@ public class NullableParameterRule implements RouteValidationRule {
             }
         }
 
-        return new RouteValidationResult(errorMessages.toArray(new String[0]));
+        return new RouteValidationResult(errorMessages.toArray(EMPTY_STRING_ARRAY));
     }
 
     private boolean isNullable(TypedElement p) {

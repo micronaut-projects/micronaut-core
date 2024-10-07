@@ -73,7 +73,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             synchronized (this) { // double check
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
-                    this.expressionResolvers = new ArrayList<>();
                     exResolvers = new ArrayList<>();
                     ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
@@ -395,14 +394,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         @Override
         public <T> Optional<T> findValue(Class<T> type) {
-            for (String expression: expressions) {
-                Optional<T> optionalValue = resolveOptionalExpression(expression, type);
-                if (optionalValue.isPresent()) {
-                    return optionalValue;
+            try {
+                for (String expression: expressions) {
+                    Optional<T> optionalValue = resolveOptionalExpression(expression, type);
+                    if (optionalValue.isPresent()) {
+                        return optionalValue;
+                    }
                 }
-            }
-            if (defaultValue != null) {
-                return conversionService.convert(defaultValue, type);
+                if (defaultValue != null) {
+                    return conversionService.convert(defaultValue, type);
+                }
+            } catch (ConfigurationException e) {
+                // Swallow exception.
             }
             return Optional.empty();
         }

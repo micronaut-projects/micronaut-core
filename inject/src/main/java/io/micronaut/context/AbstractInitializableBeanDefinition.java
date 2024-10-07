@@ -52,6 +52,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectableBeanDefinition;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ValidatedBeanDefinition;
@@ -61,8 +62,6 @@ import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -104,7 +103,6 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional
     implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static final Optional<Class<? extends Annotation>> SINGLETON_SCOPE = Optional.of(Singleton.class);
 
@@ -178,11 +176,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    public final boolean isConfigurationProperties() {
-        return precalculatedInfo.isConfigurationProperties;
-    }
-
-    @Override
     public Qualifier<T> getDeclaredQualifier() {
         if (declaredQualifier == null) {
             declaredQualifier = InstantiatableBeanDefinition.super.getDeclaredQualifier();
@@ -252,6 +245,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     public boolean isIterable() {
         return precalculatedInfo.isIterable;
+    }
+
+    @Override
+    public final boolean isConfigurationProperties() {
+        return precalculatedInfo.isConfigurationProperties;
     }
 
     @Override
@@ -686,12 +684,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * Allows printing warning messages produced by the compiler.
      *
      * @param message The message
+     * @deprecated No longer used
      */
     @Internal
+    @Deprecated(forRemoval = true, since = "4.4.0")
     protected final void warn(String message) {
-        if (LOG.isWarnEnabled()) {
-            LOG.warn(message);
-        }
     }
 
     /**
@@ -700,13 +697,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @param type     The type
      * @param method   The method
      * @param property The property
+     * @deprecated No longer used
      */
     @SuppressWarnings("unused")
     @Internal
+    @Deprecated(forRemoval = true, since = "4.4.0")
     protected final void warnMissingProperty(Class type, String method, String property) {
-        if (LOG.isWarnEnabled()) {
-            LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
-        }
     }
 
     /**
@@ -1151,8 +1147,34 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<K> argument = resolveArgument(context, argIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            return resolveBean(resolutionContext, argument, qualifier);
+            return resolveBean(
+                resolutionContext,
+                argument,
+                qualifier,
+                !InjectionPoint.isInjectionRequired(methodRef.annotationMetadata)
+            );
         }
+    }
+
+    @Internal
+    @UsedByGeneratedCode
+    protected final boolean isMethodResolved(int methodIndex, Object[] parameters) {
+        MethodReference methodRef = methodInjection[methodIndex];
+        Argument<?>[] arguments = methodRef.arguments;
+        if (arguments.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            Object value = parameters[i];
+            if (value == null) {
+                Argument<?> argument = arguments[i];
+                if (!argument.isDeclaredNullable()
+                    && !InjectionPoint.isInjectionRequired(methodRef.annotationMetadata)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -1197,7 +1219,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     protected final Object getBeanForSetter(BeanResolutionContext resolutionContext, BeanContext context, String setterName, Argument argument, Qualifier qualifier) {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            return resolveBean(resolutionContext, argument, qualifier);
+            return resolveBean(resolutionContext, argument, qualifier, !InjectionPoint.isInjectionRequired(argument.getAnnotationMetadata()));
         }
     }
 
@@ -1325,7 +1347,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushConstructorResolve(this, argument)) {
-            return resolveBean(resolutionContext, argument, qualifier);
+            return resolveBean(resolutionContext, argument, qualifier, false);
         }
     }
 
@@ -1669,7 +1691,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     protected final <K> K getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Qualifier<K> qualifier) {
         final Argument<K> argument = resolveArgument(context, fieldInjection[fieldIndex].argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolveBean(resolutionContext, argument, qualifier);
+            return resolveBean(resolutionContext, argument, qualifier, !InjectionPoint.isInjectionRequired(argument.getAnnotationMetadata()));
         }
     }
 
@@ -1679,7 +1701,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         final Argument<K> argument = resolveArgument(context, annotationInjection[annotationBeanIndex].argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushAnnotationResolve(this, argument)) {
-            return resolveBean(resolutionContext, argument, qualifier);
+            return resolveBean(resolutionContext, argument, qualifier, false);
         }
     }
 
@@ -2146,10 +2168,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
     }
 
-    private <K> K resolveBean(
-            BeanResolutionContext resolutionContext,
-            Argument<K> argument,
-            @Nullable Qualifier<K> qualifier) {
+    private <K> @Nullable K resolveBean(
+        BeanResolutionContext resolutionContext,
+        Argument<K> argument,
+        @Nullable Qualifier<K> qualifier,
+        boolean isOptional) {
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, argument) : qualifier;
         Class<K> t = argument.getType();
         if (Qualifier.class.isAssignableFrom(t)) {
@@ -2159,7 +2182,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
-                if (argument.isDeclaredNullable()) {
+                if (argument.isDeclaredNullable() || isOptional) {
                     return resolutionContext.findBean(argument, qualifier).orElse(null);
                 }
                 return resolutionContext.getBean(argument, qualifier);

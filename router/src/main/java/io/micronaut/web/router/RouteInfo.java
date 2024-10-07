@@ -159,12 +159,32 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     List<MediaType> getConsumes();
 
     /**
+     * Whether this is consuming any content type.
+     *
+     * @return True if it is
+     * @since 4.4.0
+     */
+    default boolean consumesAll() {
+        return false;
+    }
+
+    /**
      * Whether the specified content type is an accepted type.
      *
      * @param contentType The content type
      * @return True if it is
      */
     boolean doesConsume(@Nullable MediaType contentType);
+
+    /**
+     * Whether this is producing any content type.
+     *
+     * @return True if it is
+     * @since 4.3.0
+     */
+    default boolean producesAll() {
+        return false;
+    }
 
     /**
      * Whether the route does produce any of the given types.
@@ -204,6 +224,15 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @since 2.0.0
      */
     boolean isSuspended();
+
+    /**
+     * Is this route recognized as imperative.
+     * @return Is this route recognized as imperative.
+     * @since 4.3.0
+     */
+    default boolean isImperative() {
+        return false;
+    }
 
     /**
      * @return Is the route a reactive route.

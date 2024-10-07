@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -86,6 +87,7 @@ class ConnectionCloseSpec extends Specification {
         server.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ConnectionCloseSpec')
     @Controller("/connection")
     static class ConnectionCloseController {
 

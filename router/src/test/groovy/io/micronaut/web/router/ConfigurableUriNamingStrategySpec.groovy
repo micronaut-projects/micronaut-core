@@ -16,11 +16,9 @@
 package io.micronaut.web.router
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.web.router.naming.ConfigurableUriNamingStrategy
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -31,33 +29,6 @@ import static io.micronaut.http.HttpMethod.GET
  * @since 1.2.0
  */
 class ConfigurableUriNamingStrategySpec extends Specification {
-
-    void "By default ConfigurableUriNamingStrategy bean is not loaded"() {
-        given:
-        def applicationContext = new DefaultApplicationContext('test').start()
-
-        expect:
-        !applicationContext.containsBean(ConfigurableUriNamingStrategy)
-
-        cleanup:
-        applicationContext.close()
-    }
-
-    void "ConfigurableUriNamingStrategy bean is loaded if 'micronaut.server.context-path' specified"() {
-        given:
-        def applicationContext = ApplicationContext.run(
-                PropertySource.of(
-                        'test',
-                        ['micronaut.server.context-path': '/test']
-                )
-        )
-
-        expect:
-        applicationContext.containsBean(ConfigurableUriNamingStrategy)
-
-        cleanup:
-        applicationContext.close()
-    }
 
     @Unroll
     void "Test 'micronaut.server.context-path' matches with #route"() {
@@ -161,6 +132,32 @@ class ConfigurableUriNamingStrategySpec extends Specification {
         GET    | '/test/city'               | 'Hello city'
         GET    | '/test/city/Madrid'        | 'City Madrid'
         GET    | '/test/city/country/Spain' | 'Country Spain'
+    }
+
+    @Unroll
+    void "Test 'micronaut.server.context-path' set to empty String matches with #route"() {
+        given:
+        def applicationContext = ApplicationContext.run(
+                PropertySource.of(
+                        'test',
+                        ['micronaut.server.context-path': '']
+                )
+        )
+                .start()
+        def router = applicationContext.getBean(Router)
+
+        expect:
+        router."$method"(route).isPresent()
+        router."$method"(route).get().invoke() == result
+
+        cleanup:
+        applicationContext.close()
+
+        where:
+        method | route                 | result
+        GET    | '/city'               | 'Hello city'
+        GET    | '/city/Madrid'        | 'City Madrid'
+        GET    | '/city/country/Spain' | 'Country Spain'
     }
 
     @Controller('/city')

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.body;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.Writable;
@@ -35,8 +34,6 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Set;
 
 /**
  * Body writer for {@link Writable}s.
@@ -47,12 +44,17 @@ import java.util.Set;
 @Singleton
 @Experimental
 @BootstrapContextCompatible
-@Bean(typed = RawMessageBodyHandler.class)
-public final class WritableBodyWriter implements RawMessageBodyHandler<Writable> {
+public final class WritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
+
     private final ApplicationConfiguration applicationConfiguration;
 
     public WritableBodyWriter(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    @Override
+    public Argument<Writable> getType() {
+        return Argument.of(Writable.class);
     }
 
     @Override
@@ -61,17 +63,12 @@ public final class WritableBodyWriter implements RawMessageBodyHandler<Writable>
     }
 
     @Override
-    public Collection<? extends Class<?>> getTypes() {
-        return Set.of(Writable.class);
-    }
-
-    @Override
     public void writeTo(Argument<Writable> type, MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        if (mediaType != null) {
+            outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, mediaType);
         }
         try {
-            object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
+            object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, outgoingHeaders));
             outputStream.flush();
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);

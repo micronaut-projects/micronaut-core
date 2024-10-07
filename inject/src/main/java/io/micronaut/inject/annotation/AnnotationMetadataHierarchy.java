@@ -45,6 +45,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Used to represent an annotation metadata hierarchy. The first {@link AnnotationMetadata} instance passed
  * to the constructor represents the annotation metadata that is declared, hence methods like {@link #hasDeclaredAnnotation(String)} will return true for the last annotation metadata passed in the hierarchy.
@@ -898,7 +900,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
             }
         }
-        return strings.toArray(new String[0]);
+        return strings.toArray(EMPTY_STRING_ARRAY);
     }
 
     @Override
@@ -911,7 +913,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
             }
         }
-        return strings.toArray(new String[0]);
+        return strings.toArray(EMPTY_STRING_ARRAY);
     }
 
     @NonNull

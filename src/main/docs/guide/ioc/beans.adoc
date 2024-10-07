@@ -14,11 +14,3 @@ snippet::io.micronaut.docs.inject.intro.VehicleSpec[tags="start",indent="0"]
 
 The Micronaut framework automatically discovers dependency injection metadata on the classpath and wires the beans together according to injection points you define.
 
-The Micronaut framework supports the following types of dependency injection:
-
-* Constructor injection (must be one public constructor or a single constructor annotated with `@Inject`)
-* Field injection
-* JavaBean property injection
-* Method parameter injection
-
-NOTE: Classes or particular fields, methods can be excluded by adding an annotation ann:core.annotation.Vetoed[]

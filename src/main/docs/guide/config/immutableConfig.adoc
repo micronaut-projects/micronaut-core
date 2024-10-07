@@ -1,4 +1,8 @@
-Since 1.3, Micronaut framework supports the definition of immutable configuration.
+Since 1.3, Micronaut framework supports the definition of immutable configuration. Immutable configuration with an interface requires the Micronaut Context dependency.
+
+dependency::micronaut-context[]
+
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
 
 There are two ways to define immutable configuration. The preferred way is to define an interface annotated with ann:context.annotation.ConfigurationProperties[]. For example:
 

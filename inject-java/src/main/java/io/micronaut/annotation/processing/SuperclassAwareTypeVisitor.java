@@ -22,18 +22,36 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.*;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ErrorType;
+import javax.lang.model.type.ExecutableType;
+import javax.lang.model.type.IntersectionType;
+import javax.lang.model.type.NoType;
+import javax.lang.model.type.NullType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.UnionType;
+import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Processes the type and its super classes.
  *
- * @param <R>
- * @param <P>
+ * @param <R> The return type of the visitor's method
+ * @param <P> The type of the additional parameter to the visitor's methods.
+ * @deprecated No longer used
  */
+@Deprecated(forRemoval = true, since = "4.3.0")
 public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisitor8<R, P> {
     private final Set<String> processed = new HashSet<>();
 
@@ -60,10 +78,10 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     private R visitDeclared(DeclaredType type, P p, boolean visitInterfaces) {
         final Element element = type.asElement();
 
-        if ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
-                !element.toString().equals(Object.class.getName()) &&
-                !element.toString().equals(Enum.class.getName())) {
-            TypeElement typeElement = (TypeElement) element;
+        if ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+            && !element.toString().equals(Object.class.getName())
+            && !element.toString().equals(Enum.class.getName())) {
+            var typeElement = (TypeElement) element;
             List<? extends Element> enclosedElements = typeElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {
                 boolean isAcceptable = isAcceptable(enclosedElement);
@@ -95,7 +113,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                 visitDeclared(declaredType, p);
             }
             if (visitInterfaces) {
-                List<TypeMirror> interfaces = new ArrayList<>();
+                var interfaces = new ArrayList<TypeMirror>();
                 for (TypeMirror anInterface : typeElement.getInterfaces()) {
                     if (anInterface instanceof DeclaredType interfaceType) {
                         interfaces.add(anInterface);
@@ -103,17 +121,17 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                     }
                 }
                 interfaces.stream()
-                        .distinct()
-                        .sorted((o1, o2) -> {
-                            if (types.isSubtype(o1, o2)) {
-                                return -1;
-                            } else {
-                                return 0;
-                            }
-                        })
-                        .filter(DeclaredType.class::isInstance)
-                        .map(DeclaredType.class::cast)
-                        .forEach((dt) -> visitDeclared(dt, p, false));
+                    .distinct()
+                    .sorted((o1, o2) -> {
+                        if (types.isSubtype(o1, o2)) {
+                            return -1;
+                        } else {
+                            return 0;
+                        }
+                    })
+                    .filter(DeclaredType.class::isInstance)
+                    .map(DeclaredType.class::cast)
+                    .forEach((dt) -> visitDeclared(dt, p, false));
             }
         }
 
@@ -122,7 +140,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
 
     private List<TypeMirror> getInterfaces(DeclaredType declaredType) {
         Element interfaceElement = declaredType.asElement();
-        List<TypeMirror> interfaces = new ArrayList<>();
+        var interfaces = new ArrayList<TypeMirror>();
         if (interfaceElement instanceof TypeElement interfaceTypeElement) {
             for (TypeMirror anInterface : interfaceTypeElement.getInterfaces()) {
                 if (anInterface instanceof DeclaredType interfaceType) {
@@ -141,9 +159,9 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     protected abstract boolean isAcceptable(Element element);
 
     /**
-     * @param type    The {@link DeclaredType}
+     * @param type The {@link DeclaredType}
      * @param element The {@link Element}
-     * @param p       The additional type
+     * @param p The additional type
      */
     protected abstract void accept(DeclaredType type, Element element, P p);
 
@@ -206,7 +224,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
 
         if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
             Map<String, TypeMirror> generics = genericUtils.buildGenericTypeArgumentInfo(type)
-                    .get(typeElement.getQualifiedName().toString());
+                .get(typeElement.getQualifiedName().toString());
             if (generics != null) {
                 String key = returnTypeMirror.toString();
                 if (generics.containsKey(key)) {

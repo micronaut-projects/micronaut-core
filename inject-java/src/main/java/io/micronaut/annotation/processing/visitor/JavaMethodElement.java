@@ -22,7 +22,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -36,15 +35,20 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -67,10 +71,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private final MethodElementAnnotationsHelper helper;
 
     /**
-     * @param owningType                The declaring class
-     * @param nativeElement             The native element
+     * @param owningType The declaring class
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     public JavaMethodElement(JavaClassElement owningType,
                              JavaNativeElement.Method nativeElement,
@@ -87,16 +91,19 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
+    @NonNull
     @Override
     public ElementAnnotationMetadata getMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
+    @NonNull
     @Override
     public JavaNativeElement.Method getNativeType() {
         return (JavaNativeElement.Method) super.getNativeType();
@@ -119,7 +126,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public MethodElement withParameters(ParameterElement... parameters) {
+    public @NonNull MethodElement withParameters(ParameterElement... parameters) {
         JavaMethodElement methodElement = (JavaMethodElement) makeCopy();
         methodElement.parameters = parameters;
         return methodElement;
@@ -161,29 +168,44 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public boolean overrides(MethodElement overridden) {
-        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+    public boolean overrides(@NonNull MethodElement overridden) {
+        if (equals(overridden) || isStatic() || overridden.isStatic() || isPrivate() || overridden.isPrivate()) {
             return false;
         }
         if (overridden instanceof JavaMethodElement javaMethodElement) {
-            boolean overrides = visitorContext.getElements().overrides(
+            if (isPackagePrivate() && overridden.isPackagePrivate()) {
+                // Test special case of the default methods
+                return MethodElement.super.overrides(overridden);
+            }
+            return visitorContext.getElements().overrides(
                 executableElement,
                 javaMethodElement.executableElement,
                 owningType.classElement
             );
-            if (overrides) {
-                return true;
-            }
         }
         return MethodElement.super.overrides(overridden);
     }
 
     @Override
-    public boolean hides(MemberElement hidden) {
+    public boolean isSubSignature(MethodElement element) {
+        if (element instanceof JavaMethodElement javaMethodElement) {
+            return visitorContext.getTypes().isSubsignature(
+                (ExecutableType) executableElement.asType(),
+                (ExecutableType) javaMethodElement.executableElement.asType()
+            );
+        }
+        return MethodElement.super.isSubSignature(element);
+    }
+
+    @Override
+    public boolean hides(@NonNull MethodElement hiddenMethod) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }
-        return visitorContext.getElements().hides(getNativeType().element(), ((JavaNativeElement.Method) hidden.getNativeType()).element());
+        if (hiddenMethod instanceof JavaMethodElement javaMethodElement) {
+            return visitorContext.getElements().hides(getNativeType().element(), javaMethodElement.getNativeType().element());
+        }
+        return MethodElement.super.hides(hiddenMethod);
     }
 
     @NonNull
@@ -212,7 +234,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public @NonNull Map<String, ClassElement> getTypeArguments() {
         if (typeArguments == null) {
             typeArguments = MethodElement.super.getTypeArguments();
         }
@@ -220,7 +242,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public Map<String, ClassElement> getDeclaredTypeArguments() {
+    public @NonNull Map<String, ClassElement> getDeclaredTypeArguments() {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = resolveTypeArguments(executableElement, getDeclaringType().getTypeArguments());
         }
@@ -237,7 +259,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     public ParameterElement[] getParameters() {
         if (this.parameters == null) {
             List<? extends VariableElement> parameters = executableElement.getParameters();
-            List<ParameterElement> elts = new ArrayList<>(parameters.size());
+            var elts = new ArrayList<ParameterElement>(parameters.size());
             for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext(); ) {
                 VariableElement variableElement = i.next();
                 if (!i.hasNext() && isSuspend(variableElement)) {
@@ -246,13 +268,13 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 }
                 elts.add(newParameterElement(this, variableElement));
             }
-            this.parameters = elts.toArray(new ParameterElement[0]);
+            this.parameters = elts.toArray(ZERO_PARAMETER_ELEMENTS);
         }
         return this.parameters;
     }
 
     @Override
-    public MethodElement withNewOwningType(ClassElement owningType) {
+    public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
         JavaMethodElement javaMethodElement = new JavaMethodElement((JavaClassElement) owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
         copyValues(javaMethodElement);
         return javaMethodElement;
@@ -271,7 +293,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     /**
      * Creates a new parameter element for the given args.
      *
-     * @param methodElement   The method element
+     * @param methodElement The method element
      * @param variableElement The variable element
      * @return The parameter element
      */
@@ -335,4 +357,17 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return false;
     }
 
+    @Override
+    public Collection<MethodElement> getOverriddenMethods() {
+        return visitorContext.getNativeElementsHelper()
+            .findOverriddenMethods(owningType.classElement, executableElement)
+            .stream()
+            .map(overriddenMethod -> new JavaMethodElement(
+                    owningType,
+                    new JavaNativeElement.Method(overriddenMethod),
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            ).collect(Collectors.toList());
+    }
 }

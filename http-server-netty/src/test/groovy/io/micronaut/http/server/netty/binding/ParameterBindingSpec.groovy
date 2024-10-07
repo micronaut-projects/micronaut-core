@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.*
@@ -38,7 +39,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
         HttpRequest req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
-        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
         HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -94,7 +95,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test list to single error"() {
         given:
         HttpRequest req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
-        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
         HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -107,6 +108,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         response.body().contains('Unexpected token (VALUE_STRING), expected END_ARRAY')
     }
 
+    @Requires(property = 'spec.name', value = 'ParameterBindingSpec')
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
         @Get

@@ -2,6 +2,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.reflect.ClassUtils
@@ -10,6 +11,7 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
+import test.another.BeanWithPackagePrivate
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -668,6 +670,40 @@ interface AInterface<K, V> {
             arguments[1].type == Long
     }
 
+    void "test package-private methods with different package are marked as overridden"() {
+        when:
+            def ctx = ApplicationContext.builder().build().start()
+            BeanDefinition definition = buildBeanDefinition('test.another.Test', '''
+package test.another;
+
+import test.Middle;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test extends Middle {
+    public boolean root;
+    void injectPackagePrivateMethod() {
+        root = true;
+    }
+}
+
+''')
+
+            def bean1 = ctx.getBean(BeanWithPackagePrivate)
+            def bean2 = ctx.getBean(definition)
+        then: """By Java rules the base method is not overridden and should have been injected too, but it's not possible to invoked using the reflection,
+so we mark it as overridden
+"""
+            !bean1.@root
+            bean1.@middle
+            !bean1.@base
+            !bean2.@root
+            bean2.@middle
+            !bean2.@base
+        cleanup:
+            ctx.close()
+    }
+
     void "test repeatable inner type annotation 1"() {
         when:
             def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
@@ -721,5 +757,81 @@ interface AInterface<K, V> {
 
         cleanup:
             ctx.close()
+    }
+
+    void "test interface bean"() {
+        given:
+            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test;
+
+import io.micronaut.http.annotation.Controller;
+
+@Controller
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
+    void "test interface bean 2"() {
+        given:
+            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+package test;
+
+import jakarta.inject.Singleton;
+
+@Singleton
+interface MyEntityControllerInterface {
+}
+''')
+
+        expect:
+            definition == null
+    }
+
+    void "test mapped interface bean"() {
+        given:
+            def definition = buildSimpleInterceptedBeanDefinition('test.ProductMappers', '''
+package test;
+
+import io.micronaut.context.annotation.Mapper.Mapping;
+import jakarta.inject.Singleton;
+import io.micronaut.core.annotation.Introspected;
+
+@Singleton
+interface ProductMappers {
+    @Mapping(
+        to = "price",
+        from = "#{product.price * 2}",
+        format = "$#.00"
+    )
+    @Mapping(
+        to = "distributor",
+        from = "#{this.getDistributor()}"
+    )
+    ProductDTO toProductDTO(Product product);
+
+    default String getDistributor() {
+        return "Great Product Company";
+    }
+}
+
+@Introspected
+record Product(
+    String name,
+    double price,
+    String manufacturer) {
+}
+
+@Introspected
+record ProductDTO(String name, String price, String distributor) {
+}
+''')
+
+        expect:
+            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
+            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
 }

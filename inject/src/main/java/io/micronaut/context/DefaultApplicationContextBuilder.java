@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
+
 /**
  * Implementation of {@link ApplicationContextBuilder}.
  *
@@ -47,6 +49,7 @@ import java.util.Set;
  */
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private final List<Object> singletons = new ArrayList<>();
+    private final List<RuntimeBeanDefinition<?>> beanDefinitions = new ArrayList<>();
     private final List<String> environments = new ArrayList<>();
     private final List<String> defaultEnvironments = new ArrayList<>();
     private final List<String> packages = new ArrayList<>();
@@ -54,13 +57,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private final List<PropertySource> propertySources = new ArrayList<>();
     private final Collection<String> configurationIncludes = new HashSet<>();
     private final Collection<String> configurationExcludes = new HashSet<>();
+    private final ApplicationContextConfigurer contextConfigurer;
     private Boolean deduceEnvironments = null;
     private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
     private final List<String> envVarExcludes = new ArrayList<>();
-    private String[] args = new String[0];
+    private String[] args = EMPTY_STRING_ARRAY;
     private final Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;
@@ -73,11 +77,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
-        loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
+        ApplicationContextConfigurer applicationContextConfigurer = loadApplicationContextCustomizer(resolveClassLoader());
+        applicationContextConfigurer.configure(this);
+        this.contextConfigurer = applicationContextConfigurer;
     }
 
     DefaultApplicationContextBuilder(ClassLoader classLoader) {
-        loadApplicationContextCustomizer(classLoader).configure(this);
+        ApplicationContextConfigurer applicationContextConfigurer = loadApplicationContextCustomizer(classLoader);
+        applicationContextConfigurer.configure(this);
+        this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
     }
 
@@ -87,6 +95,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             return contextClassLoader;
         }
         return DefaultApplicationContextBuilder.class.getClassLoader();
+    }
+
+    @Override
+    public Optional<ApplicationContextConfigurer> getContextConfigurer() {
+        return Optional.ofNullable(this.contextConfigurer);
     }
 
     @Override
@@ -147,6 +160,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public @NonNull ApplicationContextBuilder singletons(Object... beans) {
         if (beans != null) {
             singletons.addAll(Arrays.asList(beans));
+        }
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        if (definitions != null) {
+            beanDefinitions.addAll(Arrays.asList(definitions));
         }
         return this;
     }
@@ -344,6 +365,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             }
         }
 
+        if (!beanDefinitions.isEmpty()) {
+            for (RuntimeBeanDefinition<?> beanDefinition : beanDefinitions) {
+                applicationContext.registerBeanDefinition(beanDefinition);
+            }
+        }
+
         if (!configurationIncludes.isEmpty()) {
             environment.addConfigurationIncludes(configurationIncludes.toArray(StringUtils.EMPTY_STRING_ARRAY));
         }
@@ -422,7 +449,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (configurers.size() == 1) {
             return configurers.get(0);
         }
-        OrderUtil.sort(configurers);
+        OrderUtil.sortOrdered(configurers);
         return new ApplicationContextConfigurer() {
 
             @Override
@@ -432,6 +459,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
                 }
             }
 
+            @Override
+            public void configure(ApplicationContext applicationContext) {
+                for (ApplicationContextConfigurer customizer : configurers) {
+                    customizer.configure(applicationContext);
+                }
+            }
         };
     }
 }

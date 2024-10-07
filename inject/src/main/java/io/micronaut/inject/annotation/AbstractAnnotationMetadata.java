@@ -29,6 +29,8 @@ import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
+
 /**
  * Abstract implementation of the {@link AnnotationMetadata} interface.
  *
@@ -38,41 +40,52 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
-    protected final Map<String, Annotation> annotationMap;
-    protected final Map<String, Annotation> declaredAnnotationMap;
-    private Annotation[] allAnnotationArray;
-    private Annotation[] declaredAnnotationArray;
-
-    /**
-     * Constructs an instance for the given arguments.
-     *
-     * @param declaredAnnotations The declared annotations
-     * @param allAnnotations All annotations
-     */
-    protected AbstractAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-                                         @Nullable Map<String, Map<CharSequence, Object>> allAnnotations) {
-        this.declaredAnnotationMap = declaredAnnotations != null ? new ConcurrentHashMap<>(declaredAnnotations.size()) : null;
-        this.annotationMap = allAnnotations != null ? new ConcurrentHashMap<>(allAnnotations.size()) : null;
-    }
+    private volatile Map<String, Annotation> annotationMap;
+    private volatile Map<String, Annotation> declaredAnnotationMap;
+    private volatile Annotation[] allAnnotationArray;
+    private volatile Annotation[] declaredAnnotationArray;
 
     /**
      * Constructs a default metadata.
      */
     protected AbstractAnnotationMetadata() {
-        annotationMap = new ConcurrentHashMap<>(2);
-        declaredAnnotationMap = new ConcurrentHashMap<>(2);
+    }
+
+    private Map<String, Annotation> getAnnotationMap() {
+        Map<String, Annotation> map = annotationMap;
+        if (map == null) {
+            synchronized (this) { // double check
+                map = annotationMap;
+                if (map == null) {
+                    annotationMap = new ConcurrentHashMap<>();
+                    return annotationMap;
+                }
+            }
+        }
+        return annotationMap;
+    }
+
+    private Map<String, Annotation> getDeclaredAnnotationMap() {
+        Map<String, Annotation> map = declaredAnnotationMap;
+        if (map == null) {
+            synchronized (this) { // double check
+                map = declaredAnnotationMap;
+                if (map == null) {
+                    declaredAnnotationMap = new ConcurrentHashMap<>();
+                    return declaredAnnotationMap;
+                }
+            }
+        }
+        return declaredAnnotationMap;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
-        if (annotationMap == null) {
-            return null;
-        }
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName();
-            return (T) annotationMap.computeIfAbsent(annotationName, s -> {
+            return (T) getAnnotationMap().computeIfAbsent(annotationName, s -> {
                 final AnnotationValue<T> annotationValue = findAnnotation(annotationClass).orElse(null);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
@@ -87,12 +100,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
-        if (annotationMap == null) {
-            return null;
-        }
         if (hasAnnotation(sourceAnnotation) || hasStereotype(sourceAnnotation)) {
             String annotationName = annotationClass.getName();
-            return (T) annotationMap.computeIfAbsent(annotationName, s -> {
+            return (T) getAnnotationMap().computeIfAbsent(annotationName, s -> {
                 final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findAnnotation(sourceAnnotation).orElse(null);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
@@ -107,12 +117,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
-        if (declaredAnnotationMap == null) {
-            return null;
-        }
         String annotationName = annotationClass.getName();
         if (hasDeclaredAnnotation(sourceAnnotation) || hasDeclaredStereotype(sourceAnnotation)) {
-            return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
+            return (T) getDeclaredAnnotationMap().computeIfAbsent(annotationName, s -> {
                 final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findDeclaredAnnotation(sourceAnnotation).orElse(null);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
@@ -125,12 +132,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     @Override
     public @Nullable <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
-        if (declaredAnnotationMap == null) {
-            return null;
-        }
         String annotationName = annotationClass.getName();
         if (hasDeclaredAnnotation(annotationName) || hasDeclaredStereotype(annotationName)) {
-            return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
+            return (T) getDeclaredAnnotationMap().computeIfAbsent(annotationName, s -> {
                 final AnnotationValue<T> annotationValue = findDeclaredAnnotation(annotationClass).orElse(null);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
@@ -141,9 +145,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @Override
     public @NonNull Annotation[] synthesizeAll() {
-        if (annotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        }
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
@@ -159,9 +160,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @Override
     public @NonNull Annotation[] synthesizeDeclared() {
-        if (declaredAnnotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        }
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
@@ -175,23 +173,21 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         return annotations;
     }
 
-
     private Annotation[] initializeAnnotations(Set<String> names) {
-        if (CollectionUtils.isNotEmpty(names)) {
-            List<Annotation> annotations = new ArrayList<>();
-            for (String name : names) {
-                @SuppressWarnings("unchecked")
-                Class<? extends Annotation> aClass = (Class<? extends Annotation>) ClassUtils.forName(name, getClass().getClassLoader()).orElse(null);
-                if (aClass != null) {
-                    Annotation ann = synthesize(aClass);
-                    if (ann != null) {
-                        annotations.add(ann);
-                    }
+        if (CollectionUtils.isEmpty(names)) {
+            return AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        List<Annotation> annotations = new ArrayList<>(names.size());
+        for (String name : names) {
+            @SuppressWarnings("unchecked")
+            Class<? extends Annotation> aClass = (Class<? extends Annotation>) ClassUtils.forName(name, getClass().getClassLoader()).orElse(null);
+            if (aClass != null) {
+                Annotation ann = synthesize(aClass);
+                if (ann != null) {
+                    annotations.add(ann);
                 }
             }
-            return annotations.toArray(new Annotation[0]);
         }
-
-        return AnnotationUtil.ZERO_ANNOTATIONS;
+        return annotations.toArray(ZERO_ANNOTATIONS);
     }
 }

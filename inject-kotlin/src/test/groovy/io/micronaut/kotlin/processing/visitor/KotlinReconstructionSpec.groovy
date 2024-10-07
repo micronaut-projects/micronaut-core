@@ -62,7 +62,7 @@ class Lst<in E> {
 }
 """, {
                 element ->
-                    def method = element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get()
+                    def method = element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.filter(el -> el.name == 'method')).get()
                     return reconstructTypeSignature(method.declaredTypeVariables[0], true)
             })
         expect:

@@ -18,7 +18,6 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -41,10 +40,10 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     /**
      * Default constructor.
      *
-     * @param methodElement             The parent method element
-     * @param visitorContext            The visitor context
-     * @param nativeElement             The nativeElement
-     * @param parameter                 The parameter
+     * @param methodElement The parent method element
+     * @param visitorContext The visitor context
+     * @param nativeElement The nativeElement
+     * @param parameter The parameter
      * @param elementAnnotationMetadata The annotation metadata
      */
     GroovyParameterElement(GroovyMethodElement methodElement,
@@ -58,7 +57,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    protected AbstractGroovyElement copyConstructor() {
+    protected @NonNull AbstractGroovyElement copyConstructor() {
         return new GroovyParameterElement(methodElement, visitorContext, getNativeType(), parameter, elementAnnotationMetadataFactory);
     }
 
@@ -82,7 +81,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
         return getType().getArrayDimensions();
     }
 
-    @Nullable
+    @NonNull
     @Override
     public ClassElement getGenericType() {
         if (genericType == null) {
@@ -92,7 +91,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return parameter.getName();
     }
 

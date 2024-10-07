@@ -1,9 +1,49 @@
 package io.micronaut.context
 
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.BeanContextException
+import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
 
 class ApplicationContextBuilderSpec extends Specification {
+
+    void "test configure() context"() {
+        when:"a context is built"
+        ApplicationContextBuilder builder = ApplicationContext.builder()
+        def context = builder.build()
+
+        then:"it is configurable"
+        context instanceof ConfigurableApplicationContext
+
+        when:"the configure() method is called"
+        context.configure()
+
+        then:"Then bean definitions are available"
+        !context.beanDefinitionReferences.isEmpty()
+        !context.isRunning()
+        context.getBeanDefinition(ApplicationConfiguration)
+
+        when:
+        context.getBean(ApplicationConfiguration)
+
+        then:
+        thrown(BeanContextException)
+
+        when:"The context is started"
+        context.start()
+
+        then:"The context is running and beans are available"
+        context.isRunning()
+        context.getBean(ApplicationConfiguration)
+
+        when:
+        context.close()
+
+        then:
+        !context.isRunning()
+        context.beanDefinitionReferences.isEmpty()
+    }
 
     void "test disable default property sources"() {
         given:
