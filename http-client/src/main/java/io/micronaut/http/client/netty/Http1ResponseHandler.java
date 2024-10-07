@@ -270,7 +270,17 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         public void start() {
-            assert streamingContext.executor().inEventLoop();
+            if (streamingContext.executor().inEventLoop()) {
+                start0();
+            } else {
+                streamingContext.executor().execute(this::start0);
+            }
+        }
+
+        private void start0() {
+            if (state != this) {
+                return;
+            }
 
             demand++;
             if (demand == 1) {
@@ -280,7 +290,17 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
-            assert streamingContext.executor().inEventLoop();
+            if (streamingContext.executor().inEventLoop()) {
+                onBytesConsumed0(bytesConsumed);
+            } else {
+                streamingContext.executor().execute(() -> onBytesConsumed0(bytesConsumed));
+            }
+        }
+
+        private void onBytesConsumed0(long bytesConsumed) {
+            if (state != this) {
+                return;
+            }
 
             long oldDemand = demand;
             long newDemand = oldDemand + bytesConsumed;
@@ -296,8 +316,14 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         public void allowDiscard() {
-            assert streamingContext.executor().inEventLoop();
+            if (streamingContext.executor().inEventLoop()) {
+                allowDiscard0();
+            } else {
+                streamingContext.executor().execute(this::allowDiscard0);
+            }
+        }
 
+        private void allowDiscard0() {
             if (state == this) {
                 transitionToState(streamingContext, this, new DiscardingContent(listener, streaming));
                 disregardBackpressure();
@@ -307,8 +333,14 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         public void disregardBackpressure() {
-            assert streamingContext.executor().inEventLoop();
+            if (streamingContext.executor().inEventLoop()) {
+                disregardBackpressure0();
+            } else {
+                streamingContext.executor().execute(this::disregardBackpressure0);
+            }
+        }
 
+        private void disregardBackpressure0() {
             long oldDemand = demand;
             demand = Long.MAX_VALUE;
             if (oldDemand <= 0 && state == this) {
