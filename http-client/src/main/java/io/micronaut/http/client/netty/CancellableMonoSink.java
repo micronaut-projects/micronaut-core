@@ -44,6 +44,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     private T value;
     private Throwable failure;
     private boolean complete = false;
+    private boolean cancelled = false;
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
 
@@ -72,7 +73,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     private void tryForward() {
-        if (subscriberWaiting && complete) {
+        if (subscriberWaiting && complete && !cancelled) {
             if (failure == null) {
                 if (value != EMPTY) {
                     subscriber.onNext(value);
@@ -181,6 +182,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
         lock.lock();
         try {
             complete = true;
+            cancelled = true;
         } finally {
             lock.unlock();
         }
