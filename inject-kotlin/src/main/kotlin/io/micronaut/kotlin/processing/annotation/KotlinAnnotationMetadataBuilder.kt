@@ -56,7 +56,7 @@ import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(
     private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
-    private val resolver: Resolver,
+    var resolver: Resolver,
     private val visitorContext: KotlinVisitorContext
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 

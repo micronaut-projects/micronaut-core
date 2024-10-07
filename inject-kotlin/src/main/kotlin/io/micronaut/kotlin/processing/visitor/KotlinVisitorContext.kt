@@ -50,7 +50,7 @@ import kotlin.collections.ArrayList
 @OptIn(KspExperimental::class)
 internal class KotlinVisitorContext(
     private val environment: SymbolProcessorEnvironment,
-    var resolver: Resolver
+    private var resolver: Resolver
 ) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
@@ -71,6 +71,12 @@ internal class KotlinVisitorContext(
         } catch (e: Exception) {
             // Ignore
         }
+    }
+
+    fun setResolver(resolver: Resolver) {
+        this.resolver = resolver
+        annotationMetadataBuilder.resolver = resolver
+        nativeElementsHelper.resolver = resolver
     }
 
     override fun getLanguage() = VisitorContext.Language.KOTLIN
