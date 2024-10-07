@@ -85,6 +85,21 @@ class RawTest {
         }
     }
 
+    @Test
+    public void httpClientFactory() throws Exception {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+             RawHttpClient client = RawHttpClient.create(null);
+             ByteBodyHttpResponse<?> response = Mono.from(client.exchange(HttpRequest.GET(server.getURL().get() + "/raw/get-long"), null, null))
+                 .cast(ByteBodyHttpResponse.class)
+                 .block()) {
+
+            Assertions.assertArrayEquals(
+                LONG_PAYLOAD,
+                response.byteBody().buffer().get().toByteArray()
+            );
+        }
+    }
+
     @Controller("/raw")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class RawController {
