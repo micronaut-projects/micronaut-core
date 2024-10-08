@@ -8,7 +8,7 @@ The api:inject.beans.visitor.IntrospectedTypeElementVisitor[] visits declaration
 
 image::arch/introspections.png[]
 
-This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter`, an internal class that uses the ASM bytecode generation library to generate an additional classes.
+This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter`, an internal class that uses the ASM bytecode generation library to generate an additional class.
 
 For example, given a class called `example.Person`  Micronaut generates the following class :
 
