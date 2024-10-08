@@ -73,6 +73,7 @@ import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -115,10 +116,13 @@ import reactor.core.scheduler.Schedulers;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -128,6 +132,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -668,6 +673,91 @@ public class ConnectionManager {
         });
     }
 
+    private void insertPcapLoggingHandlerLazy(Channel ch, String qualifier) {
+        if (configuration.getPcapLoggingPathPattern() == null) {
+            return;
+        }
+
+        if (ch.isActive()) {
+            ChannelHandler actual = createPcapLoggingHandler(ch, qualifier);
+            ch.pipeline().addLast("pcap-" + qualifier, actual);
+        } else {
+            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelActive(ChannelHandlerContext ctx) throws Exception {
+                    ChannelHandler actual = createPcapLoggingHandler(ch, qualifier);
+                    ctx.pipeline().addBefore(ctx.name(), "pcap-" + qualifier, actual);
+                    ctx.pipeline().remove(ctx.name());
+
+                    super.channelActive(ctx);
+                }
+            });
+        }
+    }
+
+    @Nullable
+    private ChannelHandler createPcapLoggingHandler(Channel ch, String qualifier) {
+        String pattern = configuration.getPcapLoggingPathPattern();
+        if (pattern == null) {
+            return null;
+        }
+
+        String path = pattern;
+        path = path.replace("{qualifier}", qualifier);
+        if (ch.localAddress() != null) {
+            path = path.replace("{localAddress}", resolveIfNecessary(ch.localAddress()));
+        }
+        if (ch.remoteAddress() != null) {
+            path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
+        }
+        if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
+            path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
+            path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
+        }
+        path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
+        path = path.replace("{timestamp}", Instant.now().toString());
+
+        path = path.replace(':', '_'); // for windows
+
+        log.warn("Logging *full* request data, as configured. This will contain sensitive information! Path: '{}'", path);
+
+        try {
+            PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
+
+            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
+                builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
+            }
+
+            return builder.build(new FileOutputStream(path));
+        } catch (FileNotFoundException e) {
+            log.warn("Failed to create target pcap at '{}', not logging.", path, e);
+            return null;
+        }
+    }
+
+    /**
+     * Force resolution of the given address, and then transform it to string. This prevents any potential user data
+     * appearing in the file path
+     */
+    private String resolveIfNecessary(SocketAddress address) {
+        if (address instanceof InetSocketAddress socketAddress) {
+            if (socketAddress.isUnresolved()) {
+                // try resolution
+                socketAddress = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
+                if (socketAddress.isUnresolved()) {
+                    // resolution failed, bail
+                    return "unresolved";
+                }
+            }
+            return socketAddress.getAddress().getHostAddress() + ':' + socketAddress.getPort();
+        }
+        String s = address.toString();
+        if (s.contains("/")) {
+            return "weird";
+        }
+        return s;
+    }
+
     /**
      * Initializer for HTTP2 multiplexing, called either in h2c mode, or after ALPN in TLS. The
      * channel should already contain a {@link #makeFrameCodec() frame codec} that does the HTTP2
@@ -776,10 +866,15 @@ public class ConnectionManager {
         protected void initChannel(@NonNull Channel ch) {
             NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
+            insertPcapLoggingHandlerLazy(ch, "outer");
+
             configureProxy(ch.pipeline(), true, host, port);
 
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+
+            insertPcapLoggingHandlerLazy(ch, "tls-unwrapped");
+
             ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)))
                 .addLast(
                     ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
                     // if the server doesn't do ALPN, fall back to HTTP 1
@@ -839,6 +934,8 @@ public class ConnectionManager {
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
             NettyClientCustomizer connectionCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            insertPcapLoggingHandlerLazy(ch, "outer");
 
             Http2FrameCodec frameCodec = makeFrameCodec();
 
@@ -915,6 +1012,8 @@ public class ConnectionManager {
 
         private void initChannel(Channel ch) {
             NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            insertPcapLoggingHandlerLazy(ch, "outer");
 
             ch.pipeline()
                 .addLast(Http3.newQuicClientCodecBuilder()
@@ -1130,6 +1229,7 @@ public class ConnectionManager {
                     case HTTP_1 -> new CustomizerAwareInitializer() {
                         @Override
                         protected void initChannel(@NonNull Channel ch) throws Exception {
+                            insertPcapLoggingHandlerLazy(ch, "outer");
                             configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
                             initHttp1(ch);
                             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ChannelInboundHandlerAdapter() {
