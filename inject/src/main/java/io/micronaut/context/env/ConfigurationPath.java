@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -119,6 +120,16 @@ public sealed interface ConfigurationPath
      * @return The current index or -1 if there is none
      */
     int index();
+
+    /**
+     * @return the current property catalog
+     *
+     * @since 4.7.0
+     */
+    @NonNull
+    default PropertyCatalog propertyCatalog() {
+        return PropertyCatalog.NORMALIZED;
+    }
 
     /**
      * @return The qualifier.
