@@ -89,7 +89,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      * @param httpHostResolver  HTTP Host resolver
-     * @deprecated replaced with a different constructor
+     * @deprecated use {@link CorsFilter(HttpServerConfiguration, HttpHostResolver, Router)} instead.
      */
     @Deprecated(since = "4.7", forRemoval = true)
     public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,
