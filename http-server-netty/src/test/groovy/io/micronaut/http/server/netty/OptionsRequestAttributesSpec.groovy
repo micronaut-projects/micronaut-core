@@ -37,6 +37,11 @@ class OptionsRequestAttributesSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
 
+        MyFilter myFilter = ctx.getBean(MyFilter)
+        !myFilter.containsRouteInfo
+        !myFilter.containsRouteMatch
+        !myFilter.containsUriTemplate
+
         cleanup:
         ctx.close()
         server.close()
@@ -73,7 +78,7 @@ class OptionsRequestAttributesSpec extends Specification {
     @Requires(property = 'spec.name', value = 'OptionsRequestAttributesSpec')
     static class SimpleController {
         @Get('/foo')
-        public String foo() {
+        String foo() {
             return "bar"
         }
     }
@@ -82,12 +87,15 @@ class OptionsRequestAttributesSpec extends Specification {
     @Singleton
     @Filter("/**")
     static class MyFilter implements HttpServerFilter {
+        boolean containsRouteMatch = false
+        boolean containsRouteInfo = false
+        boolean containsUriTemplate = false
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString()))
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString()))
-            Assert.that(request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString()))
+            containsRouteMatch = request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString())
+            containsRouteInfo = request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString())
+            containsUriTemplate = request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString())
             return chain.proceed(request)
         }
     }

@@ -242,8 +242,8 @@ class CorsFilterSpec extends Specification {
         HttpResponse<?> response = execute(request)
 
         then:
-        HttpStatus.OK == response.status()
-        response.headers.names().size() == 7
+        response.status() == HttpStatus.OK
+        7 == response.headers.names().size()
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
@@ -318,7 +318,7 @@ class CorsFilterSpec extends Specification {
         HttpResponse<?> response = execute(request)
 
         then:
-        HttpStatus.OK == response.status()
+        HttpStatus.FORBIDDEN == response.status()
     }
 
     @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")

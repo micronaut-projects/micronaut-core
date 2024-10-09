@@ -482,36 +482,43 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     @NonNull
     private MutableHttpResponse<?> handlePreflightRequest(@NonNull HttpRequest<?> request,
                                                           @NonNull CorsOriginConfiguration corsOriginConfiguration) {
-        HttpStatus status = validatePreflightRequest(request, corsOriginConfiguration);
-        if (status.getCode() >= 400) {
-            return HttpResponse.status(status);
+        boolean isValid = validatePreflightRequest(request, corsOriginConfiguration);
+        if (!isValid) {
+            return HttpResponse.status(HttpStatus.FORBIDDEN);
         }
-        MutableHttpResponse<?> resp = HttpResponse.status(status);
+        MutableHttpResponse<?> resp = HttpResponse.status(HttpStatus.OK);
         decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
         decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
         return resp;
     }
 
-    @NonNull
-    private HttpStatus validatePreflightRequest(@NonNull HttpRequest<?> request,
+    @Nullable
+    private boolean validatePreflightRequest(@NonNull HttpRequest<?> request,
                                                 @NonNull CorsOriginConfiguration config) {
         Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
         if (methodToMatchOptional.isEmpty()) {
-            return HttpStatus.FORBIDDEN;
+            return false;
         }
         HttpMethod methodToMatch = methodToMatchOptional.get();
 
-        if (hasAllowedHeaders(request, config)) {
-            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(request);
-            if (anyUriRoutes.isEmpty()) {
-                return HttpStatus.OK;
-            }
-            for (UriRouteMatch<Object, Object> routeMatch : anyUriRoutes) {
-                if (routeMatch.getHttpMethod().equals(methodToMatch)) {
-                    return HttpStatus.OK;
-                }
+        if (!CorsUtil.isPreflightRequest(request)) {
+            return false;
+        }
+        List<HttpMethod> availableHttpMethods = router.findAny(request).stream().map(UriRouteMatch::getHttpMethod).toList();
+        if (availableHttpMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
+            return false;
+        }
+
+        if (!hasAllowedHeaders(request, config)) {
+            return false;
+        }
+
+        if (request.getHeaders().contains(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK)) {
+            boolean accessControlRequestPrivateNetwork = request.getHeaders().get(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, Boolean.class, Boolean.FALSE);
+            if (accessControlRequestPrivateNetwork && !config.isAllowPrivateNetwork()) {
+                return false;
             }
         }
-        return HttpStatus.FORBIDDEN;
+        return true;
     }
 }
