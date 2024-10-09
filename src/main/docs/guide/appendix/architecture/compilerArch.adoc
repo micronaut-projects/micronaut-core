@@ -12,7 +12,7 @@ The AST of user source is visited using implementations of api:inject.visitor.Ty
 
 Each api:inject.visitor.TypeElementVisitor[] implementation can override one or more of the `visit*` methods which receive an instance of api:inject.ast.Element[].
 
-The api:inject.ast.package-info[Element API] provides a language-neutral abstraction over the AST and computation of the api:core.annotation.AnnotationMetadata[] for a given element (class, method, field etc).
+The link:../api/io/micronaut/inject/ast/package-summary.html[Element API] provides a language-neutral abstraction over the AST and computation of the api:core.annotation.AnnotationMetadata[] for a given element (class, method, field etc).
 
 
 
