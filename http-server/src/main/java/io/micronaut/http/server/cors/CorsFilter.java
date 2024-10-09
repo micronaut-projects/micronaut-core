@@ -129,12 +129,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     @Nullable
     @Internal
     public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
-        String origin = request.getOrigin().orElse(null);
-        if (origin == null) {
-            LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
-            return null; // proceed
-        }
-        if (CorsUtil.isPreflightRequest(request)) {
+        if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
             CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request).orElse(null);
             if (corsOriginConfiguration != null) {
                 return handlePreflightRequest(request, corsOriginConfiguration);
