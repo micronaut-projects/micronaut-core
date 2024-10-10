@@ -16,133 +16,120 @@
 package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Property
-import io.micronaut.core.annotation.Nullable
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.server.util.HttpHostResolver
+import io.micronaut.http.server.cors.CorsUtil
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
-import static io.micronaut.http.HttpHeaders.VARY
+import static io.micronaut.http.HttpHeaders.*
 
-@Property(name = "micronaut.server.cors.enabled", value = "true")
-@Property(name = "micronaut.server.dispatch-options-requests", value = "true")
+@Property(name = "spec.name", value = SPEC_NAME)
+@Property(name = "micronaut.server.cors.enabled", value = StringUtils.TRUE)
 @MicronautTest
 class CorsFilterSpec extends Specification {
+    private final static String SPEC_NAME = "CorsFilterSpec"
 
     @Inject
     @Client("/")
     HttpClient httpClient
 
-    void "non CORS request is passed through"() {
-        given:
-        def request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
-
-        when:
-        HttpResponse<?> response = execute(request)
-
-        then:
-        HttpStatus.OK == response.status()
-        response.headers.names().stream().filter { it.startsWith("Access-Control-Allow-") }.toList().isEmpty()
-    }
-
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    void "request with origin and no matching configuration"() {
-        given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example").header(HttpHeaders.ORIGIN, 'http://www.bar.com')
-
-        when:
-        HttpResponse<?> response = execute(request)
-
-        then: "the request is passed through because no configuration matches the origin"
-        HttpStatus.OK == response.status()
-        response.headers.names().stream().filter { it.startsWith("Access-Control-Allow-") }.toList().isEmpty()
-    }
-
     @Unroll
-    void "regex matching configuration"(String regex, String origin) {
+    void "it is possible to use a regular expression to match cors origins"(String regex, String origin) {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                "micronaut.server.cors.enabled": "true",
-                "micronaut.server.dispatch-options-requests": "true",
-                "micronaut.server.cors.configurations.foo.allowedOrigins": origin,
-                "micronaut.server.cors.configurations.foo.allowedOriginsRegex": "regex"
+                "spec.name": SPEC_NAME,
+                "micronaut.server.cors.enabled": StringUtils.TRUE,
+                "micronaut.server.cors.configurations.foo.allowed-origins-regex": regex
         ])
-        def client = embeddedServer.applicationContext.getBean(HttpClient)
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, embeddedServer.URL.toString() + "/example").header(HttpHeaders.ORIGIN, origin)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        BlockingHttpClient client = httpClient.toBlocking()
+        HttpRequest request = HttpRequest.OPTIONS("/example")
+                .header(HttpHeaders.ORIGIN, origin)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+
+        and:
+        CorsUtil.isPreflightRequest(request)
 
         when:
-        HttpResponse<?> response = client.toBlocking().exchange(request)
+        HttpResponse<?> response = client.exchange(request)
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 7
-        response.headers.contains(HttpHeaders.ALLOW)
-        response.headers.contains(HttpHeaders.DATE)
-        response.headers.contains(HttpHeaders.CONTENT_TYPE)
+        response.headers.names().size() == 6
+
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+        response.headers.contains(HttpHeaders.VARY)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }
-        response.headers.find { it.key == 'Vary' }
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }.value == [origin]
-        response.headers.find { it.key == 'Vary' }.value == ['Origin']
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }.value == [StringUtils.TRUE]
+        [origin] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+        ['Origin'] == response.headers.getAll(VARY)
+        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
 
         cleanup:
+        httpClient.close()
         embeddedServer.close()
 
         where:
-        regex                               | origin
-        '.*'                                | 'http://www.bar.com'
+        regex                                                | origin
+        '.*'                                                     | 'http://www.bar.com'
         '^http://www\\.(foo|bar)\\.com$'    | 'http://www.bar.com'
         '^http://www\\.(foo|bar)\\.com$'    | 'http://www.foo.com'
-        '.*(bar|foo)$'                      | 'asdfasdf foo'
-        '.*(bar|foo)$'                      | 'asdfasdf bar'
-        '.*(bar|foo)$'                      | 'http://asdfasdf.foo'
-        '.*(bar|foo)$'                      | 'http://asdfasdf.bar'
+        '.*(bar|foo)$'                                    | 'asdfasdf foo'
+        '.*(bar|foo)$'                                    | 'asdfasdf bar'
+        '.*(bar|foo)$'                                    | 'http://asdfasdf.foo'
+        '.*(bar|foo)$'                                    | 'http://asdfasdf.bar'
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
     void "test handleRequest with disallowed method"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+        HttpRequest<?> request = HttpRequest.OPTIONS("/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+        and:
+        CorsUtil.isPreflightRequest(request)
 
         when:
         HttpResponse<?> response = execute(request)
 
         then:
-        HttpStatus.FORBIDDEN == response.status()
-        response.headers.size() == 1
-        response.headers.contains(HttpHeaders.CONTENT_LENGTH)
+        noExceptionThrown()
+        response.status() == HttpStatus.OK
+        containsAccessControlHeaders(response)
+
+        when:
+        request = HttpRequest.OPTIONS("/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'PUT')
+        response = execute(request)
+
+        then:
+        noExceptionThrown()
+        response.status() == HttpStatus.FORBIDDEN
+        !containsAccessControlHeaders(response)
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
-    void "with disallowed header (not preflight) the request is passed through because allowed headers are only checked for preflight requests"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
+    void "GET request with origin is passed through because origin matches"() {
         given:
         HttpRequest request = HttpRequest.create(HttpMethod.GET, "/example").header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+
+        and:
+        !CorsUtil.isPreflightRequest(request)
 
         when:
         HttpResponse<?> response = execute(request)
@@ -153,37 +140,47 @@ class CorsFilterSpec extends Specification {
         response.headers.contains(HttpHeaders.DATE)
         response.headers.contains(HttpHeaders.CONTENT_TYPE)
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }
-        response.headers.find { it.key == 'Vary' }
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }.value == ['http://www.foo.com']
-        response.headers.find { it.key == 'Vary' }.value == ['Origin']
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }.value == [StringUtils.TRUE]
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+        response.headers.contains(HttpHeaders.VARY)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        ['http://www.foo.com'] == response.headers.getAll(ACCESS_CONTROL_ALLOW_ORIGIN)
+        ['Origin'] == response.headers.getAll(HttpHeaders.VARY)
+        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedHeaders", value = "foo")
-    void "test preflight handleRequest with disallowed header"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-headers", value = "foo")
+    void "preflight rejected because the access control request headers does not match the allowed headers in configuration"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header('foo', 'bar')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'bar')
 
         when:
         HttpResponse<?> response = execute(request)
 
         then: "the request is rejected because bar is not allowed"
         HttpStatus.FORBIDDEN == response.status()
+
+        when:
+        request = HttpRequest.OPTIONS("/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'foo')
+        response = execute(request)
+
+        then: "the preflight request is accepted because foo header is allowed"
+        HttpStatus.OK == response.status()
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedHeaders", value = "foo,bar")
-    void "test preflight with allowed header"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-headers", value = "foo,bar")
+    void "A preflight request with Access-Control-Request-Headers matching allowed headers in configuration is let through"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'foo')
@@ -195,48 +192,46 @@ class CorsFilterSpec extends Specification {
         HttpStatus.OK == response.status()
         response.headers.names().size() == 7
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }
-        response.headers.find { it.key == 'Vary' }
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }
-        response.headers.find { it.key == 'Access-Control-Allow-Methods' }
-        response.headers.find { it.key == 'Access-Control-Allow-Headers' }
-        response.headers.find { it.key == 'Access-Control-Max-Age' }
-        response.headers.find { it.key == 'Access-Control-Allow-Origin' }.value == ['http://www.foo.com']
-        response.headers.find { it.key == 'Vary' }.value == ['Origin']
-        response.headers.find { it.key == 'Access-Control-Allow-Credentials' }.value == [StringUtils.TRUE]
-        response.headers.find { it.key == 'Access-Control-Allow-Methods' }.value == ['GET']
-        response.headers.find { it.key == 'Access-Control-Allow-Headers' }.value == ['foo']
-        response.headers.find { it.key == 'Access-Control-Max-Age' }.value == ['1800']
+
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+        response.headers.contains(HttpHeaders.VARY)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS)
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
+
+        ['http://www.foo.com'] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+        ['Origin'] == response.headers.getAll(HttpHeaders.VARY)
+        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        ['GET']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
+        ['foo']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS)
+        ['1800']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    void "test handleResponse when configuration not present"() {
+
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
+    void "a GET request with origin header  is let through even if origins don't match"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
-                .header(HttpHeaders.ORIGIN, 'http://www.bar.com')
+        HttpRequest request = HttpRequest.create(HttpMethod.GET, "/example").header(HttpHeaders.ORIGIN, 'http://www.bar.com')
 
         when:
         HttpResponse<?> response = execute(request)
 
         then:
-        HttpStatus.OK == response.status()
+        HttpStatus.FORBIDDEN == response.status()
 
         and:
-        !response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN)
-        !response.getHeaders().get(VARY)
-        !response.getHeaders().getAll(ACCESS_CONTROL_EXPOSE_HEADERS)
-        !response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
-        !response.getHeaders().get(ACCESS_CONTROL_MAX_AGE)
+        !containsAccessControlHeaders(response)
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
-    void "verify behaviour for normal request"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposed-headers", value = "Foo-Header,Bar-Header")
+    void "server includes exposed headers in a response to a preflight request if they are set in configuration"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header('foo', 'bar')
 
         when:
         HttpResponse<?> response = execute(request)
@@ -252,16 +247,15 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800'
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
-    void "test handleResponse for preflight request"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposed-headers", value = "Foo-Header,Bar-Header")
+    void "preflight request with Access-Control-Request-Headers but no allowed headers in configuration goes through. Exposed headers in configuration are echoed in response. Access-Control-Request-Headers  are echoed in response"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'X-Header')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'Y-Header')
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header('foo', 'bar')
 
         when:
         HttpResponse<?> response = execute(request)
@@ -279,16 +273,15 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
 
-    @Property(name = "micronaut.server.cors.singleHeader", value = "true")
-    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
-    void "test handleResponse for preflight request with single header"() {
+    @Property(name = "micronaut.server.cors.single-header", value = StringUtils.TRUE)
+    @Property(name = "micronaut.server.cors.configurations.foo.exposed-headers", value = "Foo-Header,Bar-Header")
+    void "if single-headers is set in configuration the response headers' values are comma separated"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'X-Header')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'Y-Header')
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header('foo', 'bar')
 
         when:
         HttpResponse<?> response = execute(request)
@@ -306,11 +299,11 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedMethods", value = "GET")
-    void "test preflight handleRequest on route that doesn't exists"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-methods", value = "GET")
+    void "A preflight request is rejected for a non-existing route"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/doesnt-exists-route")
+        HttpRequest request = HttpRequest.OPTIONS("/doesnt-exists-route")
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
 
@@ -321,11 +314,11 @@ class CorsFilterSpec extends Specification {
         HttpStatus.FORBIDDEN == response.status()
     }
 
-    @Property(name = "micronaut.server.cors.configurations.foo.allowedOrigins", value = "http://www.foo.com")
-    @Property(name = "micronaut.server.cors.configurations.foo.exposedHeaders", value = "Foo-Header,Bar-Header")
-    void "test preflight handleRequest on route that does exist but doesn't handle requested HTTP Method"() {
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.exposed-headers", value = "Foo-Header,Bar-Header")
+    void "A preflight request is rejected for a route that does exist but doesn't handle the requested HTTP Method"() {
         given:
-        HttpRequest request = HttpRequest.create(HttpMethod.OPTIONS, "/example")
+        HttpRequest request = HttpRequest.OPTIONS("/example")
                 .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'POST')
 
@@ -336,6 +329,7 @@ class CorsFilterSpec extends Specification {
         HttpStatus.FORBIDDEN == response.status()
     }
 
+    @Requires(property = "spec.name", value = "CorsFilterSpec")
     @Controller
     static class TestController{
 
@@ -351,15 +345,7 @@ class CorsFilterSpec extends Specification {
         }
     }
 
-    @Singleton
-    @Primary
-    HttpHostResolver testHttpHostResolver() {
-        return new HttpHostResolver() {
-            @Override
-            String resolve(@Nullable HttpRequest request) {
-                return "http://micronautexample.com";
-            }
-        }
+    private static boolean containsAccessControlHeaders(HttpResponse<?> response) {
+        response.headers.names().stream().anyMatch { it.startsWith("Access-Control-Allow-") }
     }
-
 }
