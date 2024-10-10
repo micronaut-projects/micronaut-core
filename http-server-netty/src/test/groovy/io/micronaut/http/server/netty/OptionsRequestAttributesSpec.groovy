@@ -37,6 +37,7 @@ class OptionsRequestAttributesSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
 
+        and:
         MyFilter myFilter = ctx.getBean(MyFilter)
         !myFilter.containsRouteInfo
         !myFilter.containsRouteMatch
