@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.stream
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -19,7 +20,7 @@ import spock.lang.Specification
 
 class FluxBodySpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FluxBodySpec'])
     @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
 
     void "test empty and non-empty flux"() {
@@ -40,6 +41,7 @@ class FluxBodySpec extends Specification {
         e.response.status() == HttpStatus.BAD_REQUEST
     }
 
+    @Requires(property = 'spec.name', value = 'FluxBodySpec')
     @Controller("/body/flux/test")
     static class ReactiveController {
 

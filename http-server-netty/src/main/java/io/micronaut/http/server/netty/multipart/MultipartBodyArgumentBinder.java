@@ -27,7 +27,7 @@ import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;

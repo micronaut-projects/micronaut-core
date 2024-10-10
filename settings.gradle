@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '7.2.0'
+    id 'io.micronaut.build.shared.settings' version '7.2.1'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -82,7 +82,10 @@ include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
 include "test-suite-netty-ssl-graalvm"
+include "test-suite-kotlin-graalvm"
 include "test-utils"
+include "test-suite-annotation-remapper"
+include "test-suite-annotation-remapper-visitor"
 
 // benchmarks
 include "benchmarks"

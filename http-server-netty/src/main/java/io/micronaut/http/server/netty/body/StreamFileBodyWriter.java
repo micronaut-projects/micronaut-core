@@ -18,23 +18,20 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyBodyWriter;
-import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.scheduling.TaskExecutors;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpHeaders;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -52,7 +49,7 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 @Experimental
 @Internal
-public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<StreamedFile> {
+public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<StreamedFile> {
     private final ExecutorService ioExecutor;
 
     StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
@@ -61,29 +58,13 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object, NettyWriteContext nettyContext) throws CodecException {
-        if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
-            if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
-                nettyContext.writeFull(notModified(outgoingResponse));
-            } else {
-                HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();
-                long length = object.getLength();
-                if (length > -1) {
-                    nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, length);
-                } else {
-                    nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                }
-                final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
-                    nettyResponse.getNettyHttpVersion(),
-                    nettyResponse.getNettyHttpStatus(),
-                    nettyHeaders
-                );
-                InputStream inputStream = object.getInputStream();
-                nettyContext.write(finalResponse, InputStreamByteBody.create(inputStream, OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
-            }
-
+    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object) throws CodecException {
+        if (handleIfModifiedAndHeaders(request, outgoingResponse, object, outgoingResponse)) {
+            return notModified(outgoingResponse);
         } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
+            long length = object.getLength();
+            InputStream inputStream = object.getInputStream();
+            return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
         }
     }
 

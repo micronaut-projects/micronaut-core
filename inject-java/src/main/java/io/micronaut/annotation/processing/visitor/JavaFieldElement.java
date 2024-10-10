@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -130,8 +131,8 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         if (resolvedDeclaringClass == null) {
             Element enclosingElement = variableElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement te) {
-                String typeName = te.getQualifiedName().toString();
-                if (owningType.getName().equals(typeName)) {
+                String typeName = JavaModelUtils.getClassName(te);
+                if (owningType.getName().equals(JavaModelUtils.getClassName(te))) {
                     resolvedDeclaringClass = owningType;
                 } else {
                     TypeMirror returnType = te.asType();

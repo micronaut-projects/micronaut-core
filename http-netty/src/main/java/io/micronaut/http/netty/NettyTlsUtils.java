@@ -42,6 +42,8 @@ public final class NettyTlsUtils {
     /**
      * The SSL provider to use.
      *
+     * @param sslConfiguration The ssl configuration
+     *
      * @return The provider
      */
     public static SslProvider sslProvider(SslConfiguration sslConfiguration) {

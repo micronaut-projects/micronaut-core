@@ -63,6 +63,7 @@ public final class AnnotationReflectionUtils {
      *
      * @param runtimeGenericType The implementation class of the interface
      * @param rawSuperType       The implementedType type - interface or an abstract class
+     * @param <T> T
      * @return The argument of the interface with types and annotations
      * @since 4.6
      */

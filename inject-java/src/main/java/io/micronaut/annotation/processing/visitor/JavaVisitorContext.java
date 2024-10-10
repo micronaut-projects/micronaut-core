@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
@@ -66,6 +67,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,6 +102,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final JavaNativeElementsHelper nativeElementsHelper;
     private final Filer filer;
+    private final Set<String> postponedTypes;
 
     /**
      * The default constructor.
@@ -128,7 +131,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         Filer filer,
         MutableConvertibleValues<Object> visitorAttributes,
         TypeElementVisitor.VisitorKind visitorKind) {
-        this(processingEnv, messager, elements, types, modelUtils, filer, visitorAttributes, visitorKind);
+        this(processingEnv, messager, elements, types, modelUtils, filer, visitorAttributes, visitorKind, new HashSet<>());
     }
 
     /**
@@ -142,7 +145,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      * @param filer The filer
      * @param visitorAttributes The attributes
      * @param visitorKind The visitor kind
+     * @deprecated No longer needed
      */
+    @Deprecated(forRemoval = true, since = "4.7.0")
     public JavaVisitorContext(
         ProcessingEnvironment processingEnv,
         Messager messager,
@@ -152,6 +157,32 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         Filer filer,
         MutableConvertibleValues<Object> visitorAttributes,
         TypeElementVisitor.VisitorKind visitorKind) {
+        this(processingEnv, messager, elements, types, modelUtils, filer, visitorAttributes, visitorKind, Set.of());
+    }
+
+    /**
+     * The default constructor.
+     *
+     * @param processingEnv The processing environment
+     * @param messager The messager
+     * @param elements The elements
+     * @param types Type types
+     * @param modelUtils The model utils
+     * @param filer The filer
+     * @param visitorAttributes The attributes
+     * @param visitorKind The visitor kind
+     * @param postponedTypes The postponed types
+     */
+    public JavaVisitorContext(
+        ProcessingEnvironment processingEnv,
+        Messager messager,
+        Elements elements,
+        Types types,
+        ModelUtils modelUtils,
+        Filer filer,
+        MutableConvertibleValues<Object> visitorAttributes,
+        TypeElementVisitor.VisitorKind visitorKind,
+        Set<String> postponedTypes) {
         this.messager = messager;
         this.elements = elements;
         this.types = types;
@@ -166,6 +197,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
         this.filer = filer;
+        this.postponedTypes = postponedTypes;
     }
 
     @Override
@@ -321,13 +353,29 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
+    private void checkForPostponedOriginalElement(io.micronaut.inject.ast.Element originatingElement) {
+        if (originatingElement != null && postponedTypes.contains(originatingElement.getName())) {
+            throw new ElementPostponedToNextRoundException(originatingElement);
+        }
+    }
+
+    private void checkForPostponedOriginalElements(io.micronaut.inject.ast.Element[] originatingElements) {
+        if (originatingElements != null) {
+            for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+                checkForPostponedOriginalElement(originatingElement);
+            }
+        }
+    }
+
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
+        checkForPostponedOriginalElement(originatingElement);
         return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 
     @Override
     public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitClass(classname, originatingElements);
     }
 
@@ -338,11 +386,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        checkForPostponedOriginalElement(originatingElement);
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
     }
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitMetaInfFile(path, originatingElements);
     }
 
@@ -353,11 +403,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitGeneratedFile(path, originatingElements);
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
+        checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
     }
 

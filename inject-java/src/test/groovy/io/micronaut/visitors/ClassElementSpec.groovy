@@ -15,7 +15,6 @@
  */
 package io.micronaut.visitors
 
-
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.context.annotation.Replaces
@@ -39,13 +38,12 @@ import io.micronaut.inject.ast.WildcardElement
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Null
+import java.sql.SQLException
+import java.util.function.Supplier
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Unroll
 import spock.util.environment.Jvm
-
-import java.sql.SQLException
-import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
 
@@ -1179,6 +1177,105 @@ class MyBean {}
         superType.getTypeArguments().get('Q').getName() == 'test.Time'
         superType.getTypeArguments().get('U').getName() == 'test.TimeUnit'
 
+    }
+
+    void "test field type with generic in inner class"() {
+        given:
+        buildClassElement("""
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import java.util.List;
+import java.util.Locale;
+
+@Controller("/test")
+class TestController {
+    @Get
+    public HttpResponse<ResponseObject<List<Dto>>> endpoint() {
+        return null;
+    }
+
+    public static class ResponseObject<T> {
+
+        public T body;
+    }
+
+    public static class Dto {
+
+        public Locale locale;
+    }
+}
+""") { ClassElement ce ->
+
+            def responseType = ce.methods[0].returnType
+
+            responseType.type.name == 'io.micronaut.http.HttpResponse'
+            assert responseType.typeArguments
+            assert responseType.typeArguments.size() == 1
+
+            def typeArg = responseType.firstTypeArgument.orElse(null)
+            assert typeArg
+            assert typeArg.fields
+            assert typeArg.fields.size() == 1
+
+            def bodyField = typeArg.fields[0]
+            assert bodyField.name == "body"
+            assert bodyField.genericType.name == "java.util.List"
+            assert bodyField.genericType.getFirstTypeArgument().get().name == 'test.TestController$Dto'
+        }
+    }
+
+    void "test field type with generic in inner super class"() {
+        given:
+        buildClassElement("""
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import java.util.List;
+import java.util.Locale;
+
+@Controller("/test")
+class TestController {
+    @Get
+    public HttpResponse<ResponseObject<List<Dto>>> endpoint() {
+        return null;
+    }
+
+    public static class BaseResponseObject<T> {
+
+        public T body;
+    }
+
+    public static class ResponseObject<T> extends BaseResponseObject<T> {
+    }
+
+    public static class Dto {
+
+        public Locale locale;
+    }
+}
+""") { ClassElement ce ->
+
+            def responseType = ce.methods[0].returnType
+
+            responseType.type.name == 'io.micronaut.http.HttpResponse'
+            assert responseType.typeArguments
+            assert responseType.typeArguments.size() == 1
+
+            def typeArg = responseType.firstTypeArgument.orElse(null)
+            assert typeArg
+            assert typeArg.fields
+            assert typeArg.fields.size() == 1
+
+            def bodyField = typeArg.fields[0]
+            assert bodyField.name == "body"
+            assert bodyField.genericType.name == "java.util.List"
+            assert bodyField.genericType.getFirstTypeArgument().get().name == 'test.TestController$Dto'
+        }
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-openapi/issues/593')

@@ -40,9 +40,13 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Utility methods for I/O operations.
@@ -98,7 +102,6 @@ public class IOUtils {
         try {
             Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
             if (myPath != null) {
-                Path finalMyPath = myPath;
                 // use this method instead of Files#walk to eliminate the Stream overhead
                 Files.walkFileTree(myPath, Collections.emptySet(), 1, new FileVisitor<>() {
                     @Override
@@ -108,7 +111,7 @@ public class IOUtils {
 
                     @Override
                     public FileVisitResult visitFile(Path currentPath, BasicFileAttributes attrs) throws IOException {
-                        if (currentPath.equals(finalMyPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+                        if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
                             return FileVisitResult.CONTINUE;
                         }
                         consumer.accept(currentPath);
@@ -136,6 +139,23 @@ public class IOUtils {
                 }
             }
         }
+    }
+
+    /**
+     * Resolve the path in the URI.
+     *
+     * @param uri     The URI
+     * @param path    The path
+     * @param toClose to close hooks
+     * @return The path resolved
+     * @throws IOException
+     * @since 4.7
+     */
+    @Nullable
+    public static Path resolvePath(@NonNull URI uri,
+                                   @NonNull String path,
+                                   @NonNull List<Closeable> toClose) throws IOException {
+        return resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
     }
 
     @Nullable
@@ -234,5 +254,97 @@ public class IOUtils {
             }
         }
         return answer.toString();
+    }
+
+    /**
+     * Find all the resources starting with the path.
+     *
+     * @param classLoader The classloader
+     * @param path        The path
+     * @return the resources as URIs
+     * @throws IOException The IO exception
+     * @since 4.7
+     */
+    public static List<URI> getResources(ClassLoader classLoader, final String path) throws IOException {
+        final Enumeration<URL> micronautResources = classLoader.getResources(path);
+        Set<URI> uniqueURIs = new LinkedHashSet<>();
+        while (micronautResources.hasMoreElements()) {
+            URL url = micronautResources.nextElement();
+            try {
+                uniqueURIs.add(url.toURI());
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        FileSystem jrtProvider = null;
+        if (uniqueURIs.isEmpty()) {
+            jrtProvider = getJrtProvider(classLoader);
+            if (jrtProvider != null) {
+                Path modulesPath = jrtProvider.getPath("modules");
+                try (Stream<Path> stream = Files.list(modulesPath)) {
+                    stream
+                        .filter(p -> !p.getFileName().toString().startsWith("jdk.")) // filter out JDK internal modules
+                        .filter(p -> !p.getFileName().toString().startsWith("java.")) // filter out JDK public modules
+                        .map(p -> p.resolve(path))
+                        .filter(Files::exists)
+                        .map(modulesPath::resolve)
+                        .map(Path::toUri)
+                        .forEach(uniqueURIs::add);
+                }
+
+                // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
+            }
+        }
+        List<URI> uris = new ArrayList<>(uniqueURIs.size());
+        for (URI uri : uniqueURIs) {
+            String scheme = uri.getScheme();
+            if ("file".equals(scheme)) {
+                uri = normalizeFilePath(path, uri);
+            }
+            // on GraalVM there are spurious extra resources that end with # and then a number
+            // we ignore this extra ones
+            if (!("resource".equals(scheme) && uri.toString().contains("#"))) {
+                uris.add(uri);
+            }
+        }
+        if (jrtProvider != null && jrtProvider.isOpen()) {
+            try {
+                jrtProvider.close();
+            } catch (Throwable ignore) {
+                // Ignore
+            }
+        }
+        return uris;
+    }
+
+    @Nullable
+    private static FileSystem getJrtProvider(ClassLoader classLoader) {
+        try {
+            URI uri = URI.create("jrt:/");
+            FileSystem fs = FileSystems.getFileSystem(uri);
+            if (fs.isOpen()) {
+                return fs;
+            }
+            fs = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+            if (fs.isOpen()) {
+                return fs;
+            }
+        } catch (Throwable e) {
+            // not available, probably running in Native Image.
+        }
+        return null;
+    }
+
+    private static URI normalizeFilePath(String path, URI uri) {
+        Path p = Paths.get(uri);
+        if (p.endsWith(path)) {
+            Path subpath = Paths.get(path);
+            for (int i = 0; i < subpath.getNameCount(); i++) {
+                p = p.getParent();
+            }
+            uri = p.toUri();
+        }
+        return uri;
     }
 }

@@ -73,6 +73,12 @@ internal class KotlinVisitorContext(
         }
     }
 
+    fun updateResolver(resolver: Resolver) {
+        this.resolver = resolver
+        annotationMetadataBuilder.resolver = resolver
+        nativeElementsHelper.resolver = resolver
+    }
+
     override fun getLanguage() = VisitorContext.Language.KOTLIN
 
     override fun <T : Any?> get(

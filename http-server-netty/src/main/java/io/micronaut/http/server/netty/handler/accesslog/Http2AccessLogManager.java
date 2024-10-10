@@ -71,6 +71,17 @@ public final class Http2AccessLogManager {
         accessLog.onRequestHeaders(ConnectionMetadata.ofNettyChannel(ctx.channel()), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
     }
 
-    public record Factory(Logger logger, String spec, Predicate<String> uriInclusion) {
+    /**
+     * The factory.
+     *
+     * @param logger the logger
+     * @param spec the pec
+     * @param uriInclusion the uri inclusion
+     */
+    public record Factory(
+        Logger logger,
+        String spec,
+        Predicate<String> uriInclusion
+    ) {
     }
 }

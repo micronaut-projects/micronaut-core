@@ -18,15 +18,20 @@ package io.micronaut.http.client.jdk;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
@@ -52,19 +57,21 @@ public final class HttpRequestFactory {
     public static <I> HttpRequest.Builder builder(
         @NonNull URI uri, io.micronaut.http.HttpRequest<I> request,
         @NonNull HttpClientConfiguration configuration,
-        Argument<?> bodyType,
-        MediaTypeCodecRegistry mediaTypeCodecRegistry
+        @Nullable Argument<?> bodyType,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        @NonNull MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
+        MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         configuration.getReadTimeout().ifPresent(builder::timeout);
-        if (request.getMethod() == HttpMethod.GET) {
+        if (mutableHttpRequest.getMethod() == HttpMethod.GET) {
             builder.GET();
         } else {
-            HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
-            builder.method(request.getMethod().toString(), bodyPublisher);
+            HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+            builder.method(mutableHttpRequest.getMethod().toString(), bodyPublisher);
         }
-        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
-        if (request.getContentType().isEmpty()) {
+        mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
+        if (mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
         configuration.getReadTimeout().ifPresent(builder::timeout);
@@ -72,51 +79,59 @@ public final class HttpRequestFactory {
     }
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(
-        io.micronaut.http.HttpRequest<I> request,
-        Argument<?> bodyType,
-        MediaTypeCodecRegistry mediaTypeCodecRegistry
+        @NonNull MutableHttpRequest<I> request,
+        @Nullable Argument<?> bodyType,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        @NonNull MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
-        if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod())) {
-            Optional<?> body = request.getBody();
-            boolean hasBody = body.isPresent();
-            MediaType requestContentType = request.getContentType().orElseGet(() -> MediaType.APPLICATION_JSON_TYPE);
-            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
-                Object bodyValue = body.get();
+        if (!HttpMethod.permitsRequestBody(request.getMethod())) {
+            return HttpRequest.BodyPublishers.noBody();
+        }
+        Optional<?> body = request.getBody();
+        if (body.isPresent()) {
+            Object bodyValue = body.get();
+            MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
                 if (bodyValue instanceof CharSequence) {
                     return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
-                } else if (bodyValue instanceof Map<?, ?> mapBody) {
-                    return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
-                } else {
-                    throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
                 }
-            } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
-                Object bodyValue = body.get();
-                throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
-            } else {
-                if (hasBody) {
-                    Object bodyValue = body.get();
-                    if (Publishers.isConvertibleToPublisher(bodyValue)) {
-                        throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
-                    } else if (bodyValue instanceof CharSequence) {
-                        return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
-                    } else if (mediaTypeCodecRegistry != null) {
-                        Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        var encoded = registeredCodec.map(codec -> {
-                                if (bodyType != null && bodyType.isInstance(bodyValue)) {
-                                    return codec.encode((Argument<Object>) bodyType, bodyValue);
-                                } else {
-                                    return codec.encode(bodyValue);
-                                }
-                            })
-                            .orElse(null);
-                        if (encoded != null) {
-                            return HttpRequest.BodyPublishers.ofByteArray(encoded);
-                        } else {
-                            return HttpRequest.BodyPublishers.noBody();
-                        }
-                    }
+                if (bodyValue instanceof Map<?, ?> mapBody) {
+                    return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
                 }
             }
+            if (Publishers.isConvertibleToPublisher(bodyValue)) {
+                throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
+            }
+            if (bodyValue instanceof CharSequence) {
+                return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+            }
+            if (mediaTypeCodecRegistry != null) {
+                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
+                var encoded = registeredCodec.map(codec -> {
+                        if (bodyType != null && bodyType.isInstance(bodyValue)) {
+                            return codec.encode((Argument<Object>) bodyType, bodyValue);
+                        }
+                        return codec.encode(bodyValue);
+                    })
+                    .orElse(null);
+                if (encoded != null) {
+                    return HttpRequest.BodyPublishers.ofByteArray(encoded);
+                }
+            }
+            Argument<Object> bodyArgument = bodyType != null && bodyType.isInstance(bodyValue) ? (Argument<Object>) bodyType : Argument.ofInstance(bodyValue);
+            MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.findWriter(bodyArgument, requestContentType).orElse(null);
+            if (messageBodyWriter != null) {
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                messageBodyWriter.writeTo(
+                    bodyArgument,
+                    requestContentType,
+                    bodyValue,
+                    request.getHeaders(),
+                    byteArrayOutputStream
+                );
+                return HttpRequest.BodyPublishers.ofByteArray(byteArrayOutputStream.toByteArray());
+            }
+            throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
         }
         return HttpRequest.BodyPublishers.noBody();
     }

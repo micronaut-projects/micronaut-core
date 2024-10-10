@@ -19,18 +19,16 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.EventLoopFlow;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.BodySizeLimits;
+import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.NettyBodyAdapter;
+import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
-import io.micronaut.http.server.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.server.netty.body.BodySizeLimits;
-import io.micronaut.http.server.netty.body.BufferConsumer;
-import io.micronaut.http.server.netty.body.NettyBodyAdapter;
-import io.micronaut.http.server.netty.body.NettyByteBody;
-import io.micronaut.http.server.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -64,7 +62,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -315,24 +312,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * This is a wrapper around {@link AvailableNettyByteBody#AvailableNettyByteBody(ByteBuf)}
-     * with an extra body length check.
-     */
-    static CloseableByteBody createImmediateByteBody(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
-        // ImmediateNettyByteBody does not support exceptions, so if we hit one of the configured
-        // limits, we return a StreamingNettyByteBody instead.
-        if (buf.readableBytes() > bodySizeLimits.maxBodySize() || buf.readableBytes() > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = bytesConsumed -> {
-            };
-            StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
-            mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
-            return new StreamingNettyByteBody(mockBuffer);
-        } else {
-            return new AvailableNettyByteBody(buf);
-        }
-    }
-
-    /**
      * An inbound handler is responsible for all incoming messages.
      */
     private abstract class InboundHandler {
@@ -403,7 +382,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // getClass for performance
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (full) {
@@ -499,7 +478,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, request, createImmediateByteBody(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
+                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }
@@ -746,11 +725,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.request = request;
         }
 
-        @Override
-        public ByteBufAllocator alloc() {
-            return ctx.alloc();
-        }
-
         /**
          * Set an attachment that is passed to {@link RequestHandler#responseWritten}. Defaults to
          * {@code null}.
@@ -845,7 +819,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public void writeFull(FullHttpResponse response, boolean headResponse) {
+        public void writeHeadResponse(@NonNull HttpResponse response) {
+            writeFull(new DefaultFullHttpResponse(
+                response.protocolVersion(),
+                response.status(),
+                Unpooled.EMPTY_BUFFER,
+                response.headers(),
+                EmptyHttpHeaders.INSTANCE
+            ), true);
+        }
+
+        private void writeFull(FullHttpResponse response, boolean headResponse) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (canHaveBody(response.status())) {
                 if (!headResponse) {
@@ -856,20 +840,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             preprocess(response);
             FullOutboundHandler oh = new FullOutboundHandler(this, response);
-            prepareCompression(response, oh);
+            if (response.content().isReadable()) {
+                prepareCompression(response, oh);
+            }
             write(oh);
-        }
-
-        @Override
-        public void writeStreamed(HttpResponse response, Publisher<HttpContent> content) {
-            write(response, NettyBodyAdapter.adapt(Flux.from(content).map(HttpContent::content), ctx.channel().eventLoop()));
         }
 
         @Override
         public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
             NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
             if (nbb instanceof AvailableNettyByteBody available) {
-                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE));
+                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
                 OptionalLong expectedLength = body.expectedLength();
                 if (expectedLength.isPresent()) {
@@ -1108,8 +1089,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
+                int n = buf.readableBytes();
                 writeCompressing(new DefaultHttpContent(buf), true, false);
-                incompleteWrittenBytes += buf.readableBytes();
+                incompleteWrittenBytes += n;
                 if (ctx.channel().isWritable()) {
                     writeSome();
                 }

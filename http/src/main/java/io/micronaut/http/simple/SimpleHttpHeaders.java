@@ -41,6 +41,13 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     /**
      * Map-based implementation of {@link MutableHttpHeaders}.
+     */
+    public SimpleHttpHeaders() {
+        this(ConversionService.SHARED);
+    }
+
+    /**
+     * Map-based implementation of {@link MutableHttpHeaders}.
      *
      * @param headers           The headers
      * @param conversionService The conversion service

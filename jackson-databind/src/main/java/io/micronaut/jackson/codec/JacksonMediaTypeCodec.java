@@ -41,7 +41,9 @@ import java.io.IOException;
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
+@Deprecated(forRemoval = true, since = "4.7")
 public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
 
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
@@ -51,7 +53,19 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
         super(
-            () -> new JacksonDatabindMapper(objectMapperProvider.get()),
+            new JacksonDatabindMapper(objectMapperProvider.get()),
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType
+        );
+    }
+
+    public JacksonMediaTypeCodec(BeanProvider<JacksonDatabindMapper> objectMapperProvider,
+                                 ApplicationConfiguration applicationConfiguration,
+                                 MediaType mediaType,
+                                 CodecConfiguration codecConfiguration) {
+        super(
+            objectMapperProvider.get(),
             applicationConfiguration,
             codecConfiguration,
             mediaType

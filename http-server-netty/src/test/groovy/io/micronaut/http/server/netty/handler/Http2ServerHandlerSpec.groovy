@@ -5,9 +5,10 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
+import io.micronaut.http.netty.body.AvailableNettyByteBody
+import io.micronaut.http.netty.body.NettyBodyAdapter
+import io.micronaut.http.netty.body.NettyByteBody
 import io.micronaut.http.server.netty.EmbeddedTestUtil
-import io.micronaut.http.server.netty.body.AvailableNettyByteBody
-import io.micronaut.http.server.netty.body.NettyByteBody
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
@@ -15,11 +16,7 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
-import io.netty.handler.codec.http.DefaultHttpContent
-import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpResponse
-import io.netty.handler.codec.http.EmptyHttpHeaders
-import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod
@@ -118,7 +115,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
-                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
             }
 
             @Override
@@ -248,15 +245,15 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "download backpressure"() {
         given:
-        Subscriber<? super HttpContent> subscriber = null
+        Subscriber<? super ByteBuf> subscriber = null
         long demand = 0
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
                     @Override
-                    void subscribe(Subscriber<? super HttpContent> s) {
+                    void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
                         s.onSubscribe(new Subscription() {
                             @Override
@@ -270,7 +267,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                })
+                }, ctx.channel().eventLoop()))
             }
 
             @Override
@@ -297,7 +294,7 @@ class Http2ServerHandlerSpec extends Specification {
         when: "we satisfy the demand for body data"
         def windowSize = duplexHandler.frameCodec.connection().remote().flowController().windowSize(duplexHandler.frameCodec.connection().stream(stream1.id()))
         def data1 = randomData(windowSize)
-        subscriber.onNext(new DefaultHttpContent(data1.retainedSlice()))
+        subscriber.onNext(data1.retainedSlice())
         demand--
         EmbeddedTestUtil.advance(server, client)
         then: "first data is fully written & received, so there is new demand. window is now empty"
@@ -306,7 +303,7 @@ class Http2ServerHandlerSpec extends Specification {
 
         when: "we satisfy the demand for body data"
         def data2 = randomData(100)
-        subscriber.onNext(new DefaultHttpContent(data2.retainedSlice()))
+        subscriber.onNext(data2.retainedSlice())
         demand--
         EmbeddedTestUtil.advance(server, client)
         then: "because window is empty, data2 is not written -> no new demand"
@@ -322,7 +319,7 @@ class Http2ServerHandlerSpec extends Specification {
 
         when: "we satisfy the demand for more data"
         def data3 = randomData(50000)
-        subscriber.onNext(new DefaultHttpContent(data3.retainedSlice()))
+        subscriber.onNext(data3.retainedSlice())
         demand--
         EmbeddedTestUtil.advance(server, client)
         then: "we receive data3 fully, because it is smaller than window size"
@@ -492,14 +489,14 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "download exception"(Exception exception, Http2Error expectedCode) {
         given:
-        Subscriber<? super HttpContent> subscriber = null
+        Subscriber<? super ByteBuf> subscriber = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
                     @Override
-                    void subscribe(Subscriber<? super HttpContent> s) {
+                    void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
                         s.onSubscribe(new Subscription() {
                             @Override
@@ -511,7 +508,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                })
+                }, ctx.channel().eventLoop()))
             }
 
             @Override
@@ -536,7 +533,7 @@ class Http2ServerHandlerSpec extends Specification {
 
         when: "send some data"
         def data1 = randomData(100)
-        subscriber.onNext(new DefaultHttpContent(data1.retainedSlice()))
+        subscriber.onNext(data1.retainedSlice())
         EmbeddedTestUtil.advance(server, client)
         then: "data is received"
         duplexHandler.received.readSlice(duplexHandler.received.readableBytes()) == data1
@@ -601,7 +598,7 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() == null
 
         when:"response can still be sent"
-        oa.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK))
+        oa.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
         EmbeddedTestUtil.advance(server, client)
         then:"we get the response but then a reset"
         Http2HeadersFrame response = client.readInbound()
@@ -621,16 +618,16 @@ class Http2ServerHandlerSpec extends Specification {
 
     def "download cancelled by client"() {
         given:
-        Subscriber<? super HttpContent> subscriber = null
+        Subscriber<? super ByteBuf> subscriber = null
         long demand = 0
         boolean cancelled = false
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.writeStreamed(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new Publisher<HttpContent>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
                     @Override
-                    void subscribe(Subscriber<? super HttpContent> s) {
+                    void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
                         s.onSubscribe(new Subscription() {
                             @Override
@@ -644,7 +641,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                })
+                }, ctx.channel().eventLoop()))
             }
 
             @Override
@@ -664,11 +661,11 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(server, client)
         def windowSize = duplexHandler.frameCodec.connection().remote().flowController().windowSize(duplexHandler.frameCodec.connection().stream(stream1.id()))
         def data1 = randomData(windowSize)
-        subscriber.onNext(new DefaultHttpContent(data1.retainedSlice()))
+        subscriber.onNext(data1.retainedSlice())
         demand--
         EmbeddedTestUtil.advance(server, client)
         def data2 = randomData(100)
-        subscriber.onNext(new DefaultHttpContent(data2.retainedSlice()))
+        subscriber.onNext(data2.retainedSlice())
         demand--
         EmbeddedTestUtil.advance(server, client)
         then: "we get the response headers, and a demand for body data"
@@ -736,7 +733,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
-                outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
             }
 
             @Override
@@ -781,7 +778,7 @@ class Http2ServerHandlerSpec extends Specification {
 
                 InternalByteBody.bufferFlow(body).onComplete((imm, t) -> {
                     def bb = AvailableNettyByteBody.toByteBuf(imm)
-                    outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, bb, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, bb.readableBytes()), EmptyHttpHeaders.INSTANCE))
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new AvailableNettyByteBody(bb))
                 })
             }
 

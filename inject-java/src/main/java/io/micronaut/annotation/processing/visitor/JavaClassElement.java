@@ -52,6 +52,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
@@ -265,9 +266,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            resolvedInterfaces = classElement.getInterfaces().stream().map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            resolvedInterfaces = classElement.getInterfaces().stream().filter(this::onlyAvailable).map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
         }
         return resolvedInterfaces;
+    }
+
+    private boolean onlyAvailable(TypeMirror mirror) {
+        return !(mirror instanceof DeclaredType declaredType) || declaredType.getKind() != TypeKind.ERROR;
     }
 
     @Override

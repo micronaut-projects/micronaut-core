@@ -21,7 +21,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.http.server.netty.body.BodySizeLimits;
+import io.micronaut.http.netty.body.BodySizeLimits;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
@@ -293,7 +293,7 @@ final class HttpPipelineBuilder implements Closeable {
             if (address instanceof InetSocketAddress socketAddress) {
                 if (socketAddress.isUnresolved()) {
                     // try resolution
-                    address = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
+                    socketAddress = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
                     if (socketAddress.isUnresolved()) {
                         // resolution failed, bail
                         return "unresolved";

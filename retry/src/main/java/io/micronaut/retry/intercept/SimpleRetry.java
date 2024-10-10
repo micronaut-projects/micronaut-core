@@ -46,7 +46,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final Class<? extends Throwable> capturedException;
 
     /**
-     * @param maxAttempts The maximum number of attemps
+     * @param maxAttempts The maximum number of attempts
      * @param multiplier The multiplier to use between delays
      * @param delay The overall delay so far
      * @param maxDelay The maximum overall delay
@@ -70,7 +70,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     /**
-     * @param maxAttempts The maximum number of attemps
+     * @param maxAttempts The maximum number of attempts
      * @param multiplier The multiplier to use between delays
      * @param delay The overall delay so far
      * @param maxDelay The maximum overall delay
@@ -81,7 +81,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     /**
-     * @param maxAttempts The maximum number of attemps
+     * @param maxAttempts The maximum number of attempts
      * @param multiplier The multiplier to use between delays
      * @param delay The overall delay so far
      */

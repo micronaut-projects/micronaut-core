@@ -601,13 +601,13 @@ class Test {
                 @Override
                 protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
                     def loadedTransformers = super.getAnnotationTransformers(annotationName)
-                    def localTransfomers = getLocalAnnotationTransformers(annotationName)
-                    if (localTransfomers) {
+                    def localTransformers = getLocalAnnotationTransformers(annotationName)
+                    if (localTransformers) {
                         def newList = []
                         if (loadedTransformers) {
                             newList.addAll(loadedTransformers)
                         }
-                        newList.addAll(localTransfomers)
+                        newList.addAll(localTransformers)
                         return newList
                     } else {
                         return loadedTransformers

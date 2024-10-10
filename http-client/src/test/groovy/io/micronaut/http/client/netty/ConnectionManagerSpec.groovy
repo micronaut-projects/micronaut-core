@@ -94,8 +94,9 @@ class ConnectionManagerSpec extends Specification {
             int i = 0
 
             @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
+            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer) {
                 try {
+                    channelInitializer.bootstrappedCustomizer = clientCustomizer
                     def connection = connections[i++]
                     connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
                         def loop
@@ -445,7 +446,6 @@ class ConnectionManagerSpec extends Specification {
 
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.channel == conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -503,7 +503,6 @@ class ConnectionManagerSpec extends Specification {
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req1Channel.channel !== conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()

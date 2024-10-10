@@ -23,7 +23,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -56,6 +55,18 @@ public interface MessageBodyHandlerRegistry {
      * @return A message body reader if it is existing.
      * @param <T> The generic type
      */
+    @NonNull
+    default <T> MessageBodyReader<T> getReader(@NonNull Argument<T> type, @Nullable List<MediaType> mediaType) {
+        return findReader(type, mediaType).orElseThrow(() -> new CodecException("Cannot read value of argument [" + type + "]. No possible readers found for media type: " + mediaType));
+    }
+
+    /**
+     * Find a reader for the type and annotation metadata at declaration point.
+     * @param type The type
+     * @param mediaType The media type
+     * @return A message body reader if it is existing.
+     * @param <T> The generic type
+     */
     <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
                                                   @Nullable List<MediaType> mediaType);
 
@@ -68,9 +79,8 @@ public interface MessageBodyHandlerRegistry {
      * @since 4.6
      */
     default <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
-                                                          @NonNull MediaType mediaType) {
-        Objects.requireNonNull(mediaType);
-        return findReader(type, List.of(mediaType));
+                                                          @Nullable MediaType mediaType) {
+        return findReader(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**
@@ -103,8 +113,8 @@ public interface MessageBodyHandlerRegistry {
      * @since 4.6
      */
     default <T> Optional<MessageBodyWriter<T>> findWriter(@NonNull Argument<T> type,
-                                                          @NonNull MediaType mediaType) {
-        return findWriter(type, List.of(mediaType));
+                                                          @Nullable MediaType mediaType) {
+        return findWriter(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**
@@ -125,6 +135,7 @@ public interface MessageBodyHandlerRegistry {
      * @return A message body writer if it is existing.
      * @param <T> The generic type
      */
+    @NonNull
     default <T> MessageBodyWriter<T> getWriter(@NonNull Argument<T> type,
                                                @NonNull List<MediaType> mediaType) {
         return findWriter(type, mediaType)
