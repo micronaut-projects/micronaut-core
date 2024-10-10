@@ -57,7 +57,11 @@ public final class CrossOriginUtil {
             .flatMap(CrossOriginUtil::getCorsOriginConfiguration);
     }
 
-    private static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull AnnotationMetadata annotationMetadata) {
+    /**
+     * @param annotationMetadata The route annotation metadata
+     * @return The possible CORS configuration
+     */
+    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull AnnotationMetadata annotationMetadata) {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return Optional.empty();
         }

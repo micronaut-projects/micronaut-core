@@ -37,6 +37,16 @@ class OptionsRequestAttributesSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
 
+        and: 'filter is invoked'
+        MyFilter myFilter = ctx.getBean(MyFilter)
+        myFilter.containsRouteInfo != null && myFilter.containsRouteMatch != null && myFilter.containsUriTemplate != null
+
+        and: 'but no route info/match or uri tempalte information is present'
+        !myFilter.containsRouteInfo
+        !myFilter.containsRouteMatch
+        !myFilter.containsUriTemplate
+
+
         cleanup:
         ctx.close()
         server.close()
@@ -82,12 +92,15 @@ class OptionsRequestAttributesSpec extends Specification {
     @Singleton
     @Filter("/**")
     static class MyFilter implements HttpServerFilter {
+        Boolean containsRouteMatch
+        Boolean containsRouteInfo
+        Boolean containsUriTemplate
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString()))
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString()))
-            Assert.that(request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString()))
+            containsRouteMatch = request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString())
+            containsRouteInfo = request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString())
+            containsUriTemplate = request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString())
             return chain.proceed(request)
         }
     }

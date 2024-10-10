@@ -85,7 +85,6 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
-import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
 /**
@@ -177,16 +176,7 @@ public final class RouteExecutor {
 
     @Nullable
     UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
-        UriRouteMatch<Object, Object> routeMatch = router.findClosest(httpRequest);
-
-        if (routeMatch == null && httpRequest.getMethod().equals(HttpMethod.OPTIONS)) {
-            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest);
-            if (!anyUriRoutes.isEmpty()) {
-                setRouteAttributes(httpRequest, anyUriRoutes.get(0));
-                httpRequest.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).toList());
-            }
-        }
-        return routeMatch;
+        return router.findClosest(httpRequest);
     }
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
