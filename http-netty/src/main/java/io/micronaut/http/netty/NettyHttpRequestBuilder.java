@@ -133,23 +133,22 @@ public interface NettyHttpRequestBuilder {
      */
     static NettyHttpRequestBuilder asBuilder(@NonNull io.micronaut.http.HttpRequest<?> request) {
         boolean supportDirect = true;
-        while (request instanceof HttpRequestWrapper<?> wrapper) {
+
+        while (true) {
+            if (request instanceof NettyHttpRequestBuilder builder) {
+                if (supportDirect) {
+                    return builder;
+                } else {
+                    // don't allow direct access to body
+                    return builder::toHttpRequestWithoutBody;
+                }
+            }
+            if (!(request instanceof HttpRequestWrapper<?> wrapper)) {
+                break;
+            }
+
             supportDirect &= wrapper.getBody() == wrapper.getDelegate().getBody();
             request = wrapper.getDelegate();
-        }
-        if (request instanceof NettyHttpRequestBuilder builder) {
-            if (supportDirect) {
-                return builder;
-            } else {
-                // delegate to builder, excluding toHttpRequestDirect
-                //noinspection Convert2Lambda
-                return new NettyHttpRequestBuilder() {
-                    @Override
-                    public HttpRequest toHttpRequestWithoutBody() {
-                        return builder.toHttpRequestWithoutBody();
-                    }
-                };
-            }
         }
 
         // manual conversion
@@ -162,5 +161,4 @@ public interface NettyHttpRequestBuilder {
             .forEach((s, strings) -> nettyRequest.headers().add(s, strings));
         return () -> nettyRequest;
     }
-
 }

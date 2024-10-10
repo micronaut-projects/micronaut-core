@@ -23,6 +23,8 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientFactory;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientFactory;
+import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawHttpClientFactory;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.StreamingHttpClientFactory;
 import io.micronaut.http.client.sse.SseClient;
@@ -46,7 +48,8 @@ public class NettyHttpClientFactory implements
         SseClientFactory,
         ProxyHttpClientFactory,
         StreamingHttpClientFactory,
-        WebSocketClientFactory {
+        WebSocketClientFactory,
+        RawHttpClientFactory {
 
     @NonNull
     @Override
@@ -106,6 +109,16 @@ public class NettyHttpClientFactory implements
     @Override
     public WebSocketClient createWebSocketClient(URI uri, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(uri, configuration);
+    }
+
+    @Override
+    public @NonNull RawHttpClient createRawClient(@Nullable URI url) {
+        return createNettyClient(url);
+    }
+
+    @Override
+    public @NonNull RawHttpClient createRawClient(@Nullable URI url, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(url, configuration);
     }
 
     private DefaultHttpClient createNettyClient(URL url) {

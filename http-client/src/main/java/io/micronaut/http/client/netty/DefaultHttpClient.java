@@ -63,6 +63,7 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
@@ -201,7 +202,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -216,6 +216,7 @@ public class DefaultHttpClient implements
         StreamingHttpClient,
         SseClient,
         ProxyHttpClient,
+        RawHttpClient,
         Closeable,
         AutoCloseable {
 
@@ -1469,6 +1470,27 @@ public class DefaultHttpClient implements
         }
     }
 
+    @Override
+    public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
+        if (requestBody == null) {
+            requestBody = AvailableNettyByteBody.empty();
+        }
+        Mono<HttpResponse<?>> mono = null;
+        try {
+            mono = sendRequestWithRedirects(
+                ServerRequestContext.currentRequest().orElse(null),
+                blockedThread == null ? null : new BlockHint(blockedThread, null),
+                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
+                (req, resp) -> Mono.just(resp)
+            );
+        } finally {
+            if (mono == null) {
+                requestBody.close();
+            }
+        }
+        return mono.doOnTerminate(requestBody::close);
+    }
+
     /**
      * This is the high-level request method. It sits above {@link #sendRawRequest} and handles
      * things like filters, error handling, response parsing, request writing.
@@ -1572,7 +1594,7 @@ public class DefaultHttpClient implements
                 }
 
                 // send the raw request
-                return sendRawRequest(poolHandle, request, byteBody, c -> handleResponseError(request, c));
+                return sendRawRequest(poolHandle, request, byteBody);
             })
             .flatMap(byteBodyResponse -> {
                 // handle redirects or map the response bytes
@@ -1611,15 +1633,12 @@ public class DefaultHttpClient implements
      * @param poolHandle         The pool handle to send the request on
      * @param request            The request to send
      * @param byteBody           The request body
-     * @param mapConnectionError Operator used to map connection errors (e.g. when the connection
-     *                           is closed by the remote). Other errors are not mapped
      * @return A mono containing the response
      */
     private Mono<NettyClientByteBodyResponse> sendRawRequest(
         ConnectionManager.PoolHandle poolHandle,
         io.micronaut.http.HttpRequest<?> request,
-        NettyByteBody byteBody,
-        UnaryOperator<Throwable> mapConnectionError
+        NettyByteBody byteBody
     ) {
         URI uri = request.getUri();
         String uriWithoutHost = uri.getRawPath();
@@ -1666,7 +1685,7 @@ public class DefaultHttpClient implements
                 @Override
                 public void fail(ChannelHandlerContext ctx, Throwable cause) {
                     poolHandle.taint();
-                    sink.error(mapConnectionError.apply(cause));
+                    sink.error(handleResponseError(request, cause));
                 }
 
                 @Override
