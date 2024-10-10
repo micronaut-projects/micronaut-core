@@ -8,12 +8,11 @@ The api:inject.beans.visitor.IntrospectedTypeElementVisitor[] visits declaration
 
 image::arch/introspections.png[]
 
-This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter`, an internal class that uses the ASM bytecode generation library to generate two additional classes.
+This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter`, an internal class that uses the ASM bytecode generation library to generate an additional class.
 
-For example, given a class called `example.Person` the classes generated are:
+For example, given a class called `example.Person`  Micronaut generates the following class :
 
-* `example.$Person$IntrospectionRef` - an implementation of api:core.beans.BeanIntrospectionReference[] that allows the application to soft load the introspection without loading all metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
-* `example.$Person$Introspection` - an implementation of api:core.beans.BeanIntrospection[] which contains the actual runtime introspection information.
+* `example.$Person$Introspection` - an implementation of api:core.beans.BeanIntrospection[] which contains the actual runtime introspection information. Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
 
 The following example demonstrates usage of the api:core.beans.BeanIntrospection[] API:
 
