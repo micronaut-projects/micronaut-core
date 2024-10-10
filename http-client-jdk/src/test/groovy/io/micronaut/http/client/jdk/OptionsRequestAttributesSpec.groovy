@@ -37,11 +37,15 @@ class OptionsRequestAttributesSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.METHOD_NOT_ALLOWED
 
-        and:
+        and: 'filter is invoked'
         MyFilter myFilter = ctx.getBean(MyFilter)
+        myFilter.containsRouteInfo != null && myFilter.containsRouteMatch != null && myFilter.containsUriTemplate != null
+
+        and: 'but no route info/match or uri tempalte information is present'
         !myFilter.containsRouteInfo
         !myFilter.containsRouteMatch
         !myFilter.containsUriTemplate
+
 
         cleanup:
         ctx.close()
@@ -88,9 +92,9 @@ class OptionsRequestAttributesSpec extends Specification {
     @Singleton
     @Filter("/**")
     static class MyFilter implements HttpServerFilter {
-        boolean containsRouteMatch = false
-        boolean containsRouteInfo = false
-        boolean containsUriTemplate = false
+        Boolean containsRouteMatch
+        Boolean containsRouteInfo
+        Boolean containsUriTemplate
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
