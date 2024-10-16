@@ -60,15 +60,30 @@ public abstract class SslBuilder<T> {
     /**
      * @param ssl The ssl configuration
      *
-     * @return The {@link TrustManagerFactory}, or {@code null} for the default JDK trust store
+     * @return The {@link TrustManagerFactory}
      */
     @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
+        Optional<KeyStore> store = null;
         try {
-            Optional<KeyStore> store = getTrustStore(ssl);
+            store = getTrustStore(ssl);
+        } catch (Exception e) {
+            throw new SslConfigurationException(e);
+        }
+        return getTrustManagerFactory(store.orElse(null));
+    }
+
+    /**
+     * @param store The key store
+     *
+     * @return The {@link TrustManagerFactory}
+     */
+    @Nullable
+    protected TrustManagerFactory getTrustManagerFactory(KeyStore store) {
+        try {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
                 .getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init(store.orElse(null));
+            trustManagerFactory.init(store);
             return trustManagerFactory;
         } catch (Exception ex) {
             throw new SslConfigurationException(ex);
