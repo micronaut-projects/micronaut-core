@@ -25,9 +25,23 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * The propagation across different threads using the context which is immutable and can be extended/reduced by different elements.
- * Each element can be a simple data structure carrying its state across the threads, or it can implement {@link ThreadPropagatedContextElement}
- * for use-cases when thread-local values needs to be updated.
+ * A mechanism for propagating state across threads that's easier to use and safer than
+ * {@link ThreadLocal}.
+ *
+ * <p>
+ * A propagated context is an immutable list of objects. {@link #plus(PropagatedContextElement)
+ * Adding} or {@link #minus(PropagatedContextElement) deleting} elements from a context creates a
+ * new context that must then be explicitly brought into scope by {@link #propagate() propagating
+ * it}.
+ *
+ * <p>
+ * If an element wraps an existing thread local variable then it can implement {@link
+ * ThreadPropagatedContextElement} to take part in the enter-exit process.
+ *
+ * <p>
+ * In standard usage you would call {@link #getOrEmpty()}, then {@link
+ * #plus(PropagatedContextElement)} to add some data, then {@link #propagate(Supplier)} to execute a
+ * lambda with the context in scope.
  *
  * @author Denis Stepanov
  * @since 4.0.0
@@ -76,7 +90,9 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap runnable for this context to be propagated in.
+     * Captures the current context and returns a new {@link Runnable} that, when executed, will run
+     * the given runnable with the captured context in scope. If no context is in scope then the
+     * given callable is returned as-is.
      *
      * @param runnable The runnable
      * @return new runnable or existing if the context is missing
@@ -87,7 +103,9 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap callable for this context to be propagated in.
+     * Captures the current context and returns a new {@link Callable} that, when executed, will run
+     * the given callable with the captured context in scope. If no context is in scope then the
+     * given callable is returned as-is.
      *
      * @param callable The callable
      * @param <V> The callable type
@@ -99,7 +117,9 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap supplier for this context to be propagated in.
+     * Captures the current context and returns a new {@link Supplier} that, when executed, will run
+     * the given supplier with the captured context in scope. If no context is in scope then the
+     * given callable is returned as-is.
      *
      * @param supplier The supplier
      * @param <V> The supplier type
@@ -111,61 +131,60 @@ public interface PropagatedContext {
     }
 
     /**
-     * Check if there is a context associated.
+     * Check if there is a context in scope.
      *
-     * @return true if the context exists
+     * @return true if a context has been {@link #propagate() propagated}.
      */
     static boolean exists() {
         return PropagatedContextImpl.exists();
     }
 
     /**
-     * Creates a new element with added element.
-     * <p>
-     * NOTE: The new element needs to be propagated.
+     * Returns a new context extended with the given element. This doesn't add anything
+     * to the existing in-scope context (if any), so you will need to propagate it
+     * yourself. You can add multiple elements of the same type.
      *
-     * @param element The element element to be added
-     * @return new element
+     * @param element the element to be added
+     * @return the new context
      */
     @NonNull
     PropagatedContext plus(@NonNull PropagatedContextElement element);
 
     /**
-     * Creates a new context without the provided element.
-     * <p>
-     * NOTE: The new context needs to be propagated.
+     * Returns a new context without the provided element. This doesn't remove anything
+     * from the existing in-scope context (if any), so you will need to propagate it
+     * yourself. Elements are compared using {@link Object#equals(Object)}.
      *
      * @param element The context element to be removed
-     * @return new context
+     * @return the new context
      */
     @NonNull
     PropagatedContext minus(@NonNull PropagatedContextElement element);
 
     /**
-     * Creates a new context with replaced the provided element.
-     * <p>
-     * NOTE: The new context needs to be propagated.
+     * Creates a new context with the given element replaced. This doesn't change anything
+     * in the existing in-scope context (if any), so you will need to propagate it
+     * yourself. Elements are compared using {@link Object#equals(Object)}.
      *
-     * @param oldElement The context element to be replaced
-     * @param newElement The context element to be replaced with
-     * @return new context
+     * @param oldElement the element to be replaced
+     * @param newElement the element that will replace it
+     * @return the new context
      */
     @NonNull
     PropagatedContext replace(@NonNull PropagatedContextElement oldElement,
                               @NonNull PropagatedContextElement newElement);
 
     /**
-     * Finds optional element of type.
-     * In a case of multiple element of the same type the last one will be returned.
+     * Finds the first element of the given type, if any exist.
      *
      * @param elementType The element type
      * @param <T> The element's type
-     * @return optional element
+     * @return element if found
      */
     <T extends PropagatedContextElement> Optional<T> find(@NonNull Class<T> elementType);
 
     /**
-     * Find all elements of type. The first element processed by stream will be the last one added.
+     * Find all elements of the given type. The first element in the stream will be the last element added.
      *
      * @param elementType The element type
      * @param <T> The element's type
@@ -174,11 +193,12 @@ public interface PropagatedContext {
     <T extends PropagatedContextElement> Stream<T> findAll(@NonNull Class<T> elementType);
 
     /**
-     * Gets element of type.
+     * Gets the first element of the given type.
      *
      * @param elementType The element type
      * @param <T> The element's type
-     * @return an element or exception
+     * @return an element
+     * @throws java.util.NoSuchElementException if no elements of that type are in the context.
      */
     <T extends PropagatedContextElement> T get(@NonNull Class<T> elementType);
 
@@ -190,7 +210,8 @@ public interface PropagatedContext {
     List<PropagatedContextElement> getAllElements();
 
     /**
-     * Propagate the context using try-resource block.
+     * Brings this context into scope, temporarily replacing the previous context (if any). The returned
+     * object must be closed to undo the propagation.
      *
      * @return auto-closeable block to be used in try-resource block.
      */
@@ -198,9 +219,9 @@ public interface PropagatedContext {
     Scope propagate();
 
     /**
-     * Wrap runnable for this context to be propagated in.
+     * Returns a new runnable that runs the given runnable with this context in scope.
      *
-     * @param runnable The runnable
+     * @param runnable The runnable that will execute with this context in scope.
      * @return new runnable
      */
     @NonNull
@@ -214,7 +235,7 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap callable for this context to be propagated in.
+     * Returns a new callable that runs the given callable with this context in scope.
      *
      * @param callable The callable
      * @param <V>      The callable return type
@@ -231,7 +252,7 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap supplier for this context to be propagated in.
+     * Returns a new supplier that runs the given supplier with this context in scope.
      *
      * @param supplier The supplier
      * @param <V>      The supplier return type
@@ -248,22 +269,22 @@ public interface PropagatedContext {
     }
 
     /**
-     * Propagate the context for the supplier.
+     * Executes the given supplier with this context in scope, restoring the previous context when execution completes.
      *
      * @param supplier The supplier
      * @param <V>      The supplier return type
-     * @return new supplier
+     * @return the result of calling {@link Supplier#get()}.
      */
     @NonNull
     default <V> V propagate(@NonNull Supplier<V> supplier) {
-        PropagatedContext propagatedContext = this;
-        try (Scope ignore = propagatedContext.propagate()) {
+        try (Scope ignore = propagate()) {
             return supplier.get();
         }
     }
 
     /**
-     * Context propagation {@link AutoCloseable} to be used in try-resource block.
+     * Closing this object undoes the effect of calling {@link #propagate()} on a context. Intended to be used in a
+     * try-with-resources block.
      *
      * @author Denis Stepanov
      * @since 4.0.0
@@ -272,5 +293,4 @@ public interface PropagatedContext {
         @Override
         void close();
     }
-
 }
