@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @TypeHint(value = MediaType[].class)
-public class MediaType implements CharSequence {
+public class MediaType implements CharSequence, Comparable<MediaType> {
 
     /**
      * Default file extension used for JSON.
@@ -914,10 +914,20 @@ public class MediaType implements CharSequence {
      * Check if the extension matches.
      * @param matchExtension The extension to match
      * @return true if matches
+     * @since 4.7.0
+     */
+    public boolean matchesAllOrWildcardOrExtension(String matchExtension) {
+        return extension.equalsIgnoreCase(ALL_TYPE.extension) || extension.equals(WILDCARD) || matchesExtension(matchExtension);
+    }
+
+    /**
+     * Check if the extension matches.
+     * @param matchExtension The extension to match
+     * @return true if matches
      * @since 4.6.3
      */
     public boolean matchesExtension(String matchExtension) {
-        return extension.equalsIgnoreCase(ALL_TYPE.extension) || extension.equals(WILDCARD) || extension.equalsIgnoreCase(matchExtension);
+        return extension.equalsIgnoreCase(matchExtension);
     }
 
     /**
@@ -1135,24 +1145,7 @@ public class MediaType implements CharSequence {
                 }
             }
         }
-        mediaTypes.sort((o1, o2) -> {
-            //The */* type is always last
-            boolean fullWildcard1 = o1.type.equals(WILDCARD);
-            boolean fullWildcard2 = o2.type.equals(WILDCARD);
-            if (fullWildcard1 && fullWildcard2) {
-                return 0;
-            } else if (fullWildcard1) {
-                return 1;
-            } else if (fullWildcard2) {
-                return -1;
-            }
-            if (o2.subtype.equals(WILDCARD) && !o1.subtype.equals(WILDCARD)) {
-                return -1;
-            } else if (o1.subtype.equals(WILDCARD) && !o2.subtype.equals(WILDCARD)) {
-                return 1;
-            }
-            return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
-        });
+        mediaTypes.sort(null);
         return Collections.unmodifiableList(mediaTypes);
     }
 
@@ -1275,5 +1268,26 @@ public class MediaType implements CharSequence {
         }
 
         return Collections.emptyMap();
+    }
+
+    @Override
+    public int compareTo(@NonNull MediaType o2) {
+        //The */* type is always last
+        MediaType o1 = this;
+        boolean fullWildcard1 = o1.type.equals(WILDCARD);
+        boolean fullWildcard2 = o2.type.equals(WILDCARD);
+        if (fullWildcard1 && fullWildcard2) {
+            return 0;
+        } else if (fullWildcard1) {
+            return 1;
+        } else if (fullWildcard2) {
+            return -1;
+        }
+        if (o2.subtype.equals(WILDCARD) && !o1.subtype.equals(WILDCARD)) {
+            return -1;
+        } else if (o1.subtype.equals(WILDCARD) && !o2.subtype.equals(WILDCARD)) {
+            return 1;
+        }
+        return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
     }
 }

@@ -71,7 +71,7 @@ Adding a `ChannelHandler` allows performing tasks such as wire-level logging of 
 
 === Netty Server Routing
 
-Micronaut defines a set of api:http.annotation.package-info[HTTP annotations] that allow binding user code to incoming api:http.HttpRequest[] instances and customizing the resulting api:http.HttpResponse[].
+Micronaut defines a set of link:../api/io/micronaut/http/annotation/package-summary.html[HTTP annotations] that allow binding user code to incoming api:http.HttpRequest[] instances and customizing the resulting api:http.HttpResponse[].
 
 One or many configured api:web.router.RouteBuilder[] implementations construct instances of api:web.router.UriRoute[] which is used by the api:web.router.Router[] components to route incoming requests methods of annotated classes such as:
 

@@ -3,6 +3,8 @@ package io.micronaut.inject.configproperties.eachbeanparameter
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.env.PropertySource
+import io.micronaut.context.env.SystemPropertiesPropertySource
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.PrimaryQualifier
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -58,5 +60,48 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
         cleanup:
             ctx.close()
+    }
+
+    void 'test disabled normalization property keys'() {
+        when:
+        Map<String, Object> datasourcesConfiguration = [
+                'app.raw.Raw_1.url': 'url1',
+                'app.raw.Raw_2.url': 'url2',
+                'app.normalized.Normalized_1.url': 'url1',
+                'app.normalized.Normalized_2.url': 'url2',
+                'app.default.Default_1.url': 'url1',
+                'app.default.Default_2.url': 'url2',
+                'app.generated.Generated_1.url': 'url1',
+                'app.generated.Generated_2.url': 'url2',
+        ]
+        ApplicationContext ctx = ApplicationContext.builder()
+                .propertySources(PropertySource.of(PropertySource.CONTEXT, ['spec': 'DisabledNormalizationSpec'] + datasourcesConfiguration, SystemPropertiesPropertySource.POSITION + 100))
+                .start()
+
+        then:
+        ctx
+
+        def eachPropertyPropertiesRawBeans = ctx.getBeansOfType(EachPropertyPropertiesRaw)
+        eachPropertyPropertiesRawBeans.size() == 2
+        ctx.getBean(EachPropertyPropertiesRaw, Qualifiers.byName("Raw_1")).name == "Raw_1"
+        ctx.getBean(EachPropertyPropertiesRaw, Qualifiers.byName("Raw_2")).name == "Raw_2"
+
+        def eachPropertyPropertiesNormalizedBeans = ctx.getBeansOfType(EachPropertyPropertiesNormalized)
+        eachPropertyPropertiesNormalizedBeans.size() == 2
+        ctx.getBean(EachPropertyPropertiesNormalized, Qualifiers.byName("normalized-1")).name == "normalized-1"
+        ctx.getBean(EachPropertyPropertiesNormalized, Qualifiers.byName("normalized-2")).name == "normalized-2"
+
+        def eachPropertyPropertiesDefaultBeans = ctx.getBeansOfType(EachPropertyPropertiesDefault)
+        eachPropertyPropertiesDefaultBeans.size() == 2
+        ctx.getBean(EachPropertyPropertiesDefault, Qualifiers.byName("default-1")).name == "default-1"
+        ctx.getBean(EachPropertyPropertiesDefault, Qualifiers.byName("default-2")).name == "default-2"
+
+        def eachPropertyPropertiesGeneratedBeans = ctx.getBeansOfType(EachPropertyPropertiesGenerated)
+        eachPropertyPropertiesGeneratedBeans.size() == 2
+        ctx.getBean(EachPropertyPropertiesGenerated, Qualifiers.byName("generated-1")).name == "generated-1"
+        ctx.getBean(EachPropertyPropertiesGenerated, Qualifiers.byName("generated-2")).name == "generated-2"
+
+        cleanup:
+        ctx.close()
     }
 }

@@ -257,7 +257,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
                     S val = instantiate(serviceEntry, classLoader);
-                    if (val != null && predicate.test(val)) {
+                    if (val != null && predicate != null && !predicate.test(val)) {
                         collection.add(val);
                     }
                 }

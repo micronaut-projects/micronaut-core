@@ -43,8 +43,8 @@ dependencies {
 
     typeCheckTestImplementation libs.junit.jupiter
     typeCheckTestImplementation libs.micronaut.test.type.pollution
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.14.19")
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.14.19")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.15.3")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.15.4")
     typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
 

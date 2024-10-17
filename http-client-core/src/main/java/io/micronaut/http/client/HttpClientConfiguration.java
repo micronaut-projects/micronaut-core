@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -181,6 +182,8 @@ public abstract class HttpClientConfiguration {
 
     @Nullable
     private String addressResolverGroupName = null;
+
+    private String pcapLoggingPathPattern = null;
 
     /**
      * Default constructor.
@@ -870,6 +873,28 @@ public abstract class HttpClientConfiguration {
     @Nullable
     public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
         return null;
+    }
+
+    /**
+     * The path pattern to use for logging outgoing connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice! Only implemented for netty.
+     *
+     * @return The path pattern, or {@code null} if logging is disabled.
+     */
+    @Internal
+    public String getPcapLoggingPathPattern() {
+        return pcapLoggingPathPattern;
+    }
+
+    /**
+     * The path pattern to use for logging outgoing connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice! Only implemented for netty.
+     *
+     * @param pcapLoggingPathPattern The path pattern, or {@code null} to disable logging.
+     */
+    @Internal
+    public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
+        this.pcapLoggingPathPattern = pcapLoggingPathPattern;
     }
 
     /**

@@ -80,8 +80,8 @@ public final class BodyAssertion<T, E> {
      * @param body The HTTP Response Body
      */
     @SuppressWarnings("java:S5960") // Assertion is the whole point of this method
-    public void evaluate(T body) {
-        assertTrue(this.evaluator.test(expected, body), () -> this.evaluator.message(expected, body));
+    public void evaluate(Object body) {
+        assertTrue(this.evaluator.test(expected, (T) body), () -> this.evaluator.message(expected, (T) body));
     }
 
     /**

@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 
@@ -38,6 +39,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     private final LinkedList<ConfigurationSegment> list = new LinkedList<>();
     private String computedPrefix;
     private boolean hasDynamicSegments = false;
+    private PropertyCatalog propertyCatalog = PropertyCatalog.NORMALIZED;
 
     DefaultConfigurationPath() {
         recomputeState();
@@ -140,6 +142,12 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return -1;
     }
 
+    @NonNull
+    @Override
+    public PropertyCatalog propertyCatalog() {
+        return propertyCatalog;
+    }
+
     @Override
     public String simpleName() {
         ConfigurationSegment segment = peekLast();
@@ -198,7 +206,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         ConfigurationSegment.ConfigurationKind kind = thisPath.kind();
         switch (kind) {
             case MAP -> {
-                Collection<String> entries = propertyResolver.getPropertyEntries(thisPath.prefix());
+                Collection<String> entries = propertyResolver.getPropertyEntries(thisPath.prefix(), thisPath.propertyCatalog());
                 for (String key : entries) {
                     ConfigurationPath newPath = thisPath.copy();
                     newPath.pushConfigurationSegment(key);
@@ -257,6 +265,8 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             if (kind() != ConfigurationSegment.ConfigurationKind.ROOT) {
                 this.hasDynamicSegments = true;
             }
+
+            propertyCatalog = beanDefinition.enumValue(EachProperty.class, "catalog", PropertyCatalog.class).orElse(PropertyCatalog.NORMALIZED);
 
             boolean isList = beanDefinition.booleanValue(EachProperty.class, "list").orElse(false);
             String prefix = beanDefinition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);

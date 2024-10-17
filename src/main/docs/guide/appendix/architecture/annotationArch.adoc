@@ -4,7 +4,7 @@ Given this design decision, a compilation-time model was formulated to address t
 
 The api:core.annotation.AnnotationMetadata[] API is a construct that is used both a compilation time and at runtime by framework components. `AnnotationMetadata` represents the computed fusion of annotation information for a particular type, field, constructor, method or bean property and may include both annotations declared in the source code, but also synthetic meta-annotations that can be used at runtime to implement framework logic.
 
-When visiting source code within the <<compilerArch, Micronaut Compiler>> using the api:inject.ast.package-info[Element API] for each api:inject.ast.ClassElement[], api:inject.ast.FieldElement[], api:inject.ast.MethodElement[], api:inject.ast.ConstructorElement[] and api:inject.ast.PropertyElement[] an instance of api:core.annotation.AnnotationMetadata[] is computed.
+When visiting source code within the <<compilerArch, Micronaut Compiler>> using the link:../api/io/micronaut/inject/ast/package-summary.html[Element API] for each api:inject.ast.ClassElement[], api:inject.ast.FieldElement[], api:inject.ast.MethodElement[], api:inject.ast.ConstructorElement[] and api:inject.ast.PropertyElement[] an instance of api:core.annotation.AnnotationMetadata[] is computed.
 
 The `AnnotationMetadata` API tries to address the following challenges:
 
