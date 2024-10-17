@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.ssl;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 
@@ -62,7 +61,6 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link TrustManagerFactory}
      */
-    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         Optional<KeyStore> store = null;
         try {
@@ -78,7 +76,6 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link TrustManagerFactory}
      */
-    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(KeyStore store) {
         try {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
