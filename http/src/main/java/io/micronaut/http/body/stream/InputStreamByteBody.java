@@ -53,10 +53,6 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
         this.stream = stream;
     }
 
-    static void failClaim() {
-        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.server.netty.body.NettyByteBody.");
-    }
-
     /**
      * Create a new stream-based {@link CloseableByteBody}. Ownership of the stream is transferred
      * to the returned body.
@@ -78,6 +74,9 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
 
     @Override
     public @NonNull CloseableByteBody allowDiscard() {
+        if (stream == null) {
+            BaseSharedBuffer.failClaim();
+        }
         stream.allowDiscard();
         return this;
     }
@@ -93,7 +92,7 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
     @Override
     public @NonNull CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         if (stream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         StreamPair.Pair pair = StreamPair.createStreamPair(stream, backpressureMode);
         stream = pair.left();
@@ -109,9 +108,10 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
     public @NonNull ExtendedInputStream toInputStream() {
         ExtendedInputStream s = stream;
         if (s == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         stream = null;
+        BaseSharedBuffer.logClaim();
         return s;
     }
 

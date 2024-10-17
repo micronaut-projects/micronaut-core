@@ -17,8 +17,8 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.body.BodySizeLimits;
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Flux;
 

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -39,7 +40,7 @@ import java.util.function.LongUnaryOperator;
  * @since 4.6.0
  */
 @Internal
-public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscriber<ByteBuf> {
+public final class NettyBodyAdapter implements ByteBufConsumer.Upstream, Subscriber<ByteBuf> {
     private final EventLoopFlow eventLoopFlow;
     private final Publisher<ByteBuf> source;
     @Nullable

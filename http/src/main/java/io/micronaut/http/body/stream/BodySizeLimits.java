@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.body;
+package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 

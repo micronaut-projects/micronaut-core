@@ -30,14 +30,19 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import reactor.adapter.JdkFlowAdapter;
+import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
 /**
@@ -84,6 +89,16 @@ public final class HttpRequestFactory {
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @NonNull MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
+        if (request instanceof RawHttpRequestWrapper<?> raw) {
+            OptionalLong length = raw.byteBody().expectedLength();
+            Flow.Publisher<ByteBuffer> buffers = JdkFlowAdapter.publisherToFlowPublisher(
+                Flux.from(raw.byteBody().toByteArrayPublisher()).map(ByteBuffer::wrap));
+            if (length.isPresent()) {
+                return HttpRequest.BodyPublishers.fromPublisher(buffers, length.getAsLong());
+            } else {
+                return HttpRequest.BodyPublishers.fromPublisher(buffers);
+            }
+        }
         if (!HttpMethod.permitsRequestBody(request.getMethod())) {
             return HttpRequest.BodyPublishers.noBody();
         }
