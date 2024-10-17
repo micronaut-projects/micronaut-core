@@ -72,6 +72,9 @@ public final class UpstreamBalancer {
 
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#SLOWEST}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
     public static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
@@ -80,6 +83,9 @@ public final class UpstreamBalancer {
 
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#FASTEST}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
     public static UpstreamPair fastest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
@@ -89,6 +95,9 @@ public final class UpstreamBalancer {
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#ORIGINAL} and
      * {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#NEW}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
     public static UpstreamPair first(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
@@ -99,6 +108,10 @@ public final class UpstreamBalancer {
      * Create a pair of {@link BufferConsumer.Upstream}
      * instances that delegates to the given {@code upstream} according to the semantics of the
      * given {@code mode}.
+     *
+     * @param upstream The original upstream
+     * @param mode The balancing mode
+     * @return The balanced upstreams
      */
     public static UpstreamPair balancer(BufferConsumer.Upstream upstream, ByteBody.SplitBackpressureMode mode) {
         return switch (mode) {

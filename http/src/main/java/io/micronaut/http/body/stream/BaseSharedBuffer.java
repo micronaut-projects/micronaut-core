@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2024 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
@@ -226,8 +241,10 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      *
      * @param targetFlow The delayed flow to use if {@code canReturnImmediate} is false and/or
      *                   we have to wait for the result
+     * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
      * @param canReturnImmediate Whether we can return an immediate ExecutionFlow instead of
      *                  {@code targetFlow}, when appropriate
+     * @return A flow that will complete when all data has arrived, with a buffer containing that data
      */
     protected final ExecutionFlow<F> subscribeFull0(DelayedExecutionFlow<F> targetFlow, BufferConsumer.Upstream specificUpstream, boolean canReturnImmediate) {
         assert !working;
@@ -273,6 +290,7 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
     /**
      * Forward the input buffer to the given list of consumers.
      *
+     * @param consumers The consumers to forward the data to
      * @see #add(int)
      */
     protected abstract void addForward(List<C> consumers);
@@ -403,6 +421,8 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
     /**
      * Implementation of {@link BufferConsumer#error(Throwable)}.<br>
      * Not thread safe, caller must handle concurrency.
+     *
+     * @param e The error
      */
     public void error(Throwable e) {
         error = e;
@@ -428,7 +448,7 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      *
      * @param <B> The buffer type
      */
-    public static abstract class AsFlux<B> implements BufferConsumer {
+    public abstract static class AsFlux<B> implements BufferConsumer {
         private final BaseSharedBuffer<?, ?> sharedBuffer;
         private final AtomicLong unconsumed = new AtomicLong(0);
         private final Sinks.Many<B> sink = Sinks.many().unicast().onBackpressureBuffer();
