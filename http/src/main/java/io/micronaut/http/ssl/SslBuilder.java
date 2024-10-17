@@ -62,7 +62,7 @@ public abstract class SslBuilder<T> {
      * @return The {@link TrustManagerFactory}
      */
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
-        Optional<KeyStore> store = null;
+        Optional<KeyStore> store;
         try {
             store = getTrustStore(ssl);
         } catch (Exception e) {
