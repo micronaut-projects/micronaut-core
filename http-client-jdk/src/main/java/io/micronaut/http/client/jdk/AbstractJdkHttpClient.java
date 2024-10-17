@@ -109,6 +109,25 @@ abstract class AbstractJdkHttpClient {
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
+    protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
+        this.loadBalancer = prototype.loadBalancer;
+        this.httpVersion = prototype.httpVersion;
+        this.configuration = prototype.configuration;
+        this.contextPath = prototype.contextPath;
+        this.client = prototype.client;
+        this.cookieManager = prototype.cookieManager;
+        this.requestBinderRegistry = prototype.requestBinderRegistry;
+        this.clientId = prototype.clientId;
+        this.conversionService = prototype.conversionService;
+        this.sslBuilder = prototype.sslBuilder;
+        this.log = prototype.log;
+        this.filterResolver = prototype.filterResolver;
+        this.clientFilterEntries = prototype.clientFilterEntries;
+        this.cookieDecoder = prototype.cookieDecoder;
+        this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
+        this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
+    }
+
     /**
      * @param log                        the logger to use
      * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers

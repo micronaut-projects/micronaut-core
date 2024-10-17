@@ -17,6 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.body.stream.PublisherAsBlocking;
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
@@ -46,7 +47,7 @@ public final class PublisherAsStream extends InputStream {
     }
 
     @Override
-    public int read(@NonNull byte[] b, int off, int len) throws IOException {
+    public int read(byte @NonNull [] b, int off, int len) throws IOException {
         while (buffer == null) {
             try {
                 ByteBuf o = publisherAsBlocking.take();

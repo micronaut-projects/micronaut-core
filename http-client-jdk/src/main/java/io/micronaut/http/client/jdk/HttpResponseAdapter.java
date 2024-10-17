@@ -21,13 +21,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
@@ -49,15 +45,12 @@ import java.util.Optional;
  */
 @Internal
 @Experimental
-public class HttpResponseAdapter<O> implements HttpResponse<O> {
+public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpResponseAdapter.class);
 
-    private final java.net.http.HttpResponse<byte[]> httpResponse;
     @NonNull
     private final Argument<O> bodyType;
-    private final ConversionService conversionService;
-    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
@@ -67,36 +60,10 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
                                ConversionService conversionService,
                                MediaTypeCodecRegistry mediaTypeCodecRegistry,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
-        this.httpResponse = httpResponse;
+        super(httpResponse, conversionService);
         this.bodyType = bodyType;
-        this.conversionService = conversionService;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
-    }
-
-    @Override
-    public HttpStatus getStatus() {
-        return HttpStatus.valueOf(httpResponse.statusCode());
-    }
-
-    @Override
-    public int code() {
-        return httpResponse.statusCode();
-    }
-
-    @Override
-    public String reason() {
-        return getStatus().getReason();
-    }
-
-    @Override
-    public HttpHeaders getHeaders() {
-        return new HttpHeadersAdapter(httpResponse.headers(), conversionService);
-    }
-
-    @Override
-    public MutableConvertibleValues<Object> getAttributes() {
-        return attributes;
     }
 
     @Override

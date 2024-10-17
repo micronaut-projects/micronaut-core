@@ -38,7 +38,9 @@ public interface RawHttpClientFactory {
      * @return The client
      */
     @NonNull
-    RawHttpClient createRawClient(@Nullable URI url);
+    default RawHttpClient createRawClient(@Nullable URI url) {
+        return createRawClient(url, new DefaultHttpClientConfiguration());
+    }
 
     /**
      * Create a new {@link RawHttpClient} with the specified configuration. Note that this method should only be used

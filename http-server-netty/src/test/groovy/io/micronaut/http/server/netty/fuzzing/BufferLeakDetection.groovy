@@ -1,7 +1,7 @@
 package io.micronaut.http.server.netty.fuzzing
 
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.PooledByteBufAllocator
+import io.netty.buffer.ByteBufAllocator
 import io.netty.util.ResourceLeakDetector
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -49,7 +49,7 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
     }
 
     private static void leakCanary() {
-        ByteBuf resource = PooledByteBufAllocator.DEFAULT.directBuffer()
+        ByteBuf resource = ByteBufAllocator.DEFAULT.directBuffer()
         resource.touch(canaryString)
     }
 

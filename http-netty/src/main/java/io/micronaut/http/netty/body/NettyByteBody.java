@@ -40,7 +40,7 @@ import reactor.core.publisher.Flux;
 @Internal
 public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
     // don't change this, isolate body buffering to separate logging name space
-    protected static final Logger LOG = LoggerFactory.getLogger(NettyByteBufferFactory.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(ByteBody.class);
 
     public static Flux<ByteBuf> toByteBufs(ByteBody body) {
         if (body instanceof NettyByteBody net) {
@@ -69,8 +69,4 @@ public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody
     public abstract @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
 
     abstract Flux<ByteBuf> toByteBufPublisher();
-
-    static void failClaim() {
-        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for io.micronaut.http.netty.body.NettyByteBody.");
-    }
 }

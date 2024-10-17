@@ -1,6 +1,8 @@
 package io.micronaut.http.netty.body
 
 import io.micronaut.http.body.ByteBody.SplitBackpressureMode
+import io.micronaut.http.body.stream.BufferConsumer
+import io.micronaut.http.body.stream.UpstreamBalancer
 import spock.lang.Specification
 
 class UpstreamBalancerSpec extends Specification {
