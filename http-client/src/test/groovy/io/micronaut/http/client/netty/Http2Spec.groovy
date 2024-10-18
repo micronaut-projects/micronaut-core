@@ -1,14 +1,10 @@
-package io.micronaut.http.client.jdk
+package io.micronaut.http.client.netty
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
@@ -39,6 +35,7 @@ class Http2Spec extends Specification {
 
     def "test http2 post long string"() {
         when:
+        // Body must be >8096 bytes, according to io.netty.handler.codec.http.multipart.HttpPostBodyUtil#chunkSize
         def body = Map.of("q", "a" * 8097)
 
         def response = client.toBlocking().retrieve(HttpRequest.POST("/http2", body)
@@ -62,7 +59,7 @@ class Http2Spec extends Specification {
         @Post
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Produces(MediaType.TEXT_PLAIN)
-        String post() {
+        String post(@Body Map<String, String> ignored) {
             "hello"
         }
     }
