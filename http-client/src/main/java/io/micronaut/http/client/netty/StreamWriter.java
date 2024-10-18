@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 
 import java.util.function.Consumer;
@@ -99,7 +100,7 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         }
 
         int readable = buf.readableBytes();
-        ctx.writeAndFlush(buf).addListener((ChannelFutureListener) future -> {
+        ctx.writeAndFlush(new DefaultHttpContent(buf)).addListener((ChannelFutureListener) future -> {
             assert ctx.executor().inEventLoop();
             if (future.isSuccess()) {
                 if (ctx.channel().isWritable()) {
@@ -107,6 +108,8 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
                 } else {
                     unwritten += readable;
                 }
+            } else {
+                error(future.cause());
             }
         });
     }
