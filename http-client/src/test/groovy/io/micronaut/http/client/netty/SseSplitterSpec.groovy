@@ -1,6 +1,6 @@
 package io.micronaut.http.client.netty
 
-import io.micronaut.http.netty.body.BodySizeLimits
+import io.micronaut.http.body.stream.BodySizeLimits
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import reactor.core.publisher.Flux

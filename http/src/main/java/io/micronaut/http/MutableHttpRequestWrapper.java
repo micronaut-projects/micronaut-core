@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty;
+package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -21,11 +21,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpRequestWrapper;
-import io.micronaut.http.MutableHttpHeaders;
-import io.micronaut.http.MutableHttpParameters;
-import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 
 import java.net.URI;
@@ -38,7 +33,7 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
+public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
     private ConversionService conversionService;
 
     @Nullable
@@ -46,12 +41,12 @@ class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements Muta
     @Nullable
     private URI uri;
 
-    MutableHttpRequestWrapper(ConversionService conversionService, HttpRequest<B> delegate) {
+    protected MutableHttpRequestWrapper(ConversionService conversionService, HttpRequest<B> delegate) {
         super(delegate);
         this.conversionService = conversionService;
     }
 
-    static MutableHttpRequest<?> wrapIfNecessary(ConversionService conversionService, HttpRequest<?> request) {
+    public static MutableHttpRequest<?> wrapIfNecessary(ConversionService conversionService, HttpRequest<?> request) {
         if (request instanceof MutableHttpRequest<?> httpRequest) {
             return httpRequest;
         } else {

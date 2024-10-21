@@ -19,10 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.BodySizeLimits;
-import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -1033,7 +1034,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Handler that writes a {@link StreamedHttpResponse}.
      */
-    private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
+    private final class StreamingOutboundHandler extends OutboundHandler implements ByteBufConsumer {
         private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;

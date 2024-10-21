@@ -19,10 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.BodySizeLimits;
-import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -259,7 +260,7 @@ abstract class MultiplexedServerHandler {
                 writeFull(response, AvailableNettyByteBody.toByteBuf(available));
             } else {
                 StreamingNettyByteBody snbb = (StreamingNettyByteBody) nbb;
-                var consumer = new BufferConsumer() {
+                var consumer = new ByteBufConsumer() {
                     Upstream upstream;
                     final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
 
@@ -462,7 +463,7 @@ abstract class MultiplexedServerHandler {
          * This is the {@link HotObservable} that represents the request body in the streaming
          * request case.
          */
-        private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
+        private class InputStreamer implements BufferConsumer.Upstream, ByteBufConsumer {
             final StreamingNettyByteBody.SharedBuffer dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
             /**
              * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream

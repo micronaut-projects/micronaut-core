@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty;
+package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpRequestWrapper;
@@ -36,10 +35,10 @@ import java.io.IOException;
  * {@link NettyHttpRequestBuilder} so that the bytes are
  *
  * @param <B> The body type, mostly unused
- * @since 4.7.0
+ * @since 4.8.0
  */
 @Internal
-final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder, ServerHttpRequest<B>, Closeable {
+final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>, Closeable {
     private final CloseableByteBody byteBody;
 
     public RawHttpRequestWrapper(ConversionService conversionService, MutableHttpRequest<B> delegate, CloseableByteBody byteBody) {
@@ -53,18 +52,8 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public @Nullable ByteBody byteBodyDirect() {
-        return byteBody;
-    }
-
-    @Override
     public <T> MutableHttpRequest<T> body(T body) {
         throw new UnsupportedOperationException("Changing the body of raw requests is currently not supported");
-    }
-
-    @Override
-    public @NonNull HttpRequest toHttpRequestWithoutBody() {
-        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
     }
 
     @Override

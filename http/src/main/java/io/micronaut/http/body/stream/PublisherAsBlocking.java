@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty;
+package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.scheduler.NonBlocking;
@@ -35,7 +34,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author Jonas Konrad
  */
 @Internal
-public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
+public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     private final Lock lock = new ReentrantLock();
     private final Condition newDataCondition = lock.newCondition();
     /**
@@ -63,6 +62,10 @@ public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
      * Failure from {@link #onError}.
      */
     private Throwable failure;
+
+    protected void release(T item) {
+        // optional resource management for subclasses
+    }
 
     /**
      * The failure from {@link #onError(Throwable)}. When {@link #take()} returns {@code null}, this
@@ -96,7 +99,7 @@ public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         lock.lock();
         try {
             if (closed) {
-                ReferenceCountUtil.release(o);
+                release(o);
                 return;
             }
             swap = o;
@@ -111,7 +114,7 @@ public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         lock.lock();
         try {
             if (swap != null) {
-                ReferenceCountUtil.release(swap);
+                release(swap);
                 swap = null;
             }
             failure = t;
@@ -181,7 +184,7 @@ public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         try {
             closed = true;
             if (swap != null) {
-                ReferenceCountUtil.release(swap);
+                release(swap);
                 swap = null;
             }
         } finally {
