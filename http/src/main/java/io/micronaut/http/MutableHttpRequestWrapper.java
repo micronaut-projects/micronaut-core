@@ -41,7 +41,7 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
     @Nullable
     private URI uri;
 
-    public MutableHttpRequestWrapper(ConversionService conversionService, HttpRequest<B> delegate) {
+    protected MutableHttpRequestWrapper(ConversionService conversionService, HttpRequest<B> delegate) {
         super(delegate);
         this.conversionService = conversionService;
     }

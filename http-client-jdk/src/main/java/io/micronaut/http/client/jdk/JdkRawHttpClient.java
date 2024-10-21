@@ -62,10 +62,13 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
-                HttpHeadersUtil.trace(log,
-                    () -> httpRequest.headers().map().keySet(),
-                    headerName -> httpRequest.headers().allValues(headerName));
-                return client.sendAsync(httpRequest, responseInfo -> new ReactiveByteBufferByteBody.ByteBodySubscriber(new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength())));
+                if (log.isTraceEnabled()) {
+                    HttpHeadersUtil.trace(log,
+                        () -> httpRequest.headers().map().keySet(),
+                        headerName -> httpRequest.headers().allValues(headerName));
+                }
+                BodySizeLimits bodySizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
+                return client.sendAsync(httpRequest, responseInfo -> new ReactiveByteBufferByteBody.ByteBodySubscriber(bodySizeLimits));
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))

@@ -25,6 +25,7 @@ import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.PublisherAsBlocking;
 import io.micronaut.http.body.stream.UpstreamBalancer;
 import io.micronaut.http.netty.PublisherAsStream;
@@ -69,20 +70,20 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
      * with a single subscribe.
      */
     private final boolean forceDelaySubscribe;
-    private ByteBufConsumer.Upstream upstream;
+    private BufferConsumer.Upstream upstream;
 
     public StreamingNettyByteBody(SharedBuffer sharedBuffer) {
         this(sharedBuffer, false, sharedBuffer.getRootUpstream());
     }
 
-    private StreamingNettyByteBody(SharedBuffer sharedBuffer, boolean forceDelaySubscribe, ByteBufConsumer.Upstream upstream) {
+    private StreamingNettyByteBody(SharedBuffer sharedBuffer, boolean forceDelaySubscribe, BufferConsumer.Upstream upstream) {
         this.sharedBuffer = sharedBuffer;
         this.forceDelaySubscribe = forceDelaySubscribe;
         this.upstream = upstream;
     }
 
-    public ByteBufConsumer.Upstream primary(ByteBufConsumer primary) {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+    public BufferConsumer.Upstream primary(ByteBufConsumer primary) {
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -94,7 +95,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -106,7 +107,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public @NonNull StreamingNettyByteBody allowDiscard() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -117,7 +118,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     @Override
     protected Flux<ByteBuf> toByteBufPublisher() {
         AsFlux asFlux = new AsFlux(sharedBuffer);
-        ByteBufConsumer.Upstream upstream = primary(asFlux);
+        BufferConsumer.Upstream upstream = primary(asFlux);
         return asFlux.asFlux(upstream)
             .doOnDiscard(ByteBuf.class, ReferenceCounted::release);
     }
@@ -141,7 +142,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -154,7 +155,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public void close() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             return;
         }

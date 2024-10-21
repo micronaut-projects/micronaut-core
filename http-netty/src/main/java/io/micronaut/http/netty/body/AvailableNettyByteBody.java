@@ -26,6 +26,7 @@ import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -83,7 +84,7 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
         // limits, we return a StreamingNettyByteBody instead.
         int readable = buf.readableBytes();
         if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
-            ByteBufConsumer.Upstream upstream = bytesConsumed -> {
+            BufferConsumer.Upstream upstream = bytesConsumed -> {
             };
             StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
             mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size

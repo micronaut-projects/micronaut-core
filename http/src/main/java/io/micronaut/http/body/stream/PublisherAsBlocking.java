@@ -64,6 +64,7 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     private Throwable failure;
 
     protected void release(T item) {
+        // optional resource management for subclasses
     }
 
     /**

@@ -75,6 +75,23 @@ class RawTest {
     }
 
     @Test
+    public void getLongInputStream() throws Exception {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
+             ByteBodyHttpResponse<?> response = Mono.from(client.exchange(HttpRequest.GET(server.getURL().get() + "/raw/get-long"), null, null))
+                 .cast(ByteBodyHttpResponse.class)
+                 .block()) {
+
+            try (InputStream is = response.byteBody().toInputStream()) {
+                Assertions.assertArrayEquals(
+                    LONG_PAYLOAD,
+                    is.readAllBytes()
+                );
+            }
+        }
+    }
+
+    @Test
     public void echoLong() throws Exception {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
              RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);

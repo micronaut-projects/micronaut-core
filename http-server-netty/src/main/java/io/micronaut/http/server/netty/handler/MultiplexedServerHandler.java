@@ -83,7 +83,7 @@ abstract class MultiplexedServerHandler {
         private HttpRequest request;
 
         private List<ByteBuf> bufferedContent;
-        private ByteBufConsumer.Upstream writerUpstream;
+        private BufferConsumer.Upstream writerUpstream;
         private InputStreamer streamer;
 
         private Object attachment;
@@ -321,7 +321,7 @@ abstract class MultiplexedServerHandler {
             }
         }
 
-        private void writeStreaming(HttpResponse response, ByteBufConsumer.Upstream upstream) {
+        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream) {
             if (!ctx.executor().inEventLoop()) {
                 ctx.executor().execute(() -> writeStreaming(response, upstream));
                 return;

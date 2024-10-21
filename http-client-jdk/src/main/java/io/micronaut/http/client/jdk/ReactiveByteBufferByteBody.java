@@ -30,7 +30,6 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.PublisherAsBlocking;
 import io.micronaut.http.body.stream.UpstreamBalancer;
-import io.micronaut.http.netty.body.ByteBufConsumer;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -99,7 +98,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
 
     private Flux<ByteBuffer> toNioBufferPublisher() {
         AsFlux asFlux = new AsFlux(sharedBuffer);
-        ByteBufConsumer.Upstream upstream = primary(asFlux);
+        BufferConsumer.Upstream upstream = primary(asFlux);
         return asFlux.asFlux(upstream);
     }
 
@@ -172,7 +171,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
 
     @Override
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -186,7 +185,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
 
     @Override
     public void close() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             return;
         }
@@ -200,7 +199,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
 
     @Override
     public @NonNull CloseableByteBody allowDiscard() {
-        ByteBufConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
         }
@@ -209,10 +208,10 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
     }
 
     interface ByteBufferConsumer extends BufferConsumer {
-        void add(ByteBuffer buffer);
+        void add(@NonNull ByteBuffer buffer);
     }
 
-    private static class AsFlux extends BaseSharedBuffer.AsFlux<ByteBuffer> implements ByteBufferConsumer {
+    private static final class AsFlux extends BaseSharedBuffer.AsFlux<ByteBuffer> implements ByteBufferConsumer {
         AsFlux(BaseSharedBuffer<?, ?> sharedBuffer) {
             super(sharedBuffer);
         }
@@ -332,11 +331,6 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
                 }
                 return snapshot;
             }
-        }
-
-        @Override
-        protected void addDoNotBuffer() {
-
         }
 
         @Override

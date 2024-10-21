@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.netty.buffer.ByteBuf;
 
@@ -34,5 +35,5 @@ public interface ByteBufConsumer extends BufferConsumer {
      *
      * @param buf The buffer to consume
      */
-    void add(ByteBuf buf);
+    void add(@NonNull ByteBuf buf);
 }

@@ -300,7 +300,8 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      *
      * @see #add(int)
      */
-    protected abstract void addDoNotBuffer();
+    protected void addDoNotBuffer() {
+    }
 
     /**
      * Buffer the input buffer.

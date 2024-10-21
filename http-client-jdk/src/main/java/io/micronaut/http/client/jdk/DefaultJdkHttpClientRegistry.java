@@ -168,7 +168,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     @BootstrapContextCompatible
     @Primary
     @Order(2) // If both this and the netty client are present, netty is the default.
-    JdkRawHttpClient rawHttpClient(
+    RawHttpClient rawHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,
         @Parameter @Nullable HttpClientConfiguration configuration,
