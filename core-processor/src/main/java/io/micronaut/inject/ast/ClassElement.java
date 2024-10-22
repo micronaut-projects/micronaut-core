@@ -269,6 +269,10 @@ public interface ClassElement extends TypedElement {
             // only static inner classes can be constructed
             return Optional.empty();
         }
+        if (isAbstract()) {
+            // abstract classes constructors are accessible only from their subtypes
+            return Optional.empty();
+        }
         List<ConstructorElement> constructors = getAccessibleConstructors()
                 .stream()
                 .filter(ctor -> ctor.getParameters().length == 0).toList();
