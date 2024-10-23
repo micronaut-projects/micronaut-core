@@ -26,7 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.filter.bodyparser.FilterBodyParser;
+import io.micronaut.http.filter.FilterBodyParser;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
 import io.netty.handler.codec.http.QueryStringDecoder;
