@@ -21,8 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import io.micronaut.http.filter.bodyparser.FormUrlEncodedFilterBodyParser;
-import io.micronaut.http.filter.bodyparser.JsonFilterBodyParser;
+import io.micronaut.http.filter.bodyparser.FilterBodyParser;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
@@ -100,47 +99,22 @@ public class FormUrlEncodedBodyInRequestFilterTest {
     @Requires(property = "spec.name", value = FormUrlEncodedBodyInRequestFilterTest.SPEC_NAME)
     @ServerFilter(ServerFilter.MATCH_ALL_PATTERN)
     static class CsrfFilter {
-        private final FormUrlEncodedFilterBodyParser bodyParser;
-        private final JsonFilterBodyParser jsonParser;
+        private final FilterBodyParser bodyParser;
 
-        CsrfFilter(FormUrlEncodedFilterBodyParser bodyParser,
-                   JsonFilterBodyParser jsonParser) {
+        CsrfFilter(FilterBodyParser bodyParser) {
             this.bodyParser = bodyParser;
-            this.jsonParser = jsonParser;
         }
 
         @ExecuteOn(TaskExecutors.BLOCKING)
         @RequestFilter
         @Nullable
         public HttpResponse<?> csrfFilter(@NonNull HttpRequest<?> request) {
-
-            if (request.getContentType().isEmpty()) {
+            Optional<Map<String, Object>> bodyOptional = Mono.from(bodyParser.parseBody(request)).blockOptional();
+            if (bodyOptional.isEmpty()) {
                 return HttpResponse.unauthorized();
             }
-            if (request.getContentType().get().equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
-                Optional<PasswordChangeForm> passwordChangeFormOptional = Mono.from(bodyParser.parseBody(request, PasswordChangeForm.class)).blockOptional();
-                if (passwordChangeFormOptional.isEmpty()) {
-                    return HttpResponse.unauthorized();
-                }
-                PasswordChangeForm passwordChangeForm = passwordChangeFormOptional.get();
-                if (!passwordChangeForm.username.equals("sherlock")) {
-                    return HttpResponse.unauthorized();
-                }
-                Optional<Map> optionalBody = Mono.from(bodyParser.parseBody(request, Map.class)).blockOptional();
-                if (optionalBody.isEmpty()) {
-                    return HttpResponse.unauthorized();
-                }
-                Map body = optionalBody.get();
-                return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
-            } else if (request.getContentType().get().equals(MediaType.APPLICATION_JSON_TYPE)) {
-                Optional<PasswordChangeForm> optionalBody = Mono.from(jsonParser.parseBody(request, PasswordChangeForm.class)).blockOptional();
-                if (optionalBody.isEmpty()) {
-                    return HttpResponse.unauthorized();
-                }
-                PasswordChangeForm body = optionalBody.get();
-                return body.csrfToken() != null && body.csrfToken().equals("abcde") ? null : HttpResponse.unauthorized();
-            }
-            return HttpResponse.unauthorized();
+            Map<String, Object> body = bodyOptional.get();
+            return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
         }
     }
 
@@ -149,7 +123,6 @@ public class FormUrlEncodedBodyInRequestFilterTest {
             String username,
             String password) {
     }
-
 
     @Introspected
     record PasswordChangeForm(

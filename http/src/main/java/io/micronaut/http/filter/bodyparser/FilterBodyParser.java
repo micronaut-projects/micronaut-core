@@ -18,11 +18,9 @@ package io.micronaut.http.filter.bodyparser;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import org.reactivestreams.Publisher;
 import reactor.util.annotation.NonNull;
-
-import java.util.Optional;
+import java.util.Map;
 
 /**
  * API to parse a body within a filter.
@@ -30,33 +28,13 @@ import java.util.Optional;
  * @since 4.7.1
  */
 @Experimental
+@FunctionalInterface
 public interface FilterBodyParser {
     /**
      * @param request HTTP Request
-     * @param type The type to parse the body into
-     * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to the requested type.
-     *  @param <T> Body Type
+     * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to a Map.
      */
     @SingleResult
-    <T> Publisher<T> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<T> type);
+    Publisher<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request);
 
-    /**
-     *
-     * @return Supported Request's content type
-     */
-    MediaType getContentType();
-
-    /**
-     *
-     * @param request Request
-     * @return whether the request's content type is supported by this parser.
-     */
-    default boolean supportsRequestContentType(@NonNull HttpRequest<?> request) {
-        final Optional<MediaType> contentTypeOptional = request.getContentType();
-        if (contentTypeOptional.isEmpty()) {
-            return false;
-        }
-        final MediaType contentType = contentTypeOptional.get();
-        return contentType.equals(getContentType());
-    }
 }
