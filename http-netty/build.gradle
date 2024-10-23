@@ -33,9 +33,6 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testCompileOnly project(":inject-groovy")
-    testImplementation(libs.micronaut.test.junit5) {
-        exclude group: 'io.micronaut'
-    }
 }
 
 spotless {
