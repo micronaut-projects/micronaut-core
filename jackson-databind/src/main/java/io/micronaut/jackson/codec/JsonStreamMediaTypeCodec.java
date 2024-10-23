@@ -75,7 +75,7 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
      * @param objectMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration The configuration for the codec
-     * @deprecated Use {@link #JsonStreamMediaTypeCodec(BeanProvider, ApplicationConfiguration, CodecConfiguration, ApplicationConfiguration)} instead.
+     * @deprecated Use {@link #JsonStreamMediaTypeCodec(BeanProvider, CodecConfiguration, ApplicationConfiguration)} instead.
      */
     @Deprecated
     public JsonStreamMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
