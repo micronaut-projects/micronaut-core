@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import io.micronaut.http.filter.bodyparser.FilterBodyParser;
 import io.micronaut.http.filter.bodyparser.FormUrlEncodedFilterBodyParser;
 import io.micronaut.http.filter.bodyparser.JsonFilterBodyParser;
 import io.micronaut.http.tck.AssertionUtils;
@@ -29,7 +28,6 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import jakarta.inject.Named;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 

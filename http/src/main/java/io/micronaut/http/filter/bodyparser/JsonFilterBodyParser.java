@@ -21,6 +21,7 @@ import io.micronaut.http.MediaType;
  * Implementation of {@link FilterBodyParser} for a request with JSON content type.
  * @author Sergio del Amo
  * @since 4.7.1
+ * @param <T> Body type
  */
 public interface JsonFilterBodyParser<T> extends FilterBodyParser<T> {
     @Override

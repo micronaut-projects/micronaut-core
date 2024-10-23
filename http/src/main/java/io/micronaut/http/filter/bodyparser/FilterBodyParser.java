@@ -29,7 +29,8 @@ import reactor.util.annotation.NonNull;
  */
 public interface FilterBodyParser<T> {
     /**
-     *
+     * @param request HTTP Request
+     * @param type The type to parse the body into
      * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to the requested type.
      */
     @SingleResult
