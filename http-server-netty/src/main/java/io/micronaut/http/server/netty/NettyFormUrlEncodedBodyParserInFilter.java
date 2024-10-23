@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
@@ -41,6 +42,15 @@ import java.util.*;
 @Singleton
 @Experimental
 final class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
+    private final Integer maxParams;
+
+    /**
+     *
+     * @param maxParams Max Parameters passed to {@link QueryStringDecoder} to avoid denials of service attack.
+     */
+    NettyFormUrlEncodedBodyParserInFilter(@Value("${micronaut.http.server.filter.body-parser.form-url-encoded.max-params:20}") Integer maxParams) {
+        this.maxParams = maxParams;
+    }
 
     @Override
     @NonNull
@@ -59,12 +69,12 @@ final class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilte
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return Mono.fromFuture(closeableByteBody.buffer())
                     .map(bb -> bb.toString(request.getCharacterEncoding()))
-                    .map(NettyFormUrlEncodedBodyParserInFilter::parse);
+                    .map(str -> parse(request, str));
         }
     }
 
-    private static Map<String, Object> parse(String formUrlEncoded) {
-        QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncoded, false);
+    private Map<String, Object> parse(@NonNull ServerHttpRequest<?> request, String formUrlEncoded) {
+        QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncoded, request.getCharacterEncoding(), false, maxParams);
         Map<String, List<String>> parameters = decoder.parameters();
         Map<String, Object> result = new LinkedHashMap<>(parameters.size());
         parameters.forEach((k, v) -> {
