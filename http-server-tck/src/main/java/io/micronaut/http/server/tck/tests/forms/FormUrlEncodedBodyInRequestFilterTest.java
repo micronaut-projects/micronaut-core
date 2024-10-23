@@ -30,11 +30,9 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-
 
 @SuppressWarnings({
         "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -120,6 +118,14 @@ public class FormUrlEncodedBodyInRequestFilterTest {
                 return HttpResponse.unauthorized();
             }
             if (request.getContentType().get().equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+                Optional<PasswordChangeForm> passwordChangeFormOptional = Mono.from(bodyParser.parseBody(request, PasswordChangeForm.class)).blockOptional();
+                if (passwordChangeFormOptional.isEmpty()) {
+                    return HttpResponse.unauthorized();
+                }
+                PasswordChangeForm passwordChangeForm = passwordChangeFormOptional.get();
+                if (!passwordChangeForm.username.equals("sherlock")) {
+                    return HttpResponse.unauthorized();
+                }
                 Optional<Map> optionalBody = Mono.from(bodyParser.parseBody(request, Map.class)).blockOptional();
                 if (optionalBody.isEmpty()) {
                     return HttpResponse.unauthorized();
