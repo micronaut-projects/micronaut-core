@@ -30,6 +30,7 @@ import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -70,7 +71,7 @@ public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilt
     private static Map<String, Object> parse(String formUrlEncoded) {
         QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncoded, false);
         Map<String, List<String>> parameters = decoder.parameters();
-        Map<String, Object> result = new HashMap<>(parameters.size());
+        Map<String, Object> result = new LinkedHashMap<>(parameters.size());
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
             if (entry.getValue().size() > 1) {
                 result.put(entry.getKey(), entry.getValue());
