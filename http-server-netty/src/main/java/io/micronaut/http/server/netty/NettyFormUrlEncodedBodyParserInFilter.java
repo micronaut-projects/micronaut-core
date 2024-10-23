@@ -36,7 +36,7 @@ import java.util.Map;
 @Named(NettyFormUrlEncodedBodyParserInFilter.NAME_QUALIFIER)
 @Singleton
 public class NettyFormUrlEncodedBodyParserInFilter implements FilterBodyParser<Map<String, Object>> {
-    public static final String NAME_QUALIFIER =  MediaType.APPLICATION_FORM_URLENCODED;
+    public static final String NAME_QUALIFIER = MediaType.APPLICATION_FORM_URLENCODED;
 
     @Override
     @NonNull
