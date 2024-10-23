@@ -70,7 +70,7 @@ public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilt
     private static Map<String, Object> parse(String formUrlEncoded) {
         QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncoded, false);
         Map<String, List<String>> parameters = decoder.parameters();
-        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> result = new HashMap<>(parameters.size());
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
             if (entry.getValue().size() > 1) {
                 result.put(entry.getKey(), entry.getValue());
