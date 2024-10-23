@@ -15,17 +15,16 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.filter.FilterBodyParser;
+import io.micronaut.http.filter.bodyparser.FormUrlEncodedFilterBodyParser;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
@@ -33,10 +32,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Named(NettyFormUrlEncodedBodyParserInFilter.NAME_QUALIFIER)
+@Requires(missingBeans = FormUrlEncodedFilterBodyParser.class)
 @Singleton
-public class NettyFormUrlEncodedBodyParserInFilter implements FilterBodyParser<Map<String, Object>> {
-    public static final String NAME_QUALIFIER = MediaType.APPLICATION_FORM_URLENCODED;
+public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
 
     @Override
     @NonNull
@@ -45,7 +43,7 @@ public class NettyFormUrlEncodedBodyParserInFilter implements FilterBodyParser<M
         if (request.getContentType().isEmpty()) {
             return Publishers.empty();
         }
-        if (!request.getContentType().get().toString().equals(NAME_QUALIFIER)) {
+        if (!request.getContentType().get().equals(getContentType())) {
             return Publishers.empty();
         }
         if (request instanceof ServerHttpRequest<?> serverHttpRequest) {

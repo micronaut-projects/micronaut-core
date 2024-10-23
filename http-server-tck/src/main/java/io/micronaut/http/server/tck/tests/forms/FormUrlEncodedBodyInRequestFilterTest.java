@@ -21,7 +21,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import io.micronaut.http.filter.FilterBodyParser;
+import io.micronaut.http.filter.bodyparser.FilterBodyParser;
+import io.micronaut.http.filter.bodyparser.FormUrlEncodedFilterBodyParser;
+import io.micronaut.http.filter.bodyparser.JsonFilterBodyParser;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
@@ -45,30 +47,36 @@ public class FormUrlEncodedBodyInRequestFilterTest {
     public static final String SPEC_NAME = "FormUrlEncodedBodyInRequestFilterTest";
 
     @Test
-    public void formWithListOfOneItem() throws IOException {
-        String body = "username=sherlock&csrfToken=abcde&password=elementary";
+    public void bodyParsingInFilter() throws IOException {
+        String csrfToken = "abcde";
+        String body = "username=sherlock&csrfToken=" + csrfToken + "&password=elementary";
+        assertOk(body, MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+
+        PasswordChangeForm json = new PasswordChangeForm("sherlock", "elementary", null);
+        assertUnauthorized(json, MediaType.APPLICATION_JSON_TYPE);
+
+        json = new PasswordChangeForm("sherlock", "elementary", csrfToken);
+        assertOk(json, MediaType.APPLICATION_JSON_TYPE);
+
+        body = "username=sherlock&password=elementary";
+        assertUnauthorized(body, MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+    }
+
+    void assertOk(Object body, MediaType contentType) throws IOException {
         TestScenario.builder()
                 .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/password/change", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .request(HttpRequest.POST("/password/change", body).contentType(contentType))
                 .assertion((server, request) ->
                         AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                                 .status(HttpStatus.ACCEPTED)
                                 .build()))
                 .run();
+    }
 
+    void assertUnauthorized(Object body, MediaType contentType) throws IOException {
         TestScenario.builder()
                 .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/password/change", body).contentType(MediaType.APPLICATION_JSON_TYPE))
-                .assertion((server, request) ->
-                        AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                                .status(HttpStatus.UNAUTHORIZED)
-                                .build()))
-                .run();
-
-        body = "username=sherlock&password=elementary";
-        TestScenario.builder()
-                .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/password/change", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .request(HttpRequest.POST("/password/change", body).contentType(contentType))
                 .assertion((server, request) ->
                         AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                                 .status(HttpStatus.UNAUTHORIZED)
@@ -83,29 +91,52 @@ public class FormUrlEncodedBodyInRequestFilterTest {
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Post("/password/change")
         @Status(HttpStatus.ACCEPTED)
-        void changePassword(@Body PasswordChange passwordChangeForm) {
+        void changePasswordForm(@Body PasswordChange passwordChangeForm) {
+        }
+
+        @Produces(MediaType.TEXT_HTML)
+        @Post("/password/change")
+        @Status(HttpStatus.ACCEPTED)
+        void changePasswordJson(@Body PasswordChange passwordChangeForm) {
         }
     }
 
     @Requires(property = "spec.name", value = FormUrlEncodedBodyInRequestFilterTest.SPEC_NAME)
     @ServerFilter(ServerFilter.MATCH_ALL_PATTERN)
     static class CsrfFilter {
-        private final FilterBodyParser<Map<String, Object>> bodyParser;
+        private final FormUrlEncodedFilterBodyParser bodyParser;
+        private final JsonFilterBodyParser<PasswordChangeForm> jsonParser;
 
-        CsrfFilter(@Named(MediaType.APPLICATION_FORM_URLENCODED) FilterBodyParser<Map<String, Object>> bodyParser) {
+        CsrfFilter(FormUrlEncodedFilterBodyParser bodyParser,
+                   JsonFilterBodyParser<PasswordChangeForm> jsonParser) {
             this.bodyParser = bodyParser;
+            this.jsonParser = jsonParser;
         }
 
         @ExecuteOn(TaskExecutors.BLOCKING)
         @RequestFilter
         @Nullable
         public HttpResponse<?> csrfFilter(@NonNull HttpRequest<?> request) {
-            Optional<Map<String, Object>> optionalBody = Mono.from(bodyParser.parseBody(request)).blockOptional();
-            if (optionalBody.isEmpty()) {
+
+            if (request.getContentType().isEmpty()) {
                 return HttpResponse.unauthorized();
             }
-            Map<String, Object> body = optionalBody.get();
-            return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
+            if (request.getContentType().get().equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+                Optional<Map<String, Object>> optionalBody = Mono.from(bodyParser.parseBody(request)).blockOptional();
+                if (optionalBody.isEmpty()) {
+                    return HttpResponse.unauthorized();
+                }
+                Map<String, Object> body = optionalBody.get();
+                return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
+            } else if (request.getContentType().get().equals(MediaType.APPLICATION_JSON_TYPE)) {
+                Optional<PasswordChangeForm> optionalBody = Mono.from(jsonParser.parseBody(request, PasswordChangeForm.class)).blockOptional();
+                if (optionalBody.isEmpty()) {
+                    return HttpResponse.unauthorized();
+                }
+                PasswordChangeForm body = optionalBody.get();
+                return body.csrfToken() != null && body.csrfToken().equals("abcde") ? null : HttpResponse.unauthorized();
+            }
+            return HttpResponse.unauthorized();
         }
     }
 
@@ -113,5 +144,13 @@ public class FormUrlEncodedBodyInRequestFilterTest {
     record PasswordChange(
             String username,
             String password) {
+    }
+
+
+    @Introspected
+    record PasswordChangeForm(
+            String username,
+            String password,
+            String csrfToken) {
     }
 }
