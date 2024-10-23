@@ -33,15 +33,19 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 
+/**
+ * {@link JsonFilterBodyParser} implementation which leverages {@link ServerHttpRequest#byteBody()} API and a  {@link JsonMapper}.
+ * @param <T> Body type
+ */
 @Singleton
 @Requires(bean = JsonMapper.class)
 @Requires(missingBeans = JsonFilterBodyParser.class)
 @Experimental
-public class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
+final class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyJsonFilterBodyParser.class);
     private final JsonMapper jsonMapper;
 
-    public NettyJsonFilterBodyParser(JsonMapper jsonMapper) {
+    NettyJsonFilterBodyParser(JsonMapper jsonMapper) {
         this.jsonMapper = jsonMapper;
     }
 

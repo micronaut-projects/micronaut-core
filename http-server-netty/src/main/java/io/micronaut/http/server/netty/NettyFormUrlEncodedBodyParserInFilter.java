@@ -40,7 +40,7 @@ import java.util.*;
 @Requires(missingBeans = FormUrlEncodedFilterBodyParser.class)
 @Singleton
 @Experimental
-public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
+final class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
 
     @Override
     @NonNull
