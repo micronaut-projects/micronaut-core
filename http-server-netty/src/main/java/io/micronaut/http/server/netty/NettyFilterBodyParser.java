@@ -55,7 +55,6 @@ final class NettyFilterBodyParser implements FilterBodyParser {
     private final Integer maxParams;
     private final JsonMapper jsonMapper;
 
-
     /**
      * @param jsonMapper JSON Mapper
      * @param httpServerConfiguration HTTP Server configuration
@@ -89,21 +88,21 @@ final class NettyFilterBodyParser implements FilterBodyParser {
         return Publishers.empty();
     }
 
-        private Mono<Map<String, Object>> parseJson(@NonNull ServerHttpRequest<?> request) {
-            try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
-                return Mono.fromFuture(closeableByteBody.buffer())
-                        .flatMap(bb -> {
-                            try {
-                                return Mono.just(jsonMapper.readValue(bb.toByteArray(), Argument.mapOf(String.class, Object.class)));
-                            } catch (IOException e) {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("could not bind JSON body to Map");
-                                }
-                                return Mono.error(e);
+    private Mono<Map<String, Object>> parseJson(@NonNull ServerHttpRequest<?> request) {
+        try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
+            return Mono.fromFuture(closeableByteBody.buffer())
+                    .flatMap(bb -> {
+                        try {
+                            return Mono.just(jsonMapper.readValue(bb.toByteArray(), Argument.mapOf(String.class, Object.class)));
+                        } catch (IOException e) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("could not bind JSON body to Map");
                             }
-                        });
-            }
+                            return Mono.error(e);
+                        }
+                    });
         }
+    }
 
     private Mono<Map<String, Object>> parseFormUrlEncoded(@NonNull ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
