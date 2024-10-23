@@ -51,7 +51,7 @@ public class NettyFormUrlEncodedBodyParserInFilter implements FilterBodyParser<M
         if (request instanceof ServerHttpRequest<?> serverHttpRequest) {
             return parseBody(serverHttpRequest);
         }
-        return null;
+        return Publishers.empty();
     }
 
     private Mono<Map<String, Object>> parseBody(@NonNull ServerHttpRequest<?> request) {
