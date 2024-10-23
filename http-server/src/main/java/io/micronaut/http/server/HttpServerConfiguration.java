@@ -122,6 +122,11 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
 
+    /**
+     * The default max of number of parameters for parsing a form-url-encoded body to a map in a filter.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_FILTER_BODY_PARSER_FORM_MAX_PARAMS = 20;
 
     /**
      * The default value whether to dispatch OPTIONS Requests.
@@ -156,6 +161,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
     private boolean notFoundOnMissingBody = true;
+    private int filterBodyParserFormMaxParams = DEFAULT_FILTER_BODY_PARSER_FORM_MAX_PARAMS;
 
     /**
      * Default constructor.
@@ -597,6 +603,22 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setNotFoundOnMissingBody(boolean notFoundOnMissingBody) {
         this.notFoundOnMissingBody = notFoundOnMissingBody;
+    }
+
+    /**
+     *
+     * @return max of number of parameters for parsing a form-url-encoded body to a map in a filter
+     */
+    public int getFilterBodyParserFormMaxParams() {
+        return filterBodyParserFormMaxParams;
+    }
+
+    /**
+     *
+     * @param filterBodyParserFormMaxParams max of number of parameters for parsing a form-url-encoded body to a map in a filter
+     */
+    public void setFilterBodyParserFormMaxParams(int filterBodyParserFormMaxParams) {
+        this.filterBodyParserFormMaxParams = filterBodyParserFormMaxParams;
     }
 
     /**

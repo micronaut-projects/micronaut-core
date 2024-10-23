@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
@@ -27,6 +26,7 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.filter.bodyparser.FormUrlEncodedFilterBodyParser;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -45,14 +45,15 @@ import java.util.*;
 final class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
     private final Integer maxParams;
     private final ConversionService conversionService;
+
     /**
      *
-     * @param maxParams Max Parameters passed to {@link QueryStringDecoder} to avoid denials of service attack.
+     * @param httpServerConfiguration HTTP Server configuration
      * @param conversionService ConversionService
      */
-    NettyFormUrlEncodedBodyParserInFilter(@Value("${micronaut.http.server.filter.body-parser.form-url-encoded.max-params:20}") Integer maxParams,
-                                          ConversionService conversionService) {
-        this.maxParams = maxParams;
+    NettyFormUrlEncodedBodyParserInFilter(ConversionService conversionService,
+                                          HttpServerConfiguration httpServerConfiguration) {
+        this.maxParams = httpServerConfiguration.getFilterBodyParserFormMaxParams();
         this.conversionService = conversionService;
     }
 
