@@ -47,10 +47,7 @@ public class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
 
     @Override
     public Publisher<T> parseBody(HttpRequest<?> request, Class<T> type) {
-        if (request.getContentType().isEmpty()) {
-            return Publishers.empty();
-        }
-        if (!request.getContentType().get().equals(getContentType())) {
+        if (!supportsRequestContentType(request)) {
             return Publishers.empty();
         }
         if (request instanceof ServerHttpRequest<?> serverHttpRequest) {

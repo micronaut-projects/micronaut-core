@@ -17,10 +17,13 @@ package io.micronaut.http.filter.bodyparser;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import org.reactivestreams.Publisher;
 import reactor.util.annotation.NonNull;
+
+import java.util.Optional;
 
 /**
  * API to parse a body within a filter.
@@ -43,4 +46,18 @@ public interface FilterBodyParser<T> {
      * @return Supported Request's content type
      */
     MediaType getContentType();
+
+    /**
+     *
+     * @param request Request
+     * @return whether the request's content type is supported by this parser.
+     */
+    default boolean supportsRequestContentType(@NonNull HttpRequest<?> request) {
+        final Optional<MediaType> contentTypeOptional = request.getContentType();
+        if (contentTypeOptional.isEmpty()) {
+            return false;
+        }
+        final MediaType contentType = contentTypeOptional.get();
+        return contentType.equals(getContentType());
+    }
 }

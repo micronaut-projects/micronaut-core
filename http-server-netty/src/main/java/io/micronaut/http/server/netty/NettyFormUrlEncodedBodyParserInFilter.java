@@ -29,10 +29,8 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 
 /**
  * Implementation of {@link FormUrlEncodedFilterBodyParser} which leverages {@link ServerHttpRequest#byteBody()} API and Netty {@link QueryStringDecoder}.
@@ -48,10 +46,7 @@ public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilt
     @NonNull
     @SingleResult
     public Publisher<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
-        if (request.getContentType().isEmpty()) {
-            return Publishers.empty();
-        }
-        if (!request.getContentType().get().equals(getContentType())) {
+        if (!supportsRequestContentType(request)) {
             return Publishers.empty();
         }
         if (request instanceof ServerHttpRequest<?> serverHttpRequest) {
