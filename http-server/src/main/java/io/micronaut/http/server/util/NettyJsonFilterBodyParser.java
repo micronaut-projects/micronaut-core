@@ -18,6 +18,7 @@ package io.micronaut.http.server.util;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
@@ -35,13 +36,12 @@ import java.io.IOException;
 
 /**
  * {@link JsonFilterBodyParser} implementation which leverages {@link ServerHttpRequest#byteBody()} API and a  {@link JsonMapper}.
- * @param <T> Body type
  */
 @Singleton
 @Requires(bean = JsonMapper.class)
 @Requires(missingBeans = JsonFilterBodyParser.class)
 @Experimental
-final class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
+final class NettyJsonFilterBodyParser implements JsonFilterBodyParser {
     private static final Logger LOG = LoggerFactory.getLogger(NettyJsonFilterBodyParser.class);
     private final JsonMapper jsonMapper;
 
@@ -50,7 +50,9 @@ final class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
     }
 
     @Override
-    public Publisher<T> parseBody(HttpRequest<?> request, Class<T> type) {
+    @NonNull
+    @SingleResult
+    public <T> Publisher<T> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<T> type) {
         if (!supportsRequestContentType(request)) {
             return Publishers.empty();
         }
@@ -60,7 +62,7 @@ final class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
         return Publishers.empty();
     }
 
-    private Mono<T> parseBodyInServerHttpRequest(@NonNull ServerHttpRequest<?> request, Class<T> type) {
+    private <T> Mono<T> parseBodyInServerHttpRequest(@NonNull ServerHttpRequest<?> request, Class<T> type) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return Mono.fromFuture(closeableByteBody.buffer())
                     .mapNotNull(bb -> {

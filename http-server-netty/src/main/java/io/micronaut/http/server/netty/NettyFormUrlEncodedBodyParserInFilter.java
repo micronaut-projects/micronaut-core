@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
@@ -43,33 +44,40 @@ import java.util.*;
 @Experimental
 final class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
     private final Integer maxParams;
-
+    private final ConversionService conversionService;
     /**
      *
      * @param maxParams Max Parameters passed to {@link QueryStringDecoder} to avoid denials of service attack.
+     * @param conversionService ConversionService
      */
-    NettyFormUrlEncodedBodyParserInFilter(@Value("${micronaut.http.server.filter.body-parser.form-url-encoded.max-params:20}") Integer maxParams) {
+    NettyFormUrlEncodedBodyParserInFilter(@Value("${micronaut.http.server.filter.body-parser.form-url-encoded.max-params:20}") Integer maxParams,
+                                          ConversionService conversionService) {
         this.maxParams = maxParams;
+        this.conversionService = conversionService;
     }
 
     @Override
     @NonNull
     @SingleResult
-    public Publisher<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
+    public <T> Publisher<T> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<T> type) {
         if (!supportsRequestContentType(request)) {
             return Publishers.empty();
         }
         if (request instanceof ServerHttpRequest<?> serverHttpRequest) {
-            return parseBody(serverHttpRequest);
+            return parseBody(serverHttpRequest, type);
         }
         return Publishers.empty();
     }
 
-    private Mono<Map<String, Object>> parseBody(@NonNull ServerHttpRequest<?> request) {
+    private <T> Mono<T> parseBody(@NonNull ServerHttpRequest<?> request, @NonNull Class<T> type) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return Mono.fromFuture(closeableByteBody.buffer())
                     .map(bb -> bb.toString(request.getCharacterEncoding()))
-                    .map(str -> parse(request, str));
+                    .map(str -> parse(request, str))
+                    .mapNotNull(m -> {
+                        Optional<T> optionalT = conversionService.convert(m, type);
+                        return optionalT.orElse(null);
+                    });
         }
     }
 

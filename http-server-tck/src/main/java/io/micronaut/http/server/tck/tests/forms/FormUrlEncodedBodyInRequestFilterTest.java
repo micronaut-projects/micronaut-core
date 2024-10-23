@@ -103,10 +103,10 @@ public class FormUrlEncodedBodyInRequestFilterTest {
     @ServerFilter(ServerFilter.MATCH_ALL_PATTERN)
     static class CsrfFilter {
         private final FormUrlEncodedFilterBodyParser bodyParser;
-        private final JsonFilterBodyParser<PasswordChangeForm> jsonParser;
+        private final JsonFilterBodyParser jsonParser;
 
         CsrfFilter(FormUrlEncodedFilterBodyParser bodyParser,
-                   JsonFilterBodyParser<PasswordChangeForm> jsonParser) {
+                   JsonFilterBodyParser jsonParser) {
             this.bodyParser = bodyParser;
             this.jsonParser = jsonParser;
         }
@@ -120,11 +120,11 @@ public class FormUrlEncodedBodyInRequestFilterTest {
                 return HttpResponse.unauthorized();
             }
             if (request.getContentType().get().equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
-                Optional<Map<String, Object>> optionalBody = Mono.from(bodyParser.parseBody(request)).blockOptional();
+                Optional<Map> optionalBody = Mono.from(bodyParser.parseBody(request, Map.class)).blockOptional();
                 if (optionalBody.isEmpty()) {
                     return HttpResponse.unauthorized();
                 }
-                Map<String, Object> body = optionalBody.get();
+                Map body = optionalBody.get();
                 return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
             } else if (request.getContentType().get().equals(MediaType.APPLICATION_JSON_TYPE)) {
                 Optional<PasswordChangeForm> optionalBody = Mono.from(jsonParser.parseBody(request, PasswordChangeForm.class)).blockOptional();

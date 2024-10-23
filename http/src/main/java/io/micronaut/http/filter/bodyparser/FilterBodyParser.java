@@ -17,7 +17,6 @@ package io.micronaut.http.filter.bodyparser;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import org.reactivestreams.Publisher;
@@ -29,17 +28,17 @@ import java.util.Optional;
  * API to parse a body within a filter.
  * @author Sergio del Amo
  * @since 4.7.1
- *  @param <T> Body Type
  */
 @Experimental
-public interface FilterBodyParser<T> {
+public interface FilterBodyParser {
     /**
      * @param request HTTP Request
      * @param type The type to parse the body into
      * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to the requested type.
+     *  @param <T> Body Type
      */
     @SingleResult
-    Publisher<T> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<T> type);
+    <T> Publisher<T> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<T> type);
 
     /**
      *

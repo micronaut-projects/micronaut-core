@@ -16,13 +16,7 @@
 package io.micronaut.http.filter.bodyparser;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import org.reactivestreams.Publisher;
-import reactor.util.annotation.NonNull;
-
-import java.util.Map;
 
 /**
  * Implementation of {@link FilterBodyParser} for a request with Form Url Encoded content type.
@@ -30,20 +24,9 @@ import java.util.Map;
  * @since 4.7.1
  */
 @Experimental
-public interface FormUrlEncodedFilterBodyParser extends FilterBodyParser<Map<String, Object>> {
+public interface FormUrlEncodedFilterBodyParser extends FilterBodyParser {
     @Override
     default MediaType getContentType() {
         return MediaType.APPLICATION_FORM_URLENCODED_TYPE;
     }
-
-    @Override
-    @NonNull
-    @SingleResult
-    default Publisher<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request, @NonNull Class<Map<String, Object>> type) {
-        return parseBody(request);
-    }
-
-    @NonNull
-    @SingleResult
-    Publisher<Map<String, Object>> parseBody(HttpRequest<?> request);
 }
