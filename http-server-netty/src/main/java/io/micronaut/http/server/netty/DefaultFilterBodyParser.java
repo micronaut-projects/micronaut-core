@@ -21,15 +21,14 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.form.FormUrlEncodedDecoder;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.filter.FilterBodyParser;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
-import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -41,27 +40,26 @@ import java.util.*;
 
 /**
  * Implementation of {@link FilterBodyParser} which leverages {@link ServerHttpRequest#byteBody()} API.
- * For form-url-encoded payloads it uses Netty {@link QueryStringDecoder}.
+ * For form-url-encoded payloads it uses the {@link FormUrlEncodedDecoder} API.
  * For JSON payloads it uses a {@link JsonMapper}.
  * @author Sergio del Amo
  * @since 4.11.0
  */
-@Requires(bean = JsonMapper.class)
-@Requires(missingBeans = FilterBodyParser.class)
+@Requires(beans = {JsonMapper.class, FormUrlEncodedDecoder.class})
 @Singleton
 @Experimental
-final class NettyFilterBodyParser implements FilterBodyParser {
-    private static final Logger LOG = LoggerFactory.getLogger(NettyFilterBodyParser.class);
-    private final Integer maxParams;
+final class DefaultFilterBodyParser implements FilterBodyParser {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultFilterBodyParser.class);
     private final JsonMapper jsonMapper;
+    private final FormUrlEncodedDecoder formUrlEncodedDecoder;
 
     /**
      * @param jsonMapper JSON Mapper
-     * @param httpServerConfiguration HTTP Server configuration
+     * @param formUrlEncodedDecoder Decoder for form-url-encoded payload
      */
-    NettyFilterBodyParser(HttpServerConfiguration httpServerConfiguration,
-                          JsonMapper jsonMapper) {
-        this.maxParams = httpServerConfiguration.getFilterBodyParserFormMaxParams();
+    DefaultFilterBodyParser(FormUrlEncodedDecoder formUrlEncodedDecoder,
+                            JsonMapper jsonMapper) {
+        this.formUrlEncodedDecoder = formUrlEncodedDecoder;
         this.jsonMapper = jsonMapper;
     }
 
@@ -108,23 +106,7 @@ final class NettyFilterBodyParser implements FilterBodyParser {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return Mono.fromFuture(closeableByteBody.buffer())
                     .map(bb -> bb.toString(request.getCharacterEncoding()))
-                    .map(str -> parse(request, str));
+                    .map(str -> formUrlEncodedDecoder.decode(str, request.getCharacterEncoding()));
         }
-    }
-
-    private Map<String, Object> parse(@NonNull ServerHttpRequest<?> request, String formUrlEncoded) {
-        QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncoded, request.getCharacterEncoding(), false, maxParams);
-        Map<String, List<String>> parameters = decoder.parameters();
-        Map<String, Object> result = new LinkedHashMap<>(parameters.size());
-        parameters.forEach((k, v) -> {
-            if (v.size() > 1) {
-                result.put(k, v);
-            } else if (v.size() == 1) {
-                result.put(k, v.get(0));
-            } else {
-                result.put(k, null);
-            }
-        });
-        return result;
     }
 }
