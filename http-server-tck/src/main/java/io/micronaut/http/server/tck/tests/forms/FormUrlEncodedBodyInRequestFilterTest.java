@@ -28,10 +28,9 @@ import io.micronaut.http.tck.TestScenario;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 @SuppressWarnings({
         "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -109,11 +108,14 @@ public class FormUrlEncodedBodyInRequestFilterTest {
         @RequestFilter
         @Nullable
         public HttpResponse<?> csrfFilter(@NonNull HttpRequest<?> request) {
-            Optional<Map<String, Object>> bodyOptional = Mono.from(bodyParser.parseBody(request)).blockOptional();
-            if (bodyOptional.isEmpty()) {
+            Map<String, Object> body = null;
+            try {
+                body = bodyParser.parseBody(request).get();
+            } catch (InterruptedException e) {
+                return HttpResponse.unauthorized();
+            } catch (ExecutionException e) {
                 return HttpResponse.unauthorized();
             }
-            Map<String, Object> body = bodyOptional.get();
             return body.containsKey("csrfToken") && body.get("csrfToken").equals("abcde") ? null : HttpResponse.unauthorized();
         }
     }

@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.form.FormUrlEncodedDecoder;
 import io.micronaut.http.HttpRequest;
@@ -30,13 +29,13 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.filter.FilterBodyParser;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Implementation of {@link FilterBodyParser} which leverages {@link ServerHttpRequest#byteBody()} API.
@@ -66,15 +65,15 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
     @Override
     @NonNull
     @SingleResult
-    public Publisher<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
+    public CompletableFuture<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
         Optional<MediaType> mediaTypeOptional = request.getContentType();
         if (mediaTypeOptional.isEmpty()) {
             LOG.debug("Could not parse body into a Map because the request does not have a Content-Type");
-            return Publishers.empty();
+            return CompletableFuture.completedFuture(Collections.emptyMap());
         }
         if (!(request instanceof ServerHttpRequest<?>)) {
             LOG.debug("Could not parse body into a Map because the request is not an instance of ServerHttpRequest");
-            return Publishers.empty();
+            return CompletableFuture.completedFuture(Collections.emptyMap());
         }
         MediaType contentType = mediaTypeOptional.get();
         if (contentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
@@ -83,30 +82,27 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
             return parseJson((ServerHttpRequest<?>) request);
         }
         LOG.debug("Could not parse body into a Map because the request's content type is not either application/x-www-form-urlencoded or application/json");
-        return Publishers.empty();
+        return CompletableFuture.completedFuture(Collections.emptyMap());
     }
 
-    private Mono<Map<String, Object>> parseJson(@NonNull ServerHttpRequest<?> request) {
+    private CompletableFuture<Map<String, Object>> parseJson(@NonNull ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
-            return Mono.fromFuture(closeableByteBody.buffer())
-                    .flatMap(bb -> {
-                        try {
-                            return Mono.just(jsonMapper.readValue(bb.toByteArray(), Argument.mapOf(String.class, Object.class)));
-                        } catch (IOException e) {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("could not bind JSON body to Map");
-                            }
-                            return Mono.error(e);
-                        }
-                    });
+            return closeableByteBody.buffer()
+                .thenApply(bb -> {
+                    try {
+                        return jsonMapper.readValue(bb.toByteArray(), Argument.mapOf(String.class, Object.class));
+                    } catch (IOException e) {
+                        throw new CompletionException(e);
+                    }
+                });
         }
     }
 
-    private Mono<Map<String, Object>> parseFormUrlEncoded(@NonNull ServerHttpRequest<?> request) {
+    private CompletableFuture<Map<String, Object>> parseFormUrlEncoded(@NonNull ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
-            return Mono.fromFuture(closeableByteBody.buffer())
-                    .map(bb -> bb.toString(request.getCharacterEncoding()))
-                    .map(str -> formUrlEncodedDecoder.decode(str, request.getCharacterEncoding()));
+            return closeableByteBody.buffer()
+                    .thenApply(bb -> bb.toString(request.getCharacterEncoding()))
+                    .thenApply(str -> formUrlEncodedDecoder.decode(str, request.getCharacterEncoding()));
         }
     }
 }
