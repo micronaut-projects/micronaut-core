@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import io.micronaut.http.filter.FilterBodyParser;
+import io.micronaut.http.server.filter.FilterBodyParser;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;

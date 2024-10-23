@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.filter;
+package io.micronaut.http.server.filter;
 
+import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import reactor.util.annotation.NonNull;
@@ -28,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @Experimental
 @FunctionalInterface
+@DefaultImplementation(DefaultFilterBodyParser.class)
 public interface FilterBodyParser {
     /**
      * @param request HTTP Request
