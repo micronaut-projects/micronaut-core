@@ -9,6 +9,7 @@ dependencies {
     api project(":context")
     api project(":core-reactive")
     api(project(":context-propagation"))
+    compileOnly(project(":json-core"))
     implementation libs.managed.reactor
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.kotlinx.coroutines.reactor
