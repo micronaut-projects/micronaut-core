@@ -32,6 +32,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Optional;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -68,7 +69,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>An updated {@link HttpRequest}</li>
  *     <li>A {@link HttpResponse} to skip execution of the request</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
- *     delay further execution</li>
+ *     delay further execution.
+ *     If the return type is {@code Publisher<java.util.Optional<HttpResponse>>},
+ *     To immediately continue execution, the method should return a publisher
+ *     with an empty {@code Optional} - for example, with {@code Mono.just(Optional.empty())}.</li>
  * </ul>
  *
  * @since 4.0.0
