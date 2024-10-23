@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.filter.bodyparser;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -28,6 +29,7 @@ import java.util.Map;
  * @author Sergio del Amo
  * @since 4.7.1
  */
+@Experimental
 public interface FormUrlEncodedFilterBodyParser extends FilterBodyParser<Map<String, Object>> {
     @Override
     default MediaType getContentType() {

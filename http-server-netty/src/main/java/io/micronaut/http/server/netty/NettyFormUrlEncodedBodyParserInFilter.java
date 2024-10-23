@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
@@ -34,6 +35,7 @@ import java.util.Map;
 
 @Requires(missingBeans = FormUrlEncodedFilterBodyParser.class)
 @Singleton
+@Experimental
 public class NettyFormUrlEncodedBodyParserInFilter implements FormUrlEncodedFilterBodyParser {
 
     @Override

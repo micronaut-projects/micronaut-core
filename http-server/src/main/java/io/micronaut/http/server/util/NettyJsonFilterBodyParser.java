@@ -16,6 +16,7 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
@@ -35,6 +36,7 @@ import java.io.IOException;
 @Singleton
 @Requires(bean = JsonMapper.class)
 @Requires(missingBeans = JsonFilterBodyParser.class)
+@Experimental
 public class NettyJsonFilterBodyParser<T> implements JsonFilterBodyParser<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyJsonFilterBodyParser.class);
     private final JsonMapper jsonMapper;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.filter.bodyparser;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -27,6 +28,7 @@ import reactor.util.annotation.NonNull;
  * @since 4.7.1
  *  @param <T> Body Type
  */
+@Experimental
 public interface FilterBodyParser<T> {
     /**
      * @param request HTTP Request

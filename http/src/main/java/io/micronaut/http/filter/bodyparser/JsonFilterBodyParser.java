@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.filter.bodyparser;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 
 /**
@@ -23,6 +24,7 @@ import io.micronaut.http.MediaType;
  * @since 4.7.1
  * @param <T> Body type
  */
+@Experimental
 public interface JsonFilterBodyParser<T> extends FilterBodyParser<T> {
     @Override
     default MediaType getContentType() {
