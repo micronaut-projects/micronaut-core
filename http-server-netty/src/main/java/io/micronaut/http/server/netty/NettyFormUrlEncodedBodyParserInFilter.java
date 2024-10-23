@@ -33,6 +33,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implementation of {@link FormUrlEncodedFilterBodyParser} which leverages {@link ServerHttpRequest#byteBody()} API and Netty {@link QueryStringDecoder}.
+ * @author Sergio del Amo
+ * @since 4.11.0
+ */
 @Requires(missingBeans = FormUrlEncodedFilterBodyParser.class)
 @Singleton
 @Experimental
