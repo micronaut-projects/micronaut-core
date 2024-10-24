@@ -48,6 +48,7 @@ import java.util.concurrent.CompletionException;
 @Experimental
 final class DefaultFilterBodyParser implements FilterBodyParser {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultFilterBodyParser.class);
+    private static final @NonNull Argument<Map<String, Object>> MAP_STRING_OBJECT_ARGUMENT = Argument.mapOf(String.class, Object.class);
     private final JsonMapper jsonMapper;
     private final FormUrlEncodedDecoder formUrlEncodedDecoder;
 
@@ -89,7 +90,7 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
             return closeableByteBody.buffer()
                 .thenApply(bb -> {
                     try {
-                        return jsonMapper.readValue(bb.toByteArray(), Argument.mapOf(String.class, Object.class));
+                        return jsonMapper.readValue(bb.toByteArray(), MAP_STRING_OBJECT_ARGUMENT);
                     } catch (IOException e) {
                         throw new CompletionException(e);
                     }
