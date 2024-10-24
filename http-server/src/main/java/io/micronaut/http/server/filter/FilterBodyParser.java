@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * API to parse a body within a filter.
+ * API to parse a request body within a server filter.
  * @author Sergio del Amo
  * @since 4.7.1
  */
