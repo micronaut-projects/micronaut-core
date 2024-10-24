@@ -157,10 +157,6 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
-        if (reader != null && context.getArgument().getType().equals(Object.class)) {
-            // Prevent random object convertors
-            reader = null;
-        }
         if (reader == null && nhr.isFormOrMultipartData()) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
             ByteBuf buf = AvailableNettyByteBody.toByteBuf(imm);
@@ -202,9 +198,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             nhr.setLegacyBody(converted.orElse(null));
             return converted;
         }
-        ByteBuffer<?> byteBuffer = imm.toByteBuffer();
         if (reader != null) {
-            T result = read(context, reader, nhr.getHeaders(), mediaType, byteBuffer);
+            T result = read(context, reader, nhr.getHeaders(), mediaType, imm.toByteBuffer());
             nhr.setLegacyBody(result);
             return Optional.ofNullable(result);
         }

@@ -38,6 +38,6 @@ public interface TypedMessageBodyReader<T> extends MessageBodyReader<T> {
 
     @Override
     default boolean isReadable(Argument<T> type, MediaType mediaType) {
-        return type.isAssignableFrom(getType());
+        return type.isAssignableFrom(getType()) && !type.getType().equals(Object.class);
     }
 }
