@@ -26,6 +26,8 @@ import java.util.concurrent.CompletableFuture;
  * API to parse a request body within a server filter.
  * @author Sergio del Amo
  * @since 4.7.1
+ * @see io.micronaut.http.filter.HttpServerFilter
+ * @see io.micronaut.http.annotation.ServerFilter
  */
 @Experimental
 @FunctionalInterface
