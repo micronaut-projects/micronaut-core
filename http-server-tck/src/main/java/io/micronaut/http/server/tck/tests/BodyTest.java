@@ -184,6 +184,19 @@ public class BodyTest {
             .run();
     }
 
+    @Test
+    void testObjectBody() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.POST("/response-body/object", Map.of("fizz", "buzz")))
+            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.CREATED)
+                    .body("obj: {fizz=buzz}")
+                    .build()))
+            .run();
+    }
+
     @Controller("/response-body")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -252,6 +265,14 @@ public class BodyTest {
         @Get(uri = "/redirect-future")
         CompletableFuture<HttpResponse<?>> redirectFuture() {
             return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.FOUND).header("Location", "https://example.com"));
+        }
+
+        @SuppressWarnings("DefaultAnnotationParam")
+        @Post(uri = "/object", consumes = MediaType.TEXT_PLAIN)
+        @Status(HttpStatus.CREATED)
+        @Consumes(MediaType.APPLICATION_JSON)
+        String objectBody(@Body Object obj) {
+            return "obj: " + obj;
         }
     }
 
