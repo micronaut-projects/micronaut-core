@@ -4561,6 +4561,14 @@ abstract class Test {
         expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
+        !beanIntrospection.isBuildable()
+
+        when:
+        beanIntrospection.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
     }
 
     void "test introspection on abstract class with custom getter"() {

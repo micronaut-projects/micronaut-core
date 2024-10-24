@@ -232,15 +232,19 @@ internal open class KotlinClassElement(
         if (defaultConstructor.isPresent) {
             defaultConstructor
         } else {
-            Optional.ofNullable(declaration.primaryConstructor)
-                .filter { !it.isPrivate() && it.parameters.isEmpty() }
-                .map {
-                    visitorContext.elementFactory.newConstructorElement(
-                        this,
-                        it,
-                        elementAnnotationMetadataFactory
-                    )
-                }
+            if (isAbstract) {
+                Optional.empty()
+            } else {
+                Optional.ofNullable(declaration.primaryConstructor)
+                    .filter { !it.isPrivate() && it.parameters.isEmpty() }
+                    .map {
+                        visitorContext.elementFactory.newConstructorElement(
+                            this,
+                            it,
+                            elementAnnotationMetadataFactory
+                        )
+                    }
+            }
         }
     }
 
