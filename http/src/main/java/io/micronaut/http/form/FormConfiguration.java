@@ -23,7 +23,7 @@ package io.micronaut.http.form;
 public interface FormConfiguration {
     /**
      *
-     * @return default maximum of decoded key value parameters
+     * @return default maximum of decoded key value parameters. It defaults to 1024.
      */
     int getMaxDecodedKeyValueParameters();
 }
