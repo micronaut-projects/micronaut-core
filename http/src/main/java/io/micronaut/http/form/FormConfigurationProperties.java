@@ -40,6 +40,7 @@ final class FormConfigurationProperties implements FormConfiguration {
      *
      * @return default maximum of decoded key value parameters
      */
+    @Override
     public int getMaxDecodedKeyValueParameters() {
         return maxDecodedKeyValueParameters;
     }
