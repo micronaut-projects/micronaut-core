@@ -68,11 +68,15 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
     public CompletableFuture<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
         Optional<MediaType> mediaTypeOptional = request.getContentType();
         if (mediaTypeOptional.isEmpty()) {
-            LOG.debug("Could not parse body into a Map because the request does not have a Content-Type");
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Could not parse body into a Map because the request does not have a Content-Type");
+            }
             return CompletableFuture.completedFuture(Collections.emptyMap());
         }
         if (!(request instanceof ServerHttpRequest<?>)) {
-            LOG.debug("Could not parse body into a Map because the request is not an instance of ServerHttpRequest");
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Could not parse body into a Map because the request is not an instance of ServerHttpRequest");
+            }
             return CompletableFuture.completedFuture(Collections.emptyMap());
         }
         MediaType contentType = mediaTypeOptional.get();
@@ -81,7 +85,9 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
         } else if (contentType.equals(MediaType.APPLICATION_JSON_TYPE)) {
             return parseJson((ServerHttpRequest<?>) request);
         }
-        LOG.debug("Could not parse body into a Map because the request's content type is not either application/x-www-form-urlencoded or application/json");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Could not parse body into a Map because the request's content type is not either application/x-www-form-urlencoded or application/json");
+        }
         return CompletableFuture.completedFuture(Collections.emptyMap());
     }
 
