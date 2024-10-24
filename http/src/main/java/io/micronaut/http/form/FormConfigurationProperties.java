@@ -17,8 +17,17 @@ package io.micronaut.http.form;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-@ConfigurationProperties("micronaut.form")
+/**
+ * {@link ConfigurationProperties} implementation of {@link FormConfiguration}.
+ * @author Sergio del Amo
+ * @since 4.7.1
+ */
+@ConfigurationProperties(FormConfigurationProperties.PREFIX)
 final class FormConfigurationProperties implements FormConfiguration {
+    /**
+     * Prefix for Micronaut form settings.
+     */
+    public static final String PREFIX = "micronaut.form";
     /**
      * The default maximum of decoded key value parameters used in {@link io.micronaut.http.form.FormUrlEncodedDecoder}.
      */
