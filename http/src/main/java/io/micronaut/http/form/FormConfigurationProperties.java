@@ -27,7 +27,7 @@ final class FormConfigurationProperties implements FormConfiguration {
     /**
      * Prefix for Micronaut form settings.
      */
-    public static final String PREFIX = "micronaut.form";
+    public static final String PREFIX = "micronaut.http.forms";
     /**
      * The default maximum of decoded key value parameters used in {@link io.micronaut.http.form.FormUrlEncodedDecoder}.
      */
