@@ -235,7 +235,18 @@ final class QueryStringDecoder {
      * @return URI parameters map
      */
     static Map<String, List<String>> decodeParams(String uri) {
-        return decodeParams(uri, findPathEndIndex(uri), StandardCharsets.UTF_8, DEFAULT_MAX_PARAMS);
+        return decodeParams(uri, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Helper method to decode parameters map from URI string.
+     *
+     * @param uri URI string
+     *
+     * @return URI parameters map
+     */
+    static Map<String, List<String>> decodeParams(String uri, Charset charset) {
+        return decodeParams(uri, findPathEndIndex(uri), charset, DEFAULT_MAX_PARAMS);
     }
 
     private static String uriToString(URI uri) {

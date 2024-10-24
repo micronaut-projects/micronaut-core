@@ -122,7 +122,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
 
-
     /**
      * The default value whether to dispatch OPTIONS Requests.
      */
