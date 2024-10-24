@@ -16,6 +16,7 @@
 package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.StringUtils;
 import reactor.util.annotation.NonNull;
 
 import java.nio.charset.Charset;
@@ -49,7 +50,7 @@ public interface FormUrlEncodedDecoder {
         parameters.forEach((k, v) -> {
             if (v.size() > 1) {
                 result.put(k, v);
-            } else if (v.size() == 1) {
+            } else if (v.size() == 1 && StringUtils.isNotEmpty(v.get(0))) {
                 result.put(k, v.get(0));
             } else {
                 result.put(k, null);
