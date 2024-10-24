@@ -34,6 +34,9 @@ import java.util.concurrent.CompletableFuture;
 @DefaultImplementation(DefaultFilterBodyParser.class)
 public interface FilterBodyParser {
     /**
+     * Attempts to parse the request body into a Map.
+     * The default implementation {@link DefaultFilterBodyParser} uses {@link io.micronaut.http.form.FormUrlEncodedDecoder} for form-url-encoded payloads and a {@link io.micronaut.json.JsonMapper} for JSON payloads.
+     * For form-url-encoded payloads are first decoded into a Map with key {@code String} and value {@code List<String>} is flattened to a Map of key {@code String} and value {@code Object>}. If the value is a list of 1, the first item of that list becomes the value of the resulting map.
      * @param request HTTP Request
      * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to a Map.
      */
