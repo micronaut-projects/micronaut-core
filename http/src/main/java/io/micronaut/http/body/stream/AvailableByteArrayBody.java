@@ -90,7 +90,7 @@ public final class AvailableByteArrayBody implements CloseableAvailableByteBody,
     }
 
     @Override
-    public @NonNull CloseableByteBody send() {
+    public @NonNull CloseableByteBody move() {
         return new AvailableByteArrayBody(bufferFactory, toByteArray());
     }
 

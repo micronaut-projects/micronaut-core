@@ -6,10 +6,10 @@ import spock.lang.Specification
 import java.nio.charset.StandardCharsets
 
 class AvailableByteArrayBodySpec extends Specification {
-    def 'send'() {
+    def move() {
         given:
         def a = AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, "foo".getBytes(StandardCharsets.UTF_8))
-        def b = a.send()
+        def b = a.move()
 
         when:
         a.close()

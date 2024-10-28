@@ -8,10 +8,10 @@ import spock.lang.Specification
 import java.nio.charset.StandardCharsets
 
 class StreamingNettyByteBodySpec extends Specification {
-    def 'send'() {
+    def move() {
         given:
         def a = NettyBodyAdapter.adapt(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)), new EmbeddedChannel().eventLoop())
-        def b = a.send()
+        def b = a.move()
 
         when:
         a.close()

@@ -6,10 +6,10 @@ import spock.lang.Specification
 import java.nio.charset.StandardCharsets
 
 class AvailableNettyByteBodySpec extends Specification {
-    def 'send'() {
+    def move() {
         given:
         def a = new AvailableNettyByteBody(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8))
-        def b = a.send()
+        def b = a.move()
 
         when:
         a.close()

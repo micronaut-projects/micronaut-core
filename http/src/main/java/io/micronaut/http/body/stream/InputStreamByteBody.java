@@ -162,7 +162,7 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
     }
 
     @Override
-    public @NonNull CloseableByteBody send() {
+    public @NonNull CloseableByteBody move() {
         return new InputStreamByteBody(context, toInputStream());
     }
 

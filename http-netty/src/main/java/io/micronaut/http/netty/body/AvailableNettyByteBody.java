@@ -157,7 +157,7 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     }
 
     @Override
-    public @NonNull CloseableByteBody send() {
+    public @NonNull CloseableByteBody move() {
         return new AvailableNettyByteBody(claim());
     }
 

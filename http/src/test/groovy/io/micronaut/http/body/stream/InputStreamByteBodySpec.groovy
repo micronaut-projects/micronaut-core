@@ -7,11 +7,11 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 class InputStreamByteBodySpec extends Specification {
-    def 'send'() {
+    def move() {
         given:
         def pool = Executors.newCachedThreadPool()
         def a = InputStreamByteBody.create(new ByteArrayInputStream("foo".getBytes(StandardCharsets.UTF_8)), OptionalLong.empty(), pool, ByteArrayBufferFactory.INSTANCE)
-        def b = a.send()
+        def b = a.move()
 
         when:
         a.close()
