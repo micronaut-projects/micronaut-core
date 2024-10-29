@@ -18,7 +18,6 @@ package io.micronaut.http.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
