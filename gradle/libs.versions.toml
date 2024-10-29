@@ -64,6 +64,7 @@ tomlj="1.1.1"
 vertx = "4.5.11"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
+sourcegen-bytecode-generator = "1.5.0"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -300,6 +301,8 @@ httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.r
 mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+sourcegen-bytecode-generator = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bytecode-writer", version.ref = "sourcegen-bytecode-generator" }
 
 [bundles]
 asm = ["asm", "asm-commons"]

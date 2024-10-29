@@ -16,17 +16,28 @@
 package io.micronaut.graal.reflect;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
+import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
+import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.sourcegen.model.AnnotationDef;
+import io.micronaut.sourcegen.model.ClassDef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.FieldDef;
+import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.StatementDef;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.getAnnotationMetadataMethodDef;
 
 /**
  * Generates Runtime executed Graal configuration.
@@ -34,17 +45,17 @@ import java.io.OutputStream;
  * @author graemerocher
  * @since 3.5.0
  */
-final class GraalReflectionMetadataWriter extends AbstractAnnotationMetadataWriter {
+final class GraalReflectionMetadataWriter implements ClassOutputWriter {
 
+    private final ClassElement originatingElement;
+    private final AnnotationMetadata annotationMetadata;
     private final String className;
-    private final String classInternalName;
 
     public GraalReflectionMetadataWriter(ClassElement originatingElement,
-                                         AnnotationMetadata annotationMetadata,
-                                         VisitorContext visitorContext) {
-        super(resolveName(originatingElement), originatingElement, annotationMetadata, true, visitorContext);
-        this.className = targetClassType.getClassName();
-        this.classInternalName = targetClassType.getInternalName();
+                                         AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = annotationMetadata;
+        this.originatingElement = originatingElement;
+        this.className = resolveName(originatingElement);
     }
 
     private static String resolveName(ClassElement originatingElement) {
@@ -53,49 +64,39 @@ final class GraalReflectionMetadataWriter extends AbstractAnnotationMetadataWrit
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElements())) {
-            ClassWriter classWriter = generateClassBytes();
-            outputStream.write(classWriter.toByteArray());
+        ClassTypeDef thisType = ClassTypeDef.of(className);
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElement)) {
+            ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(className)
+                .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", GraalReflectionConfigurer.class.getName()).build())
+                .addSuperinterface(ClassTypeDef.of(GraalReflectionConfigurer.class))
+                .addMethod(getAnnotationMetadataMethodDef(thisType, annotationMetadata));
+
+            Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
+            // write the static initializers for the annotation metadata
+            List<StatementDef> staticInit = new ArrayList<>();
+            AnnotationMetadataGenUtils.writeAnnotationDefault(staticInit, thisType, annotationMetadata, loadTypeMethods);
+
+            FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(
+                thisType,
+                annotationMetadata,
+                loadTypeMethods
+            );
+
+            loadTypeMethods.values().forEach(classDefBuilder::addMethod);
+
+            if (annotationMetadataField != null) {
+                classDefBuilder.addField(annotationMetadataField);
+                if (!staticInit.isEmpty()) {
+                    classDefBuilder.addStaticInitializer(StatementDef.multi(staticInit));
+                }
+            }
+            outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
         }
         classWriterOutputVisitor.visitServiceDescriptor(
             GraalReflectionConfigurer.class,
             className,
-            getOriginatingElement()
+            originatingElement
         );
     }
 
-    private ClassWriter generateClassBytes() {
-        var classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        startService(
-            classWriter,
-            getInternalName(GraalReflectionConfigurer.class.getName()),
-            classInternalName,
-            Type.getType(Object.class),
-            getInternalName(GraalReflectionConfigurer.class.getName())
-        );
-        writeAnnotationMetadataStaticInitializer(classWriter);
-        writeConstructor(classWriter);
-        writeGetAnnotationMetadataMethod(classWriter);
-
-        for (GeneratorAdapter method : loadTypeMethods.values()) {
-            method.visitMaxs(3, 1);
-            method.visitEnd();
-        }
-
-        return classWriter;
-    }
-
-    private void writeConstructor(ClassWriter classWriter) {
-        GeneratorAdapter cv = startConstructor(classWriter);
-
-        // ALOAD 0
-        cv.loadThis();
-        invokeConstructor(cv, Object.class);
-
-        // RETURN
-        cv.visitInsn(RETURN);
-        // MAXSTACK = 2
-        // MAXLOCALS = 1
-        cv.visitMaxs(2, 1);
-    }
 }

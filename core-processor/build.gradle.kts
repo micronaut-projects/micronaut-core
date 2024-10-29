@@ -12,6 +12,7 @@ dependencies {
         exclude(group = "com.google.guava", module = "guava")
     }
     implementation(projects.micronautCoreReactive)
+    api(libs.sourcegen.bytecode.generator)
 
     compileOnly(libs.managed.kotlin.stdlib.jdk8)
 }

@@ -2183,9 +2183,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
                 if (argument.isDeclaredNullable() || isOptional) {
-                    return resolutionContext.findBean(argument, qualifier).orElse(null);
+                    K k = resolutionContext.findBean(argument, qualifier).orElse(null);
+                    return k;
                 }
-                return resolutionContext.getBean(argument, qualifier);
+                K bean = resolutionContext.getBean(argument, qualifier);
+                return bean;
             } finally {
                 if (previousPath != null) {
                     resolutionContext.setConfigurationPath(previousPath);

@@ -17,16 +17,29 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
+import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.sourcegen.model.AnnotationDef;
+import io.micronaut.sourcegen.model.ClassDef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.FieldDef;
+import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.StatementDef;
 
+import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.getAnnotationMetadataMethodDef;
 
 /**
  * Writes configuration classes for configuration packages using ASM.
@@ -37,7 +50,7 @@ import java.io.OutputStream;
  * @since 1.0
  */
 @Internal
-public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
+public class BeanConfigurationWriter implements ClassOutputWriter {
 
     /**
      * Suffix for generated configuration classes.
@@ -45,77 +58,72 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
     public static final String CLASS_SUFFIX = "$BeanConfiguration";
     private final String packageName;
     private final String configurationClassName;
-    private final String configurationClassInternalName;
+    private final Element originatingElement;
+    private final AnnotationMetadata annotationMetadata;
 
     /**
      * @param packageName        The package name
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext          The visitor context
      */
     public BeanConfigurationWriter(
         String packageName,
         Element originatingElement,
-        AnnotationMetadata annotationMetadata,
-        VisitorContext visitorContext) {
-        super(packageName + '.' + CLASS_SUFFIX, originatingElement, annotationMetadata, true, visitorContext);
+        AnnotationMetadata annotationMetadata) {
         this.packageName = packageName;
-        this.configurationClassName = targetClassType.getClassName();
-        this.configurationClassInternalName = targetClassType.getInternalName();
+        this.configurationClassName = packageName + '.' + CLASS_SUFFIX;
+        this.originatingElement = originatingElement;
+        this.annotationMetadata = annotationMetadata;
     }
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElements())) {
-            ClassWriter classWriter = generateClassBytes();
-            outputStream.write(classWriter.toByteArray());
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, originatingElement)) {
+            outputStream.write(generateClassBytes());
         }
         classWriterOutputVisitor.visitServiceDescriptor(
-                BeanConfiguration.class,
-                configurationClassName,
-                getOriginatingElement()
+            BeanConfiguration.class,
+            configurationClassName,
+            originatingElement
         );
     }
 
-    private ClassWriter generateClassBytes() {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    private byte[] generateClassBytes() {
+        ClassTypeDef targetType = ClassTypeDef.of(configurationClassName);
 
-        try {
-            Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
-            Type beanConfigurationType = Type.getType(superType);
+        ClassDef.ClassDefBuilder configurationClassBuilder = ClassDef.builder(configurationClassName)
+            .superclass(ClassTypeDef.of(AbstractBeanConfiguration.class))
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanConfiguration.class.getName()).build());
 
-            startService(classWriter, BeanConfiguration.class, configurationClassInternalName, beanConfigurationType);
-            writeAnnotationMetadataStaticInitializer(classWriter);
+        ClassDef configurationClass = configurationClassBuilder
+            .addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, methodParameters)
+                -> aThis.superRef().invokeConstructor(ExpressionDef.constant(packageName))))
+            .addMethod(getAnnotationMetadataMethodDef(targetType, annotationMetadata))
+            .build();
 
-            writeConstructor(classWriter);
-            writeGetAnnotationMetadataMethod(classWriter);
 
-        } catch (NoSuchMethodException e) {
-            throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Micronaut version?: " + e.getMessage(), e);
+        Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
+        // write the static initializers for the annotation metadata
+        List<StatementDef> staticInit = new ArrayList<>();
+        AnnotationMetadataGenUtils.writeAnnotationDefault(staticInit, targetType, annotationMetadata, loadTypeMethods);
+
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(
+            targetType,
+            annotationMetadata,
+            loadTypeMethods
+        );
+
+        loadTypeMethods.values().forEach(configurationClassBuilder::addMethod);
+
+        if (annotationMetadataField != null) {
+            configurationClassBuilder.addField(annotationMetadataField);
+            if (!staticInit.isEmpty()) {
+                configurationClassBuilder.addStaticInitializer(StatementDef.multi(staticInit));
+            }
         }
-        for (GeneratorAdapter method : loadTypeMethods.values()) {
-            method.visitMaxs(3, 1);
-            method.visitEnd();
-        }
 
-        return classWriter;
+        return new ByteCodeWriter().write(configurationClass);
     }
 
-    private void writeConstructor(ClassWriter classWriter) throws NoSuchMethodException {
-        GeneratorAdapter cv = startConstructor(classWriter);
-
-        // ALOAD 0
-        cv.loadThis();
-        // LDC "..package name.."
-        cv.push(packageName);
-
-        // INVOKESPECIAL AbstractBeanConfiguration.<init> (Ljava/lang/Package;)V
-        invokeConstructor(cv, AbstractBeanConfiguration.class, String.class);
-
-        // RETURN
-        cv.visitInsn(RETURN);
-        // MAXSTACK = 2
-        // MAXLOCALS = 1
-        cv.visitMaxs(2, 1);
-    }
 }

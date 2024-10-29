@@ -41,6 +41,21 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     }
 
     @Override
+    public boolean isInner() {
+        return type.isMemberClass();
+    }
+
+    @Override
+    public boolean isInterface() {
+        return type.isInterface();
+    }
+
+    @Override
+    public boolean isEnum() {
+        return type.isEnum();
+    }
+
+    @Override
     public boolean isArray() {
         return type.isArray();
     }

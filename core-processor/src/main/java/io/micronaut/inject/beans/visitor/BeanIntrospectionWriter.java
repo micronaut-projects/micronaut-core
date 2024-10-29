@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -27,11 +28,12 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
@@ -44,37 +46,41 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
-import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.AbstractClassFileWriter;
+import io.micronaut.inject.writer.ArgumentExpUtils;
+import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
 import io.micronaut.inject.writer.EvaluatedExpressionProcessor;
-import io.micronaut.inject.writer.StringSwitchWriter;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.inject.writer.MethodGenUtils;
+import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.sourcegen.model.AnnotationDef;
+import io.micronaut.sourcegen.model.ClassDef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.FieldDef;
+import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.StatementDef;
+import io.micronaut.sourcegen.model.TypeDef;
+import io.micronaut.sourcegen.model.VariableDef;
 
+import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA;
-import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.initializeAnnotationMetadata;
-import static io.micronaut.inject.writer.AbstractAnnotationMetadataWriter.writeAnnotationDefault;
-import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
+import java.util.stream.IntStream;
 
 /**
  * A class file writer that writes a {@link BeanIntrospectionReference} and associated
@@ -85,7 +91,7 @@ import static io.micronaut.inject.writer.WriterUtils.invokeBeanConstructor;
  * @since 1.1
  */
 @Internal
-final class BeanIntrospectionWriter extends AbstractClassFileWriter {
+final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputWriter {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";
@@ -93,31 +99,127 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
-    private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class)
-    );
-    private static final Method FIND_INDEXED_PROPERTY_METHOD = Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "findIndexedProperty", Class.class, String.class)
-    );
-    private static final Method GET_INDEXED_PROPERTIES = Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class)
-    );
-    private static final Method GET_BP_INDEXED_SUBSET_METHOD = Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class)
-    );
-    private static final Method COLLECTIONS_EMPTY_LIST = Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(Collections.class, "emptyList")
-    );
-    private static final String METHOD_IS_BUILDABLE = "isBuildable";
+    private static final java.lang.reflect.Method FIND_PROPERTY_BY_INDEX_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class);
 
-    private final VisitorContext visitorContext;
+    private static final java.lang.reflect.Method FIND_INDEXED_PROPERTY_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "findIndexedProperty", Class.class, String.class);
+
+    private static final java.lang.reflect.Method GET_INDEXED_PROPERTIES =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class);
+
+    private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
+
+    private static final java.lang.reflect.Constructor<?> BEAN_METHOD_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanMethodRef.class,
+        Argument.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        int.class
+    );
+
+    private static final java.lang.reflect.Constructor<?> ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class,
+        AnnotationClassValue.class,
+        String.class,
+        AnnotationMetadata.class
+    );
+
+    private static final java.lang.reflect.Constructor<?> INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospectionAndReference.class,
+        Class.class,
+        AnnotationMetadata.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+        AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> ENUM_INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractEnumBeanIntrospectionAndReference.class,
+        Class.class,
+        AnnotationMetadata.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+        AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+        AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        Argument.class,
+        Argument.class,
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class
+    );
+
+    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_READ_ONLY_STATIC = ReflectionUtils.getRequiredMethod(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        "readOnly",
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class
+    );
+
+    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_WRITE_ONLY_STATIC = ReflectionUtils.getRequiredMethod(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        "writeOnly",
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class
+    );
+
+    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_READ_WRITE_STATIC = ReflectionUtils.getRequiredMethod(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        "readWrite",
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class
+    );
+
+    private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(
+            AbstractInitializableBeanIntrospection.class,
+        "instantiate"
+    );
+
+    private static final java.lang.reflect.Method INSTANTIATE_INTERNAL_METHOD = ReflectionUtils.getRequiredMethod(
+            AbstractInitializableBeanIntrospection.class,
+        "instantiateInternal", Object[].class
+    );
+
+    private static final java.lang.reflect.Method HAS_BUILDER_METHOD = ReflectionUtils.getRequiredMethod(
+            BeanIntrospection.class,
+        "hasBuilder"
+    );
+
+    private static final java.lang.reflect.Method IS_BUILDABLE_METHOD = ReflectionUtils.getRequiredMethod(
+            BeanIntrospection.class,
+        "isBuildable"
+    );
+
     private final String introspectionName;
-    private final Type introspectionType;
-    private final Type beanType;
+    private final ClassTypeDef introspectionTypeDef;
     private final Map<AnnotationWithValue, String> indexByAnnotationAndValue = new HashMap<>(2);
     private final Map<String, Set<String>> indexByAnnotations = new HashMap<>(2);
-    private final Map<String, String> annotationIndexFields = new HashMap<>(2);
-    private final ClassElement classElement;
+    private final Map<String, FieldDef> annotationIndexFields = new HashMap<>(2);
+    private final ClassTypeDef beanType;
+    private final ClassElement beanClassElement;
     private boolean executed = false;
     private MethodElement constructor;
     private MethodElement defaultConstructor;
@@ -128,59 +230,59 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     private final DispatchWriter dispatchWriter;
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private final AnnotationMetadata annotationMetadata;
-    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
-    private final Map<String, Integer> defaults = new HashMap<>();
+
+    private final OriginatingElements originatingElements;
+
+    private CopyConstructorDispatchTarget copyConstructorDispatchTarget;
 
     /**
      * Default constructor.
      *
-     * @param classElement           The class element
+     * @param beanClassElement   The class element
      * @param annotationMetadata The bean annotation metadata
-     * @param visitorContext          The visitor context
+     * @param visitorContext     The visitor context
      */
-    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata annotationMetadata,
+    BeanIntrospectionWriter(String targetPackage, ClassElement beanClassElement, AnnotationMetadata annotationMetadata,
                             VisitorContext visitorContext) {
-        super(classElement);
-        this.visitorContext = visitorContext;
-        final String name = classElement.getName();
-        this.classElement = classElement;
+        final String name = beanClassElement.getName();
+        this.beanClassElement = beanClassElement;
+        this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeShortIntrospectionName(targetPackage, name);
-        this.introspectionType = getTypeReferenceForName(introspectionName);
-        this.beanType = getTypeReferenceForName(name);
-        this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
+        this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
+        this.dispatchWriter = new DispatchWriter();
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        this.originatingElements = OriginatingElements.of(beanClassElement);
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
     /**
      * Constructor used to generate a reference for already compiled classes.
      *
-     * @param generatingType         The originating type
-     * @param index                  A unique index
-     * @param originatingElement     The originating element
-     * @param classElement           The class element
+     * @param generatingType     The originating type
+     * @param index              A unique index
+     * @param originatingElement The originating element
+     * @param beanClassElement   The class element
      * @param annotationMetadata The bean annotation metadata
-     * @param visitorContext          The visitor context
+     * @param visitorContext     The visitor context
      */
     BeanIntrospectionWriter(
         String targetPackage,
         String generatingType,
         int index,
         ClassElement originatingElement,
-        ClassElement classElement,
+        ClassElement beanClassElement,
         AnnotationMetadata annotationMetadata,
         VisitorContext visitorContext) {
-        super(originatingElement);
-        this.visitorContext = visitorContext;
-        final String className = classElement.getName();
-        this.classElement = classElement;
+        final String className = beanClassElement.getName();
+        this.beanClassElement = beanClassElement;
+        this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeIntrospectionName(targetPackage, className);
-        this.introspectionType = getTypeReferenceForName(introspectionName);
-        this.beanType = getTypeReferenceForName(className);
-        this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
+        this.dispatchWriter = new DispatchWriter();
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        this.originatingElements = OriginatingElements.of(originatingElement);
+        evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
     }
 
@@ -204,21 +306,21 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
      *
      * @return The bean type
      */
-    public Type getBeanType() {
+    public ClassTypeDef getBeanType() {
         return beanType;
     }
 
     /**
      * Visit a property.
      *
-     * @param type               The property type
-     * @param genericType        The generic type
-     * @param name               The property name
-     * @param readMember         The read method
-     * @param readType           The read type
-     * @param writeMember        The write member
-     * @param writeType          The write type
-     * @param isReadOnly         Is read only
+     * @param type        The property type
+     * @param genericType The generic type
+     * @param name        The property name
+     * @param readMember  The read method
+     * @param readType    The read type
+     * @param writeMember The write member
+     * @param writeType   The write type
+     * @param isReadOnly  Is read only
      */
     void visitProperty(
         @NonNull ClassElement type,
@@ -229,11 +331,11 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         @Nullable ClassElement readType,
         @Nullable ClassElement writeType,
         boolean isReadOnly) {
-        this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), classElement);
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), beanClassElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
             if (readMember instanceof MethodElement element) {
-                readDispatchIndex = dispatchWriter.addMethod(classElement, element, true);
+                readDispatchIndex = dispatchWriter.addMethod(beanClassElement, element, true);
             } else if (readMember instanceof FieldElement element) {
                 readDispatchIndex = dispatchWriter.addGetField(element);
             } else {
@@ -244,7 +346,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         int withMethodIndex = -1;
         if (writeMember != null) {
             if (writeMember instanceof MethodElement element) {
-                writeDispatchIndex = dispatchWriter.addMethod(classElement, element, true);
+                writeDispatchIndex = dispatchWriter.addMethod(beanClassElement, element, true);
             } else if (writeMember instanceof FieldElement element) {
                 writeDispatchIndex = dispatchWriter.addSetField(element);
             } else {
@@ -264,16 +366,20 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                         String methodName = methodElement.getName();
                         return methodName.startsWith(prefix) && methodName.equals(prefix + NameUtils.capitalize(name))
                             && parameters.length == 1
-                            && methodElement.getGenericReturnType().getName().equals(classElement.getName())
+                            && methodElement.getGenericReturnType().getName().equals(beanClassElement.getName())
                             && type.getType().isAssignable(parameters[0].getType());
                     }));
-                MethodElement withMethod = classElement.getEnclosedElement(elementQuery).orElse(null);
+                MethodElement withMethod = beanClassElement.getEnclosedElement(elementQuery).orElse(null);
                 if (withMethod != null) {
-                    withMethodIndex = dispatchWriter.addMethod(classElement, withMethod, true);
+                    withMethodIndex = dispatchWriter.addMethod(beanClassElement, withMethod, true);
                 } else {
                     MethodElement constructor = this.constructor == null ? defaultConstructor : this.constructor;
                     if (constructor != null) {
-                        withMethodIndex = dispatchWriter.addDispatchTarget(new CopyConstructorDispatchTarget(constructor, name));
+                        if (copyConstructorDispatchTarget == null) {
+                            copyConstructorDispatchTarget = new CopyConstructorDispatchTarget(beanType, beanProperties, dispatchWriter, constructor);
+                        }
+                        copyConstructorDispatchTarget.propertyNames.put(name, dispatchWriter.getDispatchTargets().size());
+                        withMethodIndex = dispatchWriter.addDispatchTarget(copyConstructorDispatchTarget);
                     }
                 }
             }
@@ -281,7 +387,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         } else {
             withMethodIndex = dispatchWriter.addDispatchTarget(new ExceptionDispatchTarget(
                 UnsupportedOperationException.class,
-                "Cannot mutate property [" + name + "] that is not mutable via a setter method, field or constructor argument for type: " + beanType.getClassName()
+                "Cannot mutate property [" + name + "] that is not mutable via a setter method, field or constructor argument for type: " + beanType.getName()
             ));
         }
 
@@ -304,11 +410,11 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
      */
     public void visitBeanMethod(MethodElement element) {
         if (element != null && !element.isPrivate()) {
-            int dispatchIndex = dispatchWriter.addMethod(classElement, element);
+            int dispatchIndex = dispatchWriter.addMethod(beanClassElement, element);
             beanMethods.add(new BeanMethodData(element, dispatchIndex));
-            this.evaluatedExpressionProcessor.processEvaluatedExpressions(element.getAnnotationMetadata(), classElement);
+            this.evaluatedExpressionProcessor.processEvaluatedExpressions(element.getAnnotationMetadata(), beanClassElement);
             for (ParameterElement parameter : element.getParameters()) {
-                this.evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), classElement);
+                this.evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), beanClassElement);
             }
         }
     }
@@ -335,272 +441,149 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             // First write the introspection for the annotation metadata can be populated with defaults that reference will contain
             writeIntrospectionClass(classWriterOutputVisitor);
             this.evaluatedExpressionProcessor.writeEvaluatedExpressions(classWriterOutputVisitor);
-
-            loadTypeMethods.clear();
         }
     }
 
-    private void buildStaticInit(ClassWriter classWriter, boolean isEnum) {
-        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-        Map<String, Integer> defaults = new HashMap<>();
+    private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData, Map<String, MethodDef> loadTypeMethods) {
+        ClassTypeDef beanPropertyRefDef = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
 
-        if (constructor != null) {
-            if (!constructor.getAnnotationMetadata().isEmpty()) {
-                Type am = Type.getType(AnnotationMetadata.class);
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR_ANNOTATION_METADATA, am.getDescriptor(), null, null);
-                pushAnnotationMetadata(classWriter, staticInit, constructor.getAnnotationMetadata());
-                staticInit.putStatic(introspectionType, FIELD_CONSTRUCTOR_ANNOTATION_METADATA, am);
-            }
-            if (ArrayUtils.isNotEmpty(constructor.getParameters())) {
-                Type args = Type.getType(Argument[].class);
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR_ARGUMENTS, args.getDescriptor(), null, null);
-                pushBuildArgumentsForMethod(
+        boolean mutable = !beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type);
+
+        if (beanPropertyData.type.equals(beanPropertyData.readType) && beanPropertyData.type.equals(beanPropertyData.writeType)) {
+            return beanPropertyRefDef.invokeStatic(
+                BEAN_PROPERTY_REF_READ_WRITE_STATIC,
+
+                ArgumentExpUtils.pushCreateArgument(
                     annotationMetadata,
-                    introspectionType.getClassName(),
-                    introspectionType,
-                    classWriter,
-                    staticInit,
-                    Arrays.asList(constructor.getParameters()),
-                    defaults,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    beanPropertyData.name,
+                    beanPropertyData.type,
                     loadTypeMethods
-                );
-                staticInit.putStatic(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, args);
-            }
-        }
-        if (!beanProperties.isEmpty()) {
-            Type beanPropertiesRefs = Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef[].class);
-
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs.getDescriptor(), null, null);
-
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanPropertyRef.class, beanProperties, beanPropertyData -> {
-                pushBeanPropertyReference(
-                    classWriter,
-                    staticInit,
-                    beanPropertyData
-                );
-            });
-            staticInit.putStatic(introspectionType, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs);
-        }
-        if (!beanMethods.isEmpty()) {
-            Type beanMethodsRefs = Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class);
-
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanMethodRef.class, beanMethods, beanMethodData -> {
-                pushBeanMethodReference(
-                    classWriter,
-                    staticInit,
-                    beanMethodData
-                );
-            });
-            staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
-        }
-        if (isEnum) {
-            Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class);
-            classWriter.visitField(
-                ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ENUM_CONSTANTS_REFERENCES,
-                type.getDescriptor(),
-                null,
-                null
+                ),
+                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.isReadOnly),
+                ExpressionDef.constant(mutable)
             );
-            pushNewArray(staticInit, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class, ((EnumElement) classElement).elements(), enumConstantElement -> {
-                pushEnumConstantReference(
-                    classWriter,
-                    staticInit,
-                    enumConstantElement
-                );
-            });
-            staticInit.putStatic(introspectionType, FIELD_ENUM_CONSTANTS_REFERENCES, type);
         }
+        if (beanPropertyData.type.equals(beanPropertyData.readType) && beanPropertyData.writeType == null) {
+            return beanPropertyRefDef.invokeStatic(
+                BEAN_PROPERTY_REF_READ_ONLY_STATIC,
 
-        int indexesIndex = 0;
-        for (String annotationName : indexByAnnotations.keySet()) {
-            int[] indexes = indexByAnnotations.get(annotationName)
-                .stream()
-                .mapToInt(this::getPropertyIndex)
-                .toArray();
-
-            String newIndexField = "INDEX_" + (++indexesIndex);
-            Type type = Type.getType(int[].class);
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, newIndexField, type.getDescriptor(), null, null);
-            pushNewArray(staticInit, int.class, indexes.length);
-            int i = 0;
-            for (int index : indexes) {
-                pushStoreInArray(staticInit, Type.INT_TYPE, i++, indexes.length, () -> staticInit.push(index));
-            }
-            staticInit.putStatic(introspectionType, newIndexField, type);
-            annotationIndexFields.put(annotationName, newIndexField);
+                ArgumentExpUtils.pushCreateArgument(
+                    annotationMetadata,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    beanPropertyData.name,
+                    beanPropertyData.type,
+                    loadTypeMethods
+                ),
+                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.isReadOnly),
+                ExpressionDef.constant(mutable)
+            );
         }
+        if (beanPropertyData.type.equals(beanPropertyData.writeType) && beanPropertyData.readType == null) {
+            return beanPropertyRefDef.invokeStatic(
+                BEAN_PROPERTY_REF_WRITE_ONLY_STATIC,
 
-        writeAnnotationDefault(classWriter, staticInit, introspectionType, annotationMetadata, defaults, loadTypeMethods);
-        initializeAnnotationMetadata(staticInit, classWriter, introspectionType, annotationMetadata, defaults, loadTypeMethods);
-
-        staticInit.returnValue();
-        staticInit.visitMaxs(DEFAULT_MAX_STACK, 1);
-        staticInit.visitEnd();
-    }
-
-    private void pushBeanPropertyReference(ClassWriter classWriter,
-                                           GeneratorAdapter staticInit,
-                                           BeanPropertyData beanPropertyData) {
-
-        Runnable pushTypeArgument = () -> pushCreateArgument(
-            annotationMetadata,
-            classElement.getName(),
-            introspectionType,
-            classWriter,
-            staticInit,
-            beanPropertyData.name,
-            beanPropertyData.type,
-            defaults,
-            loadTypeMethods
-        );
-
-        int typeLocal = -1;
-        int readTypeLocal = -1;
-        int writeTypeLocal = -1;
-
-        Type argumentType = Type.getType(Argument.class);
-        if (beanPropertyData.type.equals(beanPropertyData.readType)) {
-            typeLocal = staticInit.newLocal(argumentType);
-            pushTypeArgument.run();
-            staticInit.storeLocal(typeLocal, argumentType);
-            readTypeLocal = typeLocal;
+                ArgumentExpUtils.pushCreateArgument(
+                    annotationMetadata,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    beanPropertyData.name,
+                    beanPropertyData.type,
+                    loadTypeMethods
+                ),
+                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.isReadOnly),
+                ExpressionDef.constant(mutable)
+            );
         }
-        if (beanPropertyData.type.equals(beanPropertyData.writeType)) {
-            if (typeLocal == -1) {
-                typeLocal = staticInit.newLocal(argumentType);
-                pushTypeArgument.run();
-                staticInit.storeLocal(typeLocal, argumentType);
-            }
-            writeTypeLocal = typeLocal;
-        }
+        return beanPropertyRefDef.instantiate(
+            BEAN_PROPERTY_REF_CONSTRUCTOR,
 
-        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class));
-        staticInit.dup();
-
-        if (typeLocal != -1) {
-            staticInit.loadLocal(typeLocal, argumentType);
-        } else {
-            pushTypeArgument.run();
-        }
-
-        if (beanPropertyData.readType == null) {
-            staticInit.push((String) null);
-        } else if (readTypeLocal != -1) {
-            staticInit.loadLocal(readTypeLocal, argumentType);
-        } else {
-            pushCreateArgument(
+            ArgumentExpUtils.pushCreateArgument(
                 annotationMetadata,
-                classElement.getName(),
-                introspectionType,
-                classWriter,
-                staticInit,
+                beanClassElement,
+                introspectionTypeDef,
+                beanPropertyData.name,
+                beanPropertyData.type,
+                loadTypeMethods
+            ),
+            beanPropertyData.readType == null ? ExpressionDef.nullValue() : ArgumentExpUtils.pushCreateArgument(
+                annotationMetadata,
+                beanClassElement,
+                introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.readType,
-                defaults,
                 loadTypeMethods
-            );
-        }
-
-        if (beanPropertyData.writeType == null) {
-            staticInit.push((String) null);
-        } else if (writeTypeLocal != -1) {
-            staticInit.loadLocal(writeTypeLocal, argumentType);
-        } else {
-            pushCreateArgument(
+            ),
+            beanPropertyData.writeType == null ? ExpressionDef.nullValue() : ArgumentExpUtils.pushCreateArgument(
                 annotationMetadata,
-                classElement.getName(),
-                introspectionType,
-                classWriter,
-                staticInit,
+                beanClassElement,
+                introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.writeType,
-                defaults,
                 loadTypeMethods
-            );
-        }
-        staticInit.push(beanPropertyData.getDispatchIndex);
-        staticInit.push(beanPropertyData.setDispatchIndex);
-        staticInit.push(beanPropertyData.withMethodDispatchIndex);
-        staticInit.push(beanPropertyData.isReadOnly);
-        staticInit.push(!beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type));
-
-        invokeConstructor(
-            staticInit,
-            AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
-            Argument.class,
-            Argument.class,
-            Argument.class,
-            int.class,
-            int.class,
-            int.class,
-            boolean.class,
-            boolean.class);
+            ),
+            ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+            ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+            ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+            ExpressionDef.constant(beanPropertyData.isReadOnly),
+            ExpressionDef.constant(mutable)
+        );
     }
 
-    private void pushBeanMethodReference(ClassWriter classWriter,
-                                         GeneratorAdapter staticInit,
-                                         BeanMethodData beanMethodData) {
-        staticInit.newInstance(Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef.class));
-        staticInit.dup();
-        // 1: return argument
-        ClassElement genericReturnType = beanMethodData.methodElement.getGenericReturnType();
-        pushReturnTypeArgument(annotationMetadata, introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
-        // 2: name
-        staticInit.push(beanMethodData.methodElement.getName());
-        // 3: annotation metadata
-        pushAnnotationMetadata(classWriter, staticInit, beanMethodData.methodElement.getAnnotationMetadata());
-        // 4: arguments
-        if (beanMethodData.methodElement.getParameters().length == 0) {
-            staticInit.push((String) null);
-        } else {
-            pushBuildArgumentsForMethod(
-                annotationMetadata,
-                beanType.getClassName(),
-                introspectionType,
-                classWriter,
-                staticInit,
-                Arrays.asList(beanMethodData.methodElement.getParameters()),
-                new HashMap<>(),
-                loadTypeMethods
-            );
-        }
-        // 5: method index
-        staticInit.push(beanMethodData.dispatchIndex);
+    private ExpressionDef newBeanMethodRef(BeanMethodData beanMethodData, Map<String, MethodDef> loadTypeMethods) {
+        return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class)
+            .instantiate(
+                BEAN_METHOD_REF_CONSTRUCTOR,
 
-        invokeConstructor(
-            staticInit,
-            AbstractInitializableBeanIntrospection.BeanMethodRef.class,
-            Argument.class,
-            String.class,
-            AnnotationMetadata.class,
-            Argument[].class,
-            int.class);
+                // 1: return argument
+                ArgumentExpUtils.pushReturnTypeArgument(
+                    annotationMetadata,
+                    introspectionTypeDef,
+                    beanMethodData.methodElement.getOwningType(),
+                    beanMethodData.methodElement.getGenericReturnType(),
+                    loadTypeMethods),
+                // 2: name
+                ExpressionDef.constant(beanMethodData.methodElement.getName()),
+                // 3: annotation metadata
+                getAnnotationMetadataExpression(beanMethodData.methodElement.getAnnotationMetadata(), loadTypeMethods),
+                // 4: arguments
+                beanMethodData.methodElement.getParameters().length == 0 ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
+                    annotationMetadata,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    Arrays.asList(beanMethodData.methodElement.getParameters()),
+                    loadTypeMethods
+                ),
+                // 5: method index
+                ExpressionDef.constant(beanMethodData.dispatchIndex)
+            );
     }
 
-    private void pushEnumConstantReference(ClassWriter classWriter,
-                                           GeneratorAdapter staticInit,
-                                           EnumConstantElement enumConstantElement) {
-        staticInit.newInstance(Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class));
-        staticInit.dup();
-        // 1: push annotation class value
-        AnnotationMetadataWriter.invokeLoadClassValueMethod(introspectionType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue<>(enumConstantElement.getOwningType().getName()));
-        // 2: push enum name
-        staticInit.push(enumConstantElement.getName());
-        // 3: annotation metadata
-        AnnotationMetadata annotationMetadata = enumConstantElement.getAnnotationMetadata();
-        if (annotationMetadata.isEmpty()) {
-            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
-        } else {
-            pushAnnotationMetadata(classWriter, staticInit, annotationMetadata);
-        }
+    private ExpressionDef newEnumConstantRef(EnumConstantElement enumConstantElement, Map<String, MethodDef> loadTypeMethods) {
+        return ClassTypeDef.of(
+            AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class
+        ).instantiate(
+            ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR,
 
-        invokeConstructor(
-            staticInit,
-            AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class,
-            AnnotationClassValue.class,
-            String.class,
-            AnnotationMetadata.class
+            // 1: push annotation class value
+            AnnotationMetadataGenUtils.invokeLoadClassValueMethod(introspectionTypeDef, loadTypeMethods, new AnnotationClassValue<>(enumConstantElement.getOwningType().getName())),
+            // 2: push enum name
+            ExpressionDef.constant(enumConstantElement.getName()),
+            // 3: annotation metadata
+            enumConstantElement.getAnnotationMetadata() == null ? (
+                ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class))
+            ) : getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadTypeMethods)
         );
     }
 
@@ -617,308 +600,338 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        boolean isEnum = classElement.isEnum();
-        final Type superType = isEnum ? Type.getType(AbstractEnumBeanIntrospectionAndReference.class) : Type.getType(AbstractInitializableBeanIntrospectionAndReference.class);
+        boolean isEnum = beanClassElement.isEnum();
 
-        ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
-        classWriter.visit(
-            V17,
-            ACC_SYNTHETIC | ACC_FINAL | ACC_PUBLIC,
-            introspectionType.getInternalName(),
-            null,
-            superType.getInternalName(),
-            null
-        );
+        Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
 
-        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, getOriginatingElement());
+        ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).addModifiers(Modifier.FINAL, Modifier.PUBLIC);
+        classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
 
-        annotateAsGeneratedAndService(classWriter, introspectionName);
+        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, beanClassElement);
+
+        classDefBuilder.addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", introspectionName).build());
         // init expressions at build time
-        evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classWriter);
+        evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classDefBuilder);
 
-        buildStaticInit(classWriter, isEnum);
-
-        final GeneratorAdapter constructorWriter = startConstructor(classWriter);
-
-        // writer the constructor
-        constructorWriter.loadThis();
-        // 1st argument: The bean type
-        constructorWriter.push(beanType);
-
-        // 2nd argument: The annotation metadata
-        if (annotationMetadata == null || annotationMetadata.isEmpty()) {
-            constructorWriter.visitInsn(ACONST_NULL);
-        } else {
-            constructorWriter.getStatic(introspectionType, FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
-        }
+        FieldDef constructorAnnotationMetadataField;
+        FieldDef constructorArgumentsField;
+        FieldDef beanPropertiesField;
+        FieldDef beanMethodsField;
+        FieldDef enumsField;
 
         if (constructor != null) {
-            // 3rd argument: constructor metadata
             if (!constructor.getAnnotationMetadata().isEmpty()) {
-                constructorWriter.getStatic(introspectionType, FIELD_CONSTRUCTOR_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+                constructorAnnotationMetadataField = FieldDef.builder(FIELD_CONSTRUCTOR_ANNOTATION_METADATA, AnnotationMetadata.class)
+                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                    .initializer(getAnnotationMetadataExpression(constructor.getAnnotationMetadata(), loadTypeMethods))
+                    .build();
+                classDefBuilder.addField(
+                    constructorAnnotationMetadataField
+                );
             } else {
-                constructorWriter.push((String) null);
+                constructorAnnotationMetadataField = null;
             }
-            // 4th argument: constructor arguments
             if (ArrayUtils.isNotEmpty(constructor.getParameters())) {
-                constructorWriter.getStatic(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
+                constructorArgumentsField = FieldDef.builder(FIELD_CONSTRUCTOR_ARGUMENTS, Argument[].class)
+                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                    .initializer(
+                        ArgumentExpUtils.pushBuildArgumentsForMethod(
+                            annotationMetadata,
+                            constructor.getOwningType(),
+                            introspectionTypeDef,
+                            Arrays.asList(constructor.getParameters()),
+                            loadTypeMethods
+                        )
+                    )
+                    .build();
+                classDefBuilder.addField(
+                    constructorArgumentsField
+                );
             } else {
-                constructorWriter.push((String) null);
+                constructorArgumentsField = null;
             }
         } else {
-            constructorWriter.push((String) null);
-            constructorWriter.push((String) null);
+            constructorArgumentsField = null;
+            constructorAnnotationMetadataField = null;
         }
-
-        if (beanProperties.isEmpty()) {
-            constructorWriter.push((String) null);
+        if (!beanProperties.isEmpty()) {
+            beanPropertiesField = FieldDef.builder(FIELD_BEAN_PROPERTIES_REFERENCES, AbstractInitializableBeanIntrospection.BeanPropertyRef[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class).array()
+                        .instantiate(
+                            beanProperties.stream()
+                                .map(e -> pushBeanPropertyReference(e, loadTypeMethods))
+                                .toList()
+                        )
+                )
+                .build();
+            classDefBuilder.addField(beanPropertiesField);
         } else {
-            constructorWriter.getStatic(introspectionType,
-                FIELD_BEAN_PROPERTIES_REFERENCES,
-                Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef[].class));
+            beanPropertiesField = null;
         }
-        if (beanMethods.isEmpty()) {
-            constructorWriter.push((String) null);
+        if (!beanMethods.isEmpty()) {
+            beanMethodsField = FieldDef.builder(FIELD_BEAN_METHODS_REFERENCES, AbstractInitializableBeanIntrospection.BeanMethodRef[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class).array()
+                        .instantiate(
+                            beanMethods.stream()
+                                .map(e -> newBeanMethodRef(e, loadTypeMethods))
+                                .toList()
+                        )
+                )
+                .build();
+            classDefBuilder.addField(beanMethodsField);
         } else {
-            constructorWriter.getStatic(introspectionType,
-                FIELD_BEAN_METHODS_REFERENCES,
-                Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class));
+            beanMethodsField = null;
         }
         if (isEnum) {
-            constructorWriter.getStatic(introspectionType,
-                FIELD_ENUM_CONSTANTS_REFERENCES,
-                Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class)
-            );
-            invokeConstructor(
-                constructorWriter,
-                AbstractEnumBeanIntrospectionAndReference.class,
-                Class.class,
-                AnnotationMetadata.class,
-                AnnotationMetadata.class,
-                Argument[].class,
-                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
-                AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
-                AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class
-            );
+            enumsField = FieldDef.builder(FIELD_ENUM_CONSTANTS_REFERENCES, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class).array()
+                        .instantiate(
+                            ((EnumElement) beanClassElement).elements().stream()
+                                .map(e -> newEnumConstantRef(e, loadTypeMethods))
+                                .toList()
+                        )
+                )
+                .build();
+            classDefBuilder.addField(enumsField);
         } else {
-            invokeConstructor(
-                constructorWriter,
-                AbstractInitializableBeanIntrospectionAndReference.class,
-                Class.class,
-                AnnotationMetadata.class,
-                AnnotationMetadata.class,
-                Argument[].class,
-                AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
-                AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+            enumsField = null;
+        }
+
+        int indexesIndex = 0;
+        for (String annotationName : indexByAnnotations.keySet()) {
+            int[] indexes = indexByAnnotations.get(annotationName)
+                .stream()
+                .mapToInt(this::getPropertyIndex)
+                .toArray();
+
+            FieldDef field = FieldDef.builder("INDEX_" + (++indexesIndex), int[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    TypeDef.Primitive.INT.array()
+                        .instantiate(
+                            Arrays.stream(indexes).mapToObj(TypeDef.Primitive.INT::constant).toList()
+                        )
+                )
+                .build();
+            classDefBuilder.addField(
+                field
+            );
+
+            annotationIndexFields.put(annotationName, field);
+        }
+
+        List<StatementDef> statements = new ArrayList<>();
+        AnnotationMetadataGenUtils.writeAnnotationDefault(statements, introspectionTypeDef, annotationMetadata, loadTypeMethods);
+
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(introspectionTypeDef, annotationMetadata, loadTypeMethods);
+        if (annotationMetadataField != null) {
+            classDefBuilder.addField(
+                annotationMetadataField
             );
         }
 
-        constructorWriter.returnValue();
-        constructorWriter.visitMaxs(2, 1);
-        constructorWriter.visitEnd();
+        if (!statements.isEmpty()) {
+            classDefBuilder.addStaticInitializer(StatementDef.multi(statements));
+        }
 
-        dispatchWriter.buildDispatchOneMethod(classWriter);
-        dispatchWriter.buildDispatchMethod(classWriter);
-        dispatchWriter.buildGetTargetMethodByIndex(classWriter);
-        buildFindIndexedProperty(classWriter);
-        buildGetIndexedProperties(classWriter);
+        classDefBuilder.addMethod(
+            MethodDef.constructor()
+                .addModifiers(Modifier.PUBLIC)
+                .build((aThis, methodParameters) -> {
+                    List<ExpressionDef> values = new ArrayList<>();
+                    // 1st argument: The bean type
+                    values.add(ExpressionDef.constant(beanType));
+                    // 2nd argument: The annotation metadata
+                    if (annotationMetadataField == null) {
+                        values.add(ExpressionDef.nullValue());
+                    } else {
+                        values.add(introspectionTypeDef.getStaticField(annotationMetadataField));
+                    }
+                    // 3rd argument: constructor metadata
+                    values.add(constructorAnnotationMetadataField != null ? introspectionTypeDef.getStaticField(constructorAnnotationMetadataField) : ExpressionDef.nullValue());
+                    // 4th argument: constructor arguments
+                    values.add(constructorArgumentsField != null ? introspectionTypeDef.getStaticField(constructorArgumentsField) : ExpressionDef.nullValue());
+
+                    values.add(beanPropertiesField == null ? ExpressionDef.nullValue() : introspectionTypeDef.getStaticField(beanPropertiesField));
+                    values.add(beanMethodsField == null ? ExpressionDef.nullValue() : introspectionTypeDef.getStaticField(beanMethodsField));
+
+                    if (enumsField != null) {
+                        values.add(introspectionTypeDef.getStaticField(enumsField));
+                        return aThis.superRef().invokeConstructor(ENUM_INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                    } else {
+                        return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                    }
+                })
+        );
+
+        MethodDef dispatchOneMethod = dispatchWriter.buildDispatchOneMethod();
+        if (dispatchOneMethod != null) {
+            classDefBuilder.addMethod(dispatchOneMethod);
+        }
+        MethodDef dispatchMethod = dispatchWriter.buildDispatchMethod();
+        if (dispatchMethod != null) {
+            classDefBuilder.addMethod(dispatchMethod);
+        }
+        MethodDef buildGetTargetMethodByIndex = dispatchWriter.buildGetTargetMethodByIndex();
+        if (buildGetTargetMethodByIndex != null) {
+            classDefBuilder.addMethod(buildGetTargetMethodByIndex);
+        }
+
+        MethodDef findIndexedProperty = getFindIndexedProperty();
+        if (findIndexedProperty != null) {
+            classDefBuilder.addMethod(findIndexedProperty);
+        }
+        MethodDef getIndexedProperties = getGetIndexedProperties();
+        if (getIndexedProperties != null) {
+            classDefBuilder.addMethod(getIndexedProperties);
+        }
+
         boolean hasBuilder = annotationMetadata != null &&
-            (annotationMetadata.isPresent(Introspected.class, "builder") || annotationMetadata.hasDeclaredAnnotation("lombok.Builder"));
-        if (defaultConstructor != null) {
-            writeInstantiateMethod(classWriter, defaultConstructor, "instantiate");
+            (annotationMetadata.isPresent(Introspected.class, "builder") || annotationMetadata.hasDeclaredAnnotation("lombok.Builder"));        if (defaultConstructor != null) {
+            classDefBuilder.addMethod(
+                getInstantiateMethod(defaultConstructor, INSTANTIATE_METHOD)
+            );
             // in case invoked directly or via instantiateUnsafe
             if (constructor == null) {
-                writeInstantiateMethod(classWriter, defaultConstructor, "instantiateInternal", Object[].class);
-                writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
+                classDefBuilder.addMethod(
+                    getInstantiateMethod(defaultConstructor, INSTANTIATE_INTERNAL_METHOD)
+                );
+                classDefBuilder.addMethod(
+                    getBooleanMethod(IS_BUILDABLE_METHOD, true)
+                );
             }
         }
 
         if (constructor != null) {
             if (defaultConstructor == null) {
                 if (ArrayUtils.isEmpty(constructor.getParameters())) {
-                    writeInstantiateMethod(classWriter, constructor, "instantiate");
+                    classDefBuilder.addMethod(
+                        getInstantiateMethod(constructor, INSTANTIATE_METHOD)
+                    );
                 } else {
-                    List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
-                    boolean kotlinAllDefault = constructorArguments.stream().allMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+                    boolean kotlinAllDefault = Arrays.stream(constructor.getParameters())
+                        .allMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
                     if (kotlinAllDefault) {
-                        writeInstantiateMethod(classWriter, constructor, "instantiate");
+                        classDefBuilder.addMethod(
+                            getInstantiateMethod(constructor, INSTANTIATE_METHOD)
+                        );
                     }
                 }
             }
-            writeInstantiateMethod(classWriter, constructor, "instantiateInternal", Object[].class);
-            writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
+            classDefBuilder.addMethod(
+                getInstantiateMethod(constructor, INSTANTIATE_INTERNAL_METHOD)
+            );
+            classDefBuilder.addMethod(
+                getBooleanMethod(IS_BUILDABLE_METHOD, true)
+            );
         } else if (defaultConstructor == null) {
-            writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, hasBuilder);
+            classDefBuilder.addMethod(
+                getBooleanMethod(IS_BUILDABLE_METHOD, hasBuilder)
+            );
         }
+        classDefBuilder.addMethod(
+            getBooleanMethod(HAS_BUILDER_METHOD, hasBuilder)
+        );
 
-        writeBooleanMethod(classWriter, "hasBuilder", hasBuilder);
-
-        for (GeneratorAdapter method : loadTypeMethods.values()) {
-            method.visitMaxs(3, 1);
-            method.visitEnd();
-        }
-
-        classWriter.visitEnd();
+        loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
-            outputStream.write(classWriter.toByteArray());
+            outputStream.write(new ByteCodeWriter(false, true).write(classDefBuilder.build()));
         }
     }
 
-    private void writeBooleanMethod(ClassWriter classWriter, String methodName, boolean state) {
-        GeneratorAdapter booleanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, methodName);
-        booleanMethod.push(state);
-        booleanMethod.returnValue();
-        booleanMethod.visitMaxs(2, 1);
-        booleanMethod.endMethod();
+    private MethodDef getBooleanMethod(Method method, boolean state) {
+        return MethodDef.override(method)
+            .build((aThis, methodParameters) -> ExpressionDef.constant(state).returning());
     }
 
-    private void buildFindIndexedProperty(ClassWriter classWriter) {
+    @Nullable
+    private MethodDef getFindIndexedProperty() {
         if (indexByAnnotationAndValue.isEmpty()) {
-            return;
+            return null;
         }
-        GeneratorAdapter writer = new GeneratorAdapter(classWriter.visitMethod(
-            ACC_PROTECTED | ACC_FINAL,
-            FIND_INDEXED_PROPERTY_METHOD.getName(),
-            FIND_INDEXED_PROPERTY_METHOD.getDescriptor(),
-            null,
-            null),
-            ACC_PROTECTED | ACC_FINAL,
-            FIND_INDEXED_PROPERTY_METHOD.getName(),
-            FIND_INDEXED_PROPERTY_METHOD.getDescriptor()
-        );
-        writer.loadThis();
-        writer.loadArg(0);
-        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[]{}));
-        int classNameLocal = writer.newLocal(Type.getType(String.class));
-        writer.storeLocal(classNameLocal);
-        writer.loadLocal(classNameLocal);
-
-        new StringSwitchWriter() {
-
-            @Override
-            protected Set<String> getKeys() {
-                return indexByAnnotationAndValue.keySet()
-                    .stream()
-                    .map(s -> s.annotationName)
-                    .collect(Collectors.toSet());
-            }
-
-            @Override
-            protected void pushStringValue() {
-                writer.loadLocal(classNameLocal);
-            }
-
-            @Override
-            protected void onMatch(String annotationName, Label end) {
-                if (indexByAnnotationAndValue.keySet().stream().anyMatch(s -> s.annotationName.equals(annotationName) && s.value == null)) {
-                    Label falseLabel = new Label();
-                    writer.loadArg(1);
-                    writer.ifNonNull(falseLabel);
-
-                    String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, null));
-                    int propertyIndex = getPropertyIndex(propertyName);
-                    writer.loadThis();
-                    writer.push(propertyIndex);
-                    writer.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
-                    writer.returnValue();
-
-                    writer.visitLabel(falseLabel);
-                } else {
-                    Label falseLabel = new Label();
-                    writer.loadArg(1);
-                    writer.ifNonNull(falseLabel);
-                    writer.goTo(end);
-                    writer.visitLabel(falseLabel);
-                }
-                Set<String> valueMatches = indexByAnnotationAndValue.keySet()
-                    .stream()
-                    .filter(s -> s.annotationName.equals(annotationName) && s.value != null)
-                    .map(s -> s.value)
-                    .collect(Collectors.toSet());
-                if (!valueMatches.isEmpty()) {
-                    new StringSwitchWriter() {
-
-                        @Override
-                        protected Set<String> getKeys() {
-                            return valueMatches;
-                        }
-
-                        @Override
-                        protected void pushStringValue() {
-                            writer.loadArg(1);
-                        }
-
-                        @Override
-                        protected void onMatch(String value, Label end) {
-                            String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, value));
-                            int propertyIndex = getPropertyIndex(propertyName);
-                            writer.loadThis();
-                            writer.push(propertyIndex);
-                            writer.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
-                            writer.returnValue();
-                        }
-
-                    }.write(writer);
-                }
-                writer.goTo(end);
-            }
-
-        }.write(writer);
-
-        writer.push((String) null);
-        writer.returnValue();
-        writer.visitMaxs(DEFAULT_MAX_STACK, 1);
-        writer.visitEnd();
+        TypeDef returnType = TypeDef.of(FIND_INDEXED_PROPERTY_METHOD.getReturnType());
+        Set<String> keys = indexByAnnotationAndValue.keySet()
+            .stream()
+            .map(s -> s.annotationName)
+            .collect(Collectors.toSet());
+        return MethodDef.builder(FIND_INDEXED_PROPERTY_METHOD.getName())
+            .addParameters(FIND_INDEXED_PROPERTY_METHOD.getParameterTypes())
+            .addModifiers(Modifier.PUBLIC)
+            .returns(returnType)
+            .build((aThis, methodParameters) ->
+                methodParameters.get(0).invoke("getName", TypeDef.STRING)
+                    .asStatementSwitch(returnType, keys.stream()
+                        .collect(Collectors.toMap(
+                            ExpressionDef::constant,
+                            annotationName -> onMatch(aThis, methodParameters, annotationName, returnType)
+                        )), ExpressionDef.nullValue().returning()));
     }
 
-    private void buildGetIndexedProperties(ClassWriter classWriter) {
-        if (indexByAnnotations.isEmpty()) {
-            return;
+    private StatementDef onMatch(VariableDef.This aThis, List<VariableDef.MethodParameter> parameters, String annotationName, TypeDef returnType) {
+        List<StatementDef> statements = new ArrayList<>();
+        VariableDef.MethodParameter annotationValueParameter = parameters.get(1);
+        if (indexByAnnotationAndValue.keySet().stream().anyMatch(s -> s.annotationName.equals(annotationName) && s.value == null)) {
+            String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, null));
+            int propertyIndex = getPropertyIndex(propertyName);
+            statements.add(
+                annotationValueParameter.ifNonNull(
+                    aThis.invoke(FIND_PROPERTY_BY_INDEX_METHOD, ExpressionDef.constant(propertyIndex)).returning()
+                )
+            );
+        } else {
+            statements.add(
+                annotationValueParameter.ifNull(
+                    ExpressionDef.nullValue().returning()
+                )
+            );
         }
-        GeneratorAdapter writer = new GeneratorAdapter(classWriter.visitMethod(
-            ACC_PUBLIC | ACC_FINAL,
-            GET_INDEXED_PROPERTIES.getName(),
-            GET_INDEXED_PROPERTIES.getDescriptor(),
-            null,
-            null),
-            ACC_PUBLIC | ACC_FINAL,
-            GET_INDEXED_PROPERTIES.getName(),
-            GET_INDEXED_PROPERTIES.getDescriptor()
-        );
-        writer.loadThis();
-        writer.loadArg(0);
-        writer.invokeVirtual(Type.getType(Class.class), new Method("getName", Type.getType(String.class), new Type[]{}));
-        int classNameLocal = writer.newLocal(Type.getType(String.class));
-        writer.storeLocal(classNameLocal);
-        writer.loadLocal(classNameLocal);
+        Set<String> valueMatches = indexByAnnotationAndValue.keySet()
+            .stream()
+            .filter(s -> s.annotationName.equals(annotationName) && s.value != null)
+            .map(s -> s.value)
+            .collect(Collectors.toSet());
+        if (!valueMatches.isEmpty()) {
+            statements.add(annotationValueParameter.asExpressionSwitch(returnType, valueMatches.stream()
+                .collect(Collectors.toMap(ExpressionDef::constant, e -> {
+                    String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, e));
+                    int propertyIndex = getPropertyIndex(propertyName);
+                    return aThis.invoke(FIND_PROPERTY_BY_INDEX_METHOD, ExpressionDef.constant(propertyIndex));
+                })), ExpressionDef.nullValue()).returning()
+            );
+        }
+        statements.add(ExpressionDef.nullValue().returning());
+        return StatementDef.multi(statements);
+    }
 
-        new StringSwitchWriter() {
-
-            @Override
-            protected Set<String> getKeys() {
-                return indexByAnnotations.keySet();
-            }
-
-            @Override
-            protected void pushStringValue() {
-                writer.loadLocal(classNameLocal);
-            }
-
-            @Override
-            protected void onMatch(String annotationName, Label end) {
-                writer.loadThis();
-                writer.getStatic(introspectionType, annotationIndexFields.get(annotationName), Type.getType(int[].class));
-                writer.invokeVirtual(introspectionType, GET_BP_INDEXED_SUBSET_METHOD);
-                writer.returnValue();
-            }
-
-        }.write(writer);
-
-        writer.invokeStatic(Type.getType(Collections.class), COLLECTIONS_EMPTY_LIST);
-        writer.returnValue();
-        writer.visitMaxs(DEFAULT_MAX_STACK, 1);
-        writer.visitEnd();
+    @Nullable
+    private MethodDef getGetIndexedProperties() {
+        if (indexByAnnotations.isEmpty()) {
+            return null;
+        }
+        TypeDef returnType = TypeDef.of(GET_INDEXED_PROPERTIES.getReturnType());
+        return MethodDef.builder(GET_INDEXED_PROPERTIES.getName())
+            .returns(returnType)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameters(GET_INDEXED_PROPERTIES.getParameterTypes())
+            .build((aThis, methodParameters) ->
+                methodParameters.get(0).invoke("getName", TypeDef.STRING)
+                    .asExpressionSwitch(returnType, indexByAnnotations.keySet().stream()
+                        .collect(Collectors.toMap(
+                            ExpressionDef::constant,
+                            annotationName ->
+                                aThis.invoke(
+                                    GET_BP_INDEXED_SUBSET_METHOD,
+                                    introspectionTypeDef.getStaticField(annotationIndexFields.get(annotationName))
+                                )
+                        )), ExpressionDef.nullValue())
+                    .returning());
     }
 
     private int getPropertyIndex(String propertyName) {
@@ -926,38 +939,24 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         if (beanPropertyData != null) {
             return beanProperties.indexOf(beanPropertyData);
         }
-        throw new IllegalStateException("Property not found: " + propertyName + " " + classElement.getName());
+        throw new IllegalStateException("Property not found: " + propertyName + " " + beanClassElement.getName());
     }
 
-    private void writeInstantiateMethod(ClassWriter classWriter, MethodElement constructor, String methodName, Class<?>... args) {
-        final String desc = getMethodDescriptor(Object.class, Arrays.asList(args));
-        final GeneratorAdapter instantiateInternal = new GeneratorAdapter(classWriter.visitMethod(
-            ACC_PUBLIC,
-            methodName,
-            desc,
-            null,
-            null
-        ), ACC_PUBLIC,
-            methodName,
-            desc);
-
-        if (args.length == 0) {
-            invokeBeanConstructor(instantiateInternal, constructor, true, null);
-        } else {
-            invokeBeanConstructor(instantiateInternal, constructor, true, (index, parameter) -> {
-                instantiateInternal.loadArg(0);
-                instantiateInternal.push(index);
-                instantiateInternal.arrayLoad(TYPE_OBJECT);
-                pushCastToType(instantiateInternal, JavaModelUtils.getTypeReference(parameter));
+    private MethodDef getInstantiateMethod(MethodElement constructor, Method method) {
+        return MethodDef.override(method)
+            .build((aThis, methodParameters) -> {
+                if (method.getParameters().length == 0) {
+                    return MethodGenUtils.invokeBeanConstructor(constructor, true, null).returning();
+                } else {
+                    List<ExpressionDef> values = IntStream.range(0, constructor.getSuspendParameters().length)
+                            .<ExpressionDef>mapToObj(index -> methodParameters.get(0).arrayElement(index))
+                            .toList();
+                    return MethodGenUtils.invokeBeanConstructor(constructor, true, values).returning();
+                }
             });
-        }
-
-        instantiateInternal.returnValue();
-        instantiateInternal.visitMaxs(3, 1);
-        instantiateInternal.visitEnd();
     }
 
-    private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
+    private ExpressionDef getAnnotationMetadataExpression(AnnotationMetadata annotationMetadata, Map<String, MethodDef> loadTypeMethods) {
         MutableAnnotationMetadata.contributeDefaults(
             this.annotationMetadata,
             annotationMetadata
@@ -965,25 +964,18 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
-            staticInit.push((String) null);
+            return ExpressionDef.nullValue();
         } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
-            String className = annotationMetadataReference.getClassName();
-            staticInit.getStatic(getTypeReferenceForName(className), FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            return AnnotationMetadataGenUtils.annotationMetadataReference(annotationMetadataReference);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
-                introspectionType,
-                classWriter,
-                staticInit,
+            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(
+                introspectionTypeDef,
                 annotationMetadataHierarchy,
-                defaults,
                 loadTypeMethods);
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            AnnotationMetadataWriter.instantiateNewMetadata(
-                introspectionType,
-                classWriter,
-                staticInit,
+            return AnnotationMetadataGenUtils.instantiateNewMetadata(
+                introspectionTypeDef,
                 mutableAnnotationMetadata,
-                defaults,
                 loadTypeMethods);
         } else {
             throw new IllegalStateException("Unknown annotation metadata:  " + annotationMetadata);
@@ -1028,7 +1020,19 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private record ExceptionDispatchTarget(Class<?> exceptionType, String message) implements DispatchWriter.DispatchTarget {
+    @NonNull
+    @Override
+    public Element[] getOriginatingElements() {
+        return originatingElements.getOriginatingElements();
+    }
+
+    @Override
+    public void addOriginatingElement(@NonNull Element element) {
+        originatingElements.addOriginatingElement(element);
+    }
+
+    private record ExceptionDispatchTarget(Class<?> exceptionType,
+                                           String message) implements DispatchWriter.DispatchTarget {
 
         @Override
         public boolean supportsDispatchOne() {
@@ -1036,22 +1040,51 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer, int index) {
-            writer.throwException(Type.getType(exceptionType), message);
+        public boolean supportsDispatchMulti() {
+            return false;
+        }
+
+        @Override
+        public StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray) {
+            return ClassTypeDef.of(exceptionType).instantiate(ExpressionDef.constant(message)).doThrow();
+        }
+
+        @Override
+        public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            return ClassTypeDef.of(exceptionType).instantiate(ExpressionDef.constant(message)).doThrow();
+        }
+
+        @Override
+        public MethodElement getMethodElement() {
+            return null;
+        }
+
+        @Override
+        public TypedElement getDeclaringType() {
+            return null;
         }
     }
 
     /**
      * Copy constructor "with" method writer.
      */
-    private final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
+    private static final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
 
+        private final ClassTypeDef beanType;
+        private final List<BeanPropertyData> beanProperties;
+        private final DispatchWriter dispatchWriter;
         private final MethodElement constructor;
-        private final String parameterName;
+        private final Map<String, Integer> propertyNames = new HashMap<>();
+        private StatementDef statement;
 
-        private CopyConstructorDispatchTarget(MethodElement constructor, String name) {
+        private CopyConstructorDispatchTarget(ClassTypeDef beanType,
+                                              List<BeanPropertyData> beanProperties,
+                                              DispatchWriter dispatchWriter,
+                                              MethodElement constructor) {
+            this.beanType = beanType;
+            this.beanProperties = beanProperties;
+            this.dispatchWriter = dispatchWriter;
             this.constructor = constructor;
-            this.parameterName = name;
         }
 
         @Override
@@ -1060,40 +1093,20 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         }
 
         @Override
-        public boolean writeDispatchOne(GeneratorAdapter writer, int methodIndex, Map<String, DispatchWriter.DispatchTargetState> stateMap) {
-            CopyConstructorDispatchState state = (CopyConstructorDispatchState) stateMap.computeIfAbsent(CopyConstructorDispatchState.KEY, k -> new CopyConstructorDispatchState(constructor, writer.newLabel()));
-            state.propertyNames.put(parameterName, methodIndex);
-            writer.goTo(state.label);
+        public boolean supportsDispatchMulti() {
             return false;
-        }
-    }
-
-    /**
-     * Shared implementation of {@link CopyConstructorDispatchTarget#writeDispatchOne}. <br>
-     *
-     * A non-shared copy constructor implementation would be O(n²) in the number of properties: For
-     * every property we generate a constructor call, and that constructor call has that many
-     * parameters too that all have to be loaded.<br>
-     *
-     * This shared implementation instead only generates one constructor call, and branches on each
-     * loaded property to figure out whether to copy it or to use the replacement from the
-     * {@code dispatchOne} parameter.
-     */
-    private class CopyConstructorDispatchState implements DispatchWriter.DispatchTargetState {
-        static final String KEY = CopyConstructorDispatchState.class.getName();
-
-        final MethodElement constructor;
-        final Label label;
-        final Map<String, Integer> propertyNames = new HashMap<>();
-
-        CopyConstructorDispatchState(MethodElement constructor, Label label) {
-            this.constructor = constructor;
-            this.label = label;
         }
 
         @Override
-        public void complete(GeneratorAdapter writer) {
-            writer.visitLabel(label);
+        public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            if (statement == null) {
+                // The unique statement provided for the switch case should produce one case
+                statement = createStatement(caseExpression, target, value);
+            }
+            return statement;
+        }
+
+        private StatementDef createStatement(ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
             // In this case we have to do the copy constructor approach
             Set<BeanPropertyData> constructorProps = new HashSet<>();
 
@@ -1131,136 +1144,121 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
                         constructorProps.add(prop);
                     } else {
                         isMutable = false;
-                        nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Property of type [" + propertyType.getName() + "] is not assignable to constructor argument [" + parameterName + "]";
+                        nonMutableMessage = "Cannot create copy of type [" + beanType.getName() + "]. Property of type [" + propertyType.getName() + "] is not assignable to constructor argument [" + parameterName + "]";
                     }
                 } else {
                     isMutable = false;
-                    nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameterName + "] that is not a readable property";
+                    nonMutableMessage = "Cannot create copy of type [" + beanType.getName() + "]. Constructor contains argument [" + parameterName + "] that is not a readable property";
                     break;
                 }
             }
 
             if (isMutable) {
+                return target.cast(beanType).newLocal("prevBean", prevBeanVar -> {
+                    List<ExpressionDef> values = new ArrayList<>(constructorArguments.length);
+                    for (int i = 0; i < parameters.length; i++) {
+                        ParameterElement parameter = parameters[i];
+                        Object constructorArgument = constructorArguments[i];
 
-                writer.loadArg(1);
-                pushCastToType(writer, beanType);
-                int prevBeanTypeLocal = writer.newLocal(beanType);
-                writer.storeLocal(prevBeanTypeLocal, beanType);
-
-                // NOTE: It doesn't make sense to check defaults for the copy constructor
-
-                invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
-                    Object constructorArgument = constructorArguments[paramIndex];
-                    TypedElement supplierType;
-                    if (constructorArgument instanceof MethodElement readMethod) {
-                        supplierType = readMethod.getReturnType();
-                    } else if (constructorArgument instanceof FieldElement fieldElement) {
-                        supplierType = fieldElement;
-                    } else {
-                        throw new IllegalStateException();
-                    }
-
-                    Label endOfProperty = null;
-                    Integer target = propertyNames.get(parameter.getName());
-                    if (target != null) {
-                        if (propertyNames.size() == 1) {
-                            writer.loadArg(2); // Load new property value
-                            pushCastFromObjectToType(writer, parameter);
-                            // if we're the only replaceable property, we can skip the second branch
-                            return;
-                        }
-                        // replace property with new value
-                        Label nonReplaceBranch = writer.newLabel();
-                        writer.loadArg(0);
-                        writer.push(target);
-                        writer.ifICmp(GeneratorAdapter.NE, nonReplaceBranch);
-                        writer.loadArg(2); // Load new property value
-                        pushCastFromObjectToType(writer, parameter);
-                        endOfProperty = writer.newLabel();
-                        writer.goTo(endOfProperty);
-                        writer.visitLabel(nonReplaceBranch);
-                    }
-
-                    if (constructorArgument instanceof MethodElement readMethod) {
-                        writer.loadLocal(prevBeanTypeLocal, beanType);
-                        invokeMethod(writer, readMethod);
-                    } else {
-                        writer.loadLocal(prevBeanTypeLocal, beanType);
-                        invokeGetField(writer, (FieldElement) constructorArgument);
-                    }
-                    pushCastToType(writer, supplierType, parameter);
-
-                    if (endOfProperty != null) {
-                        writer.visitLabel(endOfProperty);
-                    }
-
-                });
-
-                List<BeanPropertyData> readWriteProps = beanProperties.stream()
-                    .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp)).toList();
-
-                if (!readWriteProps.isEmpty()) {
-                    int beanTypeLocal = writer.newLocal(beanType);
-                    writer.storeLocal(beanTypeLocal, beanType);
-
-                    for (BeanPropertyData readWriteProp : readWriteProps) {
-                        DispatchWriter.DispatchTarget readDispatch = dispatchWriter.getDispatchTargets().get(readWriteProp.getDispatchIndex);
-                        if (readDispatch instanceof DispatchWriter.MethodDispatchTarget methodDispatchTarget) {
-                            MethodElement readMethod = methodDispatchTarget.getMethodElement();
-                            writer.loadLocal(beanTypeLocal, beanType);
-                            writer.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeMethod(writer, readMethod);
-                        } else if (readDispatch instanceof DispatchWriter.FieldGetDispatchTarget fieldGetDispatchTarget) {
-                            FieldElement fieldElement = fieldGetDispatchTarget.getField();
-                            writer.loadLocal(beanTypeLocal, beanType);
-                            writer.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeGetField(writer, fieldElement);
+                        ExpressionDef oldValueExp;
+                        if (constructorArgument instanceof MethodElement readMethod) {
+                            oldValueExp = prevBeanVar.invoke(readMethod);
                         } else {
-                            throw new IllegalStateException();
+                            oldValueExp = prevBeanVar.field((FieldElement) constructorArgument);
                         }
 
-                        DispatchWriter.DispatchTarget writeDispatch = dispatchWriter.getDispatchTargets().get(readWriteProp.setDispatchIndex);
-                        if (writeDispatch instanceof DispatchWriter.MethodDispatchTarget methodDispatchTarget) {
-                            MethodElement writeMethod = methodDispatchTarget.getMethodElement();
-                            ClassElement writeReturnType = invokeMethod(writer, writeMethod);
-                            if (!writeReturnType.isVoid()) {
-                                writer.pop();
+                        Integer propertyIndex = propertyNames.get(parameter.getName());
+                        ExpressionDef paramExp;
+                        if (propertyIndex != null) {
+                            ExpressionDef.Cast newPropertyValue = value.cast(TypeDef.erasure(parameter.getType()));
+                            if (propertyNames.size() == 1) {
+                                paramExp =  newPropertyValue;
+                            } else {
+                                paramExp = caseExpression.equalsStructurally(ExpressionDef.constant((int) propertyIndex)).doIfElse(
+                                        newPropertyValue,
+                                        oldValueExp
+                                );
                             }
-                        } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget fieldSetDispatchTarget) {
-                            FieldElement fieldElement = fieldSetDispatchTarget.getField();
-                            invokeSetField(writer, fieldElement);
                         } else {
-                            throw new IllegalStateException();
+                            paramExp = oldValueExp;
                         }
-
+                        values.add(paramExp);
                     }
-                    writer.loadLocal(beanTypeLocal, beanType);
-                }
-                writer.returnValue();
+
+                    // NOTE: It doesn't make sense to check defaults for the copy constructor
+                    ExpressionDef newInstance = MethodGenUtils.invokeBeanConstructor(constructor, false, values);
+                    return withSetSettersAndFields(newInstance, prevBeanVar, constructorProps);
+                });
             } else {
                 // In this case the bean cannot be mutated via either copy constructor or setter so simply throw an exception
-                writer.throwException(Type.getType(UnsupportedOperationException.class), nonMutableMessage);
+                return ClassTypeDef.of(UnsupportedOperationException.class).instantiate(ExpressionDef.constant(nonMutableMessage)).doThrow();
             }
         }
 
-        @NonNull
-        private ClassElement invokeMethod(GeneratorAdapter mutateMethod, MethodElement method) {
-            ClassElement returnType = method.getReturnType();
-            if (classElement.isInterface()) {
-                mutateMethod.invokeInterface(beanType, new Method(method.getName(), getMethodDescriptor(returnType, Arrays.asList(method.getParameters()))));
-            } else {
-                mutateMethod.invokeVirtual(beanType, new Method(method.getName(), getMethodDescriptor(returnType, Arrays.asList(method.getParameters()))));
+        @Override
+        public StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray) {
+            throw new IllegalStateException("Not supported");
+        }
+
+        private StatementDef withSetSettersAndFields(ExpressionDef newInstance,
+                                                     VariableDef prevBeanVar,
+                                                     Set<BeanPropertyData> constructorProps) {
+            List<BeanPropertyData> readWriteProps = beanProperties.stream()
+                    .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp)).toList();
+
+            if (readWriteProps.isEmpty()) {
+                return newInstance.returning();
             }
-            return returnType;
+            return newInstance
+                    .newLocal("newBean", newBeanVar -> {
+                        List<StatementDef> statements = new ArrayList<>();
+                        for (BeanPropertyData readWriteProp : readWriteProps) {
+                            DispatchWriter.DispatchTarget readDispatch = dispatchWriter.getDispatchTargets().get(readWriteProp.getDispatchIndex);
+                            ExpressionDef oldValueExp;
+                            if (readDispatch instanceof DispatchWriter.MethodDispatchTarget methodDispatchTarget) {
+                                MethodElement readMethod = methodDispatchTarget.getMethodElement();
+                                oldValueExp = prevBeanVar.invoke(readMethod);
+                            } else if (readDispatch instanceof DispatchWriter.FieldGetDispatchTarget fieldGetDispatchTarget) {
+                                FieldElement fieldElement = fieldGetDispatchTarget.getField();
+                                oldValueExp = prevBeanVar.field(fieldElement);
+                            } else {
+                                throw new IllegalStateException();
+                            }
+
+                            DispatchWriter.DispatchTarget writeDispatch = dispatchWriter.getDispatchTargets().get(readWriteProp.setDispatchIndex);
+                            if (writeDispatch instanceof DispatchWriter.MethodDispatchTarget methodDispatchTarget) {
+                                MethodElement writeMethod = methodDispatchTarget.getMethodElement();
+                                statements.add(
+                                        newBeanVar.invoke(
+                                                writeMethod,
+                                                oldValueExp
+                                        )
+                                );
+                            } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget fieldSetDispatchTarget) {
+                                FieldElement fieldElement = fieldSetDispatchTarget.getField();
+                                statements.add(
+                                        newBeanVar.field(fieldElement).assign(oldValueExp)
+                                );
+                            } else {
+                                throw new IllegalStateException();
+                            }
+
+                        }
+                        statements.add(newBeanVar.returning());
+                        return StatementDef.multi(statements);
+                    });
         }
 
-        private void invokeGetField(GeneratorAdapter mutateMethod, FieldElement field) {
-            mutateMethod.getField(beanType, field.getName(), JavaModelUtils.getTypeReference(field.getType()));
+        @Override
+        public MethodElement getMethodElement() {
+            return null;
         }
 
-        private void invokeSetField(GeneratorAdapter mutateMethod, FieldElement field) {
-            mutateMethod.putField(beanType, field.getName(), JavaModelUtils.getTypeReference(field.getType()));
+        @Override
+        public TypedElement getDeclaringType() {
+            return constructor.getDeclaringType();
         }
+
     }
 
     private record BeanMethodData(MethodElement methodElement, int dispatchIndex) {
@@ -1290,7 +1288,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
      * index to be created.
      *
      * @param annotationName The annotation name
-     * @param value The annotation value
+     * @param value          The annotation value
      */
     private record AnnotationWithValue(@NonNull String annotationName, @Nullable String value) {
 

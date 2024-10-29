@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
+import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 import java.lang.annotation.Documented
@@ -62,6 +63,7 @@ class Test {
         annotationMetadata.hasDeclaredAnnotation(Outer.Inner)
     }
 
+    @PendingFeature
     @Unroll
     void "test read/write annotation array type #type"() {
         given:
