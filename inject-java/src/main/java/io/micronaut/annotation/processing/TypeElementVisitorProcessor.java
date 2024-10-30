@@ -27,6 +27,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -240,7 +241,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
 
-            postponedTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
+            for (Object nativeType : postponedTypes.values()) {
+                AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+            }
+            postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
             postponedTypes.clear();
 
             if (!elements.isEmpty()) {
@@ -271,7 +275,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            postponedTypes.add(javaClassElement.getName());
+                            postponedTypes.put(javaClassElement.getName(), e.getErrorElement());
                         }
                     }
                 }
