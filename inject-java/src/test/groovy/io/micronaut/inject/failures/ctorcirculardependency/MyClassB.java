@@ -17,10 +17,12 @@ package io.micronaut.inject.failures.ctorcirculardependency;
 
 import io.micronaut.context.annotation.Requires;
 
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "ConstructorCircularDependencyFailureSpec")
 @Singleton
-public class A {
-    public A(C c) {}
+public class MyClassB {
+    @Inject
+    protected MyClassA propA;
 }

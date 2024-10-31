@@ -17,7 +17,7 @@ package io.micronaut.inject.failures.ctorcirculardependency;
 
 import jakarta.inject.Inject;
 
-public class C {
+public class MyClassC {
     @Inject
-    public C(B b ) {}
+    public MyClassC(MyClassB propB) {}
 }

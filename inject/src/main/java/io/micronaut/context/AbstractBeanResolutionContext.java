@@ -326,28 +326,26 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             Iterator<Segment<?, ?>> i = descendingIterator();
             StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
+
+            boolean first = true;
+            String spaces = "   ";
+
             while (i.hasNext()) {
                 String segmentString = i.next().toString();
                 pathString.append(segmentString);
                 if (i.hasNext()) {
-                    pathString.append(RIGHT_ARROW);
-                } else {
-                    int totalLength = pathString.length() - 3;
-                    String spaces = String.join("", Collections.nCopies(totalLength, " "));
-                    pathString.append(ls)
-                            .append("^")
-                            .append(spaces)
-                            .append("|")
-                            .append(ls)
-                            .append("|")
-                            .append(spaces)
-                            .append("|").append(ls)
-                            .append("|")
-                            .append(spaces)
-                            .append("|").append(ls).append('+');
-                    pathString.append(String.join("", Collections.nCopies(totalLength, "-"))).append('+');
+                    pathString
+                        .append(ls).append(first ? "^" : "|").append(spaces).append("\\---> ");
                 }
+                spaces = spaces + "      ";
+                first = false;
             }
+
+            String dashes = String.join("", Collections.nCopies(spaces.length(), "-"));
+            pathString
+                .append(ls).append("|").append(spaces).append("|")
+                .append(ls).append("+").append(dashes).append("+");
+
             return pathString.toString();
         }
 
