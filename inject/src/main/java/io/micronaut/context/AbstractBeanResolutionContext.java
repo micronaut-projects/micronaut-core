@@ -327,24 +327,36 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
 
-            boolean first = true;
-            String spaces = "   ";
-
-            while (i.hasNext()) {
-                String segmentString = i.next().toString();
-                pathString.append(segmentString);
-                if (i.hasNext()) {
-                    pathString
-                        .append(ls).append(first ? "^" : "|").append(spaces).append("\\---> ");
-                }
-                spaces = spaces + "      ";
-                first = false;
+            // Try finding an actual cycle, cycleI is index where the cycle starts
+            int cycleIndex = lastIndexOf(iterator().next());
+            if (cycleIndex >= 0) {
+                cycleIndex = size() - cycleIndex;
+            } else {
+                cycleIndex = 0;
             }
 
-            String dashes = String.join("", Collections.nCopies(spaces.length(), "-"));
+            String spaces = "";
+            int index = 0;
+            // The last element ends the cycle and is repeated in the path, so we skip it
+            // and point to an already present element instead
+            while (i.hasNext() && index < size() - 1) {
+                String segmentString = i.next().toString();
+                if (index == cycleIndex) {
+                    pathString.append(ls).append(spaces).append("^").append("  \\---> ");
+                    spaces = spaces + "|  ";
+                } else if (index != 0) {
+                    pathString.append(ls).append(spaces).append("\\---> ");
+                }
+                pathString.append(segmentString);
+                spaces = spaces + "      ";
+                ++index;
+            }
+
+            String dashes = String.join("", Collections.nCopies(spaces.length() - spaces.indexOf("|") - 1, "-"));
             pathString
-                .append(ls).append("|").append(spaces).append("|")
-                .append(ls).append("+").append(dashes).append("+");
+                .append(ls).append(spaces).append("|")
+                .append(ls).append(spaces, 0, spaces.indexOf("|"))
+                .append("+").append(dashes).append("+");
 
             return pathString.toString();
         }
@@ -372,6 +384,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 Segment<?, ?> previous = peek();
                 MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
                 if (contains(methodSegment)) {
+                    push(methodSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 } else {
                     push(methodSegment);
@@ -391,6 +404,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodInjectionPoint.getName(), argument,
                     methodInjectionPoint.getArguments(), previous instanceof MethodSegment ms ? ms : null);
             if (contains(methodSegment)) {
+                push(methodSegment);
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
             } else {
                 push(methodSegment);
@@ -404,6 +418,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             Segment<?, ?> previous = peek();
             MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
             if (contains(methodSegment)) {
+                push(methodSegment);
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
             } else {
                 push(methodSegment);
@@ -416,6 +431,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldInjectionPoint.asArgument());
             if (contains(fieldSegment)) {
+                push(fieldSegment);
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
             } else {
                 push(fieldSegment);
@@ -427,6 +443,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument) {
             FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldAsArgument);
             if (contains(fieldSegment)) {
+                push(fieldSegment);
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
             } else {
                 push(fieldSegment);
@@ -438,6 +455,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
             AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, getCurrentQualifier(), annotationMemberBeanAsArgument);
             if (contains(annotationSegment)) {
+                push(annotationSegment);
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), CIRCULAR_ERROR_MSG);
             } else {
                 push(annotationSegment);
@@ -457,6 +475,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         if (declaringType instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
                             // take into account proxies
                             if (!proxyBeanDefinition.getTargetDefinitionType().equals(declaringBean.getClass())) {
+                                push(constructorSegment);
                                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);
@@ -464,6 +483,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         } else if (declaringBean instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
                             // take into account proxies
                             if (!proxyBeanDefinition.getTargetDefinitionType().equals(declaringType.getClass())) {
+                                push(constructorSegment);
                                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);

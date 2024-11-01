@@ -36,11 +36,34 @@ Failed to inject value for field [propA] of class: io.micronaut.inject.failures.
 Message: Circular dependency detected
 Path Taken:
 new MyClassB()
-^   \\---> MyClassB.propA
-|         \\---> new MyClassA([MyClassC propC])
-|               \\---> new MyClassC([MyClassB propB])
-|                           |
-+---------------------------+'''
+      \\---> MyClassB.propA
+            ^  \\---> new MyClassA([MyClassC propC])
+            |        \\---> new MyClassC([MyClassB propB])
+            |              |
+            +--------------+'''
+    }
+
+    void "test another constructor circular dependency failure"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
+
+        when:"A bean is obtained that has a setter with @Inject"
+        context.getBean(MyClassD)
+
+        then:"The implementation is injected"
+        def e = thrown(CircularDependencyException)
+        e.message.normalize() == '''\
+Failed to inject value for field [propA] of class: io.micronaut.inject.failures.ctorcirculardependency.MyClassB
+
+Message: Circular dependency detected
+Path Taken:
+new MyClassD(MyClassB propB)
+      \\---> new MyClassD([MyClassB propB])
+            \\---> MyClassB.propA
+                  ^  \\---> new MyClassA([MyClassC propC])
+                  |        \\---> new MyClassC([MyClassB propB])
+                  |              |
+                  +--------------+'''
     }
 
     void "test multiple optionals do not cause a circular dependency exception"() {
