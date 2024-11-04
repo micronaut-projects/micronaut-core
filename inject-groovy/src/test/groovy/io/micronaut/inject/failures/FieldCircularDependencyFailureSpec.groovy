@@ -39,12 +39,13 @@ class FieldCircularDependencyFailureSpec extends Specification {
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.FieldCircularDependencyFailureSpec$B
 
 Message: Circular dependency detected
-Path Taken: 
-new B() --> B.a --> new A([C c]) --> C.b
-^                                     |
-|                                     |
-|                                     |
-+-------------------------------------+'''
+Path Taken:
+new B()
+      \\---> B.a
+            ^  \\---> new A([C c])
+            |        \\---> C.b
+            |              |
+            +--------------+'''
         cleanup:
         context.close()
     }
