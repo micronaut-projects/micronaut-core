@@ -54,7 +54,6 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
-import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -343,7 +342,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
             // avoid checkcast for MessageBodyWriter interface here
             Object o = response.getBodyWriter().orElse(null);
-            MessageBodyWriter<Object> messageBodyWriter = o instanceof NettyJsonHandler njh ? njh : (MessageBodyWriter<Object>) o;
+            MessageBodyWriter<Object> messageBodyWriter = o instanceof ResponseBodyWriter rbw ? rbw : (MessageBodyWriter<Object>) o;
             MediaType responseMediaType = response.getContentType().orElse(null);
             Argument<Object> responseBodyType;
             if (routeInfo != null) {
