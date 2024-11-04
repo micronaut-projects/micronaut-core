@@ -329,7 +329,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
             // Try finding an actual cycle, cycleI is index where the cycle starts
             int cycleIndex = lastIndexOf(iterator().next());
-            if (cycleIndex >= 0) {
+            if (cycleIndex > 0) {
                 cycleIndex = size() - cycleIndex;
             } else {
                 cycleIndex = 0;
@@ -489,12 +489,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                                 push(constructorSegment);
                             }
                         } else {
+                            push(constructorSegment);
                             throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                         }
                     } else {
                         push(constructorSegment);
                     }
                 } else {
+                    push(constructorSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 }
             } else {
