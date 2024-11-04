@@ -272,6 +272,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         if (uriRoutes.size() == 1) {
             Object obj = uriRoutes.get(0);
+            // type pollution avoidance (should be covered by type pollution test)
             return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
         }
         uriRoutes = resolveAmbiguity(request, uriRoutes);
