@@ -30,6 +30,7 @@ import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.instrument.InstrumentedExecutor;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -55,6 +56,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
+    @Nullable
+    private ExecutorService executorService;
     private boolean noExecutor;
 
     @SuppressWarnings("ParameterNumber")
@@ -125,15 +128,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public ExecutorService getExecutor(ThreadSelection threadSelection) {
-        if (executorSelector == null || noExecutor) {
-            return null;
-        } else {
-            ExecutorService executor = executorSelector.select(getTargetMethod(), threadSelection)
-                .orElse(null);
-            if (executor == null) {
-                noExecutor = true;
-            }
-            return executor;
+        if (executorService != null || noExecutor) {
+            return executorService;
         }
+        ExecutorService es = executorSelector.select(getTargetMethod(), threadSelection).orElse(null);
+        if (es == null) {
+            noExecutor = true;
+            return null;
+        }
+        // Context is propagated manually
+        executorService = InstrumentedExecutor.unwrap(es);
+        return executorService;
     }
 }
