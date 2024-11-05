@@ -13,6 +13,7 @@ dependencies {
 
     testImplementation(projects.injectGroovy)
     testImplementation(libs.logback.classic)
+    testImplementation(libs.managed.reactor.test);
 
     testImplementation(projects.management)
     testImplementation(projects.httpClient)
