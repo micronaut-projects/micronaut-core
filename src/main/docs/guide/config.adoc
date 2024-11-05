@@ -1,6 +1,6 @@
 Micronaut features a flexible configuration mechanism that allows reading configuration from a variety of sources into a unified model that can be bound to Java types annotated with <<configurationProperties, @ConfigurationProperties>>.
 
-Configuration can by default be provided in Java properties files or https://www.json.org/json-en.html[JSON] with the ability to add support for more formats (such as YAML or Groovy configuration) by adding addition third-party libraries to your classpath. The convention is to search for a file named `application.properties` or `application.json` with support for other formats requiring additional dependencies as described by the following table:
+Configuration can by default be provided in Java properties files or https://www.json.org/json-en.html[JSON] with the ability to add support for more formats (such as YAML or Groovy configuration) by adding additional third-party libraries to your classpath. The convention is to search for a file named `application.properties` or `application.json` with support for other formats requiring additional dependencies as described by the following table:
 
 .Supported Configuration Formats
 |===
