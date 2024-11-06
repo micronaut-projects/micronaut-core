@@ -193,6 +193,8 @@ public class ConnectionManager {
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
+
+        refresh();
     }
 
     ConnectionManager(
