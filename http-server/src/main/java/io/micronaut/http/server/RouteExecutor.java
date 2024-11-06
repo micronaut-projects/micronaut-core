@@ -52,7 +52,6 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.instrument.InstrumentedExecutor;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 import io.micronaut.web.router.DefaultRouteInfo;
