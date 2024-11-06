@@ -638,6 +638,21 @@ public class DefaultHttpClient implements
                     }
                 }
             }
+
+            @Override
+            public boolean isRunning() {
+                return DefaultHttpClient.this.isRunning();
+            }
+
+            @Override
+            public BlockingHttpClient start() {
+                return DefaultHttpClient.this.start().toBlocking();
+            }
+
+            @Override
+            public BlockingHttpClient stop() {
+                return DefaultHttpClient.this.stop().toBlocking();
+            }
         };
     }
 
@@ -1057,6 +1072,10 @@ public class DefaultHttpClient implements
             mediaTypeCodecRegistry,
             handlerRegistry,
             conversionService);
+
+        if (!isRunning()) {
+            return Mono.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
+        }
 
         return connectionManager.connectForWebsocket(requestKey, handler)
             .then(handler.getHandshakeCompletedMono());
@@ -1569,6 +1588,11 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Mono.error(e);
         }
+
+        if (!isRunning()) {
+            return Mono.error(decorate(new HttpClientException("The client is closed, unable to send request.")));
+        }
+
         // first: connect
         return connectionManager.connect(requestKey, blockHint)
             .flatMap(poolHandle -> {
