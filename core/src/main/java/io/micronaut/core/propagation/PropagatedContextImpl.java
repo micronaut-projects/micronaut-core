@@ -231,10 +231,9 @@ final class PropagatedContextImpl implements PropagatedContext {
     private void restoreState(ThreadState[] threadState) {
         for (int i = threadState.length - 1; i >= 0; i--) {
             ThreadState s = threadState[i];
-            if (s == null) {
-                break;
+            if (s != null) {
+                s.restore();
             }
-            s.restore();
         }
     }
 
