@@ -69,6 +69,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@link HttpResponse} to skip execution of the request</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
  *     delay further execution</li>
+ *     <li>A {@link java.util.concurrent.CompletionStage}.
+ *     <li>A {@link java.util.concurrent.CompletableFuture}. Suppose you must write a filter that proceeds with the request in some scenarios. You can use {@code CompletableFuture<@ Nullable  HttpResponse<?>>} as the return type. Then, to proceed with the request, return  {@code CompletableFuture.completedFuture(null)}.</li>
  * </ul>
  *
  * @since 4.0.0

@@ -16,50 +16,68 @@
 package io.micronaut.inject.failures
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Singleton
-/**
- * Created by graemerocher on 16/05/2017.
- */
-class FieldCircularDependencyFailureSpec extends Specification {
 
-    void "test simple field circular dependency failure"() {
+
+class FactoryCircularDependencyFailureSpec extends Specification {
+
+    void "test circular dependency with factory failure"() {
         given:
         ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(ElectricalGrid)
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
         e.message.normalize() == '''\
-Failed to inject value for field [a] of class: io.micronaut.inject.failures.FieldCircularDependencyFailureSpec$B
+Failed to inject value for parameter [stations] of class: io.micronaut.inject.failures.FactoryCircularDependencyFailureSpec$ElectricalGrid
 
 Message: Circular dependency detected
 Path Taken:
-new B()
-      \\---> B.a
-            ^  \\---> new A([C c])
-            |        \\---> C.b
+new ElectricalGrid(List<ElectricStation E> stations)
+      \\---> new ElectricalGrid([List<ElectricStation E> stations])
+            ^  \\---> ElectricStationFactory.nuclearStation([MeasuringEquipment equipment])
+            |        \\---> MeasuringEquipment.grid
             |              |
             +--------------+'''
+
         cleanup:
         context.close()
     }
 
-    static class C {
-        @Inject protected B b
+    static class ElectricalGrid {
+        @Inject
+        ElectricalGrid(List<ElectricStation> stations) {}
     }
-    @Singleton
-    static class A {
-        A(C c) {}
+
+    static class ElectricStation {
+        ElectricStation() {}
+    }
+
+    @Factory
+    static class ElectricStationFactory {
+
+        @Singleton
+        ElectricStation solarStation() {
+            return new ElectricStation()
+        }
+
+        @Singleton
+        ElectricStation nuclearStation(MeasuringEquipment equipment) {
+            return new ElectricStation()
+        }
+
     }
 
     @Singleton
-    static class B {
-        @Inject protected A a
+    static class MeasuringEquipment {
+        @Inject protected ElectricalGrid grid
     }
 }
+

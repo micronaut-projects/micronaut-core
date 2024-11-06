@@ -63,7 +63,8 @@ dependencies {
     testImplementation libs.testcontainers.spock
     // end::testcontainers-dependencies[]
     testImplementation libs.awaitility
-
+    testImplementation(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")

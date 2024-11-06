@@ -21,6 +21,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -32,7 +33,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
+public final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
     private final int compressionLevel;
@@ -66,13 +67,20 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
             return false;
         }
 
+        return shouldCompress(response, HttpUtil.getContentLength(response, -1));
+    }
+
+    public boolean shouldCompress(HttpResponse response, long contentLength) {
+        if (!isEnabled()) {
+            return false;
+        }
+
         HttpHeaders headers = response.headers();
         String contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
-        Integer contentLength = headers.getInt(HttpHeaderNames.CONTENT_LENGTH);
 
         return contentType != null &&
-                (contentLength == null || contentLength >= compressionThreshold) &&
-                MediaType.isTextBased(contentType);
+            (contentLength == -1 || contentLength >= compressionThreshold) &&
+            MediaType.isTextBased(contentType);
     }
 
     @Override

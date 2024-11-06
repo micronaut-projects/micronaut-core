@@ -23,6 +23,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
+import java.util.LinkedHashMap;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -74,7 +75,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
-    protected Set<String> postponedTypes = new LinkedHashSet<>();
+    protected Map<String, Object> postponedTypes = new LinkedHashMap<>();
     private boolean incremental = false;
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
@@ -219,7 +220,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             filer,
             visitorAttributes,
             getVisitorKind(),
-            postponedTypes
+            postponedTypes.keySet()
         );
     }
 

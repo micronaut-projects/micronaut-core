@@ -174,11 +174,11 @@ class MessageUtils {
     }
 
     private static void appendPath(boolean circular, StringBuilder builder, String ls, BeanResolutionContext.Path path) {
-        String pathString = circular ? path.toCircularString() : path.toString();
-        builder.append("Path Taken: ");
+        builder.append("Path Taken:");
         if (circular) {
-            builder.append(ls);
+            builder.append(ls).append(path.toCircularString());
+        } else {
+            builder.append(" ").append(path);
         }
-        builder.append(pathString);
     }
 }

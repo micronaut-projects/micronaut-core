@@ -50,6 +50,21 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         super(conversionService);
     }
 
+    /**
+     * Constructor.
+     *
+     * @param conversionService conversion service
+     * @param argument The argument
+     */
+    public QueryValueArgumentBinder(ConversionService conversionService, Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        return new QueryValueArgumentBinder<>(conversionService, argument);
+    }
+
     @Override
     public Class<QueryValue> getAnnotationType() {
         return QueryValue.class;
@@ -90,10 +105,10 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             return () -> multiValueConversion;
         }
 
-        String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(argument.getName());
 
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *, e.g. ?pojo*
+        String parameterName = resolvedParameterName(argument);
         boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
             .map(umi -> {
                 UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
@@ -104,7 +119,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             Object value;
             // Only maps and POJOs will "bindAll", lists work like normal
             if (Iterable.class.isAssignableFrom(argument.getType())) {
-                value = doResolve(context, parameters, parameterName);
+                value = doResolve(context, parameters);
                 if (value == null) {
                     value = Collections.emptyList();
                 }
@@ -113,6 +128,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             }
             return doConvert(value, context);
         }
-        return doBind(context, parameters, parameterName, BindingResult.unsatisfied());
+        return doBind(context, parameters, BindingResult.unsatisfied());
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
+        return argument.getAnnotationMetadata().stringValue(QueryValue.class).orElse(argument.getName());
     }
 }

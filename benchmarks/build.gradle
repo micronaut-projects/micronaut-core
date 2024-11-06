@@ -30,11 +30,13 @@ dependencies {
     api project(":inject-java-test")
     api project(":http-server")
     api project(":http-server-netty")
+    api project(":http-client")
     api project(":jackson-databind")
     api project(":router")
     api project(":runtime")
 
     api platform(libs.test.boms.micronaut.validation)
+    api libs.managed.reactor
     api (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
     }
@@ -43,8 +45,8 @@ dependencies {
 
     typeCheckTestImplementation libs.junit.jupiter
     typeCheckTestImplementation libs.micronaut.test.type.pollution
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.15.5")
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.15.7")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.15.10")
+    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.15.10")
     typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
 

@@ -2,7 +2,7 @@
 asm = "9.7.1"
 awaitility = "4.2.2"
 bcpkix = "1.70"
-blaze = "1.6.12"
+blaze = "1.6.13"
 brotli4j = "1.16.0"
 caffeine = "2.9.3"
 compile-testing = "0.21.0"
@@ -34,10 +34,11 @@ jcache = "1.1.1"
 junit5 = "5.10.3"
 junit-platform="1.10.3"
 logback = "1.5.12"
+lombok = "1.18.34"
 logbook-netty = "3.7.0"
 log4j = "2.23.1"
 micronaut-aws = "4.7.1"
-micronaut-build-plugins="7.2.2"
+micronaut-build-plugins="7.2.3"
 micronaut-groovy = "4.4.0"
 micronaut-session = "4.4.0"
 micronaut-sql = "5.3.0"
@@ -76,7 +77,7 @@ managed-methvin-directory-watcher = "0.18.0"
 managed-netty = "4.1.114.Final"
 managed-netty-iouring = "0.0.25.Final"
 managed-netty-http3 = "0.0.28.Final"
-managed-netty-tcnative = "2.0.66.Final"
+managed-netty-tcnative = "2.0.69.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.6.10"
@@ -232,6 +233,7 @@ log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" 
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-build-plugins = { module = "io.micronaut.build.internal:micronaut-gradle-plugins", version.ref="micronaut-build-plugins"}

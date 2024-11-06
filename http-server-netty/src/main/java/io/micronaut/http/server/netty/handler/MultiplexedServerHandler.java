@@ -316,13 +316,13 @@ abstract class MultiplexedServerHandler {
                     }
                 };
                 consumer.upstream = snbb.primary(consumer);
-                writeStreaming(response, consumer.upstream);
+                writeStreaming(response, consumer.upstream, snbb.expectedLength().orElse(-1));
             }
         }
 
-        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream) {
+        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream, long contentLength) {
             if (!ctx.executor().inEventLoop()) {
-                ctx.executor().execute(() -> writeStreaming(response, upstream));
+                ctx.executor().execute(() -> writeStreaming(response, upstream, contentLength));
                 return;
             }
 
@@ -335,7 +335,7 @@ abstract class MultiplexedServerHandler {
 
             writerUpstream = upstream;
 
-            prepareCompression(response);
+            prepareCompression(response, contentLength);
 
             writeHeaders(response, false, ctx.voidPromise());
             upstream.start();
@@ -361,7 +361,7 @@ abstract class MultiplexedServerHandler {
             boolean empty = !content.isReadable();
 
             if (!empty) {
-                prepareCompression(response);
+                prepareCompression(response, content.readableBytes());
             }
 
             if (compressionSession != null) {
@@ -404,9 +404,9 @@ abstract class MultiplexedServerHandler {
         public final void closeAfterWrite() {
         }
 
-        private void prepareCompression(HttpResponse headers) {
+        private void prepareCompression(HttpResponse headers, long contentLength) {
             if (compressor != null) {
-                Compressor.Session session = compressor.prepare(ctx, request, headers);
+                Compressor.Session session = compressor.prepare(ctx, request, headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     compressionSession = session;

@@ -401,8 +401,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         final MediaType[] acceptTypes;
         Collection<MediaType> accept = request.accept();
+        var definitionType = annotationMetadata.enumValue(Client.class, "definitionType", Client.DefinitionType.class)
+            .orElse(Client.DefinitionType.CLIENT);
         if (accept.isEmpty()) {
-            String[] consumesMediaType = context.stringValues(Consumes.class);
+            String[] consumesMediaType = context.stringValues(definitionType.isClient() ? Consumes.class : Produces.class);
             if (ArrayUtils.isEmpty(consumesMediaType)) {
                 acceptTypes = DEFAULT_ACCEPT_TYPES;
             } else {
@@ -411,8 +413,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.accept(acceptTypes);
         }
 
-        if (body != null && !request.getContentType().isPresent()) {
-            MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
+        if (body != null && request.getContentType().isEmpty()) {
+            MediaType[] contentTypes = MediaType.of(context.stringValues(definitionType.isClient() ? Produces.class : Consumes.class));
             if (ArrayUtils.isEmpty(contentTypes)) {
                 contentTypes = DEFAULT_ACCEPT_TYPES;
             }

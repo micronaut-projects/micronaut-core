@@ -140,6 +140,7 @@ httpServer:
     filtermethods:
       title: Filter Methods
       filtermethodsexample: Server Filter with Filter Methods
+      filtermethodproceed: Proceeding with Filter Methods
       errorStates: Error States
       continuations: Continuations
       order: Filter Order

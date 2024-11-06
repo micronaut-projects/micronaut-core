@@ -841,7 +841,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             preprocess(response);
             FullOutboundHandler oh = new FullOutboundHandler(this, response);
             if (response.content().isReadable()) {
-                prepareCompression(response, oh);
+                prepareCompression(response, oh, response.content().readableBytes());
             }
             write(oh);
         }
@@ -870,17 +870,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                prepareCompression(response, oh);
+                prepareCompression(response, oh, expectedLength.orElse(-1));
                 oh.upstream = ((StreamingNettyByteBody) nbb).primary(oh);
                 write(oh);
             }
         }
 
-        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler) {
+        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
             if (compressor == null) {
                 return;
             }
-            Compressor.Session compressionSession = compressor.prepare(ctx, request, response);
+            Compressor.Session compressionSession = compressor.prepare(ctx, request, response, contentLength);
             if (compressionSession != null) {
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
