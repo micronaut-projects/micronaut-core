@@ -15,7 +15,7 @@ class ClientHostNameSpec extends Specification {
         e.message.contains('Connect Error: foo_bar') || e.message.contains('Connect Error: No such host is known (foo_bar)')
 
         cleanup:
-        client.close()
+        client.refresh()
     }
 
     void "test host name with underscores and port"() {
@@ -29,7 +29,7 @@ class ClientHostNameSpec extends Specification {
         e.message.contains('Connect Error:') && e.message.contains('foo_bar')
 
         cleanup:
-        client.close()
+        client.refresh()
     }
 
     void "test host name with dots and dashes and port"() {
@@ -42,7 +42,7 @@ class ClientHostNameSpec extends Specification {
         e.message.contains('Connect Error: slave1-6x8-build-agent-2.0.1-5h7sl') || e.message.contains('Connect Error: No such host is known (slave1-6x8-build-agent-2.0.1-5h7sl)')
 
         cleanup:
-        client.close()
+        client.refresh()
     }
 
 }
