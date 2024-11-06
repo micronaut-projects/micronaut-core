@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -128,6 +129,11 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     @Override
     public void onComplete(BiConsumer<? super T, Throwable> fn) {
         next(new OnComplete<>(fn));
+    }
+
+    @Override
+    public void completeTo(CompletableFuture<T> completableFuture) {
+        next(new OnCompleteToFuture<>(completableFuture));
     }
 
     @SuppressWarnings("unchecked")
@@ -366,6 +372,24 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         ExecutionFlow<E> apply(ExecutionFlow<E> executionFlow) {
             try {
                 executionFlow.onComplete(consumer);
+            } catch (Exception e) {
+                LOG.error("Failed to execute onComplete", e);
+            }
+            return executionFlow;
+        }
+    }
+
+    private static final class OnCompleteToFuture<E> extends Step<E, E> {
+        private final CompletableFuture<E> future;
+
+        public OnCompleteToFuture(CompletableFuture<E> future) {
+            this.future = future;
+        }
+
+        @Override
+        ExecutionFlow<E> apply(ExecutionFlow<E> executionFlow) {
+            try {
+                executionFlow.completeTo(future);
             } catch (Exception e) {
                 LOG.error("Failed to execute onComplete", e);
             }

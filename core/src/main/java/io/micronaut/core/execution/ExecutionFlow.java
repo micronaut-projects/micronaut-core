@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -90,16 +89,7 @@ public interface ExecutionFlow<T> {
     @NonNull
     static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
-        executor.execute(() -> supplier.get().onComplete((t, throwable) -> {
-            if (throwable != null) {
-                if (throwable instanceof CompletionException completionException) {
-                    throwable = completionException.getCause();
-                }
-                completableFuture.completeExceptionally(throwable);
-            } else {
-                completableFuture.complete(t);
-            }
-        }));
+        executor.execute(() -> supplier.get().onComplete(completableFuture));
         return completableFuture;
     }
 
@@ -173,14 +163,22 @@ public interface ExecutionFlow<T> {
     void onComplete(@NonNull BiConsumer<? super T, Throwable> fn);
 
     /**
+     * Completes the flow to the completable future.
+     *
+     * @param completableFuture The completable future
+     * @since 4.8
+     */
+    void completeTo(@NonNull CompletableFuture<T> completableFuture);
+
+    /**
      * Create a new {@link ExecutionFlow} that either returns the same result or, if the timeout
-     * expires before the result is received, a {@link TimeoutException}.
+     * expires before the result is received, a {@link java.util.concurrent.TimeoutException}.
      *
      * @param timeout   The timeout
      * @param scheduler Scheduler to schedule the timeout task
      * @param onDiscard An optional consumer to be called on the value of this flow if the flow
      *                  completes after the timeout has expired and thus the value is discarded
-     * @return A new flow that will produce either the same value or a {@link TimeoutException}
+     * @return A new flow that will produce either the same value or a {@link java.util.concurrent.TimeoutException}
      */
     @NonNull
     default ExecutionFlow<T> timeout(@NonNull Duration timeout, @NonNull ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
@@ -263,16 +261,7 @@ public interface ExecutionFlow<T> {
     @NonNull
     default CompletableFuture<T> toCompletableFuture() {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        onComplete((value, throwable) -> {
-            if (throwable != null) {
-                if (throwable instanceof CompletionException completionException) {
-                    throwable = completionException.getCause();
-                }
-                completableFuture.completeExceptionally(throwable);
-            } else {
-                completableFuture.complete(value);
-            }
-        });
+        completeTo(completableFuture);
         return completableFuture;
     }
 

@@ -18,13 +18,16 @@ package io.micronaut.core.execution;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.concurrent.CompletionException;
+import java.util.function.BiConsumer;
+
 /**
  * {@link ExecutionFlow} that can be completed similar to a
  * {@link java.util.concurrent.CompletableFuture}.
  *
  * @param <T> The type of this flow
  */
-public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits DelayedExecutionFlowImpl {
+public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T>, BiConsumer<T, Throwable> permits DelayedExecutionFlowImpl {
     static <T> DelayedExecutionFlow<T> create() {
         return new DelayedExecutionFlowImpl<>();
     }
@@ -66,12 +69,18 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @since 4.7.0
      */
     default void completeFrom(@NonNull ExecutionFlow<T> flow) {
-        flow.onComplete((o, t) -> {
-            if (t != null) {
-                completeExceptionally(t);
-            } else {
-                complete(o);
+        flow.onComplete(this);
+    }
+
+    @Override
+    default void accept(T value, Throwable throwable) {
+        if (throwable != null) {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
             }
-        });
+            completeExceptionally(throwable);
+        } else {
+            complete(value);
+        }
     }
 }

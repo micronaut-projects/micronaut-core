@@ -114,6 +114,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            try {
+                fn.accept(callable.call(), null);
+            } catch (Exception e) {
+                fn.accept(null, e);
+            }
+            return;
+        }
         value.subscribe(new CoreSubscriber<>() {
 
             Subscription subscription;
@@ -160,6 +168,45 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             @Override
             public void onComplete() {
                 fn.accept(value, null);
+            }
+        });
+    }
+
+    @Override
+    public void completeTo(CompletableFuture<Object> completableFuture) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            try {
+                completableFuture.complete(callable.call());
+            } catch (Exception e) {
+                completableFuture.completeExceptionally(e);
+            }
+            return;
+        }
+        value.subscribe(new CoreSubscriber<>() {
+
+            Subscription subscription;
+            Object value;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(1);
+            }
+
+            @Override
+            public void onNext(Object v) {
+                value = v;
+                subscription.request(1); // ???
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                completableFuture.completeExceptionally(t);
+            }
+
+            @Override
+            public void onComplete() {
+                completableFuture.complete(value);
             }
         });
     }
