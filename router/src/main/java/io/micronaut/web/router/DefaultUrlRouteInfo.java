@@ -30,7 +30,6 @@ import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.scheduling.instrument.InstrumentedExecutor;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -136,8 +135,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             noExecutor = true;
             return null;
         }
-        // Context is propagated manually
-        executorService = InstrumentedExecutor.unwrap(es);
+        executorService = es;
         return executorService;
     }
 }
