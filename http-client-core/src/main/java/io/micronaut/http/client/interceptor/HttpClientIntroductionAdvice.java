@@ -338,12 +338,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             publisher = httpClientResponsePublisher(httpClient, requestPublisher, returnType, errorType, valueType);
         }
 
-        publisher = Flux.from(publisher)
-            .doOnError(t -> {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
-                }
-            });
+        if (LOG.isDebugEnabled()) {
+            publisher = Flux.from(publisher).doOnError(t ->
+                LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t)
+            );
+        }
 
         Object finalPublisher = interceptedMethod.handleResult(publisher);
         for (ReactiveClientResultTransformer transformer : transformers) {
