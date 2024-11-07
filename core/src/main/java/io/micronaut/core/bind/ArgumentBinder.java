@@ -55,7 +55,8 @@ public interface ArgumentBinder<T, S> {
      * @return The specific binder
      * @since 4.8
      */
-    default ArgumentBinder<T, S> createSpecific(Argument<T> argument) {
+    @NonNull
+    default ArgumentBinder<T, S> createSpecific(@NonNull Argument<T> argument) {
         return this;
     }
 

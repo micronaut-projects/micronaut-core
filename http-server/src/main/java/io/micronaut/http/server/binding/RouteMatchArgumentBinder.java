@@ -38,7 +38,7 @@ import java.util.Optional;
  */
 @Singleton
 @Internal
-public final class RouteMatchArgumentBinder implements TypedRequestArgumentBinder<RouteMatch<?>>, FilterArgumentBinderPredicate {
+final class RouteMatchArgumentBinder implements TypedRequestArgumentBinder<RouteMatch<?>>, FilterArgumentBinderPredicate {
     RouteMatchArgumentBinder() {
     }
 

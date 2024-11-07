@@ -37,7 +37,7 @@ import jakarta.inject.Singleton;
  */
 @Singleton
 @Internal
-public final class RouteInfoArgumentBinder implements TypedRequestArgumentBinder<RouteInfo<?>>, FilterArgumentBinderPredicate {
+final class RouteInfoArgumentBinder implements TypedRequestArgumentBinder<RouteInfo<?>>, FilterArgumentBinderPredicate {
     RouteInfoArgumentBinder() {
     }
 
