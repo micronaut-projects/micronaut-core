@@ -150,8 +150,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Optional<? extends ArgumentBinder<?, HttpRequest<?>>> argumentBinder = requestBinderRegistry.findArgumentBinder(argument);
-            RequestArgumentBinder<Object> binder = (RequestArgumentBinder<Object>) argumentBinder.orElse(null);
-            binders[i] = binder.createSpecific((Argument<Object>) argument);
+            binders[i] = (RequestArgumentBinder<Object>) argumentBinder.orElse(null);
         }
         return binders;
     }

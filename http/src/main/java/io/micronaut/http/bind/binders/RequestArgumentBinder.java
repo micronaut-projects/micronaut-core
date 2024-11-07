@@ -37,6 +37,7 @@ public interface RequestArgumentBinder<T> extends ArgumentBinder<T, HttpRequest<
      * @return The specific binder
      * @since 4.8
      */
+    @Override
     default RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
         return this;
     }

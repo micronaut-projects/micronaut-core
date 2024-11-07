@@ -25,36 +25,35 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.filter.FilterArgumentBinderPredicate;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 
-import java.util.Optional;
-
 /**
- * Argument binder for {@link RouteMatch} objects.
+ * Argument binder for {@link io.micronaut.web.router.RouteInfo} objects.
  *
- * @since 4.6.0
- * @author Jonas Konrad
+ * @since 4.8.0
+ * @author Denis Stepanov
  */
 @Singleton
 @Internal
-public final class RouteMatchArgumentBinder implements TypedRequestArgumentBinder<RouteMatch<?>>, FilterArgumentBinderPredicate {
-    RouteMatchArgumentBinder() {
+public final class RouteInfoArgumentBinder implements TypedRequestArgumentBinder<RouteInfo<?>>, FilterArgumentBinderPredicate {
+    RouteInfoArgumentBinder() {
     }
 
     @Override
-    public Argument<RouteMatch<?>> argumentType() {
-        return (Argument) Argument.of(RouteMatch.class);
+    public Argument<RouteInfo<?>> argumentType() {
+        return (Argument) Argument.of(RouteInfo.class);
     }
 
     @Override
-    public BindingResult<RouteMatch<?>> bind(ArgumentConversionContext<RouteMatch<?>> context, HttpRequest<?> source) {
-        Optional<RouteMatch<?>> match = source.getAttribute(HttpAttributes.ROUTE_MATCH).map(r -> (RouteMatch<?>) r);
-        return () -> match;
+    public BindingResult<RouteInfo<?>> bind(ArgumentConversionContext<RouteInfo<?>> context, HttpRequest<?> source) {
+        return () -> source.getAttribute(HttpAttributes.ROUTE_INFO).<RouteInfo<?>>map(r1 -> (RouteInfo<?>) r1)
+            .or(() -> source.getAttribute(HttpAttributes.ROUTE_MATCH).<RouteInfo<?>>map(r -> ((RouteMatch<?>) r).getRouteInfo()));
     }
 
     @Override
     public boolean test(Argument<?> argument, MutablePropagatedContext mutablePropagatedContext, HttpRequest<?> request, @Nullable HttpResponse<?> response, @Nullable Throwable failure) {
-        return argument.isNullable() || request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent();
+        return argument.isNullable() || request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent() || request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent();
     }
 }

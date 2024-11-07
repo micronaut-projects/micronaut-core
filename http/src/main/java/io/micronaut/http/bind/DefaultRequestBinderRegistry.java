@@ -175,20 +175,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 binder = byAnnotation.get(annotationType);
             }
             if (binder != null) {
-                return Optional.of(binder);
+                return Optional.of(binder.createSpecific(argument));
             }
         } else {
             RequestArgumentBinder<T> binder = byType.get(argument.typeHashCode());
-            if (binder != null) {
-                return Optional.of(binder);
-            } else {
+            if (binder == null) {
                 binder = byType.get(Argument.of(argument.getType()).typeHashCode());
-                if (binder != null) {
-                    return Optional.of(binder);
-                }
+            }
+            if (binder != null) {
+                return Optional.of(binder.createSpecific(argument));
             }
         }
-        return Optional.of(defaultUnmatchedRequestArgumentBinder);
+        return Optional.of(defaultUnmatchedRequestArgumentBinder.createSpecific(argument));
     }
 
     /**
