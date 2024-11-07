@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -54,7 +55,7 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
-    public static Optional<Charset> resolveCharset(HttpMessage<?> request) {
+    public static Optional<Charset> resolveCharset(@NonNull HttpMessage<?> request) {
         try {
             MediaType contentType = request
                 .getContentType().orElse(null);
@@ -80,9 +81,11 @@ public class HttpUtil {
      *
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
+     * @since 4.8
      */
     @SuppressWarnings("Duplicates")
-    public static Charset getResolveCharset(HttpMessage<?> request) {
+    @NonNull
+    public static Charset getResolveCharset(@NonNull HttpMessage<?> request) {
         try {
             MediaType contentType = request.getContentType().orElse(null);
             if (contentType != null) {

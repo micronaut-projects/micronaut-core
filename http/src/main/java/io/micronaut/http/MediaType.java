@@ -967,8 +967,13 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
 
     /**
      * @return The parameters map of the media type
+     * @since 4.8
      */
+    @NonNull
     public Map<CharSequence, String> getParametersMap() {
+        if (parameters == null) {
+            return Collections.emptyMap();
+        }
         return Collections.unmodifiableMap(parameters);
     }
 
