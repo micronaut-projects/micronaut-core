@@ -249,23 +249,23 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public final ByteBody byteBody() {
+    public ByteBody byteBody() {
         return body;
     }
 
-    public final void setLegacyBody(Object legacyBody) {
+    public void setLegacyBody(Object legacyBody) {
         this.legacyBody = legacyBody;
     }
 
-    public final void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
+    public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
         routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
     }
 
-    public final ExecutionFlow<?> getRouteWaitsFor() {
+    public ExecutionFlow<?> getRouteWaitsFor() {
         return routeWaitsFor;
     }
 
-    public final FormRouteCompleter formRouteCompleter() {
+    public FormRouteCompleter formRouteCompleter() {
         assert isFormOrMultipartData();
         if (formRouteCompleter == null) {
             formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
@@ -273,7 +273,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return formRouteCompleter;
     }
 
-    public final boolean hasFormRouteCompleter() {
+    public boolean hasFormRouteCompleter() {
         return formRouteCompleter != null;
     }
 
@@ -435,7 +435,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             attributes.forEach(CLEANUP_ATTRIBUTES);
         }
     }
-
 
     @Nullable
     private ChannelHandlerContext findConnectionHandler() {
@@ -616,7 +615,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      * @return Return true if the request is form data.
      */
     @Internal
-    public final boolean isFormOrMultipartData() {
+    public boolean isFormOrMultipartData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
