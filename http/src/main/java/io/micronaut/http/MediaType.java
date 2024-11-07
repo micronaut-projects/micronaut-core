@@ -959,10 +959,17 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
     }
 
     /**
-     * @return The parameters to the media type
+     * @return The parameters of the media type
      */
     public OptionalValues<String> getParameters() {
         return OptionalValues.of(String.class, parameters);
+    }
+
+    /**
+     * @return The parameters map of the media type
+     */
+    public Map<CharSequence, String> getParametersMap() {
+        return Collections.unmodifiableMap(parameters);
     }
 
     /**
@@ -990,7 +997,11 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
      * @return The charset of the media type if specified
      */
     public Optional<Charset> getCharset() {
-        return getParameters().get(CHARSET_PARAMETER).map(Charset::forName);
+        String charset = parameters.get(CHARSET_PARAMETER);
+        if (charset == null) {
+            return Optional.empty();
+        }
+        return Optional.of(Charset.forName(charset));
     }
 
     @Override

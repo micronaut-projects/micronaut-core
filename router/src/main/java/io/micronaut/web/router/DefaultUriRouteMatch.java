@@ -41,7 +41,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
-
+    private Map<String, Object> variables;
     /**
      * @param matchInfo The URI match info
      * @param routeInfo The URI route
@@ -65,16 +65,19 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
 
     @Override
     public Map<String, Object> getVariableValues() {
-        Map<String, Object> variables = matchInfo.getVariableValues();
-        if (CollectionUtils.isNotEmpty(variables)) {
-            Map<String, Object> decoded = CollectionUtils.newLinkedHashMap(variables.size());
-            variables.forEach((k, v) -> {
-                if (v instanceof CharSequence) {
-                    v = URLDecoder.decode(v.toString(), defaultCharset);
-                }
-                decoded.put(k, v);
-            });
-            return decoded;
+        if (variables == null) {
+            Map<String, Object> matchVariables = matchInfo.getVariableValues();
+            if (CollectionUtils.isNotEmpty(matchVariables)) {
+                variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                matchVariables.forEach((k, v) -> {
+                    if (v instanceof CharSequence) {
+                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                    }
+                    variables.put(k, v);
+                });
+            } else {
+                variables = Map.of();
+            }
         }
         return variables;
     }

@@ -299,7 +299,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             this.uri = uri;
             this.variableValues = variableValues;
             this.variables = variables;
-            LinkedHashMap<String, UriMatchVariable> vm = new LinkedHashMap<>(variables.size());
+            LinkedHashMap<String, UriMatchVariable> vm = CollectionUtils.newLinkedHashMap(variables.size());
             for (UriMatchVariable variable : variables) {
                 vm.put(variable.getName(), variable);
             }
