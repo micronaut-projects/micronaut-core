@@ -25,7 +25,7 @@ class HttpUtilSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/4332")
     void "test an invalid charset returns the default 2"() {
         when:
-        Charset charset = HttpUtil.getResolveCharset(Mock(HttpMessage) {
+        Charset charset = HttpUtil.getCharset(Mock(HttpMessage) {
             getContentType() >> Optional.of(MediaType.of("text/xml;charset=\"invalid\""))
         })
 

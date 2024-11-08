@@ -75,7 +75,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
      */
     default @NonNull Charset getCharacterEncoding() {
-        return HttpUtil.getResolveCharset(this);
+        return HttpUtil.getCharset(this);
     }
 
     @Override

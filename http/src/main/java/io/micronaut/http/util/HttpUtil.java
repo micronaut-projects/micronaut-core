@@ -85,7 +85,7 @@ public class HttpUtil {
      */
     @SuppressWarnings("Duplicates")
     @NonNull
-    public static Charset getResolveCharset(@NonNull HttpMessage<?> request) {
+    public static Charset getCharset(@NonNull HttpMessage<?> request) {
         try {
             MediaType contentType = request.getContentType().orElse(null);
             if (contentType != null) {
