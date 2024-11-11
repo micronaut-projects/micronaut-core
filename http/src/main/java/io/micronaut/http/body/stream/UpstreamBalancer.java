@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.body;
+package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.ByteBody;
@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
  * only need to test for the first case.
  */
 @Internal
-final class UpstreamBalancer {
+public final class UpstreamBalancer {
     private static final AtomicLongFieldUpdater<UpstreamBalancer> DELTA = AtomicLongFieldUpdater.newUpdater(UpstreamBalancer.class, "delta");
     private static final AtomicIntegerFieldUpdater<UpstreamBalancer> FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "flags");
 
@@ -72,16 +72,22 @@ final class UpstreamBalancer {
 
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#SLOWEST}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
-    static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
+    public static UpstreamPair slowest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new SlowestUpstreamImpl(false), balancer.new SlowestUpstreamImpl(true));
     }
 
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#FASTEST}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
-    static UpstreamPair fastest(BufferConsumer.Upstream upstream) {
+    public static UpstreamPair fastest(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new FastestUpstreamImpl(false), balancer.new FastestUpstreamImpl(true));
     }
@@ -89,8 +95,11 @@ final class UpstreamBalancer {
     /**
      * Implementation of {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#ORIGINAL} and
      * {@link io.micronaut.http.body.ByteBody.SplitBackpressureMode#NEW}.
+     *
+     * @param upstream The original upstream
+     * @return The balanced upstreams
      */
-    static UpstreamPair first(BufferConsumer.Upstream upstream) {
+    public static UpstreamPair first(BufferConsumer.Upstream upstream) {
         UpstreamBalancer balancer = new UpstreamBalancer(upstream);
         return new UpstreamPair(balancer.new PassthroughUpstreamImpl(), balancer.new IgnoringUpstreamImpl());
     }
@@ -99,8 +108,12 @@ final class UpstreamBalancer {
      * Create a pair of {@link BufferConsumer.Upstream}
      * instances that delegates to the given {@code upstream} according to the semantics of the
      * given {@code mode}.
+     *
+     * @param upstream The original upstream
+     * @param mode The balancing mode
+     * @return The balanced upstreams
      */
-    static UpstreamPair balancer(BufferConsumer.Upstream upstream, ByteBody.SplitBackpressureMode mode) {
+    public static UpstreamPair balancer(BufferConsumer.Upstream upstream, ByteBody.SplitBackpressureMode mode) {
         return switch (mode) {
             case SLOWEST -> slowest(upstream);
             case FASTEST -> fastest(upstream);

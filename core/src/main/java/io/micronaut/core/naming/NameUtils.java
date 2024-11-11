@@ -35,13 +35,11 @@ public class NameUtils {
     private static final int IS_LENGTH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
-    private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
     private static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
-    private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
      * Checks whether the given name is a valid service identifier.
@@ -50,7 +48,16 @@ public class NameUtils {
      * @return True if it is
      */
     public static boolean isHyphenatedLowerCase(String name) {
-        return StringUtils.isNotEmpty(name) && SERVICE_ID_REGEX.matcher(name).matches() && Character.isLetter(name.charAt(0));
+        if (name == null || name.isEmpty() || !Character.isLetter(name.charAt(0))) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLowerCase(c) && (c < '0' || c > '9') && c != '-') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -118,11 +125,11 @@ public class NameUtils {
      * @return The hyphenated string
      */
     public static String hyphenate(String name, boolean lowerCase) {
+        String kebabReplaced = name.replace('_', '-').replace(' ', '-');
         if (isHyphenatedLowerCase(name)) {
-            return KEBAB_REPLACEMENTS.matcher(name).replaceAll("-");
+            return kebabReplaced;
         } else {
-            char separatorChar = '-';
-            return separateCamelCase(KEBAB_REPLACEMENTS.matcher(name).replaceAll("-"), lowerCase, separatorChar);
+            return separateCamelCase(kebabReplaced, lowerCase, '-');
         }
     }
 
@@ -565,12 +572,13 @@ public class NameUtils {
         return name;
     }
 
-    private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
-        StringBuilder newName = new StringBuilder();
+    static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
+        StringBuilder newName = new StringBuilder(name.length() + 4);
         if (!lowerCase) {
             boolean first = true;
             char last = '0';
-            for (char c : name.toCharArray()) {
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
                 if (first) {
                     if (c != separatorChar) {
                         // special case where first char == separatorChar, don't double it
@@ -599,12 +607,11 @@ public class NameUtils {
                 last = c;
             }
         } else {
-            char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
             char secondLast = separatorChar;
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
                     if (c != separatorChar) {

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.filter;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -121,7 +120,6 @@ record MethodFilter<T>(FilterOrder order,
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
-            AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
             if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
             } else if (argumentType.isAssignableFrom(ServerHttpRequest.class)) {

@@ -19,7 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.BiConsumer;
 
 /**
  * The imperative execution flow.
@@ -52,6 +55,19 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
     @NonNull
     @Override
     default ImperativeExecutionFlow<T> tryComplete() {
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated This method has no effect for {@link ImperativeExecutionFlow}, it makes no sense
+     * to use it
+     */
+    @Override
+    @NonNull
+    @Deprecated
+    default ExecutionFlow<T> timeout(@NonNull Duration timeout, @NonNull ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
         return this;
     }
 }

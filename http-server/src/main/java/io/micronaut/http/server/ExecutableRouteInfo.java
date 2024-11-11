@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -27,7 +28,8 @@ import io.micronaut.web.router.DefaultRouteInfo;
 import java.lang.reflect.Method;
 import java.util.List;
 
-class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodReference<T, R> {
+@Internal
+final class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodReference<T, R> {
 
     private final ExecutableMethod<T, R> method;
 

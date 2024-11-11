@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.type.Argument;
 
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +47,18 @@ import java.util.function.Function;
  */
 @FunctionalInterface
 public interface ArgumentBinder<T, S> {
+
+    /**
+     * Create a specific binder.
+     *
+     * @param argument The bound argument
+     * @return The specific binder
+     * @since 4.8
+     */
+    @NonNull
+    default ArgumentBinder<T, S> createSpecific(@NonNull Argument<T> argument) {
+        return this;
+    }
 
     /**
      * Bind the given argument from the given source.

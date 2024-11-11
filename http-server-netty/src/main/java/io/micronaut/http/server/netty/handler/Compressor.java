@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -70,7 +71,7 @@ final class Compressor {
     }
 
     @Nullable
-    Session prepare(ChannelHandlerContext ctx, HttpRequest request, HttpResponse response) {
+    Session prepare(ChannelHandlerContext ctx, HttpRequest request, HttpResponse response, long contentLength) {
         // from HttpContentEncoder: isPassthru
         int code = response.status().code();
         if (code < 200 || code == 204 || code == 304 ||
@@ -78,7 +79,7 @@ final class Compressor {
             response.protocolVersion() == HttpVersion.HTTP_1_0) {
             return null;
         }
-        if (!strategy.shouldCompress(response)) {
+        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
             return null;
         }
         if (response.headers().contains(HttpHeaderNames.CONTENT_ENCODING)) {

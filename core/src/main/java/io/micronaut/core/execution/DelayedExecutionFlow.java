@@ -44,6 +44,22 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
     void completeExceptionally(Throwable exc);
 
     /**
+     * Check for cancellation.
+     *
+     * @return {@code true} iff this flow or any downstream flow has been cancelled
+     * @since 4.8.0
+     */
+    boolean isCancelled();
+
+    /**
+     * Add a listener that is called if this flow or any downstream flow is cancelled.
+     *
+     * @param hook The hook to call on cancellation
+     * @since 4.8.0
+     */
+    void onCancel(@NonNull Runnable hook);
+
+    /**
      * Complete this flow from the given flow.
      *
      * @param flow The input flow

@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
+public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permits ReactorExecutionFlowImpl {
 
     /**
      * Creates a new reactive flow from a publisher.

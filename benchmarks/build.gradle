@@ -30,11 +30,13 @@ dependencies {
     api project(":inject-java-test")
     api project(":http-server")
     api project(":http-server-netty")
+    api project(":http-client")
     api project(":jackson-databind")
     api project(":router")
     api project(":runtime")
 
     api platform(libs.test.boms.micronaut.validation)
+    api libs.managed.reactor
     api (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
     }

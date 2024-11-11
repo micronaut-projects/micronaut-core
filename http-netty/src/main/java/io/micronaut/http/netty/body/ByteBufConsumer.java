@@ -16,17 +16,24 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.body.stream.BufferConsumer;
+import io.netty.buffer.ByteBuf;
 
 /**
- * Body size limits.
+ * This is a netty-specific reactor-like API for streaming bytes. It's a bit better than reactor
+ * because it's more explicit about reference counting semantics, has more fine-grained controls
+ * for cancelling, and has more relaxed concurrency semantics.
  *
- * @param maxBodySize max body size
- * @param maxBufferSize max buffer size
+ * @since 4.5.0
+ * @author Jonas Konrad
  */
 @Internal
-public record BodySizeLimits(
-    long maxBodySize,
-    long maxBufferSize
-) {
-    public static final BodySizeLimits UNLIMITED = new BodySizeLimits(Long.MAX_VALUE, Integer.MAX_VALUE);
+public interface ByteBufConsumer extends BufferConsumer {
+    /**
+     * Consume a buffer. Release ownership is transferred to this consumer.
+     *
+     * @param buf The buffer to consume
+     */
+    void add(@NonNull ByteBuf buf);
 }

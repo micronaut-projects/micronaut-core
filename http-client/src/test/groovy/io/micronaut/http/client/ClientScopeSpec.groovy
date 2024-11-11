@@ -14,12 +14,12 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.NoHostException
 import io.micronaut.http.client.netty.DefaultHttpClient
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import reactor.core.publisher.Flux
-import spock.lang.IgnoreIf
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 
@@ -89,8 +89,8 @@ class ClientScopeSpec extends Specification {
 
         then:
         //thrown(HttpClientException)
-        Flux.from(((DefaultHttpClient) myJavaService.client)
-                .resolveRequestURI(HttpRequest.GET("/foo"))).blockFirst().toString() == "http://localhost:${embeddedServer2.port}/foo"
+        Mono.from(ReactiveExecutionFlow.toPublisher(() -> ((DefaultHttpClient) myJavaService.client)
+                .resolveRequestURI(HttpRequest.GET("/foo")))).block().toString() == "http://localhost:${embeddedServer2.port}/foo"
 
         when:"test service definition with declarative client with jackson features"
         MyServiceJacksonFeatures jacksonFeatures = embeddedServer2.applicationContext.getBean(MyServiceJacksonFeatures)

@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
@@ -34,6 +33,7 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.bind.binders.CookieObjectArgumentBinder;
 import io.micronaut.http.bind.binders.CookieAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultUnmatchedRequestArgumentBinder;
@@ -125,16 +125,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         });
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
         byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
-        byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>) (context, source) -> {
-            Cookies cookies = source.getCookies();
-            String name = context.getArgument().getName();
-            Cookie cookie = cookies.get(name);
-            if (cookie == null) {
-                cookie = cookies.get(NameUtils.hyphenate(name));
-            }
-            Cookie finalCookie = cookie;
-            return () -> finalCookie != null ? Optional.of(finalCookie) : Optional.empty();
-        });
+        byType.put(Argument.of(Cookie.class).typeHashCode(), new CookieObjectArgumentBinder());
 
         defaultUnmatchedRequestArgumentBinder = new DefaultUnmatchedRequestArgumentBinder<>(
             List.of(
@@ -184,20 +175,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 binder = byAnnotation.get(annotationType);
             }
             if (binder != null) {
-                return Optional.of(binder);
+                return Optional.of(binder.createSpecific(argument));
             }
         } else {
             RequestArgumentBinder<T> binder = byType.get(argument.typeHashCode());
-            if (binder != null) {
-                return Optional.of(binder);
-            } else {
+            if (binder == null) {
                 binder = byType.get(Argument.of(argument.getType()).typeHashCode());
-                if (binder != null) {
-                    return Optional.of(binder);
-                }
+            }
+            if (binder != null) {
+                return Optional.of(binder.createSpecific(argument));
             }
         }
-        return Optional.of(defaultUnmatchedRequestArgumentBinder);
+        return Optional.of(defaultUnmatchedRequestArgumentBinder.createSpecific(argument));
     }
 
     /**

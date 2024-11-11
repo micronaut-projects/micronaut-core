@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFutureListener;
@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  * @since 4.7.0
  */
 @Internal
-final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferConsumer {
+final class StreamWriter extends ChannelInboundHandlerAdapter implements ByteBufConsumer {
     private final Consumer<Throwable> errorHandler;
     private ChannelHandlerContext ctx;
     private EventLoopFlow flow;

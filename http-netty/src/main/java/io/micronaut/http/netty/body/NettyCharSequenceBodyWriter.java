@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -40,6 +39,7 @@ import jakarta.inject.Singleton;
 
 import java.io.OutputStream;
 import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -57,9 +57,12 @@ public final class NettyCharSequenceBodyWriter implements ResponseBodyWriter<Cha
     @Override
     public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
-        ByteBuf byteBuf = ByteBufUtil.encodeString(ByteBufAllocator.DEFAULT, CharBuffer.wrap(object), MessageBodyWriter.getCharset(mediaType, headers));
+        Charset charset = MessageBodyWriter.getCharset(mediaType, headers);
+        ByteBuf byteBuf = charset == StandardCharsets.UTF_8 ?
+            ByteBufUtil.writeUtf8(ByteBufAllocator.DEFAULT, object) :
+            ByteBufUtil.encodeString(ByteBufAllocator.DEFAULT, CharBuffer.wrap(object), charset);
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
-        if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+        if (!nettyHttpHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
             nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
         }
         return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(byteBuf));

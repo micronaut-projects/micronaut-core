@@ -78,4 +78,35 @@ class DelayedExecutionFlowSpec extends Specification {
         }
         return output
     }
+
+    def 'cancel'() {
+        given:
+        def delayed1 = DelayedExecutionFlow.create()
+        def delayed2 = DelayedExecutionFlow.create()
+        def delayed3 = DelayedExecutionFlow.create()
+        def delayed4 = DelayedExecutionFlow.create()
+        def out = delayed1.flatMap { a ->
+            return delayed2.map { b -> a + b }
+        }.flatMap { a ->
+            return delayed3.map { b -> a + b }
+        }.flatMap { a ->
+            return delayed4.map { b -> a + b }
+        }
+        Object result = null
+        out.onComplete((v, t) -> result = v)
+
+        when:
+        delayed1.complete("foo")
+        out.cancel()
+        then:"cancellation is forwarded to the inner flows"
+        delayed1.cancelled
+        delayed2.cancelled
+
+        when:
+        delayed2.complete("bar")
+        delayed3.complete("baz")
+        delayed4.complete("fizz")
+        then:"result is still forwarded"
+        result == "foobarbazfizz"
+    }
 }

@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -43,18 +42,34 @@ public class HeaderAnnotationBinder<T> extends AbstractArgumentBinder<T> impleme
         super(conversionService);
     }
 
+    /**
+     * @param conversionService The conversion service
+     * @param argument The argument
+     */
+    public HeaderAnnotationBinder(ConversionService conversionService, Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        return new HeaderAnnotationBinder<>(conversionService, argument);
+    }
+
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
-        ConvertibleMultiValues<String> parameters = source.getHeaders();
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(Header.class)
-            .orElseGet(() -> annotationMetadata.stringValue(Header.class, "name").orElse(argument.getArgument().getName()));
-        return doBind(argument, parameters, parameterName);
+        return doBind(argument, source.getHeaders());
     }
 
     @Override
     public Class<Header> getAnnotationType() {
         return Header.class;
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        return annotationMetadata.stringValue(Header.class)
+            .orElseGet(() -> annotationMetadata.stringValue(Header.class, "name").orElse(argument.getName()));
     }
 
     @Override
