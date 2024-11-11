@@ -57,6 +57,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -93,7 +94,6 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
@@ -1570,7 +1570,7 @@ public class DefaultHttpClient implements
         }
 
         if (!isRunning()) {
-            return Mono.error(decorate(new HttpClientException("The client is closed, unable to send request.")));
+            return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to send request.")));
         }
 
         // first: connect

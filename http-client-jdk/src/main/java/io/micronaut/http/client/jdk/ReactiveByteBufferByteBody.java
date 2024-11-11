@@ -170,6 +170,16 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
     }
 
     @Override
+    public @NonNull CloseableByteBody move() {
+        BufferConsumer.Upstream upstream = this.upstream;
+        if (upstream == null) {
+            BaseSharedBuffer.failClaim();
+        }
+        this.upstream = null;
+        return new ReactiveByteBufferByteBody(sharedBuffer, upstream);
+    }
+
+    @Override
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
