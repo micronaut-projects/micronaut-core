@@ -46,6 +46,7 @@ dependencies {
     testImplementation libs.wiremock
     testImplementation libs.logback.classic
     testImplementation libs.bcpkix
+    testImplementation libs.managed.reactor.test
 
     testRuntimeOnly(libs.managed.netty.tcnative.boringssl.static) {
         artifact {

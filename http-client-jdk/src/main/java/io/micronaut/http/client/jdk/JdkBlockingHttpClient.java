@@ -87,7 +87,25 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     }
 
     @Override
-    public void close() throws IOException {
+    public boolean isRunning() {
+        // We cannot stop or close this client so is always running
+        return true;
+    }
+
+    @Override
+    public BlockingHttpClient start() {
+        // Client always running, we do not need to start it
+        return this;
+    }
+
+    @Override
+    public BlockingHttpClient stop() {
+        // Nothing to do here, we do not need to stop clients
+        return this;
+    }
+
+    @Override
+    public void close() {
         // Nothing to do here, we do not need to close clients
     }
 }

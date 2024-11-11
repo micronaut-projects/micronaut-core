@@ -157,7 +157,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     public @NonNull CloseableByteBody move() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         this.upstream = null;
         return new StreamingNettyByteBody(sharedBuffer, forceDelaySubscribe, upstream);
