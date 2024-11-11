@@ -105,7 +105,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -391,40 +390,38 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             formRouteCompleter.release();
         }
         if (attributes != null) {
-            attributes.forEach(cleanup());
+            attributes.forEach(NettyHttpRequest::cleanup);
         }
     }
 
-    private static BiConsumer<String, Object> cleanup() {
-        return (k, v) -> {
-            //noinspection StringEquality
-            if (k == HttpAttributes.ROUTE_MATCH.toString()) {
-                // usually this is a DefaultUriRouteMatch, avoid scalability issues here
-                RouteMatch<?> routeMatch = v instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) v;
-                if (routeMatch != null) {
-                    // discard parameters that have already been bound
-                    for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                        if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
-                            rc.release();
-                        }
-                        if (toDiscard instanceof ReferenceCounted rc) {
-                            rc.release();
-                        }
-                        if (toDiscard instanceof NettyCompletedFileUpload fu) {
-                            fu.discard();
-                        }
+    private static void cleanup(String k, Object v) {
+        //noinspection StringEquality
+        if (k == HttpAttributes.ROUTE_MATCH.toString()) {
+            // usually this is a DefaultUriRouteMatch, avoid scalability issues here
+            RouteMatch<?> routeMatch = v instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) v;
+            if (routeMatch != null) {
+                // discard parameters that have already been bound
+                for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                    if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
+                        rc.release();
+                    }
+                    if (toDiscard instanceof ReferenceCounted rc) {
+                        rc.release();
+                    }
+                    if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                        fu.discard();
                     }
                 }
-                // perf: avoid an instanceof in releaseIfNecessary
-                return;
             }
-            //noinspection StringEquality
-            if (k == HttpAttributes.ROUTE_INFO.toString() || v instanceof String) {
-                // perf: avoid an instanceof in releaseIfNecessary
-                return;
-            }
-            releaseIfNecessary(v);
-        };
+            // perf: avoid an instanceof in releaseIfNecessary
+            return;
+        }
+        //noinspection StringEquality
+        if (k == HttpAttributes.ROUTE_INFO.toString() || v instanceof String) {
+            // perf: avoid an instanceof in releaseIfNecessary
+            return;
+        }
+        releaseIfNecessary(v);
     }
 
     private static void releaseIfNecessary(Object value) {
