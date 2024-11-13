@@ -89,7 +89,7 @@ public interface ExecutionFlow<T> {
     @NonNull
     static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
-        executor.execute(() -> supplier.get().onComplete(completableFuture));
+        executor.execute(() -> supplier.get().onComplete(completableFuture::complete));
         return completableFuture;
     }
 

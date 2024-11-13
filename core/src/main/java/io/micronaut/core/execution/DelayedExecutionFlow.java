@@ -18,6 +18,8 @@ package io.micronaut.core.execution;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.concurrent.CompletionException;
+
 /**
  * {@link ExecutionFlow} that can be completed similar to a
  * {@link java.util.concurrent.CompletableFuture}.
@@ -66,4 +68,22 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @since 4.7.0
      */
     void completeFrom(@NonNull ExecutionFlow<T> flow);
+
+    /**
+     * Complete the flow with value / exception.
+     *
+     * @param value     The value
+     * @param throwable The exception
+     * @since 4.7.0
+     */
+    default void complete(T value, Throwable throwable) {
+        if (throwable != null) {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
+            }
+            completeExceptionally(throwable);
+        } else {
+            complete(value);
+        }
+    }
 }
