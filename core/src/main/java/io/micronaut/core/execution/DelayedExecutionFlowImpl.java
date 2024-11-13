@@ -21,12 +21,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 @SuppressWarnings("rawtypes")
-final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
+final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T>, BiConsumer<T, Throwable> {
     private static final Logger LOG = LoggerFactory.getLogger(DelayedExecutionFlowImpl.class);
 
     /**
@@ -54,6 +55,23 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
             executionFlow = step.apply(executionFlow);
             step = step.atomicSetOutput(executionFlow);
         } while (step != null);
+    }
+
+    @Override
+    public void completeFrom(@NonNull ExecutionFlow<T> flow) {
+        flow.onComplete(this);
+    }
+
+    @Override
+    public void accept(T value, Throwable throwable) {
+        if (throwable != null) {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
+            }
+            completeExceptionally(throwable);
+        } else {
+            complete(value);
+        }
     }
 
     /**

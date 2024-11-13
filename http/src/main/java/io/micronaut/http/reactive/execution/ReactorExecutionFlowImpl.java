@@ -115,11 +115,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
         if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
             try {
-                fn.accept(callable.call(), null);
+                value = callable.call();
             } catch (Exception e) {
                 fn.accept(null, e);
+                return;
             }
+            fn.accept(value, null);
             return;
         }
         value.subscribe(new CoreSubscriber<>() {
@@ -150,14 +153,13 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 if (cancel) {
                     s.cancel();
                 } else {
-                    s.request(1);
+                    s.request(Long.MAX_VALUE);
                 }
             }
 
             @Override
             public void onNext(Object v) {
                 value = v;
-                subscription.request(1); // ???
             }
 
             @Override
@@ -175,11 +177,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public void completeTo(CompletableFuture<Object> completableFuture) {
         if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
             try {
-                completableFuture.complete(callable.call());
+                value = callable.call();
             } catch (Exception e) {
                 completableFuture.completeExceptionally(e);
+                return;
             }
+            completableFuture.complete(value);
             return;
         }
         value.subscribe(new CoreSubscriber<>() {
@@ -190,13 +195,12 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             @Override
             public void onSubscribe(Subscription s) {
                 this.subscription = s;
-                s.request(1);
+                s.request(Long.MAX_VALUE);
             }
 
             @Override
             public void onNext(Object v) {
                 value = v;
-                subscription.request(1); // ???
             }
 
             @Override
