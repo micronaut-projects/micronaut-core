@@ -57,12 +57,20 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Override
     public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            return completedFlow.then(supplier);
+        }
         stage = stage.thenCompose(value -> (CompletionStage<Object>) supplier.get().toCompletableFuture());
         return (ExecutionFlow<R>) this;
     }
 
     @Override
     public <R> ExecutionFlow<R> map(Function<? super Object, ? extends R> function) {
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            return completedFlow.map(function);
+        }
         stage = stage.thenApply(function);
         return (ExecutionFlow<R>) this;
     }
@@ -94,12 +102,30 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
             completedFlow.onComplete(fn);
             return;
         }
-        stage.handle((o, throwable) -> {
+        stage.whenComplete((o, throwable) -> {
             if (throwable instanceof CompletionException completionException) {
                 throwable = completionException.getCause();
             }
             fn.accept(o, throwable);
-            return null;
+        });
+    }
+
+    @Override
+    public void completeTo(CompletableFuture<Object> completableFuture) {
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            completedFlow.completeTo(completableFuture);
+            return;
+        }
+        stage.whenComplete((o, throwable) -> {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
+            }
+            if (throwable != null) {
+                completableFuture.completeExceptionally(throwable);
+            } else {
+                completableFuture.complete(o);
+            }
         });
     }
 
