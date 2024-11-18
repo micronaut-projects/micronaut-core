@@ -3,16 +3,16 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
-    api project(':aop')
-    api project(':discovery-core')
-    api project(':context')
-    api project(':context-propagation')
-    api project(":core-reactive")
-    api project(":http")
-    api project(':inject')
-    api project(':retry')
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
+    api projects.micronautAop
+    api projects.micronautDiscoveryCore
+    api projects.micronautContext
+    api projects.micronautContextPropagation
+    api projects.micronautCoreReactive
+    api projects.micronautHttp
+    api projects.micronautInject
+    api projects.micronautRetry
 
     implementation libs.managed.reactor
 
@@ -25,12 +25,12 @@ dependencies {
     compileOnly libs.managed.kotlinx.coroutines.reactive
     testImplementation libs.logback.classic
     testImplementation libs.managed.snakeyaml
-    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor projects.micronautInjectJava
     testImplementation libs.jsr107
     testImplementation libs.jcache
-    testImplementation project(":inject-java")
-    testImplementation project(":inject-java-test")
-    testImplementation project(":inject-groovy")
+    testImplementation projects.micronautInjectJava
+    testImplementation projects.micronautInjectJavaTest
+    testImplementation projects.micronautInjectGroovy
     testImplementation libs.systemlambda
 }
 

@@ -8,7 +8,7 @@ tasks.withType(Test).configureEach {
 }
 
 dependencies {
-    testImplementation project(":context")
+    testImplementation projects.micronautContext
     testImplementation libs.logback.classic
     testImplementation libs.junit.jupiter
 }

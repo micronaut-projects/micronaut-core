@@ -9,22 +9,22 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":core-processor")
+    api projects.micronautCoreProcessor
 
-    testImplementation project(":context")
-    testImplementation project(':aop')
-    testImplementation projects.injectJavaHelper
-    testCompileOnly projects.injectJavaHelper2
+    testImplementation projects.micronautContext
+    testImplementation projects.micronautAop
+    testImplementation projects.micronautInjectJavaHelper
+    testCompileOnly projects.micronautInjectJavaHelper2
 
-    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor projects.micronautInjectJava
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
 
-    testImplementation project(":inject-java-test")
-    testImplementation project(":inject-test-utils")
-    testImplementation project(":runtime")
+    testImplementation projects.micronautInjectJavaTest
+    testImplementation projects.micronautInjectTestUtils
+    testImplementation projects.micronautRuntime
 
     testImplementation libs.managed.reactor
 
@@ -36,7 +36,7 @@ dependencies {
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }
-    testImplementation(project(":http-server"))
+    testImplementation(projects.micronautHttpServer)
     testImplementation platform(libs.test.boms.micronaut.validation)
     testImplementation (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
@@ -44,7 +44,7 @@ dependencies {
     testImplementation (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautJacksonDatabind
     testImplementation libs.junit.jupiter.api
     testImplementation libs.javax.annotation.api
     testImplementation libs.javax.inject

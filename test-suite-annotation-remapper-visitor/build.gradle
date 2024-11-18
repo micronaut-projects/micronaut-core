@@ -5,7 +5,7 @@ plugins {
 description = "A simple remapping visitor"
 
 dependencies {
-    implementation(projects.injectJava)
+    implementation(projects.micronautInjectJava)
     // Use an enum that shouldn't be present and the runtime to simulate added enum value that doesn't exist
     implementation libs.blaze.persistence.core
 }

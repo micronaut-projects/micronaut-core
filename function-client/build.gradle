@@ -3,9 +3,9 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    api project(":function")
-    api project(":http-client")
+    annotationProcessor projects.micronautInjectJava
+    api projects.micronautFunction
+    api projects.micronautHttpClient
 
     implementation libs.managed.reactor
 }

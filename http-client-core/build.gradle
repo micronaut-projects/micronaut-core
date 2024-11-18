@@ -3,17 +3,17 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 
     implementation libs.managed.reactor
 
-    api project(":http")
-    api project(":json-core")
-    api project(":discovery-core")
+    api projects.micronautHttp
+    api projects.micronautJsonCore
+    api projects.micronautDiscoveryCore
 
     compileOnly libs.managed.kotlin.stdlib
 
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautJacksonDatabind
 }
 
 //tasks.withType(Test).configureEach {

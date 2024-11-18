@@ -10,10 +10,10 @@ tasks.withType(Test).configureEach {
 }
 
 dependencies {
-    testAnnotationProcessor(projects.injectJava)
-    testImplementation(projects.httpServerNetty)
-    testImplementation(projects.httpClient)
-    testImplementation(projects.jacksonDatabind)
+    testAnnotationProcessor(projects.micronautInjectJava)
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpClient)
+    testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.bcpkix)
     testImplementation(libs.logback.classic)
     testImplementation(libs.micronaut.test.junit5) {

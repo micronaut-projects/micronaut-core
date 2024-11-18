@@ -9,15 +9,15 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
     compileOnly libs.graal
     compileOnly libs.managed.netty.transport.native.epoll
     compileOnly libs.managed.netty.transport.native.kqueue
     compileOnly libs.managed.netty.transport.native.iouring
-    compileOnly project(":websocket")
-    api project(":http")
-    api project(":buffer-netty")
+    compileOnly projects.micronautWebsocket
+    api projects.micronautHttp
+    api projects.micronautBufferNetty
 
     api libs.managed.netty.codec.http
     api libs.managed.netty.codec.http2
@@ -25,14 +25,14 @@ dependencies {
 
     implementation libs.managed.reactor
 
-    testImplementation project(":runtime")
-    testImplementation project(":websocket")
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautRuntime
+    testImplementation projects.micronautWebsocket
+    testImplementation projects.micronautJacksonDatabind
 
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":inject")
-    testImplementation project(":inject-java-test")
-    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautInjectJavaTest
+    testCompileOnly projects.micronautInjectGroovy
 }
 
 spotless {

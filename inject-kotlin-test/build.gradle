@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api project(":inject-kotlin")
+    api projects.micronautInjectKotlin
     api libs.managed.groovy
     api(libs.spock) {
         exclude module:'groovy-all'
@@ -15,7 +15,7 @@ dependencies {
     implementation "com.squareup.okio:okio:3.9.1"
     implementation "io.github.classgraph:classgraph:4.8.177"
     testImplementation libs.javax.persistence
-    testImplementation project(":runtime")
+    testImplementation projects.micronautRuntime
     api libs.blaze.persistence.core
     implementation libs.managed.kotlin.stdlib
 }

@@ -10,20 +10,20 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":core-processor")
+    api projects.micronautCoreProcessor
     api libs.managed.groovy
-    testImplementation project(":context")
+    testImplementation projects.micronautContext
     testImplementation libs.javax.inject
     testImplementation libs.spotbugs
     testImplementation libs.hibernate
     testRuntimeOnly libs.jakarta.el.impl
     testRuntimeOnly libs.jakarta.el
-    testImplementation project(":http-server-netty")
-    testImplementation project(":http-client")
-    testImplementation project(":retry")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":inject-test-utils")
-    testImplementation project(":inject-groovy-test")
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautHttpClient
+    testImplementation projects.micronautRetry
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautInjectTestUtils
+    testImplementation projects.micronautInjectGroovyTest
     testImplementation platform(libs.test.boms.micronaut.validation)
     testImplementation (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
@@ -37,7 +37,7 @@ dependencies {
     testImplementation libs.managed.snakeyaml
     testImplementation libs.managed.reactor
 
-    functionalTestImplementation(testFixtures(project(":test-suite")))
+    functionalTestImplementation(testFixtures(projects.testSuite))
 }
 
 tasks.named("test") {

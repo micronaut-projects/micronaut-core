@@ -3,17 +3,17 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 
-    api project(":inject")
-    api project(":http")
+    api projects.micronautInject
+    api projects.micronautHttp
     compileOnly libs.managed.groovy
 
-    testImplementation project(":context")
-    testImplementation project(":inject-groovy")
-    testImplementation project(":inject-java")
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":inject-groovy-test")
+    testImplementation projects.micronautContext
+    testImplementation projects.micronautInjectGroovy
+    testImplementation projects.micronautInjectJava
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautInjectGroovyTest
 }
 
 

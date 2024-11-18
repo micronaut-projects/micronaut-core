@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    api project(":core")
-    api project(":inject")
+    api projects.micronautCore
+    api projects.micronautInject
     api libs.managed.netty.buffer
     compileOnly libs.graal
 
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 }

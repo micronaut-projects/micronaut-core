@@ -20,20 +20,20 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
     annotationProcessor platform(libs.test.boms.micronaut.validation)
     annotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
 
-    api project(":core-processor")
+    api projects.micronautCoreProcessor
 
-    testImplementation project(":context")
+    testImplementation projects.micronautContext
     testImplementation libs.managed.netty.codec.http
-    testImplementation project(":http-server-netty")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":http-client")
-    testImplementation project(":http-client-jdk")
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautHttpClient
+    testImplementation projects.micronautHttpClientJdk
     testImplementation platform(libs.test.boms.micronaut.validation)
     testImplementation (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
@@ -41,14 +41,14 @@ dependencies {
     testImplementation (libs.micronaut.validation.processor) { // For Groovy
         exclude group: 'io.micronaut'
     }
-    testImplementation project(":inject-groovy")
-    testImplementation project(":inject-java")
-    testImplementation project(":inject-java-test")
-    testImplementation project(":management")
-    testImplementation project(":runtime")
-    testImplementation project(":inject")
-    testImplementation project(":function-client")
-    testImplementation project(":function-web")
+    testImplementation projects.micronautInjectGroovy
+    testImplementation projects.micronautInjectJava
+    testImplementation projects.micronautInjectJavaTest
+    testImplementation projects.micronautManagement
+    testImplementation projects.micronautRuntime
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautFunctionClient
+    testImplementation projects.micronautFunctionWeb
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }
@@ -65,9 +65,9 @@ dependencies {
     testImplementation libs.awaitility
     testImplementation(libs.lombok)
     testAnnotationProcessor(libs.lombok)
-    testAnnotationProcessor project(":test-suite-helper")
-    testAnnotationProcessor project(":inject-java")
-    testAnnotationProcessor project(":test-suite")
+    testAnnotationProcessor projects.testSuiteHelper
+    testAnnotationProcessor projects.micronautInjectJava
+    testAnnotationProcessor projects.testSuite
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
@@ -102,7 +102,7 @@ dependencies {
     testImplementation(libs.javax.persistence)
     testImplementation(libs.jakarta.persistence)
 
-    testCompileOnly projects.injectJavaHelper2
+    testCompileOnly projects.micronautInjectJavaHelper2
 
     testImplementation platform(libs.test.boms.micronaut.rxjava2)
     testImplementation platform(libs.test.boms.micronaut.rxjava3)

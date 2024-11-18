@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    testAnnotationProcessor project(":inject-java")
-    testCompileOnly project(":inject-groovy")
-    testImplementation project(":context")
-    testImplementation project(":inject")
+    testAnnotationProcessor projects.micronautInjectJava
+    testCompileOnly projects.micronautInjectGroovy
+    testImplementation projects.micronautContext
+    testImplementation projects.micronautInject
     testImplementation libs.javax.inject
     testImplementation libs.javax.annotation.api
 }

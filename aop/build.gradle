@@ -10,9 +10,9 @@ micronautBuild {
 }
 
 dependencies {
-    api project(':inject')
-    api project(':core')
-    compileOnly project(':core-reactive')
+    api projects.micronautInject
+    api projects.micronautCore
+    compileOnly projects.micronautCoreReactive
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.reactor
 }

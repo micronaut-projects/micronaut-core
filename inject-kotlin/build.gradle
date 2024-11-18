@@ -12,7 +12,7 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":core-processor")
+    api projects.micronautCoreProcessor
 
     implementation(libs.managed.ksp.api)
 
@@ -22,11 +22,11 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
-    testImplementation project(":context")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":inject-kotlin-test")
+    testImplementation projects.micronautContext
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautInjectKotlinTest
     testImplementation libs.managed.kotlin.stdlib
-    testImplementation project(':http-client')
+    testImplementation projects.micronautHttpClient
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.reactor
     testImplementation libs.hibernate
@@ -38,7 +38,7 @@ dependencies {
         exclude group: 'io.micronaut'
     }
     testImplementation libs.javax.persistence
-    testImplementation project(":runtime")
+    testImplementation projects.micronautRuntime
     testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.kotlinx.coroutines.core
     testImplementation libs.managed.kotlinx.coroutines.jdk8
@@ -79,4 +79,3 @@ tasks.named("test") {
     forkEvery = 40
     maxParallelForks = 4
 }
-

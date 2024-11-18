@@ -4,22 +4,22 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
-    api project(":context")
-    api project(":core-reactive")
-    api(project(":context-propagation"))
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
+    api projects.micronautContext
+    api projects.micronautCoreReactive
+    api projects.micronautContextPropagation
     implementation libs.managed.reactor
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.kotlinx.coroutines.reactor
 
     compileOnly libs.managed.jackson.annotations
 
-    testCompileOnly project(":inject-groovy")
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":inject")
-    testImplementation project(":runtime")
+    testCompileOnly projects.micronautInjectGroovy
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautRuntime
     testImplementation(libs.logback.classic)
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.junit.jupiter.params)

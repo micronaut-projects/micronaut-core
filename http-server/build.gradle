@@ -3,20 +3,20 @@ plugins {
 }
 
 dependencies {
-    api project(":http")
-    api project(":router")
+    api projects.micronautHttp
+    api projects.micronautRouter
 
-    compileOnly project(":websocket")
-    compileOnly project(":jackson-databind")
+    compileOnly projects.micronautWebsocket
+    compileOnly projects.micronautJacksonDatabind
     compileOnly libs.managed.kotlinx.coroutines.core
     compileOnly libs.managed.kotlinx.coroutines.reactor
     compileOnly(libs.micronaut.runtime.groovy)
     implementation libs.managed.reactor
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 
     testImplementation libs.managed.netty.codec.http
 
-    testAnnotationProcessor(project(":inject-java"))
+    testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'

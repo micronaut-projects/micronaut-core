@@ -14,9 +14,9 @@ micronautBuild {
 }
 
 dependencies {
-    testImplementation project(':http')
-    testImplementation project(':http-server-netty')
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautHttp
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautJacksonDatabind
 
     testRuntimeOnly libs.logback.classic
 }

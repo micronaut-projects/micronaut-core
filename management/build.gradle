@@ -3,12 +3,12 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
 
-    api project(":router")
-    api project(":discovery-core")
-    compileOnly project(":jackson-databind")
+    api projects.micronautRouter
+    api projects.micronautDiscoveryCore
+    compileOnly projects.micronautJacksonDatabind
     compileOnly(libs.micronaut.sql.jdbc) {
         exclude group: 'io.micronaut'
     }
@@ -18,14 +18,14 @@ dependencies {
     compileOnly (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
     }
-    compileOnly project(":http-client-core")
+    compileOnly projects.micronautHttpClientCore
 
     implementation libs.managed.reactor
 
-    testImplementation project(":http-client")
-    testImplementation project(":inject-groovy")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautHttpClient
+    testImplementation projects.micronautInjectGroovy
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautJacksonDatabind
     testImplementation(libs.micronaut.sql.jdbc.tomcat) {
         exclude group: 'io.micronaut'
     }

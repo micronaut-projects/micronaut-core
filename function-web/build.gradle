@@ -3,17 +3,17 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    api project(":function")
-    api project(":router")
-    api project(":http-server")
+    annotationProcessor projects.micronautInjectJava
+    api projects.micronautFunction
+    api projects.micronautRouter
+    api projects.micronautHttpServer
 
     testImplementation libs.managed.reactor
 
-    testImplementation project(":http-client")
-    testImplementation project(":inject")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":jackson-databind")
-    testAnnotationProcessor project(":inject-java")
-    testCompileOnly project(":inject-groovy")
+    testImplementation projects.micronautHttpClient
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautJacksonDatabind
+    testAnnotationProcessor projects.micronautInjectJava
+    testCompileOnly projects.micronautInjectGroovy
 }

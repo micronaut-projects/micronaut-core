@@ -3,14 +3,14 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-groovy")
+    annotationProcessor projects.micronautInjectGroovy
 
-    api project(":inject-groovy")
+    api projects.micronautInjectGroovy
     api libs.managed.groovy
     api(libs.spock) {
         exclude module:'groovy-all'
     }
-    api project(":context")
+    api projects.micronautContext
     api libs.jetbrains.annotations
 }
 

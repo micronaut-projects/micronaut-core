@@ -7,5 +7,5 @@ dependencies {
     api(libs.spock) {
         exclude module:'groovy-all'
     }
-    api project(":core-processor")
+    api projects.micronautCoreProcessor
 }

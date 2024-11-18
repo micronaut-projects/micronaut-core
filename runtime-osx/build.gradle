@@ -3,8 +3,8 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 
-    api project(":context")
+    api projects.micronautContext
     implementation libs.managed.methvin.directoryWatcher
 }

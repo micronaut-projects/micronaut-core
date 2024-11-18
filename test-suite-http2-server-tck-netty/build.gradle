@@ -9,10 +9,10 @@ micronautBuild {
 }
 
 dependencies {
-    implementation(projects.httpServerTck)
-    implementation(projects.jacksonDatabind)
-    testImplementation(projects.httpServerNetty)
-    testImplementation(projects.httpClient)
+    implementation(projects.micronautHttpServerTck)
+    implementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpClient)
     testImplementation(libs.junit.platform.engine)
     testImplementation(libs.logback.classic)
     testImplementation(platform(libs.test.boms.micronaut.validation))
@@ -23,12 +23,6 @@ dependencies {
 }
 
 configurations {
-    all {
-        // Stop serde pulling in AOP
-        exclude group: 'io.micronaut', module: 'micronaut-aop'
-        // Stop pulling in inject-groovy from maven
-        exclude group: 'io.micronaut', module: 'micronaut-inject-groovy'
-    }
     nativeImageTestClasspath {
         exclude module: 'groovy-test'
     }

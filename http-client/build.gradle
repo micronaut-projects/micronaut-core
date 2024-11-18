@@ -12,11 +12,11 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    api project(":context")
-    api project(":http-client-core")
-    api project(":websocket")
-    api project(":http-netty")
+    annotationProcessor projects.micronautInjectJava
+    api projects.micronautContext
+    api projects.micronautHttpClientCore
+    api projects.micronautWebsocket
+    api projects.micronautHttpNetty
     api libs.managed.netty.handler.proxy
 
     compileOnly libs.managed.netty.incubator.codec.http3
@@ -25,10 +25,10 @@ dependencies {
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
-    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor projects.micronautInjectJava
 
-    testCompileOnly project(":inject-groovy")
-    testImplementation project(":inject")
+    testCompileOnly projects.micronautInjectGroovy
+    testImplementation projects.micronautInject
 
     testImplementation platform(libs.test.boms.micronaut.validation)
     testImplementation (libs.micronaut.validation) {
@@ -40,9 +40,9 @@ dependencies {
 
     implementation libs.managed.reactor
 
-    testImplementation project(":retry")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":http-server-netty")
+    testImplementation projects.micronautRetry
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautHttpServerNetty
     testImplementation libs.wiremock
     testImplementation libs.logback.classic
     testImplementation libs.bcpkix

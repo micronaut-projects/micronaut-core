@@ -19,16 +19,16 @@ tasks.named("test") {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
 
-    api project(":http-server")
-    api project(":core")
-    api project(":http-netty")
+    api projects.micronautHttpServer
+    api projects.micronautCore
+    api projects.micronautHttpNetty
     api libs.managed.netty.codec.http
     implementation libs.managed.reactor
-    compileOnly project(":jackson-databind")
-    compileOnly project(":websocket")
+    compileOnly projects.micronautJacksonDatabind
+    compileOnly projects.micronautWebsocket
     compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
     compileOnly libs.managed.netty.incubator.codec.http3
@@ -37,10 +37,10 @@ dependencies {
     testImplementation libs.jmh.core
     testAnnotationProcessor libs.jmh.generator.annprocess
 
-    testCompileOnly project(":inject-groovy")
+    testCompileOnly projects.micronautInjectGroovy
     testCompileOnly(libs.jetbrains.annotations)
 
-    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor projects.micronautInjectJava
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
@@ -54,13 +54,13 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
-    testImplementation project(":inject")
-    testImplementation project(":inject-java-test")
-    testImplementation project(":http-client")
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautInjectJavaTest
+    testImplementation projects.micronautHttpClient
     testImplementation libs.spotbugs
     testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.bcpkix
-    testImplementation project(":jackson-databind")
+    testImplementation projects.micronautJacksonDatabind
 // Add Micronaut Jackson XML after v4 Migration
 //    testImplementation(libs.managed.micronaut.xml) {
 //        exclude module:'micronaut-inject'
@@ -102,7 +102,7 @@ dependencies {
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
-    testImplementation project(":websocket")
+    testImplementation projects.micronautWebsocket
 
     testImplementation(libs.mimepull)
 

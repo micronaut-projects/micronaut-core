@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
 
-    api project(":jackson-core")
+    api projects.micronautJacksonCore
 
     compileOnly libs.graal
     compileOnly platform(libs.test.boms.micronaut.validation)
@@ -27,10 +27,10 @@ dependencies {
         transitive = false
     }
 
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":inject-java")
-    testImplementation project(":inject-java-test")
-    testImplementation project(":inject-groovy")
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautInjectJava
+    testImplementation projects.micronautInjectJavaTest
+    testImplementation projects.micronautInjectGroovy
     testImplementation "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
     testImplementation libs.managed.snakeyaml
 }

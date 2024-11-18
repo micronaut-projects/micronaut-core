@@ -8,16 +8,16 @@ micronautBuild {
 }
 
 dependencies {
-    testAnnotationProcessor(projects.injectJava)
-    testImplementation(projects.context)
+    testAnnotationProcessor(projects.micronautInjectJava)
+    testImplementation(projects.micronautContext)
 
-    testImplementation(projects.injectGroovy)
+    testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.logback.classic)
     testImplementation(libs.managed.reactor.test);
 
-    testImplementation(projects.management)
-    testImplementation(projects.httpClient)
+    testImplementation(projects.micronautManagement)
+    testImplementation(projects.micronautHttpClient)
 
-    testRuntimeOnly(projects.httpServerNetty)
-    testRuntimeOnly(projects.micronaut.jacksonDatabind)
+    testRuntimeOnly(projects.micronautHttpServerNetty)
+    testRuntimeOnly(projects.micronautJacksonDatabind)
 }

@@ -3,11 +3,11 @@ plugins {
 }
 
 dependencies {
-	annotationProcessor project(":inject-java")
+	annotationProcessor projects.micronautInjectJava
 
-    api project(":inject")
-    api project(":http")
+    api projects.micronautInject
+    api projects.micronautHttp
 
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":jackson-databind")
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautJacksonDatabind
 }

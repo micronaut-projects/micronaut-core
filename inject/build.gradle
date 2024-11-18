@@ -14,15 +14,15 @@ dependencies {
     compileOnly libs.javax.inject
     api libs.jakarta.inject.api
     api libs.managed.jakarta.annotation.api
-    api project(':core')
+    api projects.micronautCore
 
     compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
     compileOnly libs.managed.kotlin.stdlib.jdk8
 
-    testImplementation project(":context")
-    testImplementation project(":inject-groovy")
-    testImplementation project(":inject-test-utils")
+    testImplementation projects.micronautContext
+    testImplementation projects.micronautInjectGroovy
+    testImplementation projects.micronautInjectTestUtils
     testImplementation libs.systemlambda
     testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.junit.jupiter.engine

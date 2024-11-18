@@ -9,11 +9,11 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    api project(":context")
+    annotationProcessor projects.micronautInjectJava
+    api projects.micronautContext
 
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":inject")
-    testImplementation project(":inject-java-test")
-    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautInjectJavaTest
+    testCompileOnly projects.micronautInjectGroovy
 }

@@ -11,13 +11,13 @@ micronautBuild {
 
 dependencies {
     testImplementation libs.managed.netty.codec.http
-    testImplementation project(":http-client")
-    testImplementation project(":http-client-jdk")
-    testImplementation project(":inject-groovy")
-    testImplementation project(":inject-groovy-test")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":jackson-databind")
-    testImplementation project(":runtime")
+    testImplementation projects.micronautHttpClient
+    testImplementation projects.micronautHttpClientJdk
+    testImplementation projects.micronautInjectGroovy
+    testImplementation projects.micronautInjectGroovyTest
+    testImplementation projects.micronautHttpServerNetty
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautRuntime
     testImplementation platform(libs.test.boms.micronaut.validation)
     testImplementation (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
@@ -25,8 +25,8 @@ dependencies {
     testImplementation (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'
     }
-    testImplementation project(":inject")
-    testImplementation project(":management")
+    testImplementation projects.micronautInject
+    testImplementation projects.micronautManagement
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }
@@ -35,8 +35,8 @@ dependencies {
     testImplementation libs.managed.groovy.templates
     testImplementation libs.managed.groovy.json
     testImplementation libs.logbook.netty
-    testImplementation project(":function-client")
-    testImplementation project(":function-web")
+    testImplementation projects.micronautFunctionClient
+    testImplementation projects.micronautFunctionWeb
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
     testRuntimeOnly libs.bcpkix

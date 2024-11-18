@@ -11,8 +11,8 @@ sourceSets {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    jmhAnnotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
+    jmhAnnotationProcessor projects.micronautInjectJava
     jmhAnnotationProcessor libs.bundles.asm
     jmhAnnotationProcessor libs.jmh.generator.annprocess
 
@@ -26,14 +26,14 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
-    api project(":inject")
-    api project(":inject-java-test")
-    api project(":http-server")
-    api project(":http-server-netty")
-    api project(":http-client")
-    api project(":jackson-databind")
-    api project(":router")
-    api project(":runtime")
+    api projects.micronautInject
+    api projects.micronautInjectJavaTest
+    api projects.micronautHttpServer
+    api projects.micronautHttpServerNetty
+    api projects.micronautHttpClient
+    api projects.micronautJacksonDatabind
+    api projects.micronautRouter
+    api projects.micronautRuntime
 
     api platform(libs.test.boms.micronaut.validation)
     api libs.managed.reactor
@@ -45,8 +45,8 @@ dependencies {
 
     typeCheckTestImplementation libs.junit.jupiter
     typeCheckTestImplementation libs.micronaut.test.type.pollution
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy-agent:1.15.10")
-    typeCheckTestImplementation ("net.bytebuddy:byte-buddy:1.15.10")
+    typeCheckTestImplementation libs.bytebuddy.agent
+    typeCheckTestImplementation libs.bytebuddy
     typeCheckTestRuntimeOnly libs.junit.platform.engine
 }
 

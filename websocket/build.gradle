@@ -6,15 +6,15 @@ import java.time.Duration
 
 
 dependencies {
-	annotationProcessor project(":inject-java")
-    api project(":http")
-    api project(":http-client-core")
-    api project(":inject")
-    api project(':aop')
+	annotationProcessor projects.micronautInjectJava
+    api projects.micronautHttp
+    api projects.micronautHttpClientCore
+    api projects.micronautInject
+    api projects.micronautAop
 
     implementation libs.managed.reactor
 
-    testImplementation project(":inject-groovy")
+    testImplementation projects.micronautInjectGroovy
 }
 
 tasks.named("test") {

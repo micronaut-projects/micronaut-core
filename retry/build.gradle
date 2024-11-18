@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
+    annotationProcessor projects.micronautInjectJava
 
-    api project(':context')
-    api project(':core-reactive')
+    api projects.micronautContext
+    api projects.micronautCoreReactive
 
     // Support validation annotations
     compileOnly platform(libs.test.boms.micronaut.validation)
@@ -16,6 +16,6 @@ dependencies {
 
     implementation libs.managed.reactor
 
-    testImplementation project(":jackson-databind")
-    testImplementation project(":discovery-core")
+    testImplementation projects.micronautJacksonDatabind
+    testImplementation projects.micronautDiscoveryCore
 }

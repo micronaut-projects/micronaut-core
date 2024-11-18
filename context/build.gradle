@@ -3,12 +3,12 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-    annotationProcessor project(":graal")
-    api project(':inject')
-    api project(':aop')
+    annotationProcessor projects.micronautInjectJava
+    annotationProcessor projects.micronautGraal
+    api projects.micronautInject
+    api projects.micronautAop
 
-    compileOnly project(':core-reactive')
+    compileOnly projects.micronautCoreReactive
     compileOnly libs.log4j
     compileOnly libs.logback.classic
 
@@ -18,10 +18,10 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
-    testCompileOnly project(":inject-groovy")
-    testAnnotationProcessor project(":inject-java")
-    testImplementation project(":core-reactive")
-    testImplementation project(":inject-java-test")
+    testCompileOnly projects.micronautInjectGroovy
+    testAnnotationProcessor projects.micronautInjectJava
+    testImplementation projects.micronautCoreReactive
+    testImplementation projects.micronautInjectJavaTest
     testImplementation libs.logback.classic
 
 }

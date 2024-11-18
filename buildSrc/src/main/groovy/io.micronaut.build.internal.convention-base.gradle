@@ -19,13 +19,6 @@ configurations.all {
     resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
 }
 
-configurations {
-    testRuntimeClasspath {
-        // Use AOP from here, not from maven
-        exclude group: 'io.micronaut', module: 'micronaut-aop'
-    }
-}
-
 group = projectGroupId
 
 def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
@@ -63,11 +56,12 @@ tasks.withType(Jar).configureEach {
 configurations.all {
     resolutionStrategy.dependencySubstitution {
         rootProject.subprojects.each {
-            if (!it.name.startsWith('test-')) {
+            String targetName = ":${it.name}"
+            if (it.name.startsWith('micronaut-')) {
                 if (it.name.contains('bom')) {
-                    substitute platform(module("io.micronaut:micronaut-${it.name}")) using platform(project(":${it.name}")) because "we want to test with what we're building"
+                    substitute platform(module("io.micronaut:micronaut-${it.name}")) using platform(project(targetName)) because "we want to test with what we're building"
                 } else {
-                    substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
+                    substitute module("io.micronaut:${it.name}") using project(targetName) because "we want to test with what we're building"
                 }
             }
         }
@@ -90,7 +84,7 @@ dependencies {
     compileOnly libs.caffeine
     compileOnly libs.bundles.asm
 
-    testAnnotationProcessor project(":http-validation")
+    testAnnotationProcessor projects.micronautHttpValidation
     testAnnotationProcessor libs.bundles.asm
 
     testImplementation libs.caffeine

@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api project(":core")
+    api projects.micronautCore
     api libs.managed.reactive.streams
 
     compileOnly libs.managed.reactor
