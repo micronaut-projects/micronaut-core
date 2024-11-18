@@ -4,11 +4,9 @@ plugins {
 
 dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
-    testAnnotationProcessor projects.micronautGraal
+    testCompileOnly(projects.micronautInjectGroovy)
     testImplementation(projects.micronautContext)
-    testImplementation projects.micronautGraal
     testImplementation(projects.micronautInject)
-    testImplementation libs.jakarta.inject.tck
-    testImplementation libs.junit.vintage
-    testImplementation(projects.micronautInjectJavaTest)
+    testImplementation(libs.javax.inject)
+    testImplementation(libs.javax.annotation.api)
 }
