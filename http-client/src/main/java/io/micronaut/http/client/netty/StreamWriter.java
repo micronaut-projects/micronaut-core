@@ -37,10 +37,11 @@ import java.util.function.Consumer;
  */
 @Internal
 final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferConsumer {
+    private final StreamingNettyByteBody body;
     private final Consumer<Throwable> errorHandler;
     private ChannelHandlerContext ctx;
     private EventLoopFlow flow;
-    private final Upstream upstream;
+    private Upstream upstream;
     private long unwritten = 0;
     private boolean completed = false;
 
@@ -49,8 +50,8 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
      * @param errorHandler Handler to call when the streaming body emits an error
      */
     StreamWriter(StreamingNettyByteBody body, Consumer<Throwable> errorHandler) {
+        this.body = body;
         this.errorHandler = errorHandler;
-        this.upstream = body.primary(this);
     }
 
     /**
@@ -60,6 +61,7 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         if (ctx == null) {
             throw new IllegalStateException("Not added to a channel yet");
         }
+        upstream = body.primary(this);
         try {
             upstream.start();
         } catch (Exception e) {
@@ -71,8 +73,11 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
      * Cancel writing the body (e.g. because a {@code CONTINUE} response was never received).
      */
     void cancel() {
-        upstream.allowDiscard();
-        upstream.disregardBackpressure();
+        if (upstream != null) {
+            upstream.allowDiscard();
+            upstream.disregardBackpressure();
+        }
+        body.close();
     }
 
     boolean isCompleted() {
