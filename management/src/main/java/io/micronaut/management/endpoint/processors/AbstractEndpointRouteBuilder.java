@@ -144,7 +144,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                         id = NameUtils.hyphenate(beanDefinition.getName());
                     }
 
-
                     return Optional.ofNullable(id);
                 }
             }
