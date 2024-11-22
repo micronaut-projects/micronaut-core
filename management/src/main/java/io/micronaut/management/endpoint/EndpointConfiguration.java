@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.Optional;
 
@@ -37,6 +38,7 @@ public class EndpointConfiguration {
 
     private Boolean enabled;
     private Boolean sensitive;
+    @Nullable
     private String path;
     private final String id;
 
@@ -101,8 +103,8 @@ public class EndpointConfiguration {
      * Endpoint's path. If not set the endpoint name is used as the path.
      * @param path Endpoint's path
      */
-    public void setPath(String path) {
-        this.path = path.startsWith(SLASH)
+    public void setPath(@Nullable String path) {
+        this.path = path != null && path.startsWith(SLASH)
             ? path.substring(1)
             : path;
     }
@@ -111,6 +113,7 @@ public class EndpointConfiguration {
      * Endpoint's path. If not set the endpoint name is used as the path.
      * @return Endpoint's path
      */
+    @Nullable
     public String getPath() {
         return path;
     }
