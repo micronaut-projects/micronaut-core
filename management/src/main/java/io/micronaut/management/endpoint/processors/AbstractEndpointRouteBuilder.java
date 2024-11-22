@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.LifeCycle;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -134,11 +135,10 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.stringValue(Endpoint.class).orElse(null);
-                    if (beanContext.containsBean(EndpointConfiguration.class, Qualifiers.byName(id))) {
-                        String path = beanContext.getBean(EndpointConfiguration.class, Qualifiers.byName(id)).getPath();
-                        if (StringUtils.isNotEmpty(path)) {
-                            return Optional.of(path);
-                        }
+                    final EndpointConfiguration endpointConfiguration = beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
+                        .orElse(null);
+                    if (endpointConfiguration != null && StringUtils.isNotEmpty(endpointConfiguration.getPath())) {
+                        return Optional.of(endpointConfiguration.getPath());
                     }
                     if (id == null || !ENDPOINT_ID_PATTERN.matcher(id).matches()) {
                         id = NameUtils.hyphenate(beanDefinition.getName());
