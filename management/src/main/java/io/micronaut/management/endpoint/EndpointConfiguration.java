@@ -102,6 +102,7 @@ public class EndpointConfiguration {
     /**
      * Endpoint's path. If not set the endpoint name is used as the path.
      * @param path Endpoint's path
+     * @since 4.8.0
      */
     public void setPath(@Nullable String path) {
         this.path = path != null && path.startsWith(SLASH)
@@ -112,6 +113,7 @@ public class EndpointConfiguration {
     /**
      * Endpoint's path. If not set the endpoint name is used as the path.
      * @return Endpoint's path
+     * @since 4.8.0
      */
     @Nullable
     public String getPath() {
