@@ -33,11 +33,13 @@ public class EndpointConfiguration {
      * The prefix for endpoints configurations.
      */
     public static final String PREFIX = "endpoints";
+    private static final String SLASH = "/";
 
     private Boolean enabled;
     private Boolean sensitive;
-
+    private String path;
     private final String id;
+
     private EndpointDefaultConfiguration defaultConfiguration;
 
     /**
@@ -93,5 +95,23 @@ public class EndpointConfiguration {
      */
     public void setSensitive(Boolean sensitive) {
         this.sensitive = sensitive;
+    }
+
+    /**
+     * Endpoint's path. If not set the endpoint name is used as the path.
+     * @param path Endpoint's path
+     */
+    public void setPath(String path) {
+        this.path = path.startsWith(SLASH)
+            ? path.substring(1)
+            : path;
+    }
+
+    /**
+     * Endpoint's path. If not set the endpoint name is used as the path.
+     * @return Endpoint's path
+     */
+    public String getPath() {
+        return path;
     }
 }
