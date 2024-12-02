@@ -63,8 +63,11 @@ public class DeadlockedThreadsHealthIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        HealthResult.Builder builder = HealthResult.builder(NAME);
+        return Mono.just(findResult());
+    }
 
+   private static HealthResult findResult() {
+        HealthResult.Builder builder = HealthResult.builder(NAME);
         try {
             ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
             long[] deadlockedThreads = threadMXBean.findDeadlockedThreads();
@@ -82,8 +85,7 @@ public class DeadlockedThreadsHealthIndicator implements HealthIndicator {
             builder.status(HealthStatus.UNKNOWN);
             builder.exception(e);
         }
-
-        return Publishers.just(builder.build());
+        return builder.build();
     }
 
     private static Map<String, Object> getDetails(ThreadInfo threadInfo) {
