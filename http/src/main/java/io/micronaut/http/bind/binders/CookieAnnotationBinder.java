@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -42,6 +41,19 @@ public class CookieAnnotationBinder<T> extends AbstractArgumentBinder<T> impleme
         super(conversionService);
     }
 
+    /**
+     * @param conversionService The conversion service
+     * @param argument The argument
+     */
+    public CookieAnnotationBinder(ConversionService conversionService, Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        return new CookieAnnotationBinder<>(conversionService, argument);
+    }
+
     @Override
     public Class<CookieValue> getAnnotationType() {
         return CookieValue.class;
@@ -49,11 +61,13 @@ public class CookieAnnotationBinder<T> extends AbstractArgumentBinder<T> impleme
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
-        ConvertibleValues<io.micronaut.http.cookie.Cookie> parameters = source.getCookies();
+        return doBind(argument, source.getCookies());
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(CookieValue.class)
-                                                 .orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName);
+        return annotationMetadata.stringValue(CookieValue.class).orElse(argument.getName());
     }
 
     @Override

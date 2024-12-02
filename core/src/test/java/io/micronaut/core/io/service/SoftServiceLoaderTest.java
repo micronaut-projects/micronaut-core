@@ -32,7 +32,7 @@ public class SoftServiceLoaderTest {
             ServiceCollector<String> collector = SoftServiceLoader.newCollector("io.micronaut.inject.BeanDefinitionReference", null, layer.findLoader(modulename), Function.identity());
             List<String> services = new ArrayList<>();
             collector.collect(services::add);
-     
+
             assertEquals(1, services.size());
             assertEquals("io.micronaut.logging.$PropertiesLoggingLevelsConfigurer$Definition", services.get(0));
         }

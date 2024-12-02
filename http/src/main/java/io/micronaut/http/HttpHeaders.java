@@ -623,6 +623,17 @@ public interface HttpHeaders extends Headers {
     ));
 
     /**
+     * Whether the given key is contained within these values.
+     *
+     * @param name The key name
+     * @return True if it is
+     * @since 4.8.0
+     */
+    default boolean contains(CharSequence name) {
+        return contains(name.toString());
+    }
+
+    /**
      * Obtain the date header.
      *
      * @param name The header name

@@ -17,7 +17,9 @@ package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -35,7 +37,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
+public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permits ReactorExecutionFlowImpl {
 
     /**
      * Creates a new reactive flow from a publisher.
@@ -47,6 +49,22 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
     @NonNull
     static <K> ReactiveExecutionFlow<K> fromPublisher(@NonNull Publisher<K> publisher) {
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(publisher);
+    }
+
+    /**
+     * Creates a new reactive flow from a publisher. This method eagerly subscribes to the
+     * publisher, and may return an immediate {@link ExecutionFlow} if possible.
+     *
+     * @param publisher         The publisher
+     * @param propagatedContext A context to propagate in the reactor context and as a thread-local
+     *                          in the subscribe operation.
+     * @param <K>       The flow value type
+     * @return a new flow
+     * @since 4.8.0
+     */
+    @NonNull
+    static <K> ExecutionFlow<K> fromPublisherEager(@NonNull Publisher<K> publisher, @NonNull PropagatedContext propagatedContext) {
+        return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext);
     }
 
     /**
@@ -88,7 +106,30 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
     @NonNull
     Publisher<T> toPublisher();
 
-    static <K> Publisher<K> toPublisher(Supplier<ExecutionFlow<K>> flowSupplier) {
+    /**
+     * Convert the given flow to a reactive publisher. The supplier is called for every
+     * subscription to the publisher.
+     *
+     * @param flowSupplier The flow supplier
+     * @param <K>          The element type
+     * @return The publisher
+     */
+    @NonNull
+    @SingleResult
+    static <K> Publisher<K> toPublisher(@NonNull Supplier<@NonNull ExecutionFlow<K>> flowSupplier) {
         return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flowSupplier);
+    }
+
+    /**
+     * Convert the given flow to a reactive publisher.
+     *
+     * @param flow The flow
+     * @param <K>  The element type
+     * @return The publisher
+     */
+    @NonNull
+    @SingleResult
+    static <K> Publisher<K> toPublisher(@NonNull ExecutionFlow<K> flow) {
+        return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flow);
     }
 }

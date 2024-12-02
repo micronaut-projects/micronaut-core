@@ -105,6 +105,11 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
+    public final boolean contains(CharSequence name) {
+        return nettyHeaders.contains(name);
+    }
+
+    @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {

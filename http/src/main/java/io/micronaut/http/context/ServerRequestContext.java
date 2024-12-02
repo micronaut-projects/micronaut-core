@@ -17,8 +17,10 @@ package io.micronaut.http.context;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
+import reactor.util.context.ContextView;
 
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -33,6 +35,11 @@ import java.util.function.Supplier;
  */
 public final class ServerRequestContext {
 
+    /**
+     * @deprecated Please use {@link #currentRequest(ContextView)} to look up the request in a
+     * reactor context.
+     */
+    @Deprecated
     public static final String KEY = "micronaut.http.server.request";
 
     private ServerRequestContext() {
@@ -98,6 +105,23 @@ public final class ServerRequestContext {
      */
     public static <T> Optional<HttpRequest<T>> currentRequest() {
         return ServerHttpRequestContext.find();
+    }
+
+    /**
+     * Retrieve the current server request context from the given reactor context view.
+     *
+     * @param context The reactor context view
+     * @param <T> The body type
+     * @return The request context if it is present
+     * @since 4.8.0
+     */
+    @SuppressWarnings("unchecked")
+    @NonNull
+    public static <T> Optional<HttpRequest<T>> currentRequest(@NonNull ContextView context) {
+        return ReactorPropagation.findPropagatedContext(context)
+            .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
+            .map(e -> (HttpRequest<T>) e.httpRequest())
+            .or(() -> context.getOrEmpty(KEY));
     }
 }
 

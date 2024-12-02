@@ -366,18 +366,35 @@ public final class StringUtils {
      * @return A combined uri string
      */
     public static String prependUri(String baseUri, String uri) {
-        if (!uri.startsWith("/") && !uri.startsWith("?")) {
-            uri = "/" + uri;
+        StringBuilder builder = new StringBuilder(baseUri);
+        if (!uri.isEmpty() && (uri.length() != 1 || uri.charAt(0) != '/')) {
+            if (!uri.startsWith("/") && !uri.startsWith("?")) {
+                builder.append('/');
+            }
+            builder.append(uri);
         }
-        if (uri.length() == 1 && uri.charAt(0) == '/') {
-            uri = "";
+        if (builder.isEmpty()) {
+            return "";
         }
-        uri = baseUri + uri;
-        if (uri.startsWith("/")) {
-            return uri.replaceAll("/{2,}", "/");
-        } else {
-            return uri.replaceAll("(?<=[^:])/{2,}", "/");
+
+        int i = 0;
+        if (builder.charAt(0) != '/' && builder.indexOf("://") != -1) {
+            // skip until after scheme
+            while (i < builder.length() && builder.charAt(i) != ':') {
+                i++;
+            }
+            i += 2;
         }
+        // replace double slashes
+        for (; i < builder.length() - 1; i++) {
+            if (builder.charAt(i) == '/' && builder.charAt(i + 1) == '/') {
+                builder.deleteCharAt(i);
+                i--;
+            } else if (builder.charAt(i) == '?') {
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     /**

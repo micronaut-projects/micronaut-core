@@ -55,10 +55,10 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Delegates to Netty's {@link FullHttpResponse}.
@@ -257,7 +257,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4));
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
                     this.attributes = attributes;
                 }
             }

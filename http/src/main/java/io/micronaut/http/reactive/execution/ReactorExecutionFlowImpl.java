@@ -16,21 +16,27 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.propagation.ReactorPropagation;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Operators;
 import reactor.util.context.Context;
-import reactor.util.context.ContextView;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -45,6 +51,7 @@ import java.util.function.Supplier;
 final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     private Mono<Object> value;
+    private List<Subscription> subscriptionsToCancel = new ArrayList<>(1);
 
     <K> ReactorExecutionFlowImpl(Publisher<K> value) {
         this(value instanceof Flux<K> flux ? flux.next() : Mono.from(value));
@@ -52,6 +59,108 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     <K> ReactorExecutionFlowImpl(Mono<K> value) {
         this.value = (Mono<Object>) value;
+    }
+
+    public static <T> ExecutionFlow<T> defuse(Publisher<T> publisher, PropagatedContext propagatedContext) {
+        if (publisher instanceof Fuseable.ScalarCallable<?> sc) {
+            // Mono.just, Mono.error. No need for context propagation
+            try {
+                //noinspection unchecked
+                return ExecutionFlow.just((T) sc.call());
+            } catch (Throwable t) {
+                return ExecutionFlow.error(t);
+            }
+        } else if (publisher instanceof FlowAsMono<T> flowAsMono) {
+            // unwrap directly
+            //noinspection unchecked
+            return (ExecutionFlow<T>) flowAsMono.flow;
+        }
+
+        // special subscriber that (a) contains the propagated context and (b) can return an
+        // imperative flow if the result is provided immediately in subscribe()
+        var s = new CoreSubscriber<T>() {
+            final AtomicReference<ExecutionFlow<T>> flow = new AtomicReference<>();
+
+            boolean complete = false;
+
+            @Override
+            public Context currentContext() {
+                return ReactorPropagation.addPropagatedContext(Context.empty(), propagatedContext);
+            }
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                if (s instanceof Fuseable.QueueSubscription<?> qs && qs.requestFusion(Fuseable.SYNC) == Fuseable.SYNC) {
+                    // we can avoid the subscribe / WIP dance. This is for example Mono.just(…).map(…)
+                    T result;
+                    try {
+                        //noinspection unchecked
+                        result = (T) qs.poll();
+                    } catch (Throwable t) {
+                        completeError(t);
+                        return;
+                    }
+                    complete(result);
+                    return;
+                }
+                // fallback, normal reactive subscription
+                s.request(Long.MAX_VALUE);
+            }
+
+            private void complete(T result) {
+                if (!flow.compareAndSet(null, ExecutionFlow.just(result))) {
+                    ((DelayedExecutionFlow<T>) flow.get()).complete(result);
+                }
+                complete = true;
+            }
+
+            private void completeError(Throwable t) {
+                if (!flow.compareAndSet(null, ExecutionFlow.error(t))) {
+                    ((DelayedExecutionFlow<?>) flow.get()).completeExceptionally(t);
+                }
+                complete = true;
+            }
+
+            @Override
+            public void onNext(T t) {
+                if (complete) {
+                    Operators.onNextDropped(t, Context.empty());
+                    return;
+                }
+                complete(t);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (complete) {
+                    Operators.onErrorDropped(t, Context.empty());
+                    return;
+                }
+                completeError(t);
+            }
+
+            @Override
+            public void onComplete() {
+                if (!complete) {
+                    complete(null);
+                }
+            }
+        };
+        try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+            publisher.subscribe(s);
+        }
+        ExecutionFlow<T> immediate = s.flow.getPlain();
+        if (immediate != null) {
+            return immediate;
+        } else {
+            DelayedExecutionFlow<T> flow = DelayedExecutionFlow.create();
+            if (s.flow.compareAndSet(null, flow)) {
+                return flow;
+            } else {
+                // data race
+                return s.flow.getPlain();
+            }
+        }
     }
 
     @Override
@@ -85,30 +194,69 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
+    public @NonNull ExecutionFlow<Object> putInContextIfAbsent(@NonNull String key, @NonNull Object value) {
+        this.value = this.value.contextWrite(context -> {
+            if (!context.hasKey(key)) {
+                return context.put(key, value);
+            } else {
+                return context;
+            }
+        });
+        return this;
+    }
+
+    @Override
+    public void cancel() {
+        List<Subscription> stc;
+        synchronized (this) {
+            stc = subscriptionsToCancel;
+            subscriptionsToCancel = null;
+        }
+        for (Subscription subscription : stc) {
+            subscription.cancel();
+        }
+    }
+
+    @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
+            try {
+                value = callable.call();
+            } catch (Exception e) {
+                fn.accept(null, e);
+                return;
+            }
+            fn.accept(value, null);
+            return;
+        }
         value.subscribe(new CoreSubscriber<>() {
 
             Subscription subscription;
             Object value;
 
             @Override
-            public Context currentContext() {
-                if (fn instanceof ReactiveConsumer reactiveConsumer) {
-                    return Context.of(reactiveConsumer.contextView);
-                }
-                return CoreSubscriber.super.currentContext();
-            }
-
-            @Override
             public void onSubscribe(Subscription s) {
                 this.subscription = s;
-                s.request(1);
+                boolean cancel;
+                synchronized (ReactorExecutionFlowImpl.this) {
+                    if (subscriptionsToCancel == null) {
+                        cancel = true;
+                    } else {
+                        subscriptionsToCancel.add(subscription);
+                        cancel = false;
+                    }
+                }
+                if (cancel) {
+                    s.cancel();
+                } else {
+                    s.request(Long.MAX_VALUE);
+                }
             }
 
             @Override
             public void onNext(Object v) {
                 value = v;
-                subscription.request(1); // ???
             }
 
             @Override
@@ -119,6 +267,47 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             @Override
             public void onComplete() {
                 fn.accept(value, null);
+            }
+        });
+    }
+
+    @Override
+    public void completeTo(CompletableFuture<Object> completableFuture) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
+            try {
+                value = callable.call();
+            } catch (Exception e) {
+                completableFuture.completeExceptionally(e);
+                return;
+            }
+            completableFuture.complete(value);
+            return;
+        }
+        value.subscribe(new CoreSubscriber<>() {
+
+            Subscription subscription;
+            Object value;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(Object v) {
+                value = v;
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                completableFuture.completeExceptionally(t);
+            }
+
+            @Override
+            public void onComplete() {
+                completableFuture.complete(value);
             }
         });
     }
@@ -159,22 +348,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             }
             return m;
         } else {
-            return Mono.deferContextual(contextView -> {
-                Sinks.One<Object> sink = Sinks.one();
-                ReactiveConsumer reactiveConsumer = new ReactiveConsumer(contextView) {
-
-                    @Override
-                    public void accept(Object o, Throwable throwable) {
-                        if (throwable != null) {
-                            sink.tryEmitError(throwable);
-                        } else {
-                            sink.tryEmitValue(o);
-                        }
-                    }
-                };
-                next.onComplete(reactiveConsumer);
-                return sink.asMono();
-            });
+            return new FlowAsMono<>(next);
         }
     }
 
@@ -190,14 +364,5 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public CompletableFuture<Object> toCompletableFuture() {
         return value.toFuture();
-    }
-
-    private abstract static class ReactiveConsumer implements BiConsumer<Object, Throwable> {
-
-        private final ContextView contextView;
-
-        private ReactiveConsumer(ContextView contextView) {
-            this.contextView = contextView;
-        }
     }
 }

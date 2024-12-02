@@ -8,7 +8,6 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.annotation.SingleResult
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -27,16 +26,16 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
+import jakarta.validation.constraints.NotBlank
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
-import jakarta.validation.constraints.NotBlank
+
 import java.util.stream.Stream
 
 class FlatMapAndRequestInReactorContextSpec extends Specification {
@@ -107,7 +106,7 @@ class FlatMapAndRequestInReactorContextSpec extends Specification {
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             return Flux.deferContextual(contextView -> {
-                HttpRequest<?> contexRequest = contextView.getOrDefault(ServerRequestContext.KEY, null)
+                HttpRequest<?> contexRequest = ServerRequestContext.currentRequest(contextView).orElse(null)
                 if (contexRequest == null) {
                     LOG.warn("parent request is not in the reactor context")
                 }

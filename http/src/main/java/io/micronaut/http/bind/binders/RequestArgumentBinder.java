@@ -16,7 +16,9 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 
 /**
@@ -28,4 +30,18 @@ import io.micronaut.http.HttpRequest;
  */
 @Indexed(RequestArgumentBinder.class)
 public interface RequestArgumentBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+
+    /**
+     * Create a specific binder.
+     *
+     * @param argument The bound argument
+     * @return The specific binder
+     * @since 4.8
+     */
+    @NonNull
+    @Override
+    default RequestArgumentBinder<T> createSpecific(@NonNull Argument<T> argument) {
+        return this;
+    }
+
 }

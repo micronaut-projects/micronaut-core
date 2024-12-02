@@ -1569,6 +1569,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     /**
      * Used to clear mutated metadata at the end of a compilation cycle.
+     * @param key The mutated annotation metadata to remove
      */
     @Internal
     public static void clearMutated(@NonNull Object key) {

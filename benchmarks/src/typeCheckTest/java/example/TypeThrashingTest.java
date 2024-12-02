@@ -1,7 +1,7 @@
 package example;
 
+import io.micronaut.http.server.stack.ControllersBenchmark;
 import io.micronaut.http.server.stack.FullHttpStackBenchmark;
-import io.micronaut.http.server.stack.TfbLikeBenchmark;
 import io.micronaut.test.typepollution.FocusListener;
 import io.micronaut.test.typepollution.ThresholdFocusListener;
 import io.micronaut.test.typepollution.TypePollutionTransformer;
@@ -91,7 +91,7 @@ public class TypeThrashingTest {
     @Test
     public void testFromJmh() throws RunnerException {
         Options opt = new OptionsBuilder()
-            .include(Stream.of(FullHttpStackBenchmark.class, TfbLikeBenchmark.class)
+            .include(Stream.of(FullHttpStackBenchmark.class, ControllersBenchmark.class)
                 .map(Class::getName)
                 .collect(Collectors.joining("|", "(", ")"))
                 + ".*")

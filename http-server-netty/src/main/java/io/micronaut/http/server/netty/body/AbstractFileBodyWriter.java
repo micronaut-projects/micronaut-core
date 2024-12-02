@@ -27,6 +27,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.netty.handler.codec.http.HttpHeaderNames;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -70,8 +71,8 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
             }
         }
 
-        if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-            response.header(HttpHeaders.CONTENT_TYPE, systemFile.getMediaType().toString());
+        if (!response.getHeaders().contains(HttpHeaderNames.CONTENT_TYPE)) {
+            response.header(HttpHeaderNames.CONTENT_TYPE, systemFile.getMediaType().toString());
         }
         setDateAndCacheHeaders(response, lastModified);
         systemFile.process(nettyResponse);
@@ -86,7 +87,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
         LocalDateTime now = LocalDateTime.now();
-        if (!headers.contains(HttpHeaders.DATE)) {
+        if (!headers.contains(HttpHeaderNames.DATE)) {
             headers.date(now);
         }
 

@@ -16,7 +16,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'micronaut'
+rootProject.name = 'micronaut-parent'
 
 include "aop"
 include "core-bom"
@@ -89,3 +89,8 @@ include "test-suite-annotation-remapper-visitor"
 
 // benchmarks
 include "benchmarks"
+
+micronautBuild {
+    useStandardizedProjectNames = true
+    nonStandardProjectNamePrefixes.addAll(["test-", "benchmarks"])
+}

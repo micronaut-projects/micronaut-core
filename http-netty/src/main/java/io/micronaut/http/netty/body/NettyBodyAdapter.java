@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

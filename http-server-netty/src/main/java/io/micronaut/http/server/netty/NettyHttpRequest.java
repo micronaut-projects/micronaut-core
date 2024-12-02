@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.attr.AttributeHolder;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -116,7 +115,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T> {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -208,23 +207,23 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
-    public final ByteBody byteBody() {
+    public ByteBody byteBody() {
         return body;
     }
 
-    public final void setLegacyBody(Object legacyBody) {
+    public void setLegacyBody(Object legacyBody) {
         this.legacyBody = legacyBody;
     }
 
-    public final void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
+    public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
         routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
     }
 
-    public final ExecutionFlow<?> getRouteWaitsFor() {
+    public ExecutionFlow<?> getRouteWaitsFor() {
         return routeWaitsFor;
     }
 
-    public final FormRouteCompleter formRouteCompleter() {
+    public FormRouteCompleter formRouteCompleter() {
         assert isFormOrMultipartData();
         if (formRouteCompleter == null) {
             formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
@@ -232,7 +231,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return formRouteCompleter;
     }
 
-    public final boolean hasFormRouteCompleter() {
+    public boolean hasFormRouteCompleter() {
         return formRouteCompleter != null;
     }
 
@@ -386,43 +385,46 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        Object routeMatchO = ((AttributeHolder) this).getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
-        // usually this is a DefaultUriRouteMatch, avoid scalability issues here
-        RouteMatch<?> routeMatch = routeMatchO instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) routeMatchO;
-        if (routeMatch != null) {
-            // discard parameters that have already been bound
-            for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
-                    rc.release();
-                }
-                if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
-                    rc.release();
-                }
-                if (toDiscard instanceof NettyCompletedFileUpload fu) {
-                    fu.discard();
-                }
-            }
-        }
         body.close();
         if (formRouteCompleter != null) {
             formRouteCompleter.release();
         }
         if (attributes != null) {
-            attributes.forEach((k, v) -> {
-                //noinspection StringEquality
-                if (k == HttpAttributes.ROUTE_MATCH.toString() || k == HttpAttributes.ROUTE_INFO.toString() || v instanceof String) {
-                    // perf: avoid an instanceof in releaseIfNecessary
-                    return;
-                }
-                releaseIfNecessary(v);
-            });
+            attributes.forEach(NettyHttpRequest::cleanup);
         }
     }
 
-    /**
-     * @param value An object with a value
-     */
-    protected void releaseIfNecessary(Object value) {
+    private static void cleanup(String k, Object v) {
+        //noinspection StringEquality
+        if (k == HttpAttributes.ROUTE_MATCH.toString()) {
+            // usually this is a DefaultUriRouteMatch, avoid scalability issues here
+            RouteMatch<?> routeMatch = v instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) v;
+            if (routeMatch != null) {
+                // discard parameters that have already been bound
+                for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                    if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
+                        rc.release();
+                    }
+                    if (toDiscard instanceof ReferenceCounted rc) {
+                        rc.release();
+                    }
+                    if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                        fu.discard();
+                    }
+                }
+            }
+            // perf: avoid an instanceof in releaseIfNecessary
+            return;
+        }
+        //noinspection StringEquality
+        if (k == HttpAttributes.ROUTE_INFO.toString() || v instanceof String) {
+            // perf: avoid an instanceof in releaseIfNecessary
+            return;
+        }
+        releaseIfNecessary(v);
+    }
+
+    private static void releaseIfNecessary(Object value) {
         if (value instanceof ReferenceCounted referenceCounted) {
             int i = referenceCounted.refCnt();
             if (i != 0) {
@@ -610,7 +612,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Return true if the request is form data.
      */
     @Internal
-    public final boolean isFormOrMultipartData() {
+    public boolean isFormOrMultipartData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
@@ -906,10 +908,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 return conversion;
             }
             return nextConvertor.convert(conversionContext, value);
-        }
-
-        public void cleanup() {
-            nextConvertor = null;
         }
 
     }
