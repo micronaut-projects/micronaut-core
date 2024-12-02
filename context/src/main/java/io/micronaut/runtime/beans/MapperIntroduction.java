@@ -563,7 +563,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         @NonNull Argument<?>[] getBuilderArguments();
 
         /**
-         * Get the argument index based on its name
+         * Get the argument index based on its name.
          *
          * @param name The argument name
          * @return The index

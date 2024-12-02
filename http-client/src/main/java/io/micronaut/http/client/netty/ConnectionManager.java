@@ -300,6 +300,11 @@ public class ConnectionManager {
         return (ByteBufAllocator) bootstrap.config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
     }
 
+    /**
+     * Returns event loop group.
+     *
+     * @return the group
+     */
     EventLoopGroup getGroup() {
         return group;
     }

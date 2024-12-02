@@ -61,6 +61,7 @@ public abstract class AbstractArgumentBinder<T> {
      * Constructor.
      *
      * @param conversionService conversionService
+     * @param argument The argument
      */
     protected AbstractArgumentBinder(ConversionService conversionService, Argument<T> argument) {
         this.conversionService = conversionService;
