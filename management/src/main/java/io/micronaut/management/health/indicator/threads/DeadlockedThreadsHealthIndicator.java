@@ -25,6 +25,7 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
