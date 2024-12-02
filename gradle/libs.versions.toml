@@ -6,7 +6,7 @@ blaze = "1.6.14"
 brotli4j = "1.16.0"
 bytebuddy = "1.15.10"
 caffeine = "2.9.3"
-classgraph = "4.8.177"
+classgraph = "4.8.179"
 compile-testing = "0.21.0"
 
 geb = "7.0"
