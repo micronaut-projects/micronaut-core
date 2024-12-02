@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
+    testAnnotationProcessor(projects.micronautInjectJava)
     annotationProcessor(projects.micronautGraal)
 
     api(projects.micronautRouter)
@@ -38,5 +39,5 @@ dependencies {
 
     compileOnly(libs.logback.classic)
     compileOnly(libs.log4j)
-
+    testImplementation(libs.awaitility)
 }
