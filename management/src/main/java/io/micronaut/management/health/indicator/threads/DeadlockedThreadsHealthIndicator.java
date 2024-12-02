@@ -48,6 +48,18 @@ import java.util.Map;
 public class DeadlockedThreadsHealthIndicator implements HealthIndicator {
 
     private static final String NAME = "deadlockedThreads";
+    private static final String KEY_THREAD_ID = "threadId";
+    private static final String KEY_THREAD_NAME = "threadName";
+    private static final String KEY_THREAD_STATE = "threadState";
+    private static final String KEY_DAEMON = "daemon";
+    private static final String KEY_PRIORITY = "priority";
+    private static final String KEY_SUSPENDED = "suspended";
+    private static final String KEY_IN_NATIVE = "inNative";
+    private static final String KEY_LOCK_NAME = "lockName";
+    private static final String KEY_LOCK_OWNER_NAME = "lockOwnerName";
+    private static final String KEY_LOCK_OWNER_ID = "lockOwnerId";
+    private static final String KEY_LOCKED_SYNCHRONIZERS = "lockedSynchronizers";
+    private static final String KEY_STACK_TRACE = "stackTrace";
 
     @Override
     public Publisher<HealthResult> getResult() {
@@ -76,19 +88,18 @@ public class DeadlockedThreadsHealthIndicator implements HealthIndicator {
 
     private static Map<String, Object> getDetails(ThreadInfo threadInfo) {
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("threadId", String.valueOf(threadInfo.getThreadId()));
-        details.put("threadName", threadInfo.getThreadName());
-        details.put("threadState", threadInfo.getThreadState().name());
-        details.put("daemon", String.valueOf(threadInfo.isDaemon()));
-        details.put("priority", String.valueOf(threadInfo.getPriority()));
-        details.put("suspended", String.valueOf(threadInfo.isSuspended()));
-        details.put("inNative", String.valueOf(threadInfo.isInNative()));
-        details.put("lockName", threadInfo.getLockName());
-        details.put("lockOwnerName", threadInfo.getLockOwnerName());
-        details.put("lockOwnerId", String.valueOf(threadInfo.getLockOwnerId()));
-        details.put("lockedSynchronizers", Arrays.stream(threadInfo.getLockedSynchronizers()).map(String::valueOf).toList());
-        details.put("stackTrace", formatStackTrace(threadInfo));
-
+        details.put(KEY_THREAD_ID, String.valueOf(threadInfo.getThreadId()));
+        details.put(KEY_THREAD_NAME, threadInfo.getThreadName());
+        details.put(KEY_THREAD_STATE, threadInfo.getThreadState().name());
+        details.put(KEY_DAEMON, String.valueOf(threadInfo.isDaemon()));
+        details.put(KEY_PRIORITY, String.valueOf(threadInfo.getPriority()));
+        details.put(KEY_SUSPENDED, String.valueOf(threadInfo.isSuspended()));
+        details.put(KEY_IN_NATIVE, String.valueOf(threadInfo.isInNative()));
+        details.put(KEY_LOCK_NAME, threadInfo.getLockName());
+        details.put(KEY_LOCK_OWNER_NAME, threadInfo.getLockOwnerName());
+        details.put(KEY_LOCK_OWNER_ID, String.valueOf(threadInfo.getLockOwnerId()));
+        details.put(KEY_LOCKED_SYNCHRONIZERS, Arrays.stream(threadInfo.getLockedSynchronizers()).map(String::valueOf).toList());
+        details.put(KEY_STACK_TRACE, formatStackTrace(threadInfo));
         return details;
     }
 
