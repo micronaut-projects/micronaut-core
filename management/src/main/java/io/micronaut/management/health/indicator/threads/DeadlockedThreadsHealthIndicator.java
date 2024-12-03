@@ -16,6 +16,7 @@
 package io.micronaut.management.health.indicator.threads;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.OnlyWhenRunningOnTheJvmCondition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;

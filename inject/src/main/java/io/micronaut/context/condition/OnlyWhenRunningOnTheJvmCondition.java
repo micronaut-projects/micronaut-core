@@ -13,11 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.management.health.indicator.threads;
-
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
-import io.micronaut.core.annotation.Internal;
+package io.micronaut.context.condition;
 
 /**
  * Condition to hide parts of an application that only work when running on the JVM.
@@ -25,8 +21,7 @@ import io.micronaut.core.annotation.Internal;
  * @author Sergio del Amo
  * @since 4.8.0
  */
-@Internal
-class OnlyWhenRunningOnTheJvmCondition implements Condition {
+public class OnlyWhenRunningOnTheJvmCondition implements Condition {
     private static final String SYS_PROP_ORG_GRAALVM_NATIVEIMAGE_IMAGECODE = "org.graalvm.nativeimage.imagecode";
     private static final String VALUE_RUNTIME = "runtime";
     private static final String VALUE_BUILDTIME = "buildtime";
