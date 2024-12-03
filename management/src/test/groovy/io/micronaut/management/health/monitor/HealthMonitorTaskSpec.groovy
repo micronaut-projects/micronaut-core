@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.util.StringUtils
 import io.micronaut.runtime.server.EmbeddedServer
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
@@ -29,7 +30,8 @@ class HealthMonitorTaskSpec extends Specification {
                 'spec.name'                 : 'HealthMonitorTask',
                 'micronaut.application.name': 'foo',
                 'micronaut.health.monitor.enabled': true,
-                'endpoints.health.sensitive': false
+                'endpoints.health.sensitive': false,
+                'endpoints.health.deadlocked-threads.enabled': StringUtils.FALSE
         ])
 
         PollingConditions conditions = new PollingConditions(timeout: 7)
@@ -45,24 +47,22 @@ class HealthMonitorTaskSpec extends Specification {
                     assert appender.events.isEmpty()
                     break
                 case Level.DEBUG:
-                    assert appender.events.size() == 7
+                    assert appender.events.size() == 6
                     assert appender.events[0] == 'Health monitor result for compositeDiscoveryClient(): status UP'
-                    assert appender.events[1] == 'Health monitor result for deadlockedThreads: status UP'
-                    assert appender.events[2] == 'Health monitor result for diskSpace: status UP'
-                    assert appender.events[3] == 'Health monitor result for liveness: status UP'
-                    assert appender.events[4] == 'Health monitor result for readiness: status UP'
-                    assert appender.events[5] == 'Health monitor result for service: status UP'
-                    assert appender.events[6] == 'Starting health monitor check'
+                    assert appender.events[1] == 'Health monitor result for diskSpace: status UP'
+                    assert appender.events[2] == 'Health monitor result for liveness: status UP'
+                    assert appender.events[3] == 'Health monitor result for readiness: status UP'
+                    assert appender.events[4] == 'Health monitor result for service: status UP'
+                    assert appender.events[5] == 'Starting health monitor check'
                     break
                 case Level.TRACE:
-                    assert appender.events.size() == 7
+                    assert appender.events.size() == 6
                     assert appender.events[0].contains('Health monitor result for compositeDiscoveryClient(): status UP, details {')
-                    assert appender.events[1] == 'Health monitor result for deadlockedThreads: status UP, details {}'
-                    assert appender.events[2].contains('Health monitor result for diskSpace: status UP, details {')
-                    assert appender.events[3] == 'Health monitor result for liveness: status UP, details {}'
-                    assert appender.events[4] == 'Health monitor result for readiness: status UP, details {}'
-                    assert appender.events[5] == 'Health monitor result for service: status UP, details {}'
-                    assert appender.events[6] == 'Starting health monitor check'
+                    assert appender.events[1].contains('Health monitor result for diskSpace: status UP, details {')
+                    assert appender.events[2] == 'Health monitor result for liveness: status UP, details {}'
+                    assert appender.events[3] == 'Health monitor result for readiness: status UP, details {}'
+                    assert appender.events[4] == 'Health monitor result for service: status UP, details {}'
+                    assert appender.events[5] == 'Starting health monitor check'
                     break
             }
         }
