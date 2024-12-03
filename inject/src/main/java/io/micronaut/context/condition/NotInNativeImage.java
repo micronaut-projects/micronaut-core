@@ -23,7 +23,7 @@ import io.micronaut.core.util.NativeImageUtils;
  * @author Sergio del Amo
  * @since 4.8.0
  */
-public class RunningOnTheJvm implements Condition {
+public class NotInNativeImage implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         return !NativeImageUtils.inImageCode();

@@ -16,7 +16,7 @@
 package io.micronaut.management.health.indicator.threads;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.condition.RunningOnTheJvm;
+import io.micronaut.context.condition.NotInNativeImage;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
@@ -43,7 +43,7 @@ import java.util.Map;
  */
 @Singleton
 @Liveness
-@Requires(condition = RunningOnTheJvm.class)
+@Requires(condition = NotInNativeImage.class)
 @Requires(property = HealthEndpoint.PREFIX + ".deadlocked-threads.enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = HealthEndpoint.class)
 @Internal
