@@ -16,6 +16,7 @@
 package io.micronaut.management.health.indicator.threads;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
@@ -44,6 +45,7 @@ import java.util.Map;
  */
 @Singleton
 @Liveness
+@Requires(condition = OnlyWhenRunningOnTheJvmCondition.class)
 @Requires(property = HealthEndpoint.PREFIX + ".deadlocked-threads.enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = HealthEndpoint.class)
 @Internal
