@@ -15,12 +15,15 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * Utility class to retrieve information about the context in which code gets executed.
  * Partial fork of {@code org.graalvm.nativeimage.ImageInfo} to avoid a dependency on {@code org.graalvm.sdk:nativeimage}.
  *
  * @since 4.8.0
  */
+@Internal
 public final class NativeImageUtils {
     /**
      * Holds the string that is the name of the system property providing information about the
