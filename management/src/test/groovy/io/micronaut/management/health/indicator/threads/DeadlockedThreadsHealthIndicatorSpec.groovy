@@ -1,5 +1,6 @@
 package io.micronaut.management.health.indicator.threads
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.health.HealthStatus
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -12,17 +13,12 @@ class DeadlockedThreadsHealthIndicatorSpec extends Specification {
 
     Logger log = LoggerFactory.getLogger(DeadlockedThreadsHealthIndicatorSpec)
 
-    def lock1 = new Object()
-    def lock2 = new Object()
-    def thread1
-    def thread2
-
     def "No deadlocked threads so status is UP"() {
         given:
-        thread1 = new Thread()
-        thread2 = new Thread()
-        def healthIndicator = new DeadlockedThreadsHealthIndicator()
-
+        ApplicationContext applicationContext  = ApplicationContext.run()
+        Thread thread1 = new Thread()
+        Thread thread2 = new Thread()
+        DeadlockedThreadsHealthIndicator healthIndicator = applicationContext.getBean(DeadlockedThreadsHealthIndicator)
         when:
         thread1.start()
         thread2.start()
@@ -31,11 +27,17 @@ class DeadlockedThreadsHealthIndicatorSpec extends Specification {
         then:
         HealthStatus.UP == result.status
         null == result.details
+
+        cleanup:
+        applicationContext.close()
     }
 
     def "Deadlocked threads found so status is DOWN"() {
         given:
-        thread1 = new Thread(() -> {
+        ApplicationContext applicationContext  = ApplicationContext.run()
+        Object lock1 = new Object()
+        Object lock2 = new Object()
+        Thread thread1 = new Thread(() -> {
             synchronized (lock1) {
                 log.debug "Thread 1: Holding lock 1"
 
@@ -46,7 +48,7 @@ class DeadlockedThreadsHealthIndicatorSpec extends Specification {
                 }
             }
         })
-        thread2 = new Thread(() -> {
+        Thread thread2 = new Thread(() -> {
             synchronized (lock2) {
                 log.debug "Thread 2: Holding lock 2"
 
@@ -57,7 +59,7 @@ class DeadlockedThreadsHealthIndicatorSpec extends Specification {
                 }
             }
         })
-        def healthIndicator = new DeadlockedThreadsHealthIndicator()
+        DeadlockedThreadsHealthIndicator healthIndicator = applicationContext.getBean(DeadlockedThreadsHealthIndicator)
 
         when:
         thread1.start()
@@ -70,5 +72,8 @@ class DeadlockedThreadsHealthIndicatorSpec extends Specification {
         then:
         HealthStatus.DOWN == result.status
         null != result.details
+
+        cleanup:
+        applicationContext.close()
     }
 }

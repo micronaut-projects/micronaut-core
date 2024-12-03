@@ -20,12 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
+import io.micronaut.management.health.indicator.AbstractHealthIndicator;
 import io.micronaut.management.health.indicator.HealthIndicator;
-import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import jakarta.inject.Singleton;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
@@ -48,7 +46,7 @@ import java.util.Map;
 @Requires(property = HealthEndpoint.PREFIX + ".deadlocked-threads.enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = HealthEndpoint.class)
 @Internal
-class DeadlockedThreadsHealthIndicator implements HealthIndicator {
+class DeadlockedThreadsHealthIndicator extends AbstractHealthIndicator {
 
     private static final String NAME = "deadlockedThreads";
     private static final String KEY_THREAD_ID = "threadId";
@@ -65,30 +63,22 @@ class DeadlockedThreadsHealthIndicator implements HealthIndicator {
     private static final String KEY_STACK_TRACE = "stackTrace";
 
     @Override
-    public Publisher<HealthResult> getResult() {
-        return Mono.just(findResult());
-    }
-
-   private static HealthResult findResult() {
-        HealthResult.Builder builder = HealthResult.builder(NAME);
-        try {
+    protected Object getHealthInformation() {
             ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
             long[] deadlockedThreads = threadMXBean.findDeadlockedThreads();
-
             if (deadlockedThreads == null) {
-                builder.status(HealthStatus.UP);
-            } else {
-                builder.status(HealthStatus.DOWN);
-                builder.details(
-                    Arrays.stream(threadMXBean.getThreadInfo(deadlockedThreads, true, true, Integer.MAX_VALUE))
-                        .map(DeadlockedThreadsHealthIndicator::getDetails)
-                        .toList());
+                this.healthStatus = HealthStatus.UP;
+                return null;
             }
-        } catch (Exception e) {
-            builder.status(HealthStatus.UNKNOWN);
-            builder.exception(e);
-        }
-        return builder.build();
+            this.healthStatus = HealthStatus.DOWN;
+            return Arrays.stream(threadMXBean.getThreadInfo(deadlockedThreads, true, true, Integer.MAX_VALUE))
+                    .map(DeadlockedThreadsHealthIndicator::getDetails)
+                    .toList();
+    }
+
+    @Override
+    public String getName() {
+        return NAME;
     }
 
     private static Map<String, Object> getDetails(ThreadInfo threadInfo) {
