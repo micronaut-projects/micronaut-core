@@ -1,4 +1,4 @@
-The deadlocked threads health indicator uses the link:{jdkapi}/java.management/java/lang/management/ThreadMXBean.html[ThreadMXBean] to check for deadlocked threads and is part of the /health and /health/liveness endpoints.
+The deadlocked threads health indicator uses the link:{jdkapi}/java.management/java/lang/management/ThreadMXBean.html[ThreadMXBean] to check for deadlocked threads and is part of the `/health` and `/health/liveness` endpoints.
 
 Its only configuration option is to enable or disable the indicator by the `endpoints.health.deadlocked-thread.enabled` key. It is enabled by default.
 
