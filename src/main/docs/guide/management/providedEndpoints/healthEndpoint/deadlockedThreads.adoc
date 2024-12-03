@@ -2,6 +2,8 @@ The deadlocked threads health indicator uses the link:{jdkapi}/java.management/j
 
 Its only configuration option is to enable or disable the indicator by the `endpoints.health.deadlocked-thread.enabled` key. It is enabled by default.
 
+WARNING: https://github.com/oracle/graal/issues/6101[`ThreadMXBean` is not supported in GraalVM Native Image]
+
 The health status is set to api:health.HealthStatus#DOWN[DOWN] if any deadlocked threads are found and their link:{jdkapi}/java.management/java/lang/management/ThreadInfo.html[ThreadInfo] including a formatted stacktrace are given in the details. See below for an example.
 
 [source,json]
