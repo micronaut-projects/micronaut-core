@@ -20,7 +20,6 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     compileOnly(projects.micronautHttpClientCore)
-    implementation(libs.graal)
     implementation(libs.managed.reactor)
 
     testImplementation(projects.micronautHttpClient)
