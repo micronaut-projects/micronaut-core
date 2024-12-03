@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.condition;
 
+import io.micronaut.core.util.NativeImageUtils;
+
 /**
  * Condition to hide parts of an application that only work when running on the JVM.
  * Internal implementation is identical to {@code if (!ImageInfo.inImageCode()).
@@ -22,24 +24,8 @@ package io.micronaut.context.condition;
  * @since 4.8.0
  */
 public class RunningOnTheJvm implements Condition {
-    private static final String SYS_PROP_ORG_GRAALVM_NATIVEIMAGE_IMAGECODE = "org.graalvm.nativeimage.imagecode";
-    private static final String VALUE_RUNTIME = "runtime";
-    private static final String VALUE_BUILDTIME = "buildtime";
-
     @Override
     public boolean matches(ConditionContext context) {
-        return !inImageCode();
-    }
-
-    private static boolean inImageCode() {
-        return inImageBuildtimeCode() || inImageRuntimeCode();
-    }
-
-    private static boolean inImageRuntimeCode() {
-        return VALUE_RUNTIME.equals(System.getProperty(SYS_PROP_ORG_GRAALVM_NATIVEIMAGE_IMAGECODE));
-    }
-
-    private static boolean inImageBuildtimeCode() {
-        return VALUE_BUILDTIME.equals(System.getProperty(SYS_PROP_ORG_GRAALVM_NATIVEIMAGE_IMAGECODE));
+        return !NativeImageUtils.inImageCode();
     }
 }
