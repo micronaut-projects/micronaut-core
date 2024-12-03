@@ -46,7 +46,8 @@ import java.util.Map;
 @Liveness
 @Requires(property = HealthEndpoint.PREFIX + ".deadlocked-threads.enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = HealthEndpoint.class)
-public class DeadlockedThreadsHealthIndicator implements HealthIndicator {
+@Internal
+class DeadlockedThreadsHealthIndicator implements HealthIndicator {
 
     private static final String NAME = "deadlockedThreads";
     private static final String KEY_THREAD_ID = "threadId";
