@@ -21,7 +21,7 @@ package io.micronaut.context.condition;
  * @author Sergio del Amo
  * @since 4.8.0
  */
-public class OnlyWhenRunningOnTheJvmCondition implements Condition {
+public class RunningOnTheJvm implements Condition {
     private static final String SYS_PROP_ORG_GRAALVM_NATIVEIMAGE_IMAGECODE = "org.graalvm.nativeimage.imagecode";
     private static final String VALUE_RUNTIME = "runtime";
     private static final String VALUE_BUILDTIME = "buildtime";
