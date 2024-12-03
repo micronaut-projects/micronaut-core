@@ -20,6 +20,12 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.nativeimage.ImageInfo;
 
+/**
+ * Condition to hide parts of an application that only work when running on the JVM.
+ * It returns {@code if (!ImageInfo.inImageCode()).
+ * @author Sergio del Amo
+ * @since 4.8.0
+ */
 @Internal
 class OnlyWhenRunningOnTheJvmCondition implements Condition {
     @Override
