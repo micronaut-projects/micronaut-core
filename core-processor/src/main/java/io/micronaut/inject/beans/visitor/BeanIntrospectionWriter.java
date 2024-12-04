@@ -160,39 +160,6 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         boolean.class
     );
 
-    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_READ_ONLY_STATIC = ReflectionUtils.getRequiredMethod(
-        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
-        "readOnly",
-        Argument.class,
-        int.class,
-        int.class,
-        int.class,
-        boolean.class,
-        boolean.class
-    );
-
-    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_WRITE_ONLY_STATIC = ReflectionUtils.getRequiredMethod(
-        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
-        "writeOnly",
-        Argument.class,
-        int.class,
-        int.class,
-        int.class,
-        boolean.class,
-        boolean.class
-    );
-
-    private static final java.lang.reflect.Method BEAN_PROPERTY_REF_READ_WRITE_STATIC = ReflectionUtils.getRequiredMethod(
-        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
-        "readWrite",
-        Argument.class,
-        int.class,
-        int.class,
-        int.class,
-        boolean.class,
-        boolean.class
-    );
-
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(
             AbstractInitializableBeanIntrospection.class,
         "instantiate"
@@ -444,95 +411,57 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         }
     }
 
-    private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData, Map<String, MethodDef> loadTypeMethods) {
+    private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData, List<StatementDef> staticStatements, Map<String, MethodDef> loadTypeMethods) {
         ClassTypeDef beanPropertyRefDef = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
 
         boolean mutable = !beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type);
 
+        StatementDef.DefineAndAssign defineAndAssign = ArgumentExpUtils.pushCreateArgument(
+            annotationMetadata,
+            beanClassElement,
+            introspectionTypeDef,
+            beanPropertyData.name,
+            beanPropertyData.type,
+            loadTypeMethods
+        ).newLocal(beanPropertyData.name + "Arg");
+
+        staticStatements.add(defineAndAssign);
+
+        VariableDef mainArgument = defineAndAssign.variable();
+        ExpressionDef readArgument = null;
+        ExpressionDef writeArgument = null;
+
         if (beanPropertyData.type.equals(beanPropertyData.readType) && beanPropertyData.type.equals(beanPropertyData.writeType)) {
-            return beanPropertyRefDef.invokeStatic(
-                BEAN_PROPERTY_REF_READ_WRITE_STATIC,
-
-                ArgumentExpUtils.pushCreateArgument(
-                    annotationMetadata,
-                    beanClassElement,
-                    introspectionTypeDef,
-                    beanPropertyData.name,
-                    beanPropertyData.type,
-                    loadTypeMethods
-                ),
-                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.isReadOnly),
-                ExpressionDef.constant(mutable)
-            );
-        }
-        if (beanPropertyData.type.equals(beanPropertyData.readType) && beanPropertyData.writeType == null) {
-            return beanPropertyRefDef.invokeStatic(
-                BEAN_PROPERTY_REF_READ_ONLY_STATIC,
-
-                ArgumentExpUtils.pushCreateArgument(
-                    annotationMetadata,
-                    beanClassElement,
-                    introspectionTypeDef,
-                    beanPropertyData.name,
-                    beanPropertyData.type,
-                    loadTypeMethods
-                ),
-                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.isReadOnly),
-                ExpressionDef.constant(mutable)
-            );
-        }
-        if (beanPropertyData.type.equals(beanPropertyData.writeType) && beanPropertyData.readType == null) {
-            return beanPropertyRefDef.invokeStatic(
-                BEAN_PROPERTY_REF_WRITE_ONLY_STATIC,
-
-                ArgumentExpUtils.pushCreateArgument(
-                    annotationMetadata,
-                    beanClassElement,
-                    introspectionTypeDef,
-                    beanPropertyData.name,
-                    beanPropertyData.type,
-                    loadTypeMethods
-                ),
-                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
-                ExpressionDef.constant(beanPropertyData.isReadOnly),
-                ExpressionDef.constant(mutable)
-            );
-        }
-        return beanPropertyRefDef.instantiate(
-            BEAN_PROPERTY_REF_CONSTRUCTOR,
-
-            ArgumentExpUtils.pushCreateArgument(
-                annotationMetadata,
-                beanClassElement,
-                introspectionTypeDef,
-                beanPropertyData.name,
-                beanPropertyData.type,
-                loadTypeMethods
-            ),
-            beanPropertyData.readType == null ? ExpressionDef.nullValue() : ArgumentExpUtils.pushCreateArgument(
+            readArgument = mainArgument;
+            writeArgument = mainArgument;
+        } else if (beanPropertyData.type.equals(beanPropertyData.readType) && beanPropertyData.writeType == null) {
+            readArgument = mainArgument;
+        } else if (beanPropertyData.type.equals(beanPropertyData.writeType) && beanPropertyData.readType == null) {
+            writeArgument = mainArgument;
+        } else {
+            readArgument = beanPropertyData.readType == null ? null : ArgumentExpUtils.pushCreateArgument(
                 annotationMetadata,
                 beanClassElement,
                 introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.readType,
                 loadTypeMethods
-            ),
-            beanPropertyData.writeType == null ? ExpressionDef.nullValue() : ArgumentExpUtils.pushCreateArgument(
+            );
+            writeArgument = beanPropertyData.writeType == null ? null : ArgumentExpUtils.pushCreateArgument(
                 annotationMetadata,
                 beanClassElement,
                 introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.writeType,
                 loadTypeMethods
-            ),
+            );
+        }
+        return beanPropertyRefDef.instantiate(
+            BEAN_PROPERTY_REF_CONSTRUCTOR,
+
+            mainArgument,
+            readArgument == null ? ExpressionDef.nullValue() : readArgument,
+            writeArgument == null ? ExpressionDef.nullValue() : writeArgument,
             ExpressionDef.constant(beanPropertyData.getDispatchIndex),
             ExpressionDef.constant(beanPropertyData.setDispatchIndex),
             ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
@@ -604,6 +533,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
 
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
 
+        ClassTypeDef thisType = ClassTypeDef.of(introspectionName);
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).addModifiers(Modifier.FINAL, Modifier.PUBLIC);
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
 
@@ -618,6 +548,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         FieldDef beanPropertiesField;
         FieldDef beanMethodsField;
         FieldDef enumsField;
+
+        List<StatementDef> staticStatements = new ArrayList<>();
 
         if (constructor != null) {
             if (!constructor.getAnnotationMetadata().isEmpty()) {
@@ -657,16 +589,18 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         if (!beanProperties.isEmpty()) {
             beanPropertiesField = FieldDef.builder(FIELD_BEAN_PROPERTIES_REFERENCES, AbstractInitializableBeanIntrospection.BeanPropertyRef[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-                .initializer(
+                .build();
+            classDefBuilder.addField(beanPropertiesField);
+            staticStatements.add(
+                thisType.getStaticField(beanPropertiesField).put(
                     ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class).array()
                         .instantiate(
                             beanProperties.stream()
-                                .map(e -> pushBeanPropertyReference(e, loadTypeMethods))
+                                .map(e -> pushBeanPropertyReference(e, staticStatements, loadTypeMethods))
                                 .toList()
                         )
                 )
-                .build();
-            classDefBuilder.addField(beanPropertiesField);
+            );
         } else {
             beanPropertiesField = null;
         }
@@ -726,8 +660,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             annotationIndexFields.put(annotationName, field);
         }
 
-        List<StatementDef> statements = new ArrayList<>();
-        AnnotationMetadataGenUtils.writeAnnotationDefault(statements, introspectionTypeDef, annotationMetadata, loadTypeMethods);
+        AnnotationMetadataGenUtils.writeAnnotationDefault(staticStatements, introspectionTypeDef, annotationMetadata, loadTypeMethods);
 
         FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(introspectionTypeDef, annotationMetadata, loadTypeMethods);
         if (annotationMetadataField != null) {
@@ -736,8 +669,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             );
         }
 
-        if (!statements.isEmpty()) {
-            classDefBuilder.addStaticInitializer(StatementDef.multi(statements));
+        if (!staticStatements.isEmpty()) {
+            classDefBuilder.addStaticInitializer(StatementDef.multi(staticStatements));
         }
 
         classDefBuilder.addMethod(

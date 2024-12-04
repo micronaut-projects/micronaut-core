@@ -1307,36 +1307,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.writeArgument = writeArgument == null && (setMethodIndex != -1 || withMethodIndex != -1) ? argument : writeArgument;
             this.readArgument = readArgument == null && (getMethodIndex != -1) ? argument : readArgument;
         }
-
-        @UsedByGeneratedCode
-        public static <K> BeanPropertyRef<K> readWrite(@NonNull Argument<K> argument,
-                                                  int getMethodIndex,
-                                                  int setMethodIndex,
-                                                  int withMethodIndex,
-                                                  boolean readyOnly,
-                                                  boolean mutable) {
-            return new BeanPropertyRef<>(argument, argument, argument, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable);
-        }
-
-        @UsedByGeneratedCode
-        public static <K> BeanPropertyRef<K> readOnly(@NonNull Argument<K> readArgument,
-                                                  int getMethodIndex,
-                                                  int setMethodIndex,
-                                                  int withMethodIndex,
-                                                  boolean readyOnly,
-                                                  boolean mutable) {
-            return new BeanPropertyRef<>(readArgument, readArgument, null, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable);
-        }
-
-        @UsedByGeneratedCode
-        public static <K> BeanPropertyRef<K> writeOnly(@NonNull Argument<K> writeArgument,
-                                                  int getMethodIndex,
-                                                  int setMethodIndex,
-                                                  int withMethodIndex,
-                                                  boolean readyOnly,
-                                                  boolean mutable) {
-            return new BeanPropertyRef<>(writeArgument, null, writeArgument, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable);
-        }
     }
 
     /**
