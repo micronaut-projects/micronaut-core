@@ -159,14 +159,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     String getBeanTypeName();
 
     /**
-     * The provided type of the bean. Usually this is the same as {@link #getBeanTypeName()}, except in the case of
-     * factory beans which produce a different type.
-     *
-     * @return The provided type
-     */
-    Type getProvidedType();
-
-    /**
      * Make the bean definition as validated by jakarta.validation.
      *
      * @param validated Whether the bean definition is validated

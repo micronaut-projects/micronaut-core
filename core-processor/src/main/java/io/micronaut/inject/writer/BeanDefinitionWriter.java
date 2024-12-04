@@ -168,6 +168,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -949,11 +950,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     @Override
-    public Type getProvidedType() {
-        throw new IllegalStateException("Not supported!");
-    }
-
-    @Override
     public void setValidated(boolean validated) {
         if (validated) {
             if (!this.validated) {
@@ -1596,40 +1592,64 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        BuildMethodDefinition buildMethodDefinition,
                                        Function<ExpressionDef, StatementDef> onBeanInstance,
                                        boolean isParametrized) {
-        Class<?> constructorType;
-        if (constructor instanceof MethodElement) {
-            constructorType = AbstractInitializableBeanDefinition.MethodReference.class;
-        } else {
-            constructorType = AbstractInitializableBeanDefinition.FieldReference.class;
-        }
+        StatementDef.DefineAndAssign[] constructorDef= new StatementDef.DefineAndAssign[] { null };
+        Supplier<VariableDef> constructorDefSupplier = new Supplier<VariableDef>() {
+
+            @Override
+            public VariableDef get() {
+                if (constructorDef[0] == null) {
+                    Class<?> constructorType;
+                    if (constructor instanceof MethodElement) {
+                        constructorType = AbstractInitializableBeanDefinition.MethodReference.class;
+                    } else {
+                        constructorType = AbstractInitializableBeanDefinition.FieldReference.class;
+                    }
+                    constructorDef[0] = beanDefinitionTypeDef
+                        .getStaticField(FIELD_CONSTRUCTOR, ClassTypeDef.of(AbstractInitializableBeanDefinition.MethodOrFieldReference.class))
+                        .cast(constructorType)
+                        .newLocal("constructorDef");
+                }
+                return constructorDef[0].variable();
+            }
+        };
         if (buildMethodDefinition instanceof FactoryBuildMethodDefinition factoryBuildMethodDefinition) {
             if (factoryBuildMethodDefinition.parameters.length > 0) {
-                return beanDefinitionTypeDef
-                    .getStaticField(FIELD_CONSTRUCTOR, ClassTypeDef.of(AbstractInitializableBeanDefinition.MethodOrFieldReference.class))
-                    .cast(constructorType)
-                    .newLocal("constructorDef", constructorMethodVar -> {
-                        List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters, List.of(buildMethodDefinition.getParameters()), isParametrized, constructorMethodVar);
-                        return buildFactoryGet(aThis, methodParameters, onBeanInstance, factoryBuildMethodDefinition, values);
-                    });
+                List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters,
+                    List.of(buildMethodDefinition.getParameters()), isParametrized, constructorDefSupplier);
+                StatementDef statement = buildFactoryGet(aThis, methodParameters, onBeanInstance, factoryBuildMethodDefinition, values);
+                if (constructorDef[0] != null) {
+                    return StatementDef.multi(
+                        constructorDef[0],
+                        statement
+                    );
+                }
+                return statement;
             }
             return buildFactoryGet(aThis, methodParameters, onBeanInstance, factoryBuildMethodDefinition, List.of());
         }
         if (buildMethodDefinition instanceof ConstructorBuildMethodDefinition constructorBuildMethodDefinition) {
             if (constructorBuildMethodDefinition.constructor.hasParameters()) {
-                return beanDefinitionTypeDef
-                    .getStaticField(FIELD_CONSTRUCTOR, ClassTypeDef.of(AbstractInitializableBeanDefinition.MethodOrFieldReference.class))
-                    .cast(constructorType)
-                    .newLocal("constructorDef", constructorMethodVar -> {
-                        List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters, List.of(buildMethodDefinition.getParameters()), isParametrized, constructorMethodVar);
-                        return buildConstructorInstantiate(aThis, methodParameters, onBeanInstance, constructorBuildMethodDefinition, values);
-                    });
+                List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters,
+                    List.of(buildMethodDefinition.getParameters()), isParametrized, constructorDefSupplier);
+                StatementDef statement = buildConstructorInstantiate(aThis, methodParameters, onBeanInstance, constructorBuildMethodDefinition, values);
+                if (constructorDef[0] != null) {
+                    return StatementDef.multi(
+                        constructorDef[0],
+                        statement
+                    );
+                }
+                return statement;
             }
             return buildConstructorInstantiate(aThis, methodParameters, onBeanInstance, constructorBuildMethodDefinition, List.of());
         }
         throw new IllegalStateException("Unknown build method definition: " + buildMethodDefinition);
     }
 
-    private StatementDef buildConstructorInstantiate(VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters, Function<ExpressionDef, StatementDef> onBeanInstance, ConstructorBuildMethodDefinition constructorBuildMethodDefinition, List<? extends ExpressionDef> values) {
+    private StatementDef buildConstructorInstantiate(VariableDef.This aThis,
+                                                     List<VariableDef.MethodParameter> methodParameters,
+                                                     Function<ExpressionDef, StatementDef> onBeanInstance,
+                                                     ConstructorBuildMethodDefinition constructorBuildMethodDefinition,
+                                                     List<? extends ExpressionDef> values) {
         List<ParameterElement> parameters = List.of(constructorBuildMethodDefinition.constructor.getSuspendParameters());
         if (isConstructorIntercepted(constructorBuildMethodDefinition.constructor)) {
             ClassTypeDef factoryInterceptor = createConstructorInterceptor(constructorBuildMethodDefinition);
@@ -3909,12 +3929,12 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                                                        List<VariableDef.MethodParameter> methodParameters,
                                                                        List<ParameterElement> parameters,
                                                                        boolean isParametrized,
-                                                                       VariableDef constructorMethodVar) {
+                                                                       Supplier<VariableDef> constructorMethodVarSupplier) {
         List<ExpressionDef> values = new ArrayList<>();
         for (int i = 0; i < parameters.size(); i++) {
             ParameterElement parameter = parameters.get(i);
             values.add(
-                getConstructorArgument(aThis, methodParameters, parameter, i, isParametrized, constructorMethodVar)
+                getConstructorArgument(aThis, methodParameters, parameter, i, isParametrized, constructorMethodVarSupplier)
             );
         }
         return values;
@@ -3938,7 +3958,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                                  ParameterElement parameter,
                                                  int index,
                                                  boolean isParametrized,
-                                                 VariableDef constructorMethodVar) {
+                                                 Supplier<VariableDef> constructorMethodVarSupplier) {
         AnnotationMetadata annotationMetadata = parameter.getAnnotationMetadata();
         if (isAnnotatedWithParameter(annotationMetadata) && isParametrized) {
             // load the args
@@ -4011,12 +4031,12 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         values.add(ExpressionDef.constant(index));
         if (hasGenericType) {
             values.add(
-                resolveConstructorArgumentGenericType(parameter.getGenericType(), index, constructorMethodVar)
+                resolveConstructorArgumentGenericType(parameter.getGenericType(), index, constructorMethodVarSupplier.get())
             );
         }
         // push qualifier
         values.add(
-            getQualifier(parameter, resolveConstructorArgument(index, constructorMethodVar))
+            getQualifier(parameter, resolveConstructorArgument(index, constructorMethodVarSupplier.get()))
         );
         ExpressionDef result = aThis.superRef().invoke(methodToInvoke, values);
         if (isArray && hasGenericType) {

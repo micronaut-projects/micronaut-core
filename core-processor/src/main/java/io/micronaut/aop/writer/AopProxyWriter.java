@@ -86,6 +86,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -206,6 +207,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
     private static final String FIELD_PROXY_BEAN_DEFINITION = "$proxyBeanDefinition";
+    private static final ClassTypeDef METHOD_INTERCEPTOR_CHAIN_TYPE = ClassTypeDef.of(MethodInterceptorChain.class);
 
     private final String packageName;
     private final String targetClassShortName;
@@ -482,11 +484,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     }
 
     @Override
-    public Type getProvidedType() {
-        return proxyBeanDefinitionWriter.getProvidedType();
-    }
-
-    @Override
     public void setValidated(boolean validated) {
         proxyBeanDefinitionWriter.setValidated(validated);
     }
@@ -750,7 +747,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                     ExpressionDef.InvokeInstanceMethod invocation;
                     if (argumentCount > 0) {
                         // invoke MethodInterceptorChain constructor with parameters
-                        invocation = ClassTypeDef.of(MethodInterceptorChain.class).instantiate(
+                        invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
                             CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN,
 
                             // 1st argument: interceptors
@@ -764,7 +761,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                         ).invoke(METHOD_PROCEED);
                     } else {
                         // invoke MethodInterceptorChain constructor without parameters
-                        invocation = ClassTypeDef.of(MethodInterceptorChain.class).instantiate(
+                        invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
                             CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS,
 
                             // 1st argument: interceptors
@@ -794,11 +791,12 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         if (!isInterface) {
             proxyBuilder.superclass(targetType);
         }
-        List<TypeDef> interfaces = new ArrayList<>();
-        interfaceTypes.stream().map(TypeDef::erasure).forEach(interfaces::add);
+        List<ClassTypeDef> interfaces = new ArrayList<>();
+        interfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaces::add);
         if (isInterface && implementInterface) {
             interfaces.add(targetType);
         }
+        interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
         interfaces.forEach(proxyBuilder::addSuperinterface);
 
         proxyBuilder.addAnnotation(Generated.class);
