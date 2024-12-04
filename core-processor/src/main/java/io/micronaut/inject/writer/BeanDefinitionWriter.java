@@ -1889,8 +1889,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StaticBlock getStaticInitializer() {
         List<StatementDef> statements = new ArrayList<>();
 
-        AnnotationMetadataGenUtils.writeAnnotationDefault(statements, beanDefinitionTypeDef, annotationMetadata, loadTypeMethods);
-
         FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(beanDefinitionTypeDef, annotationMetadata, loadTypeMethods);
 
         classDefBuilder.addField(annotationMetadataField);
@@ -3115,26 +3113,30 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     private ExpressionDef getQualifier(Element element, ExpressionDef argumentExpression) {
+        return getQualifier(element, () -> argumentExpression);
+    }
+
+    private ExpressionDef getQualifier(Element element, Supplier<ExpressionDef> argumentExpressionSupplier) {
         final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (!qualifierNames.isEmpty()) {
             if (qualifierNames.size() == 1) {
                 // simple qualifier
                 final String annotationName = qualifierNames.iterator().next();
-                return getQualifierForAnnotation(element, annotationName, argumentExpression);
+                return getQualifierForAnnotation(element, annotationName, argumentExpressionSupplier.get());
             }
             // composite qualifier
             return TYPE_QUALIFIERS.invokeStatic(
                 METHOD_QUALIFIER_BY_QUALIFIERS,
 
                 TYPE_QUALIFIER.array().instantiate(
-                    qualifierNames.stream().map(name -> getQualifierForAnnotation(element, name, argumentExpression)).toList()
+                    qualifierNames.stream().map(name -> getQualifierForAnnotation(element, name, argumentExpressionSupplier.get())).toList()
                 )
             );
         }
         if (element.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
             return TYPE_QUALIFIERS.invokeStatic(
                 METHOD_QUALIFIER_BY_INTERCEPTOR_BINDING,
-                getAnnotationMetadataFromProvider(argumentExpression)
+                getAnnotationMetadataFromProvider(argumentExpressionSupplier.get())
             );
         }
         String[] byType = element.hasDeclaredAnnotation(io.micronaut.context.annotation.Type.NAME) ? element.stringValues(io.micronaut.context.annotation.Type.NAME) : null;
@@ -3981,47 +3983,44 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             Optional<String> property = parameter.stringValue(Property.class, "name");
             if (property.isPresent()) {
                 return getInvokeGetPropertyValueForConstructor(aThis, methodParameters, index, parameter, property.get());
-            } else {
-                if (parameter.getValue(Value.class, EvaluatedExpressionReference.class).isPresent()) {
-                    return getInvokeGetEvaluatedExpressionValueForConstructorArgument(aThis, index, parameter);
-                } else {
-                    Optional<String> valueValue = parameter.stringValue(Value.class);
-                    if (valueValue.isPresent()) {
-                        return getInvokeGetPropertyPlaceholderValueForConstructor(aThis, methodParameters, index, parameter, valueValue.get());
-                    }
-                }
+            }
+            if (parameter.getValue(Value.class, EvaluatedExpressionReference.class).isPresent()) {
+                return getInvokeGetEvaluatedExpressionValueForConstructorArgument(aThis, index, parameter);
+            }
+            Optional<String> valueValue = parameter.stringValue(Value.class);
+            if (valueValue.isPresent()) {
+                return getInvokeGetPropertyPlaceholderValueForConstructor(aThis, methodParameters, index, parameter, valueValue.get());
             }
             return ExpressionDef.nullValue();
-        } else {
-            isArray = genericType.isArray();
-            if (genericType.isAssignable(Collection.class) || isArray) {
-                hasGenericType = true;
-                ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
-                if (typeArgument != null && !typeArgument.isPrimitive()) {
-                    if (typeArgument.isAssignable(BeanRegistration.class)) {
-                        methodToInvoke = GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT;
-                    } else {
-                        methodToInvoke = GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
-                    }
+        }
+        isArray = genericType.isArray();
+        if (genericType.isAssignable(Collection.class) || isArray) {
+            hasGenericType = true;
+            ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
+            if (typeArgument != null && !typeArgument.isPrimitive()) {
+                if (typeArgument.isAssignable(BeanRegistration.class)) {
+                    methodToInvoke = GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT;
                 } else {
-                    methodToInvoke = GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
-                    hasGenericType = false;
+                    methodToInvoke = GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
                 }
-            } else if (isInjectableMap(genericType)) {
-                hasGenericType = true;
-                methodToInvoke = GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
-            } else if (genericType.isAssignable(Stream.class)) {
-                hasGenericType = true;
-                methodToInvoke = GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
-            } else if (genericType.isAssignable(Optional.class)) {
-                hasGenericType = true;
-                methodToInvoke = FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
-            } else if (genericType.isAssignable(BeanRegistration.class)) {
-                hasGenericType = true;
-                methodToInvoke = GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT;
             } else {
                 methodToInvoke = GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
+                hasGenericType = false;
             }
+        } else if (isInjectableMap(genericType)) {
+            hasGenericType = true;
+            methodToInvoke = GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
+        } else if (genericType.isAssignable(Stream.class)) {
+            hasGenericType = true;
+            methodToInvoke = GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
+        } else if (genericType.isAssignable(Optional.class)) {
+            hasGenericType = true;
+            methodToInvoke = FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
+        } else if (genericType.isAssignable(BeanRegistration.class)) {
+            hasGenericType = true;
+            methodToInvoke = GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT;
+        } else {
+            methodToInvoke = GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
         }
         List<ExpressionDef> values = new ArrayList<>();
         // load the first two arguments of the method (the BeanResolutionContext and the BeanContext) to be passed to the method
@@ -4031,12 +4030,12 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         values.add(ExpressionDef.constant(index));
         if (hasGenericType) {
             values.add(
-                resolveConstructorArgumentGenericType(parameter.getGenericType(), index, constructorMethodVarSupplier.get())
+                resolveConstructorArgumentGenericType(parameter.getGenericType(), index, constructorMethodVarSupplier)
             );
         }
         // push qualifier
         values.add(
-            getQualifier(parameter, resolveConstructorArgument(index, constructorMethodVarSupplier.get()))
+            getQualifier(parameter, () -> resolveConstructorArgument(index, constructorMethodVarSupplier.get()))
         );
         ExpressionDef result = aThis.superRef().invoke(methodToInvoke, values);
         if (isArray && hasGenericType) {
@@ -4091,12 +4090,12 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             .cast(TypeDef.erasure(entry.getType()));
     }
 
-    private ExpressionDef resolveConstructorArgumentGenericType(ClassElement type, int argumentIndex, VariableDef constructorMethodVar) {
+    private ExpressionDef resolveConstructorArgumentGenericType(ClassElement type, int argumentIndex, Supplier<VariableDef> constructorMethodVarSupplier) {
         ExpressionDef expressionDef = resolveArgumentGenericType(type);
         if (expressionDef != null) {
             return expressionDef;
         }
-        ExpressionDef argumentExpression = resolveConstructorArgument(argumentIndex, constructorMethodVar);
+        ExpressionDef argumentExpression = resolveConstructorArgument(argumentIndex, constructorMethodVarSupplier.get());
         if (type.isAssignable(Map.class)) {
             argumentExpression = resolveSecondTypeArgument(argumentExpression);
         } else {

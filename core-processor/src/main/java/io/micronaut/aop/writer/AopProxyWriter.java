@@ -55,7 +55,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -63,15 +62,16 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
+import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
@@ -623,10 +623,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
      */
     public void visitIntroductionMethod(TypedElement declaringBean,
                                         MethodElement methodElement) {
-        visitAroundMethod(
-            declaringBean,
-            methodElement
-        );
+        visitAroundMethod(declaringBean, methodElement);
     }
 
     /**
@@ -637,11 +634,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
      **/
     public void visitAroundMethod(TypedElement beanType,
                                   MethodElement methodElement) {
-
-        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
-        boolean isPrimitive = returnType.isPrimitive();
-        boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
 
         final Optional<MethodElement> overridden = methodElement.getOwningType()
             .getEnclosedElement(ElementQuery.ALL_METHODS
@@ -671,8 +663,8 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
         String methodName = methodElement.getName();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
-        int argumentCount = argumentTypeList.size();
-        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
+        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
+        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, TypeDef.erasure(returnType));
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
 
@@ -687,13 +679,12 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                     interceptedProxyBridgeMethodName = "$$access$$" + methodName;
 
                     // now build a bridge to invoke the original method
-                    ClassTypeDef declaringTypeDef = (ClassTypeDef) TypeDef.erasure(methodElement.getOwningType());
                     proxyBuilder.addMethod(
                         MethodDef.builder(interceptedProxyBridgeMethodName)
                             .addModifiers(Modifier.PUBLIC)
-                            .addParameters(argumentTypeList.stream().map(p -> TypeDef.erasure(p.getType())).toList())
+                            .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
                             .returns(TypeDef.erasure(returnType))
-                            .build((aThis, methodParameters) -> aThis.superRef(declaringTypeDef)
+                            .build((aThis, methodParameters) -> aThis.superRef((ClassTypeDef) TypeDef.erasure(methodElement.getOwningType()))
                                 .invoke(methodElement, methodParameters).returning())
                     );
                 }
@@ -713,72 +704,61 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             proxiedMethodsRefSet.add(methodKey);
             proxyTargetMethods.add(methodKey);
 
-            buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
+            proxyBuilder.addMethod(
+                buildMethodOverride(methodElement, index)
+            );
         }
     }
 
-    private void buildMethodOverride(
-        TypedElement returnType,
-        String methodName,
-        int index,
-        List<ParameterElement> argumentTypeList,
-        int argumentCount,
-        boolean isVoidReturn) {
-        // override the original method
-        proxyBuilder.addMethod(
-            MethodDef.builder(methodName)
-                .addModifiers(Modifier.PUBLIC)
-                .overrides()
-                .returns(TypeDef.erasure(returnType))
-                .addParameters(argumentTypeList.stream().map(p -> TypeDef.erasure(p.getType())).toList())
-                .build((aThis, methodParameters) -> {
+    private MethodDef buildMethodOverride(MethodElement methodElement, int index) {
+        return MethodDef.override(methodElement)
+            .build((aThis, methodParameters) -> {
 
-                    ExpressionDef targetArgument;
-                    if (isProxyTarget) {
-                        if (hotswap || lazy) {
-                            targetArgument = aThis.invoke(METHOD_INTERCEPTED_TARGET);
-                        } else {
-                            targetArgument = aThis.field(targetField);
-                        }
+                ExpressionDef targetArgument;
+                if (isProxyTarget) {
+                    if (hotswap || lazy) {
+                        targetArgument = aThis.invoke(METHOD_INTERCEPTED_TARGET);
                     } else {
-                        targetArgument = aThis;
+                        targetArgument = aThis.field(targetField);
                     }
+                } else {
+                    targetArgument = aThis;
+                }
 
-                    ExpressionDef.InvokeInstanceMethod invocation;
-                    if (argumentCount > 0) {
-                        // invoke MethodInterceptorChain constructor with parameters
-                        invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
-                            CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN,
+                ExpressionDef.InvokeInstanceMethod invocation;
+                if (methodParameters.isEmpty()) {
+                    // invoke MethodInterceptorChain constructor without parameters
+                    invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
+                        CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS,
 
-                            // 1st argument: interceptors
-                            aThis.field(interceptorsField).arrayElement(index),
-                            // 2nd argument: this or target
-                            targetArgument,
-                            // 3rd argument: the executable method
-                            aThis.field(proxyMethodsField).arrayElement(index),
-                            // 4th argument: array of the argument values
-                            TypeDef.OBJECT.array().instantiate(methodParameters)
-                        ).invoke(METHOD_PROCEED);
-                    } else {
-                        // invoke MethodInterceptorChain constructor without parameters
-                        invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
-                            CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS,
+                        // 1st argument: interceptors
+                        aThis.field(interceptorsField).arrayElement(index),
+                        // 2nd argument: this or target
+                        targetArgument,
+                        // 3rd argument: the executable method
+                        aThis.field(proxyMethodsField).arrayElement(index)
+                        // fourth argument: array of the argument values
+                    ).invoke(METHOD_PROCEED);
+                } else {
+                    // invoke MethodInterceptorChain constructor with parameters
+                    invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
+                        CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN,
 
-                            // 1st argument: interceptors
-                            aThis.field(interceptorsField).arrayElement(index),
-                            // 2nd argument: this or target
-                            targetArgument,
-                            // 3rd argument: the executable method
-                            aThis.field(proxyMethodsField).arrayElement(index)
-                            // fourth argument: array of the argument values
-                        ).invoke(METHOD_PROCEED);
-                    }
-                    if (isVoidReturn) {
-                        return invocation;
-                    }
+                        // 1st argument: interceptors
+                        aThis.field(interceptorsField).arrayElement(index),
+                        // 2nd argument: this or target
+                        targetArgument,
+                        // 3rd argument: the executable method
+                        aThis.field(proxyMethodsField).arrayElement(index),
+                        // 4th argument: array of the argument values
+                        TypeDef.OBJECT.array().instantiate(methodParameters)
+                    ).invoke(METHOD_PROCEED);
+                }
+                if (!methodElement.getReturnType().isVoid() || methodElement.isSuspend()) {
                     return invocation.returning();
-                })
-        );
+                }
+                return invocation;
+            });
     }
 
     /**
@@ -1528,10 +1508,10 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         private final String name;
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
-        private final Type returnType;
+        private final TypeDef returnType;
         private final List<String> rawTypes;
 
-        public MethodRef(String name, List<ParameterElement> parameterElements, Type returnType) {
+        public MethodRef(String name, List<ParameterElement> parameterElements, TypeDef returnType) {
             this.name = name;
             this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
             this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
