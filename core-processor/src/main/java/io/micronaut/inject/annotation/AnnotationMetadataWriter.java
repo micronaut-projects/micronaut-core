@@ -27,6 +27,7 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +42,8 @@ import java.util.Map;
  */
 @Internal
 public class AnnotationMetadataWriter {
+
+    private static final Method GET_ANNOTATION_METADATA_METHOD = ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata");
 
     /**
      * Create a new {@link AnnotationMetadataProvider} class that is including the annotation metadata.
@@ -61,9 +64,8 @@ public class AnnotationMetadataWriter {
             .addSuperinterface(TypeDef.of(AnnotationMetadataProvider.class))
             .addField(annotationMetadataField)
             .addStaticInitializer(StatementDef.multi(statements))
-            .addMethod(MethodDef.override(
-                    ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata")
-                ).build((aThis, methodParameters) -> aThis.type().getStaticField(annotationMetadataField).returning())
+            .addMethod(MethodDef.override(GET_ANNOTATION_METADATA_METHOD)
+                .build((aThis, methodParameters) -> aThis.type().getStaticField(annotationMetadataField).returning())
             );
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
         ClassDef classDef = classDefBuilder.build();
