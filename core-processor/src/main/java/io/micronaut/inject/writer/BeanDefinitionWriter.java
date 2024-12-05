@@ -1125,7 +1125,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         classDefBuilder.addMethod(
             MethodDef.override(
                 LOAD_REFERENCE_METHOD
-            ).build((aThis, methodParameters) -> beanDefinitionTypeDef.instantiate().returning())
+            ).build((aThis, methodParameters) -> aThis.type().instantiate().returning())
         );
 
         if (annotationMetadata.hasDeclaredAnnotation(Context.class)) {
@@ -1604,7 +1604,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     } else {
                         constructorType = AbstractInitializableBeanDefinition.FieldReference.class;
                     }
-                    constructorDef[0] = beanDefinitionTypeDef
+                    constructorDef[0] = aThis.type()
                         .getStaticField(FIELD_CONSTRUCTOR, ClassTypeDef.of(AbstractInitializableBeanDefinition.MethodOrFieldReference.class))
                         .cast(constructorType)
                         .newLocal("constructorDef");
@@ -2286,7 +2286,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
             classDefBuilder.addMethod(
                 MethodDef.override(IS_INNER_CONFIGURATION_METHOD)
-                    .build((aThis, methodParameters) -> beanDefinitionTypeDef.getStaticField(innerClassesField)
+                    .build((aThis, methodParameters) -> aThis.type().getStaticField(innerClassesField)
                         .invoke(CONTAINS_METHOD, methodParameters.get(0))
                         .returning())
             );
@@ -2310,7 +2310,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
                 classDefBuilder.addMethod(
                     MethodDef.override(GET_EXPOSED_TYPES_METHOD)
-                        .build((aThis, methodParameters) -> beanDefinitionTypeDef.getStaticField(exposedTypesField).returning())
+                        .build((aThis, methodParameters) -> aThis.type().getStaticField(exposedTypesField).returning())
                 );
 
                 return beanDefinitionTypeDef.getStaticField(exposedTypesField).put(getClassesAsSetExpression(exposedTypes));
