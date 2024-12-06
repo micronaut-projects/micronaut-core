@@ -144,6 +144,9 @@ public final class Tokenizer {
 
         remaining = expression.substring(cursor);
         for (TokenPattern pattern: PATTERNS) {
+            // TODO for things like ctx[io.micronaut.core.context.env.Environment] this will return the wrong token
+            //  it will return the ENVIRONMENT token instead of the IDENTIFIER token because of the env package name.
+            //  Order of the map above matters if multiple things can match it
             Token token = pattern.matches(remaining);
             if (token == null) {
                 continue;
