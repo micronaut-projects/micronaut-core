@@ -465,7 +465,7 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
         if (wrapped) {
             eat(TYPE_IDENTIFIER);
         }
-        
+
         List<String> parts = new ArrayList<>();
         parts.add(eat(IDENTIFIER).value());
         while (lookahead != null && lookahead.type() == DOT) {
