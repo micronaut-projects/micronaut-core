@@ -72,6 +72,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
+    private BeanResolutionDebugMode debugMode = BeanResolutionDebugMode.getDefaultMode();
 
     /**
      * Default constructor.
@@ -87,6 +88,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         applicationContextConfigurer.configure(this);
         this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
+    }
+
+    @Override
+    public ApplicationContextBuilder debugMode(BeanResolutionDebugMode debugMode) {
+        this.debugMode = debugMode == null ? BeanResolutionDebugMode.NONE : debugMode;
+        return this;
+    }
+
+    @Override
+    public BeanResolutionDebugMode getDebugMode() {
+        return this.debugMode;
     }
 
     private ClassLoader resolveClassLoader() {

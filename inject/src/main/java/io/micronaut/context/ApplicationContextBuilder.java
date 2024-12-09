@@ -37,6 +37,17 @@ import java.util.Map;
 public interface ApplicationContextBuilder {
 
     /**
+     * Sets the debug mode for bean resolution.
+     * @param debugMode The debug mode
+     * @since 4.8.0
+     * @see BeanResolutionDebugMode
+     * @return This builder
+     */
+    default @NonNull ApplicationContextBuilder debugMode(@NonNull BeanResolutionDebugMode debugMode) {
+        return this;
+    }
+
+    /**
      * Whether to eager initialize {@link io.micronaut.context.annotation.ConfigurationProperties} beans.
      * @param eagerInitConfiguration True if configuration properties should be eagerly initialized
      * @return The context builder
