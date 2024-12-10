@@ -607,7 +607,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @return {@code true} if ';' is normal, {@code false} otherwise.
+     * Returns whether the semicolon is considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @return {@code true} if the semicolon is a normal character, {@code false} otherwise.
      * @since 4.8
      */
     public boolean isSemicolonIsNormalChar() {
@@ -615,7 +618,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param semicolonIsNormalChar {@code true} to treat ';' normally, {@code false} otherwise.
+     * Sets whether the semicolon should be considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @param semicolonIsNormalChar {@code true} if the semicolon should be a normal character, {@code false} otherwise.
      * @since 4.8
      */
     public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
