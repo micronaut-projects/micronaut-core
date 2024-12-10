@@ -30,6 +30,8 @@ public interface FormConfiguration {
     /**
      * @return true if the semicolon handle as a normal character, false otherwise.
      */
-    boolean isSemicolonIsNormalChar();
+    default boolean isSemicolonIsNormalChar() {
+        return false;
+    }
 
 }
