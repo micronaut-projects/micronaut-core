@@ -72,7 +72,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
-    private BeanResolutionDebugMode debugMode = BeanResolutionDebugMode.getDefaultMode();
+    private Set<String> traceClasses = BeanResolutionTraceMode.getDefaultTraceClasses();
+    private BeanResolutionTraceMode traceMode = BeanResolutionTraceMode.getDefaultMode(traceClasses);
 
     /**
      * Default constructor.
@@ -91,14 +92,28 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder debugMode(BeanResolutionDebugMode debugMode) {
-        this.debugMode = debugMode == null ? BeanResolutionDebugMode.NONE : debugMode;
+    public ApplicationContextBuilder traceMode(BeanResolutionTraceMode traceMode) {
+        this.traceMode = traceMode == null ? BeanResolutionTraceMode.NONE : traceMode;
         return this;
     }
 
     @Override
-    public BeanResolutionDebugMode getDebugMode() {
-        return this.debugMode;
+    public ApplicationContextBuilder traceClasses(String... classPatterns) {
+        if (traceMode == BeanResolutionTraceMode.NONE) {
+            traceMode = BeanResolutionTraceMode.STANDARD_OUT;
+        }
+        this.traceClasses = Set.of(classPatterns);
+        return this;
+    }
+
+    @Override
+    public BeanResolutionTraceMode getTraceMode() {
+        return this.traceMode;
+    }
+
+    @Override
+    public Set<String> getTraceClasses() {
+        return traceClasses;
     }
 
     private ClassLoader resolveClassLoader() {

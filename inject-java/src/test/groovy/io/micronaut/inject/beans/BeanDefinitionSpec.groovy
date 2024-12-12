@@ -8,12 +8,41 @@ import io.micronaut.core.annotation.Order
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import test.another.BeanWithPackagePrivate
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
+
+    void "test getTypeString for format #format"() {
+        given:
+        def definition = buildBeanDefinition('typestring.Test', '''
+package typestring;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+class Test  {
+}
+
+''')
+
+        expect:
+        definition.asArgument().getTypeString(format) == result
+
+        where:
+        format                                    | result
+        TypeInformation.TypeFormat.SIMPLE         | "Test"
+        TypeInformation.TypeFormat.QUALIFIED      | "typestring.Test"
+        TypeInformation.TypeFormat.SHORTENED      | "t.Test"
+        TypeInformation.TypeFormat.ANSI_SIMPLE    | "\u001B[0;36mTest\u001B[0m"
+        TypeInformation.TypeFormat.ANSI_QUALIFIED | "\u001B[0;36mtypestring.Test\u001B[0m"
+        TypeInformation.TypeFormat.ANSI_SHORTENED | "\u001B[0;36mt.Test\u001B[0m"
+
+    }
 
     void "test limit the exposed bean types"() {
         given:
@@ -443,7 +472,7 @@ class TestBean {
 
     void "test deep type parameters are created in definition"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test','Test','''
+        BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
 import java.util.List;
 
@@ -470,7 +499,7 @@ public class Test {
 
     void "test annotation metadata present on deep type parameters of definition"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test','Test','''
+        BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
 import jakarta.validation.constraints.*;
 import java.util.List;
@@ -498,7 +527,7 @@ public class Test {
 
     void "test isTypeVariable"() {
         given:
-        ApplicationContext context = buildContext( '''
+        ApplicationContext context = buildContext('''
 package test;
 import jakarta.validation.constraints.*;
 import java.util.*;
@@ -533,27 +562,27 @@ class SetTest<E> implements Serde<HashSet<E>> {
 
 
         when: "Micronaut Serialization use-case"
-            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
-            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
-            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
-            def listDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.listOf(String)))
-            def collectionDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.of(Collection.class, String)))
+        def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+        def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+        def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+        def listDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.listOf(String)))
+        def collectionDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.of(Collection.class, String)))
 
         then: "The first is a placeholder"
-            listDeser.getClass().name == 'test.ArrayListTest'
-            listDeser.is(collectionDeser)
-            !serdeTypeParam.isTypeVariable() //
-            !(serdeTypeParam instanceof GenericPlaceholder)
+        listDeser.getClass().name == 'test.ArrayListTest'
+        listDeser.is(collectionDeser)
+        !serdeTypeParam.isTypeVariable() //
+        !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            !serializerTypeParam.isTypeVariable()
-            !(serializerTypeParam instanceof GenericPlaceholder)
-            !deserializerTypeParam.isTypeVariable()
-            !(deserializerTypeParam instanceof GenericPlaceholder)
+        !serializerTypeParam.isTypeVariable()
+        !(serializerTypeParam instanceof GenericPlaceholder)
+        !deserializerTypeParam.isTypeVariable()
+        !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
         given:
-            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+        BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
 import jakarta.validation.constraints.*;
 import java.util.List;
@@ -575,26 +604,26 @@ interface Deserializer<T> {
         ''')
 
         when: "Micronaut Serialization use-case"
-            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
-            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
-            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+        def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+        def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+        def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
         // Arrays are not resolved as JavaClassElements or placeholders
         then: "The first is a placeholder"
-            serdeTypeParam.simpleName == "String[]"
-            !serdeTypeParam.isTypeVariable()
-            !(serdeTypeParam instanceof GenericPlaceholder)
+        serdeTypeParam.simpleName == "String[]"
+        !serdeTypeParam.isTypeVariable()
+        !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            serializerTypeParam.simpleName == "String[]"
-            !serializerTypeParam.isTypeVariable()
-            !(serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.simpleName == "String[]"
-            !deserializerTypeParam.isTypeVariable()
-            !(deserializerTypeParam instanceof GenericPlaceholder)
+        serializerTypeParam.simpleName == "String[]"
+        !serializerTypeParam.isTypeVariable()
+        !(serializerTypeParam instanceof GenericPlaceholder)
+        deserializerTypeParam.simpleName == "String[]"
+        !deserializerTypeParam.isTypeVariable()
+        !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test intercepted type arguments"() {
         given:
-            BeanDefinition definition = buildSimpleInterceptedBeanDefinition('test.AImplementationLong', '''
+        BeanDefinition definition = buildSimpleInterceptedBeanDefinition('test.AImplementationLong', '''
 package test;
 
 import io.micronaut.aop.Introduction;
@@ -664,16 +693,16 @@ interface AInterface<K, V> {
 ''')
 
         when:
-            def arguments = definition.getTypeArguments(ClassUtils.forName("test.AInterface", definition.getClass().classLoader).orElseThrow())
+        def arguments = definition.getTypeArguments(ClassUtils.forName("test.AInterface", definition.getClass().classLoader).orElseThrow())
         then:
-            arguments[0].type == Long
-            arguments[1].type == Long
+        arguments[0].type == Long
+        arguments[1].type == Long
     }
 
     void "test package-private methods with different package are marked as overridden"() {
         when:
-            def ctx = ApplicationContext.builder().build().start()
-            BeanDefinition definition = buildBeanDefinition('test.another.Test', '''
+        def ctx = ApplicationContext.builder().build().start()
+        BeanDefinition definition = buildBeanDefinition('test.another.Test', '''
 package test.another;
 
 import test.Middle;
@@ -689,79 +718,79 @@ class Test extends Middle {
 
 ''')
 
-            def bean1 = ctx.getBean(BeanWithPackagePrivate)
-            def bean2 = ctx.getBean(definition)
+        def bean1 = ctx.getBean(BeanWithPackagePrivate)
+        def bean2 = ctx.getBean(definition)
         then: """By Java rules the base method is not overridden and should have been injected too, but it's not possible to invoked using the reflection,
 so we mark it as overridden
 """
-            !bean1.@root
-            bean1.@middle
-            !bean1.@base
-            !bean2.@root
-            bean2.@middle
-            !bean2.@base
+        !bean1.@root
+        bean1.@middle
+        !bean1.@base
+        !bean2.@root
+        bean2.@middle
+        !bean2.@base
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test repeatable inner type annotation 1"() {
         when:
-            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
-            def beanDef = ctx.getBeanDefinition(MapOfListsBean1)
+        def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+        def beanDef = ctx.getBeanDefinition(MapOfListsBean1)
         then:
-            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin1).isPresent()
+        beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin1).isPresent()
 
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test repeatable inner type annotation 2"() {
         when:
-            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
-            def beanDef = ctx.getBeanDefinition(MapOfListsBean2)
+        def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+        def beanDef = ctx.getBeanDefinition(MapOfListsBean2)
         then:
-            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin2).isPresent()
+        beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin2).isPresent()
 
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test repeatable inner type annotation 3"() {
         when:
-            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
-            def beanDef = ctx.getBeanDefinition(MapOfListsBean3)
+        def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+        def beanDef = ctx.getBeanDefinition(MapOfListsBean3)
         then:
-            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin3).isPresent()
+        beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin3).isPresent()
 
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test repeatable inner type annotation 4"() {
         when:
-            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
-            def beanDef = ctx.getBeanDefinition(MapOfListsBean4)
+        def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+        def beanDef = ctx.getBeanDefinition(MapOfListsBean4)
         then:
-            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin4).isPresent()
+        beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin4).isPresent()
 
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test repeatable inner type annotation 5"() {
         when:
-            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
-            def beanDef = ctx.getBeanDefinition(MapOfListsBean5)
+        def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+        def beanDef = ctx.getBeanDefinition(MapOfListsBean5)
         then:
-            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin5).isPresent()
+        beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin5).isPresent()
 
         cleanup:
-            ctx.close()
+        ctx.close()
     }
 
     void "test interface bean"() {
         given:
-            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+        def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
 package test;
 
 import io.micronaut.http.annotation.Controller;
@@ -772,12 +801,12 @@ interface MyEntityControllerInterface {
 ''')
 
         expect:
-            definition == null
+        definition == null
     }
 
     void "test interface bean 2"() {
         given:
-            def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
+        def definition = buildBeanDefinition('test.MyEntityControllerInterface', '''
 package test;
 
 import jakarta.inject.Singleton;
@@ -788,12 +817,12 @@ interface MyEntityControllerInterface {
 ''')
 
         expect:
-            definition == null
+        definition == null
     }
 
     void "test mapped interface bean"() {
         given:
-            def definition = buildSimpleInterceptedBeanDefinition('test.ProductMappers', '''
+        def definition = buildSimpleInterceptedBeanDefinition('test.ProductMappers', '''
 package test;
 
 import io.micronaut.context.annotation.Mapper.Mapping;
@@ -831,7 +860,7 @@ record ProductDTO(String name, String price, String distributor) {
 ''')
 
         expect:
-            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
-            definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
+        definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
 }

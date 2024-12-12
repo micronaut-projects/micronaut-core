@@ -37,13 +37,23 @@ import java.util.Map;
 public interface ApplicationContextBuilder {
 
     /**
-     * Sets the debug mode for bean resolution.
-     * @param debugMode The debug mode
+     * Sets the trace mode for bean resolution.
+     * @param traceMode The debug mode
      * @since 4.8.0
-     * @see BeanResolutionDebugMode
+     * @see BeanResolutionTraceMode
      * @return This builder
      */
-    default @NonNull ApplicationContextBuilder debugMode(@NonNull BeanResolutionDebugMode debugMode) {
+    default @NonNull ApplicationContextBuilder traceMode(@NonNull BeanResolutionTraceMode traceMode) {
+        return this;
+    }
+
+    /**
+     * The patterns of the classes to trace using Ant style-patterns ({@code com.example.* }). Can be a regular expression.
+     * @param classPatterns The class patterns.
+     * @return The class patterns to trace
+     * @since 4.8.0
+     */
+    default ApplicationContextBuilder traceClasses(String... classPatterns) {
         return this;
     }
 

@@ -1000,7 +1000,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = methodRef.arguments[argIndex];
         try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolutionContext.resolvePropertyValue( argument, propertyValue, cliProperty, false);
             if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
                 validatedBeanDefinition.validateBeanArgument(
                     resolutionContext,
@@ -1035,7 +1035,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = methodRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            return resolvePropertyValue(resolutionContext, context, argument, value, null, true);
+            return resolutionContext.resolvePropertyValue(argument, value, null, true);
         }
     }
 
@@ -1069,7 +1069,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                      String cliProperty) {
         try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
             if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
                 validatedBeanDefinition.validateBeanArgument(
                     resolutionContext,
@@ -1102,7 +1102,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                                 String value) {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            return resolvePropertyValue(resolutionContext, context, argument, value, null, true);
+            return resolutionContext.resolvePropertyValue(argument, value, null, true);
         }
     }
 
@@ -1145,7 +1145,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     protected final <K> K getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Qualifier<K> qualifier) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<K> argument = resolveArgument(context, argIndex, methodRef.arguments);
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        try (BeanResolutionContext.Path ignored = path
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
             return resolveBean(
                 resolutionContext,
@@ -1339,13 +1340,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Qualifier qualifier) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         if (argument != null && argument.isDeclaredNullable()) {
-            BeanResolutionContext.Segment<?, ?> current = resolutionContext.getPath().peek();
+            BeanResolutionContext.Segment<?, ?> current = path.peek();
             if (current != null && current.getArgument().equals(argument)) {
                 return null;
             }
         }
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path ignored = path
                 .pushConstructorResolve(this, argument)) {
             return resolveBean(resolutionContext, argument, qualifier, false);
         }
@@ -1412,7 +1414,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = constructorRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
-                Object result = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+                Object result = resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
 
                 if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
                     validatedBeanDefinition.validateBeanArgument(
@@ -1460,7 +1462,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = constructorRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
-                Object result = resolvePropertyValue(resolutionContext, context, argument, propertyValue, null, true);
+                Object result = resolutionContext.resolvePropertyValue(argument, propertyValue, null, true);
 
                 if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
                     validatedBeanDefinition.validateBeanArgument(
@@ -1743,7 +1745,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     protected final Object getPropertyValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String propertyValue, String cliProperty) {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            return resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
         }
     }
 
@@ -1763,7 +1765,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     protected final Object getPropertyPlaceholderValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String placeholder) {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolvePropertyValue(resolutionContext, context, argument, placeholder, null, true);
+            return resolutionContext.resolvePropertyValue(argument, placeholder, null, true);
         }
     }
 
@@ -2021,14 +2023,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     private Object resolveValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument, Qualifier qualifier) {
-        if (!(context instanceof PropertyResolver)) {
-            throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
-        }
         AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
         if (argumentAnnotationMetadata.hasEvaluatedExpressions()) {
             boolean isOptional = argument.isOptional();
             if (isOptional) {
-                Argument<?> t = isOptional ? argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : argument;
+                Argument<?> t = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 Object v = argumentAnnotationMetadata.getValue(Value.class, t).orElse(null);
                 return Optional.ofNullable(v);
             } else {
@@ -2061,6 +2060,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argumentAnnotationMetadata, valueAnnVal);
             ArgumentConversionContext conversionContext = wrapperType ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
             Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
+            resolutionContext.valueResolved(
+                argument,
+                qualifier,
+                valString,
+                value.orElse(null)
+            );
             if (argument.isOptional()) {
                 if (value.isEmpty()) {
                     return value;
@@ -2092,78 +2097,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     return argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument)
                             .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
                 }
-            }
-        }
-    }
-
-    private Object resolvePropertyValue(BeanResolutionContext resolutionContext, BeanContext context, Argument<?> argument,
-                                        String stringValue, String cliProperty, boolean isPlaceholder) {
-        if (!(context instanceof PropertyResolver)) {
-            throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
-        }
-        ApplicationContext applicationContext = (ApplicationContext) context;
-
-        Argument<?> argumentType = argument;
-        Class<?> wrapperType = null;
-        Class<?> type = argument.getType();
-        if (type == Optional.class) {
-            wrapperType = Optional.class;
-            argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-        } else if (type == OptionalInt.class) {
-            wrapperType = OptionalInt.class;
-            argumentType = Argument.INT;
-        } else if (type == OptionalLong.class) {
-            wrapperType = OptionalLong.class;
-            argumentType = Argument.LONG;
-        } else if (type == OptionalDouble.class) {
-            wrapperType = OptionalDouble.class;
-            argumentType = Argument.DOUBLE;
-        }
-
-        ArgumentConversionContext<?> conversionContext = wrapperType != null ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
-
-        Optional<?> value;
-        if (isPlaceholder) {
-            value = applicationContext.resolvePlaceholders(stringValue).flatMap(v -> applicationContext.getConversionService().convert(v, conversionContext));
-        } else {
-            stringValue = substituteWildCards(resolutionContext, stringValue);
-            value = applicationContext.getProperty(stringValue, conversionContext);
-            if (value.isEmpty() && cliProperty != null) {
-                value = applicationContext.getProperty(cliProperty, conversionContext);
-            }
-        }
-
-        if (argument.isOptional()) {
-            if (value.isEmpty()) {
-                return value;
-            } else {
-                Object convertedOptional = value.get();
-                if (convertedOptional instanceof Optional) {
-                    return convertedOptional;
-                } else {
-                    return value;
-                }
-            }
-        } else {
-            if (wrapperType != null) {
-                final Object v = value.orElse(null);
-                if (OptionalInt.class == wrapperType) {
-                    return v instanceof Integer i ? OptionalInt.of(i) : OptionalInt.empty();
-                } else if (OptionalLong.class == wrapperType) {
-                    return v instanceof Long l ? OptionalLong.of(l) : OptionalLong.empty();
-                } else if (OptionalDouble.class == wrapperType) {
-                    return v instanceof Double d ? OptionalDouble.of(d) : OptionalDouble.empty();
-                }
-            }
-            if (value.isPresent()) {
-                return value.get();
-            } else {
-                if (argument.isDeclaredNullable()) {
-                    return null;
-                }
-                String finalStringValue = stringValue;
-                return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
-                        .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, finalStringValue));
             }
         }
     }

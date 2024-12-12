@@ -113,6 +113,7 @@ import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -175,6 +176,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
+    final @NonNull BeanResolutionTraceMode traceMode;
+    final @NonNull Set<String> tracePatterns;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
     protected final SingletonScope singletonScope = new SingletonScope();
@@ -302,6 +305,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beanContextConfiguration = contextConfiguration;
+        this.traceMode = beanContextConfiguration.getTraceMode();
+        this.tracePatterns = beanContextConfiguration.getTraceClasses();
     }
 
     /**
@@ -3120,7 +3125,18 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             final BeanResolutionContext.Path path = context.getPath();
             final boolean isNewPath = path.isEmpty();
             if (isNewPath) {
-                path.pushBeanCreate(definition, beanType);
+                Argument<T> resolvedBeanType;
+                if (qualifier instanceof TypeArgumentQualifier<T> taq) {
+                    Class<?>[] typeArguments = taq.getTypeArguments();
+                    resolvedBeanType = Argument.of(
+                        beanType.getType(),
+                        beanType.getAnnotationMetadata(),
+                        typeArguments
+                    );
+                } else {
+                    resolvedBeanType = beanType;
+                }
+                path.pushBeanCreate(definition, resolvedBeanType);
             }
             try {
                 List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
@@ -3139,7 +3155,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 return beanRegistration;
             } finally {
                 if (isNewPath) {
-                    path.pop();
+                    path.close();
                 }
             }
         }
@@ -3578,7 +3594,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                                         @NonNull Collection<BeanRegistration<T>> beansOfTypeList) {
         BeanRegistration<T> beanRegistration = null;
         try {
-            beanRegistration = resolveBeanRegistration(resolutionContext, candidate);
+            beanRegistration = resolveBeanRegistration(
+                resolutionContext,
+                candidate,
+                beanType,
+                qualifier
+            );
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found a registration {} for candidate: {} with qualifier: {}", beanRegistration, candidate, qualifier);
             }

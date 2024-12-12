@@ -36,11 +36,21 @@ public interface BeanContextConfiguration {
      * The debug mode for bean resolution.
      *
      * @since 4.8.0
-     * @see BeanResolutionDebugMode
+     * @see BeanResolutionTraceMode
      * @return The bean resolution debug mode.
      */
-    default @NonNull BeanResolutionDebugMode getDebugMode() {
-        return BeanResolutionDebugMode.NONE;
+    default @NonNull BeanResolutionTraceMode getTraceMode() {
+        return BeanResolutionTraceMode.NONE;
+    }
+
+    /**
+     * The class patterns to trace.
+     *
+     * @return A set of regex patterns for tracing.
+     * @since 4.8.0
+     */
+    default Set<String> getTraceClasses() {
+        return Set.of();
     }
 
     /**
