@@ -20,7 +20,7 @@ The easiest way to do this is with Micronaut's Gradle or Maven plugins. For exam
 [source,groovy,subs="attributes+"]
 ----
 plugins {
-    id 'io.micronaut.library' version '1.3.2' // <1>
+    id 'io.micronaut.library' version '4.4.4' // get latest version from https://plugins.gradle.org/plugin/io.micronaut.library
 }
 
 version "0.1"
