@@ -36,7 +36,9 @@ import java.util.Set;
  *
  * @author Fabian Nonnenmacher
  * @since 2.0
+ * @deprecated CloudFoundry support should be added manually
  */
+@Deprecated(forRemoval = true)
 @Internal
 public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropertySourceLoader {
 

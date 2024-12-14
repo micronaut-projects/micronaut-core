@@ -44,4 +44,9 @@ public class SystemPropertiesPropertySource extends MapPropertySource {
     public int getOrder() {
         return POSITION;
     }
+
+    @Override
+    public Origin getOrigin() {
+        return new Origin("System.properties");
+    }
 }

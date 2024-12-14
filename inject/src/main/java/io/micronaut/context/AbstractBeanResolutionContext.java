@@ -36,7 +36,6 @@ import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.type.TypeInformation.TypeFormat;
 import io.micronaut.core.util.AnsiColour;
-import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.*;
 
@@ -100,7 +99,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void valueResolved(Argument<?> argument, Qualifier<?> qualifier, String property, Object value) {
         if (traceEnabled) {
-            traceMode.valueResolved(
+            traceMode.traceValueResolved(
                 this,
                 argument,
                 property,
@@ -149,7 +148,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         if (traceEnabled) {
-            traceMode.valueResolved(
+            traceMode.traceValueResolved(
                 this,
                 argument,
                 stringValue,
@@ -205,7 +204,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         T bean = context.getBean(this, beanType, qualifier);
         if (traceEnabled) {
-            traceMode.beanResolved(
+            traceMode.traceBeanResolved(
                 this,
                 beanType,
                 qualifier,
@@ -217,7 +216,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 qualifier
             );
             if (disabledBeanMessage != null) {
-                traceMode.beansDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
+                traceMode.traceBeanDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
             }
         }
         return bean;
@@ -229,7 +228,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
         if (traceEnabled) {
             for (T bean : beans) {
-                traceMode.beanResolved(this, beanType, qualifier, bean);
+                traceMode.traceBeanResolved(this, beanType, qualifier, bean);
             }
             String disabledBeanMessage = context.resolveDisabledBeanMessage(
                 this,
@@ -237,7 +236,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 qualifier
             );
             if (disabledBeanMessage != null) {
-                traceMode.beansDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
+                traceMode.traceBeanDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
             }
         }
         return beans;
@@ -259,14 +258,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Optional<T> resolved = context.findBean(this, beanType, qualifier);
         if (traceEnabled) {
-            traceMode.beanResolved(this, beanType, qualifier, resolved.orElse(null));
+            traceMode.traceBeanResolved(this, beanType, qualifier, resolved.orElse(null));
             String disabledBeanMessage = context.resolveDisabledBeanMessage(
                 this,
                 beanType,
                 qualifier
             );
             if (disabledBeanMessage != null) {
-                traceMode.beansDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
+                traceMode.traceBeanDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
             }
         }
         return resolved;
@@ -556,7 +555,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     }
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
             return this;
         }
@@ -564,7 +563,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
             if (traceEnabled) {
-                traceMode.startResolve(
+                traceMode.startTrace(
                     AbstractBeanResolutionContext.this,
                     beanType,
                     declaringType
@@ -573,9 +572,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return pushConstructorResolve(declaringType, beanType);
         }
 
-        private void debugResolution() {
+        private void traceResolution() {
             if (traceEnabled) {
-               traceMode.debugSegment(
+               traceMode.traceSegment(
                     AbstractBeanResolutionContext.this
                );
             }
@@ -594,7 +593,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     push(methodSegment);
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
 
             return this;
@@ -612,7 +611,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     push(methodSegment);
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
 
             return this;
@@ -629,7 +628,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     push(fieldSegment);
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
             return this;
         }
@@ -645,7 +644,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     push(fieldSegment);
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
             return this;
         }
@@ -661,7 +660,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     push(annotationSegment);
                 }
             } finally {
-                debugResolution();
+                traceResolution();
             }
             return this;
         }
@@ -717,7 +716,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public void close() {
             Path.super.close();
             if (traceEnabled && isEmpty()) {
-                traceMode.finishResolve(
+                traceMode.finishTrace(
                     AbstractBeanResolutionContext.this,
                     rootDefinition
                 );
@@ -973,10 +972,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toConsoleString(boolean ansiSupported) {
-            return getDeclaringType().getBeanDescription(
+            String beanDescription = getDeclaringType().getBeanDescription(
                 ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED,
                 false
             );
+            StringBuilder baseString = new StringBuilder(beanDescription);
+            String memberSeparator = ansiSupported ? AnsiColour.CYAN_BOLD + MEMBER_SEPARATOR + AnsiColour.RESET : MEMBER_SEPARATOR;
+            baseString.append(memberSeparator);
+            baseString.append(getName());
+
+            return baseString.toString();
         }
 
         @Override

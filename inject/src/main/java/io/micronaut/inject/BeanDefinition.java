@@ -501,6 +501,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     default @NonNull String getBeanDescription(@NonNull TypeFormat typeFormat, boolean includeArguments) {
         ConstructorInjectionPoint<T> constructor = getConstructor();
         StringBuilder beanDescription = new StringBuilder();
+        Argument<?>[] arguments = constructor.getArguments();
         if (constructor instanceof MethodInjectionPoint<?,?> methodInjectionPoint) {
             // factory bean with method
             Class<?> declaringType = methodInjectionPoint.getDeclaringType();
@@ -550,6 +551,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                     @SuppressWarnings("unchecked") ExecutableMethod<Object, ?> method =
                         (ExecutableMethod<Object, ?>) getExecutableMethods().iterator().next();
                     // Not great, but to produce accurate debug output we have to reach into AOP internals
+                    Class<?> adaptedType = method.classValue(ANN_ADAPTER).orElse(getBeanType());
                     Class<?> beanType = method.classValue(ANN_ADAPTER, "adaptedBean").orElse(getBeanType());
                     String beanMethod = method.stringValue(ANN_ADAPTER, "adaptedMethod").orElse("unknown");
                     String beanTypeString = getBeanTypeString(
@@ -561,6 +563,21 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                     beanDescription.append(beanTypeString)
                         .append(".")
                         .append(beanMethod);
+                    @NonNull Argument<?>[] methodArguments = method.getArguments();
+                    List<Argument<?>> typeArguments = getTypeArguments(adaptedType);
+                    if (typeArguments.size() == methodArguments.length) {
+                        arguments = new Argument[methodArguments.length];
+                        for (int i = 0; i < methodArguments.length; i++) {
+                            @NonNull Argument<?> methodArgument = methodArguments[i];
+                            Argument<?> t = typeArguments.get(i);
+                            arguments[i] = Argument.of(
+                                t.getType(),
+                                methodArgument.getName(),
+                                methodArgument.getAnnotationMetadata(),
+                                t.getTypeParameters()
+                            );
+                        }
+                    }
                 } else {
                     Class<T> beanType = getBeanType();
                     String beanTypeString;
@@ -589,12 +606,13 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
         }
 
         if (includeArguments) {
-
-            Argument<?>[] arguments = constructor.getArguments();
             beanDescription.append(typeFormat.isAnsi() ? AnsiColour.brightCyan("(") : "(");
-            boolean isIntercepted = InterceptedBean.class.isAssignableFrom(getBeanType());
-            for (int i = isIntercepted ? 5 : 0; i < arguments.length; i++) {
+            for (int i = 0; i < arguments.length; i++) {
                 Argument<?> argument = arguments[i];
+                if (argument.getName().startsWith("$")) {
+                    // skip internal
+                    continue;
+                }
                 String argType = getBeanTypeString(
                     typeFormat,
                     argument

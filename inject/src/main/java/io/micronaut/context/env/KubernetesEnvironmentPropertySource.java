@@ -72,6 +72,11 @@ public class KubernetesEnvironmentPropertySource extends MapPropertySource {
     }
 
     @Override
+    public Origin getOrigin() {
+        return EnvironmentPropertySource.ORIGIN;
+    }
+
+    @Override
     public int getOrder() {
         return EnvironmentPropertySource.POSITION;
     }

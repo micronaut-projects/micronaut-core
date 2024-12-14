@@ -36,6 +36,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.inject.BeanConfiguration;
 
 import java.io.BufferedReader;
@@ -300,7 +301,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String, Object>[] copiedCatalog = copyCatalog();
+        Map<String, PropertySource.PropertyEntry>[] copiedCatalog = copyCatalog();
         refresh();
         return diffCatalog(copiedCatalog, catalog);
     }
@@ -597,6 +598,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
     }
 
+    @Override
+    public Optional<PropertySource.PropertyEntry> getPropertyEntry(String name) {
+        for (PropertyCatalog propertyCatalog : PropertyCatalog.values()) {
+            Map<String, PropertySource.PropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
+            if (entries != null) {
+                PropertySource.PropertyEntry entry = entries.get(name);
+                if (entry != null) {
+                    return Optional.of(entry);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * Obtains the {@link PropertySourceLoader} instances.
      *
@@ -830,11 +845,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
+    private Map<String, Object> diffCatalog(Map<String, PropertySource.PropertyEntry>[] original, Map<String, PropertySource.PropertyEntry>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
         for (int i = 0; i < original.length; i++) {
-            Map<String, Object> map = original[i];
-            Map<String, Object> newMap = newCatalog[i];
+            Map<String, PropertySource.PropertyEntry> map = original[i];
+            Map<String, PropertySource.PropertyEntry> newMap = newCatalog[i];
             boolean hasNew = newMap != null;
             boolean hasOld = map != null;
             if (!hasOld && hasNew) {
@@ -849,13 +864,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         if (!changes.isEmpty()) {
             Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
-            for (Map<String, Object> map : newCatalog) {
+            for (Map<String, PropertySource.PropertyEntry> map :
+                newCatalog) {
                 if (map != null) {
                     map.forEach((key, v) -> {
-                        if (v instanceof String val) {
+                        if (v.value() instanceof String val) {
                             for (String changed : changes.keySet()) {
                                 if (val.contains(changed)) {
-                                    placeholdersAltered.put(key, v);
+                                    placeholdersAltered.put(key, v.value());
                                 }
                             }
                         }
@@ -867,14 +883,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return changes;
     }
 
-    private void diffMap(Map<String, Object> map, Map<String, Object> newMap, Map<String, Object> changes) {
-        for (Map.Entry<String, Object> entry : newMap.entrySet()) {
+    private void diffMap(Map<String, PropertySource.PropertyEntry> map, Map<String, PropertySource.PropertyEntry> newMap, Map<String, Object> changes) {
+        for (Map.Entry<String, PropertySource.PropertyEntry> entry : newMap.entrySet()) {
             String key = entry.getKey();
-            Object newValue = entry.getValue();
+            Object newValue = entry.getValue().value();
             if (!map.containsKey(key)) {
                 changes.put(key, newValue);
             } else {
-                Object oldValue = map.get(key);
+                Object oldValue = map.getOrDefault(key, PropertySource.PropertyEntry.NULL_ENTRY).value();
                 boolean hasNew = newValue != null;
                 boolean hasOld = oldValue != null;
                 if (hasNew && !hasOld) {
@@ -892,10 +908,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return !Objects.deepEquals(newValue, oldValue);
     }
 
-    private Map<String, Object>[] copyCatalog() {
-        Map<String, Object>[] newCatalog = new Map[catalog.length];
+    private Map<String, PropertySource.PropertyEntry>[] copyCatalog() {
+        Map<String, PropertySource.PropertyEntry>[] newCatalog = new Map[catalog.length];
         for (int i = 0; i < catalog.length; i++) {
-            Map<String, Object> entry = catalog[i];
+            Map<String, PropertySource.PropertyEntry> entry = catalog[i];
             if (entry != null) {
                 newCatalog[i] = new LinkedHashMap<>(entry);
             }

@@ -196,6 +196,19 @@ public enum AnsiColour {
         }
     }
 
+    /**
+     * Format blue.
+     * @param text The text
+     * @return The formatted text
+     */
+    public static @NonNull String blue(@NonNull String text) {
+        if (isSupported()) {
+            return AnsiColour.BLUE + text + AnsiColour.RESET;
+        } else {
+            return text;
+        }
+    }
+
     @Override
     public String toString() {
         return code;
