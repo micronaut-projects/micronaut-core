@@ -633,7 +633,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     return false;
                 });
         }
-        return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanType, qualifier, executableMethod));
+        return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanDefinition, beanType, qualifier, executableMethod));
     }
 
     @Override
@@ -3908,11 +3908,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * @param <R>
      */
     private static final class BeanExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
-        private final BeanContext beanContext;
+        private final DefaultBeanContext beanContext;
         private final Class<T> beanType;
         private final Argument<T> beanArgument;
         private final Qualifier<T> qualifier;
         private final boolean isSingleton;
+        private final BeanDefinition<T> definition;
 
         private T target;
 
@@ -3922,13 +3923,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
          * @param qualifier   The qualifier
          * @param method      The method
          */
-        BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
+        BeanExecutionHandle(DefaultBeanContext beanContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
             super(method);
             this.beanContext = beanContext;
             this.beanType = beanType;
             this.beanArgument = Argument.of(beanType);
             this.qualifier = qualifier;
-            this.isSingleton = beanContext.findBeanDefinition(beanType, qualifier).map(BeanDefinition::isSingleton).orElse(false);
+            this.isSingleton = definition.isSingleton();
+            this.definition = definition;
         }
 
         @Override
@@ -3938,8 +3940,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 synchronized (this) { // double check
                     target = this.target;
                     if (target == null) {
-                        target = beanContext.getBean(beanArgument, qualifier);
-                        this.target = target;
+                        try (BeanResolutionContext resolutionContext = beanContext.newResolutionContext(definition, null)) {
+                            target = beanContext.getBean(resolutionContext, beanArgument, qualifier);
+                            this.target = target;
+                        }
                     }
                 }
             }

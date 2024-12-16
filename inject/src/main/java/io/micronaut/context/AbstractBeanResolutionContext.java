@@ -460,14 +460,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     class DefaultPath extends LinkedList<Segment<?, ?>> implements Path {
 
-        public static final String RIGHT_ARROW = AnsiColour.isSupported() ? " ↪️  " : "\\---> ";
+        public static final String RIGHT_ARROW = "\\---> ";
+        public static final String RIGHT_ARROW_EMOJI = " ↪️  ";
         private static final String CIRCULAR_ERROR_MSG = "Circular dependency detected";
 
         DefaultPath() {
         }
 
         @Override
-        public String toString() {
+        public String toConsoleString(boolean ansiSupported) {
             Iterator<Segment<?, ?>> i = descendingIterator();
             String ls = CachedEnvironment.getProperty("line.separator");
             StringBuilder pathString = new StringBuilder().append(ls);
@@ -476,16 +477,29 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             while (i.hasNext()) {
                 pathString.append(i.next().toString());
                 if (i.hasNext()) {
-                    pathString.append(ls).append(spaces).append(RIGHT_ARROW);
+                    pathString
+                        .append(ls)
+                        .append(spaces)
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
                     spaces += "      ";
                 }
             }
             return pathString.toString();
         }
 
-        @SuppressWarnings("MagicNumber")
+        @Override
+        public String toString() {
+            return toConsoleString(false);
+        }
+
         @Override
         public String toCircularString() {
+            return toConsoleCircularString(false);
+        }
+
+        @SuppressWarnings("MagicNumber")
+        @Override
+        public String toConsoleCircularString(boolean ansiSupported) {
             Iterator<Segment<?, ?>> i = descendingIterator();
             StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
@@ -505,10 +519,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             while (i.hasNext() && index < size() - 1) {
                 String segmentString = i.next().toString();
                 if (index == cycleIndex) {
-                    pathString.append(ls).append(spaces).append("^").append("  \\---> ");
+                    pathString.append(ls).append(spaces).append("^").append("  ")
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
                     spaces = spaces + "|  ";
                 } else if (index != 0) {
-                    pathString.append(ls).append(spaces).append(RIGHT_ARROW);
+                    pathString
+                        .append(ls)
+                        .append(spaces)
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
                 }
                 pathString.append(segmentString);
                 spaces = spaces + "      ";
@@ -1154,7 +1172,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         /**
          * @param baseString    The base string
          * @param arguments     The arguments
-         * @param ansiSupported
+         * @param ansiSupported Whether ANSI colour is supported
          */
         void outputArguments(StringBuilder baseString, Argument[] arguments, boolean ansiSupported) {
             baseString.append(ansiSupported ? AnsiColour.brightCyan("(") : "(");

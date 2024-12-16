@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.ConfigurationPath;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -392,6 +391,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          */
         Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument);
 
+        /**
+         * Push resolution of a bean from an annotation.
+         * @param beanDefinition The bean definition
+         * @param annotationMemberBeanAsArgument The annotation member
+         * @return The path
+         */
         Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument);
 
         /**
@@ -400,6 +405,28 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The circular string
          */
         String toCircularString();
+
+        /**
+         * Converts the path to a circular string.
+         *
+         * @param ansiSupported  Whether ANSI colour is supported
+         * @return The circular string
+         * @since 4.8.0
+         */
+        default String toConsoleCircularString(boolean ansiSupported) {
+            return toCircularString();
+        }
+
+        /**
+         * Converts the path to a string.
+         *
+         * @param ansiSupported  Whether ANSI colour is supported
+         * @return The string
+         * @since 4.8.0
+         */
+        default String toConsoleString(boolean ansiSupported) {
+            return toString();
+        }
 
         /**
          * @return The current path segment
