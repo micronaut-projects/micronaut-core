@@ -354,8 +354,9 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
 
         /**
          * Obtain the bean type string.
+         *
          * @param typeFormat The type format
-         * @param argument The argument
+         * @param argument   The argument
          * @return The string
          */
         public static @NonNull String getBeanTypeString(
@@ -379,6 +380,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
 
         /**
          * Format the annotation name.
+         *
          * @param annotationRef The type name
          * @return The annotation
          */
@@ -390,16 +392,19 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
                 case SIMPLE -> "@" + NameUtils.getSimpleName(annotationRef) + members;
                 case QUALIFIED -> "@" + annotationRef + members;
                 case SHORTENED -> "@" + NameUtils.getShortenedName(annotationRef) + members;
-                case ANSI_SIMPLE -> AnsiColour.yellow("@" + NameUtils.getSimpleName(annotationRef)) + members;
+                case ANSI_SIMPLE ->
+                    AnsiColour.yellow("@" + NameUtils.getSimpleName(annotationRef)) + members;
                 case ANSI_QUALIFIED -> AnsiColour.yellow("@" + annotationRef) + members;
-                case ANSI_SHORTENED -> AnsiColour.yellow("@" + NameUtils.getShortenedName(annotationRef)) + members;
+                case ANSI_SHORTENED ->
+                    AnsiColour.yellow("@" + NameUtils.getShortenedName(annotationRef)) + members;
             };
         }
 
         /**
          * Get a type string for the given format.
-         * @param format The format
-         * @param type The type
+         *
+         * @param format   The format
+         * @param type     The type
          * @param generics The generics
          * @return the type string
          */
@@ -408,16 +413,11 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
             @NonNull Class<?> type,
             @NonNull Map<String, Argument<?>> generics) {
             String typeName = switch (format) {
-                case SIMPLE ->
-                    type.getSimpleName();
-                case QUALIFIED ->
-                    type.getCanonicalName();
-                case SHORTENED ->
-                    NameUtils.getShortenedName(type.getTypeName());
-                case ANSI_SIMPLE ->
-                    AnsiColour.cyan(type.getSimpleName());
-                case ANSI_QUALIFIED ->
-                    AnsiColour.cyan(type.getCanonicalName());
+                case SIMPLE -> type.getSimpleName();
+                case QUALIFIED -> type.getCanonicalName();
+                case SHORTENED -> NameUtils.getShortenedName(type.getTypeName());
+                case ANSI_SIMPLE -> AnsiColour.cyan(type.getSimpleName());
+                case ANSI_QUALIFIED -> AnsiColour.cyan(type.getCanonicalName());
                 case ANSI_SHORTENED ->
                     AnsiColour.cyan(NameUtils.getShortenedName(type.getCanonicalName()));
             };
@@ -436,9 +436,11 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
 
         /**
          * Get a type string for the given format.
-         * @param format The format
-         * @param type The type
-         * @param generics The generics
+         *
+         * @param format             The format
+         * @param type               The type
+         * @param generics           The generics
+         * @param annotationMetadata The annotation metadata
          * @return the type string
          */
         public static @NonNull String getBeanTypeString(
@@ -455,7 +457,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
                 .map(qualifier -> {
                     if (AnnotationUtil.NAMED.equals(qualifier)) {
                         String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
-                        if(name != null) {
+                        if (name != null) {
                             if (format.isAnsi()) {
                                 return qualifier + "(" + AnsiColour.green("\"" + name + "\"") + ")";
                             } else {
@@ -473,8 +475,8 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
                             .orElse(scope);
                         String configuration = annotationMetadata.stringValue(
                                 ANN_CR,
-                            "prefix"
-                        )
+                                "prefix"
+                            )
                             .orElse(null);
                         if (configuration != null) {
                             if (format.isAnsi()) {

@@ -502,7 +502,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         entries.entrySet().stream()
             .filter(map -> map.getKey().startsWith(prefix))
             .forEach(entry -> {
-                Object value = entry.getValue();
+                PropertyEntry propertyEntry = entry.getValue();
+                Object value = propertyEntry.value();
                 if (value != null) {
                     String key = entry.getKey().substring(prefix.length());
                     key = keyConvention != null ? keyConvention.format(key) : key;

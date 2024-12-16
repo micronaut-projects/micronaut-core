@@ -76,7 +76,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
         this.traceMode = context.traceMode;
-        this.traceEnabled = isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns);
+        this.traceEnabled = rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns);
     }
 
     @Override
