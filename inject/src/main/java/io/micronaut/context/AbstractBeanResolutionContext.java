@@ -1193,8 +1193,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     .append(ansiSupported && !isInjectedArgument ? AnsiColour.brightBlue(argument.getName()) : argument.getName());
                 if (isInjectedArgument) {
                     baseString.append(']');
-                    baseString.append(AnsiColour.RESET);
-
+                    if (ansiSupported) {
+                        baseString.append(AnsiColour.RESET);
+                    }
                 }
                 if (i != arguments.length - 1) {
                     baseString.append(", ");

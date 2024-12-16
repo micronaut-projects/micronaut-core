@@ -3594,8 +3594,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             beanRegistration = resolveBeanRegistration(
                 resolutionContext,
                 candidate,
-                beanType,
-                qualifier
+                candidate.asArgument(),
+                candidate.getDeclaredQualifier()
             );
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found a registration {} for candidate: {} with qualifier: {}", beanRegistration, candidate, qualifier);

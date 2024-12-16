@@ -39,8 +39,8 @@ Message: No bean of type [io.micronaut.inject.failures.nesteddependency.MyClassD
 Path Taken:$space
 new i.m.i.f.n.MyClassB()
 \\---> i.m.i.f.n.MyClassB#propA
-      \\---> new i.m.i.f.n.MyClassA([MyClassC propC])
-            \\---> new i.m.i.f.n.MyClassC([MyClassD propD])"""
+      \\---> new @j.i.Singleton i.m.i.f.n.MyClassA([MyClassC propC])
+            \\---> new @j.i.Singleton i.m.i.f.n.MyClassC([MyClassD propD])"""
 
         cleanup:
         context.close()
