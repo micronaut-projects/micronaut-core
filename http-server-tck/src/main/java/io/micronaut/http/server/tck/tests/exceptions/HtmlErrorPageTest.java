@@ -17,22 +17,22 @@ package io.micronaut.http.server.tck.tests.exceptions;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import io.micronaut.http.uri.UriBuilder;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Map;
 
-import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
