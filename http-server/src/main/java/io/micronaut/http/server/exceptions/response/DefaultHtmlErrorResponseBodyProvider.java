@@ -146,7 +146,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return cache.computeIfAbsent(key, this::html);
     }
 
-    private String html(@NonNull DefaultHtmlErrorResponseBodyProvider.HtmlErrorPage htmlErrorPage) {
+    private String html(@NonNull HtmlErrorPage htmlErrorPage) {
         final String errorTitleCode = htmlErrorPage.httpStatusCode() + ".error.title";
         final String errorTitle = messageSource.getMessage(errorTitleCode, htmlErrorPage.httpStatusReason(), htmlErrorPage.locale());
         String header = "<h1>" + errorTitle + "</h1>";
@@ -184,7 +184,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return new HtmlErrorPage(locale, httpStatusCode, httpStatusReason, error, errorBold, messages);
     }
 
-    private String article(@NonNull DefaultHtmlErrorResponseBodyProvider.HtmlErrorPage htmlErrorPage) {
+    private String article(@NonNull HtmlErrorPage htmlErrorPage) {
         StringBuilder sb = new StringBuilder();
 
         for (String message : htmlErrorPage.messages) {
