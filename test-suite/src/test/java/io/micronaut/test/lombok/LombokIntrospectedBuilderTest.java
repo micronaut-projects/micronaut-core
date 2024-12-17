@@ -1,8 +1,12 @@
 package io.micronaut.test.lombok;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +14,23 @@ import java.time.Instant;
 import java.util.UUID;
 
 public class LombokIntrospectedBuilderTest {
+
+    @Test
+    void testLombokRecordBuilder() {
+        BeanIntrospection<RobotRecord> introspection = BeanIntrospection.getIntrospection(RobotRecord.class);
+
+        assertTrue(introspection.hasBuilder());
+        BeanProperty<RobotRecord, String> property =
+            introspection.getRequiredProperty("name", String.class);
+
+        assertTrue(property.hasSetterOrConstructorArgument());
+        BeanConstructor<RobotRecord> constructor = introspection.getConstructor();
+        assertNotNull(constructor);
+        assertEquals(1, constructor.getArguments().length);
+
+        RobotRecord robot = introspection.instantiate("test");
+        assertEquals("test", robot.name());
+    }
 
     @Test
     void testLombokBuilder() {

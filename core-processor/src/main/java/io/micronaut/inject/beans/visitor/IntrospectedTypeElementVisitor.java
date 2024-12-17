@@ -205,7 +205,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 throw new ElementPostponedToNextRoundException(element);
             }
             String creatorMethod = lombokBuilder.stringValue("buildMethodName").orElse("build");
-            String[] writePrefixes = lombokBuilder.stringValue("setterPrefix").map(sp -> new String[] { sp }).orElse(new String[]{""});
+            String[] writePrefixes = lombokBuilder.stringValue("setterPrefix").map(sp -> new String[]{sp}).orElse(new String[]{""});
             processBuilderDefinition(
                 element,
                 context,
@@ -420,18 +420,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();
-        // unfortunately sometimes we don't see the Lombok transformations
-        // so assume if the class is annotated with Lombok builder we cannot
-        // access the constructor.
-        if (!ce.hasDeclaredAnnotation(ANN_LOMBOK_BUILDER)) {
-            Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
-            constructorElement.ifPresent(constructorEl -> {
-                if (ArrayUtils.isNotEmpty(constructorEl.getParameters())) {
-                    writer.visitConstructor(constructorEl);
-                }
-            });
-            ce.getDefaultConstructor().ifPresent(writer::visitDefaultConstructor);
-        }
+        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
+        constructorElement.ifPresent(constructorEl -> {
+            if (ArrayUtils.isNotEmpty(constructorEl.getParameters())) {
+                writer.visitConstructor(constructorEl);
+            }
+        });
+        ce.getDefaultConstructor().ifPresent(writer::visitDefaultConstructor);
 
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.isExcluded()) {
