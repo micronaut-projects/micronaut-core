@@ -165,7 +165,6 @@ public enum BeanResolutionTraceMode {
                 System.out.print(prefix);
                 System.out.print(bean != null ? "✅ " : "❌ ");
                 if (bean != null) {
-                    System.out.print(AnsiColour.formatObject(bean));
                     if (qualifier != null) {
                         if (qualifier instanceof Named named) {
                             System.out.print(AnsiColour.yellow("@Named("));
@@ -176,6 +175,7 @@ public enum BeanResolutionTraceMode {
                         }
                         System.out.print(" ");
                     }
+                    System.out.print(AnsiColour.formatObject(bean));
                 } else {
                     System.out.print("Bean of type ");
                     System.out.print(beanType.getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE));
