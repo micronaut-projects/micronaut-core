@@ -20,6 +20,7 @@ dependencies {
     api(libs.managed.netty.handler.proxy)
 
     compileOnly(libs.managed.netty.incubator.codec.http3)
+    testImplementation(libs.managed.netty.incubator.codec.http3)
 
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
     testAnnotationProcessor(libs.micronaut.validation.processor) {
@@ -46,6 +47,8 @@ dependencies {
     testImplementation(libs.wiremock)
     testImplementation(libs.logback.classic)
     testImplementation(libs.bcpkix)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.awaitility)
     testImplementation(libs.managed.reactor.test)
 
     testRuntimeOnly(libs.managed.netty.tcnative.boringssl.static) {

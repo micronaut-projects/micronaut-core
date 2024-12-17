@@ -20,7 +20,7 @@ If you use a pre-generated certificate (as you should, for security), these step
 - Netty can use the JDK-internal `sun.security.x509` package. On newer JDK versions, this package is restricted and may not work. You may need to add `--add-exports=java.base/sun.security.x509=ALL-UNNAMED` as a VM parameter.
 - Alternatively, netty will use the Bouncy Castle BCPKIX API. This needs an additional dependency:
 
-dependency:org.bouncycastle:bcpkix-jdk15on[scope="implementation"]
+dependency:org.bouncycastle:bcpkix-jdk18on[scope="implementation"]
 
 WARNING: This configuration will generate a warning in the browser.
 

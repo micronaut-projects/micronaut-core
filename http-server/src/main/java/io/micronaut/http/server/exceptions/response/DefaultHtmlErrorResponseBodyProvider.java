@@ -27,6 +27,8 @@ import io.micronaut.http.util.HtmlSanitizer;
 import jakarta.inject.Singleton;
 
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -128,7 +130,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
     private final HtmlSanitizer htmlSanitizer;
     private final MessageSource messageSource;
     private final LocaleResolver<HttpRequest<?>> localeResolver;
-    private final Map<LocaleStatus, String> cache = new ConcurrentHashMap<>();
+    private final Map<HtmlErrorPage, String> cache = new ConcurrentHashMap<>();
 
     DefaultHtmlErrorResponseBodyProvider(HtmlSanitizer htmlSanitizer,
                                          MessageSource messageSource,
@@ -140,47 +142,57 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
 
     @Override
     public String body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response) {
-        int httpStatusCode = response.code();
-        String httpStatusReason = htmlSanitizer.sanitize(response.reason());
-        Locale locale = localeResolver.resolveOrDefault(errorContext.getRequest());
-        return cache.computeIfAbsent(new LocaleStatus(locale, httpStatusCode), key -> html(locale, httpStatusCode, httpStatusReason, errorContext));
+        HtmlErrorPage key = error(errorContext, response);
+        return cache.computeIfAbsent(key, this::html);
     }
 
-    private String html(Locale locale,
-                        int httpStatusCode,
-                        String httpStatusReason,
-                        ErrorContext errorContext) {
-        final String errorTitleCode = httpStatusCode + ".error.title";
-        final String errorTitle = messageSource.getMessage(errorTitleCode, httpStatusReason, locale);
+    private String html(@NonNull HtmlErrorPage htmlErrorPage) {
+        final String errorTitleCode = htmlErrorPage.httpStatusCode() + ".error.title";
+        final String errorTitle = messageSource.getMessage(errorTitleCode, htmlErrorPage.httpStatusReason(), htmlErrorPage.locale());
         String header = "<h1>" + errorTitle + "</h1>";
-        header += "<h2>" + httpStatusCode + "</h1>";
+        header += "<h2>" + htmlErrorPage.httpStatusCode() + "</h1>";
         return MessageFormat.format("<!doctype html><html lang=\"en\"><head><title>{0} — {1}</title><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"initial-scale=1, width=device-width\"><meta name=\"robots\" content=\"noindex, nofollow\"><style>{2}</style></head><body><main><header>{3}</header><article>{4}</article></main></body></html>",
-                httpStatusCode,
+                htmlErrorPage.httpStatusCode(),
                 errorTitle,
                 CSS,
                 header,
-                article(locale, httpStatusCode, httpStatusReason, errorContext));
+                article(htmlErrorPage));
     }
 
-    private String article(Locale locale,
-                           int httpStatusCode,
-                           String httpStatusReason,
-                           ErrorContext errorContext) {
+    private HtmlErrorPage error(@NonNull ErrorContext errorContext,
+                                @NonNull HttpResponse<?> response) {
+        int httpStatusCode = response.code();
+        Locale locale = localeResolver.resolveOrDefault(errorContext.getRequest());
         final String errorBoldCode = httpStatusCode + ".error.bold";
         final String errorCode = httpStatusCode + ".error";
         String defaultErrorBold = DEFAULT_ERROR_BOLD.get(httpStatusCode);
         String defaultError = DEFAULT_ERROR.get(httpStatusCode);
-        String errorBold = defaultErrorBold != null ? messageSource.getMessage(errorBoldCode, defaultErrorBold, locale) : messageSource.getMessage(errorBoldCode, locale).orElse(null);
-        String error = defaultError != null ? messageSource.getMessage(errorCode, defaultError, locale) : messageSource.getMessage(errorCode, locale).orElse(null);
-        StringBuilder sb = new StringBuilder();
+        String errorBold = defaultErrorBold != null
+                ? messageSource.getMessage(errorBoldCode, defaultErrorBold, locale)
+                : messageSource.getMessage(errorBoldCode, locale).orElse(null);
+        String error = defaultError != null
+                ? messageSource.getMessage(errorCode, defaultError, locale)
+                : messageSource.getMessage(errorCode, locale).orElse(null);
+        String httpStatusReason = htmlSanitizer.sanitize(response.reason());
 
+        List<String> messages = new ArrayList<>();
         for (io.micronaut.http.server.exceptions.response.Error e : errorContext.getErrors()) {
             if (!e.getMessage().equalsIgnoreCase(httpStatusReason)) {
-                sb.append(htmlSanitizer.sanitize(e.getMessage()));
-                sb.append("<br/>");
+                messages.add(htmlSanitizer.sanitize(e.getMessage()));
             }
         }
+        return new HtmlErrorPage(locale, httpStatusCode, httpStatusReason, error, errorBold, messages);
+    }
 
+    private String article(@NonNull HtmlErrorPage htmlErrorPage) {
+        StringBuilder sb = new StringBuilder();
+
+        for (String message : htmlErrorPage.messages) {
+            sb.append(message);
+            sb.append("<br/>");
+        }
+        String error = htmlErrorPage.error();
+        String errorBold = htmlErrorPage.errorBold();
         if (error != null || errorBold != null) {
             sb.append("<p>");
             if (errorBold != null) {
@@ -197,7 +209,11 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return sb.toString();
     }
 
-    private record LocaleStatus(Locale locale, int httpStatusCode) {
-
+    private record HtmlErrorPage(Locale locale,
+                                 int httpStatusCode,
+                                 String httpStatusReason,
+                                 String error,
+                                 String errorBold,
+                                 List<String> messages) {
     }
 }

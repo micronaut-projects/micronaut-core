@@ -1142,6 +1142,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
                 if (!writtenLast) {
                     writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writtenLast = true;
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();
