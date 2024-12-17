@@ -227,19 +227,23 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
         if (traceEnabled) {
-            for (T bean : beans) {
-                traceMode.traceBeanResolved(this, beanType, qualifier, bean);
-            }
-            String disabledBeanMessage = context.resolveDisabledBeanMessage(
-                this,
-                beanType,
-                qualifier
-            );
-            if (disabledBeanMessage != null) {
-                traceMode.traceBeanDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
-            }
+            traceBeanCollection(beanType, qualifier, beans);
         }
         return beans;
+    }
+
+    private <T> void traceBeanCollection(Argument<T> beanType, Qualifier<T> qualifier, Collection<T> beans) {
+        for (T bean : beans) {
+            traceMode.traceBeanResolved(this, beanType, qualifier, bean);
+        }
+        String disabledBeanMessage = context.resolveDisabledBeanMessage(
+            this,
+            beanType,
+            qualifier
+        );
+        if (disabledBeanMessage != null) {
+            traceMode.traceBeanDisabled(AbstractBeanResolutionContext.this, disabledBeanMessage);
+        }
     }
 
     @NonNull
@@ -250,7 +254,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
-        return context.mapOfType(this, beanType, qualifier);
+        Map<String, V> beanMap = context.mapOfType(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceBeanCollection(beanType, qualifier, beanMap.values());
+        }
+        return beanMap;
     }
 
     @NonNull
@@ -274,7 +282,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @NonNull
     @Override
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return context.getBeanRegistrations(this, beanType, qualifier);
+        Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceBeanCollection(
+                beanType,
+                qualifier,
+                registrations.stream().map(BeanRegistration::getBean).collect(Collectors.toList())
+            );
+        }
+        return registrations;
     }
 
     /**

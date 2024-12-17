@@ -82,7 +82,7 @@ public enum BeanResolutionTraceMode {
 
     private static final String RIGHT_ARROW = AnsiColour.isSupported() ? " ➡️  " : " -> ";
     private static final String RIGHT_ARROW_LOOP = AnsiColour.isSupported() ? " ↪️  " : "\\---> ";
-    private static final CharSequence START_TIME = "ResolutionDebug-start";
+    private static final CharSequence START_TIME = "BeanResolutionTrace-start";
 
     /**
      * Obtains the default mode.
@@ -164,17 +164,24 @@ public enum BeanResolutionTraceMode {
             case STANDARD_OUT -> {
                 System.out.print(prefix);
                 System.out.print(bean != null ? "✅ " : "❌ ");
-                if (qualifier != null) {
-                    if (qualifier instanceof Named named) {
-                        System.out.print(AnsiColour.yellow("@Named("));
-                        System.out.print(AnsiColour.green("\"" + named.getName() + "\""));
-                        System.out.print(AnsiColour.yellow(")"));
-                    } else {
-                        System.out.print(AnsiColour.yellow(qualifier.toString()));
+                if (bean != null) {
+                    System.out.print(AnsiColour.formatObject(bean));
+                    if (qualifier != null) {
+                        if (qualifier instanceof Named named) {
+                            System.out.print(AnsiColour.yellow("@Named("));
+                            System.out.print(AnsiColour.green("\"" + named.getName() + "\""));
+                            System.out.print(AnsiColour.yellow(")"));
+                        } else {
+                            System.out.print(AnsiColour.yellow(qualifier.toString()));
+                        }
+                        System.out.print(" ");
                     }
-                    System.out.print(" ");
+                } else {
+                    System.out.print("Bean of type ");
+                    System.out.print(beanType.getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE));
+                    System.out.print(" does not exist.");
                 }
-                System.out.print(AnsiColour.formatObject(bean));
+
                 System.out.println();
             }
         }
