@@ -84,6 +84,7 @@ managed-reactor = "3.6.10"
 managed-snakeyaml = "2.2"
 managed-java-parser-core = "3.26.3"
 managed-ksp = "1.9.25-1.0.20"
+sonatype-scan = "2.8.3"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -164,6 +165,7 @@ managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref 
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
+sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", version.ref = "sonatype-scan" }
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
