@@ -1,7 +1,7 @@
 plugins {
-    id "io.micronaut.build.internal.convention-library"
+    id("io.micronaut.build.internal.convention-core-library")
     alias libs.plugins.managed.kotlin.jvm
-}
+ }
 
 dependencies {
     annotationProcessor project(":inject-java")
