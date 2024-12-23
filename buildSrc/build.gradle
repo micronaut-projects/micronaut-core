@@ -14,4 +14,5 @@ dependencies {
     implementation libs.tomlj
     implementation libs.japicmp.gradle.plugin
     implementation libs.native.gradle.plugin
+    implementation("org.sonatype.gradle.plugins:scan-gradle-plugin:3.0.0")
 }
