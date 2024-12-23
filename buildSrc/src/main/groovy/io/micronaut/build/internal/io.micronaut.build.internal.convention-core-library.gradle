@@ -10,7 +10,7 @@ String ossIndexPassword = System.getenv("OSS_INDEX_PASSWORD") != null
         : project.properties["ossIndexPassword"]
 boolean sonatypePluginConfigured = ossIndexUsername != null && ossIndexPassword != null
 if (sonatypePluginConfigured) {
-ossIndexPasswordossIndexAudit {
+ossIndexAudit {
     username = ossIndexUsername
     password = ossIndexPassword
 }
