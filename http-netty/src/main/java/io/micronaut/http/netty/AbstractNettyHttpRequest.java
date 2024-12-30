@@ -202,7 +202,6 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
      */
     protected abstract boolean isSemicolonIsNormalChar();
 
-
     /**
      * @param uri The URI
      * @return The query string decoder
