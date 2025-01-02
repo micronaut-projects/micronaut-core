@@ -224,6 +224,7 @@ httpClient:
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
+  nettyPooling: Connection pooling in the netty client
 contextPropagation:
   title: Context propagation
   reactorContextPropagation: Reactor context propagation
