@@ -607,6 +607,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
 
         if (includeArguments) {
             beanDescription.append(typeFormat.isAnsi() ? AnsiColour.brightCyan("(") : "(");
+
             for (int i = 0; i < arguments.length; i++) {
                 Argument<?> argument = arguments[i];
                 if (argument.getName().startsWith("$")) {
@@ -623,6 +624,12 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                     .append(typeFormat.isAnsi() ? AnsiColour.brightBlue(argumentName) : argumentName);
 
                 if (i != arguments.length - 1) {
+                    Argument<?> next = arguments[i + 1];
+                    if (getBeanType().isSynthetic() &&
+                        next.getName().startsWith("$")) {
+                        // skip synthetic arguments
+                        break;
+                    }
                     beanDescription.append(", ");
                 }
             }

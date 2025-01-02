@@ -652,6 +652,30 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        public Path pushEventListenerResolve(BeanDefinition<?> declaringType, Argument<?> eventType) {
+            try {
+                EventListenerSegment<?, ?> segment = new EventListenerSegment<>(
+                    declaringType,
+                    eventType
+                );
+                if (contains(segment)) {
+                    push(segment);
+                    throw new CircularDependencyException(
+                        AbstractBeanResolutionContext.this,
+                        eventType,
+                        CIRCULAR_ERROR_MSG
+                    );
+                } else {
+                    push(segment);
+                }
+            } finally {
+                traceResolution();
+            }
+
+            return this;
+        }
+
+        @Override
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             try {
                 FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldInjectionPoint.asArgument());
@@ -918,6 +942,51 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             } else {
                 return super.toConsoleString(ansiSupported);
             }
+        }
+    }
+
+    /**
+     * Represents a segment that is an event listener.
+     * @param <B> The bean type
+     * @param <T> The event type
+     */
+    public static class EventListenerSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
+        /**
+         * @param declaringClass The declaring class
+         * @param eventType       The argument
+         */
+        EventListenerSegment(
+            BeanDefinition<B> declaringClass,
+            Argument<T> eventType) {
+            super(declaringClass, null, eventType.getName(), eventType);
+        }
+
+        @Override
+        public String toConsoleString(boolean ansiSupported) {
+            if (ansiSupported) {
+                String event = getArgument().getTypeString(TypeFormat.ANSI_SIMPLE);
+                return event + " ➡️  " +
+                    getDeclaringBean().getBeanDescription(TypeFormat.ANSI_SHORTENED);
+            } else {
+                String event = getArgument().getTypeString(TypeFormat.SIMPLE);
+                return event + " -> " +
+                    getDeclaringBean().getBeanDescription(TypeFormat.SHORTENED);
+            }
+        }
+
+        @Override
+        public InjectionPoint<B> getInjectionPoint() {
+            return this;
+        }
+
+        @Override
+        public Argument<?>[] getArguments() {
+            return new Argument[] { getArgument() };
+        }
+
+        @Override
+        public BeanDefinition<B> getDeclaringBean() {
+            return getDeclaringType();
         }
     }
 
@@ -1213,7 +1282,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         baseString.append(AnsiColour.RESET);
                     }
                 }
+
                 if (i != arguments.length - 1) {
+                    Argument<?> next = arguments[i + 1];
+                    if (getDeclaringType().getBeanType().isSynthetic() &&
+                        next.getName().startsWith("$")) {
+                        // skip synthetic arguments
+                        break;
+                    }
                     baseString.append(", ");
                 }
             }

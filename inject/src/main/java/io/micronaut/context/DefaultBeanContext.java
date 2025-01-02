@@ -1966,7 +1966,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
         List<Map.Entry<Class<?>, ListenersSupplier<T>>> eventToListeners = new ArrayList<>(typeToListener.size());
         for (Map.Entry<Class<?>, List<BeanDefinition<T>>> e : typeToListener.entrySet()) {
-            eventToListeners.add(new AbstractMap.SimpleEntry<>(e.getKey(), new EventListenerListenersSupplier<>(e.getValue())));
+            eventToListeners.add(new AbstractMap.SimpleEntry<>(e.getKey(), new EventListenerListenersSupplier<>(
+                Argument.of(listenerType, e.getKey()),
+                e.getValue()
+            )));
         }
         return eventToListeners;
     }
@@ -4131,12 +4134,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private final class EventListenerListenersSupplier<T extends EventListener> implements ListenersSupplier<T> {
 
         private final List<BeanDefinition<T>> listenersDefinitions;
+        private final Argument<?> eventType;
         // The supplier can be triggered concurrently.
         // We allow for the listeners collection to be initialized multiple times.
         @SuppressWarnings("java:S3077")
         private volatile List<T> listeners;
 
-        public EventListenerListenersSupplier(List<BeanDefinition<T>> listenersDefinitions) {
+        EventListenerListenersSupplier(Argument<?> eventType, List<BeanDefinition<T>> listenersDefinitions) {
+            this.eventType = eventType;
             this.listenersDefinitions = listenersDefinitions;
         }
 
@@ -4148,10 +4153,20 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     T listener;
                     if (beanResolutionContext == null) {
                         try (BeanResolutionContext context = newResolutionContext(listenersDefinition, null)) {
-                            listener = resolveBeanRegistration(context, listenersDefinition).bean;
+                            try (BeanResolutionContext.Path ignored = context.getPath().pushEventListenerResolve(
+                                listenersDefinition,
+                                eventType
+                            )) {
+                                listener = resolveBeanRegistration(context, listenersDefinition).bean;
+                            }
                         }
                     } else {
-                        listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
+                        try (BeanResolutionContext.Path ignored = beanResolutionContext.getPath().pushEventListenerResolve(
+                            listenersDefinition,
+                            eventType
+                        )) {
+                            listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
+                        }
                     }
                     listeners.add(listener);
                 }

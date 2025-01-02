@@ -374,6 +374,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments);
 
         /**
+         * Push resolution of an event listener
+         * @param declaringType The declaration type
+         * @param eventType The event type
+         * @return The path
+         */
+        Path pushEventListenerResolve(BeanDefinition<?> declaringType, Argument<?> eventType);
+
+        /**
          * Push an unresolved field onto the queue.
          *
          * @param declaringType       declaring type

@@ -119,18 +119,12 @@ public enum BeanResolutionTraceMode {
             .walk(s ->
                 s.dropWhile(f ->
                         (INTERNAL_PACKAGES.stream().anyMatch(p -> f.getClassName().startsWith(p)) || f.getDeclaringClass().isSynthetic()) &&
-                        // capture startup beans
-                        !(f.getClassName().equals(DefaultBeanContext.class.getName()) && f.getMethodName().equals("start")))
+                            // capture startup beans
+                            !(f.getClassName().equals(DefaultBeanContext.class.getName()) && f.getMethodName().equals("start")))
                     .limit(3)
                     .collect(Collectors.toList())
             );
-        String beanName;
-        if (beanType.getType().isSynthetic()) {
-            beanName = beanDefinition.getTypeInformation().getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE);
-        } else {
-            beanName = beanType
-                .getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE);
-        }
+        String beanName = getBeanName(beanType, beanDefinition);
         switch (this) {
             case STANDARD_OUT -> {
                 System.out.println();
@@ -150,6 +144,17 @@ public enum BeanResolutionTraceMode {
             }
 
         }
+    }
+
+    private static String getBeanName(Argument<?> beanType, BeanDefinition<?> beanDefinition) {
+        String beanName;
+        if (beanType.getType().isSynthetic()) {
+            beanName = beanDefinition.getTypeInformation().getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE);
+        } else {
+            beanName = beanType
+                .getBeanTypeString(TypeInformation.TypeFormat.ANSI_SIMPLE);
+        }
+        return beanName;
     }
 
     <T> void traceBeanResolved(
@@ -208,8 +213,9 @@ public enum BeanResolutionTraceMode {
                     System.out.print(AnsiColour.formatObject(value));
                     if (origin != null) {
                         System.out.println(" (Origin: " + AnsiColour.brightYellow(origin.location()) + ")");
+                    } else {
+                        System.out.println();
                     }
-                    System.out.println();
                 }
             }
         }
@@ -245,20 +251,22 @@ public enum BeanResolutionTraceMode {
         BeanResolutionContext.Path path = context.getPath();
         BeanResolutionContext.Segment<?, ?> segment = path.peek();
         if (segment != null) {
-            BeanDefinition<?> declaringType = segment.getDeclaringType();
-            if (declaringType == null || !declaringType.getBeanType().isSynthetic()) {
-
-                int size = path.size();
-                String prefix = "";
-                if (size > 1) {
-                    String spaces = "   ".repeat(size);
-                    prefix = spaces + RIGHT_ARROW_LOOP;
-                }
-                String content = prefix + segment.toConsoleString(AnsiColour.isSupported());
-                // TODO: other output methods
-                switch (this) {
-                    case STANDARD_OUT -> System.out.println(content);
-                }
+            if (segment.getDeclaringType() != null &&
+                segment.getDeclaringType().getBeanType().isSynthetic() &&
+                segment.getArgument().getName().startsWith("$")) {
+                // skip synthetic arguments
+                return;
+            }
+            int size = path.size();
+            String prefix = "";
+            if (size > 1) {
+                String spaces = "   ".repeat(size);
+                prefix = spaces + RIGHT_ARROW_LOOP;
+            }
+            String content = prefix + segment.toConsoleString(AnsiColour.isSupported());
+            // TODO: other output methods
+            switch (this) {
+                case STANDARD_OUT -> System.out.println(content);
             }
         }
     }
@@ -318,25 +326,25 @@ public enum BeanResolutionTraceMode {
             ).toList();
 
         configRefs.forEach(ref -> {
-                String prefix = ref.stringValue(ConfigurationReader.class, "prefix").orElse(null);
-                if (prefix != null) {
-                    Argument<?> argument = ref.asArgument();
-                    System.out.print(" ✚ ");
-                    System.out.print(AnsiColour.formatObject(prefix));
-                    System.out.print(RIGHT_ARROW);
-                    System.out.println(TypeInformation.TypeFormat.getTypeString(
-                        TypeInformation.TypeFormat.ANSI_SHORTENED,
-                        argument.getType(),
-                        argument.getTypeVariables()
-                    ));
-                }
-            });
+            String prefix = ref.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+            if (prefix != null) {
+                Argument<?> argument = ref.asArgument();
+                System.out.print(" ✚ ");
+                System.out.print(AnsiColour.formatObject(prefix));
+                System.out.print(RIGHT_ARROW);
+                System.out.println(TypeInformation.TypeFormat.getTypeString(
+                    TypeInformation.TypeFormat.ANSI_SHORTENED,
+                    argument.getType(),
+                    argument.getTypeVariables()
+                ));
+            }
+        });
         System.out.println();
         System.out.println(AnsiColour.brightBlue("Applicable Configuration Present: "));
         configRefs.stream()
             .flatMap(ref -> ref.stringValue(ConfigurationReader.class, "prefix").stream())
             .flatMap(prefix -> {
-                if(prefix.endsWith(".*")) {
+                if (prefix.endsWith(".*")) {
                     String eachProperty = prefix.substring(0, prefix.length() - 2);
                     return environment.getPropertyEntries(eachProperty).stream().flatMap(entry ->
                         {
