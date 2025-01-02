@@ -241,7 +241,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         creatorMethod,
                         writePrefixes,
                         methodElement,
-                        null,
+                        element.getDefaultConstructor().orElse(null),
                         returnType,
                         methodMetadata,
                         index,

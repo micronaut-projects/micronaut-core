@@ -167,6 +167,15 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     /**
+     * Whether an accessible constructor exists.
+     * @return True if a default constructor exists
+     * @since 4.7.11
+     */
+    protected boolean hasConstructor() {
+        return false;
+    }
+
+    /**
      * Reflection free bean instantiation implementation for the given arguments.
      *
      * @param arguments The arguments
@@ -393,7 +402,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public Argument<?>[] getConstructorArguments() {
-        return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
+        if (hasConstructor()) {
+            return constructorArguments;
+        } else {
+            return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
+        }
     }
 
     @NonNull

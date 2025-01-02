@@ -724,7 +724,11 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
         buildGetIndexedProperties(classWriter);
         boolean hasBuilder = annotationMetadata != null &&
             (annotationMetadata.isPresent(Introspected.class, "builder") || annotationMetadata.hasDeclaredAnnotation("lombok.Builder"));
+        if (defaultConstructor != null || constructor != null) {
+            writeBooleanMethod(classWriter, "hasConstructor", true);
+        }
         if (defaultConstructor != null) {
+
             writeInstantiateMethod(classWriter, defaultConstructor, "instantiate");
             // in case invoked directly or via instantiateUnsafe
             if (constructor == null) {
@@ -766,7 +770,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
     }
 
     private void writeBooleanMethod(ClassWriter classWriter, String methodName, boolean state) {
-        GeneratorAdapter booleanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, methodName);
+        GeneratorAdapter booleanMethod = startPublicFinalMethodZeroArgs(classWriter, boolean.class, methodName);
         booleanMethod.push(state);
         booleanMethod.returnValue();
         booleanMethod.visitMaxs(2, 1);
