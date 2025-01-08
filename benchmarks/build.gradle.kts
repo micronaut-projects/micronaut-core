@@ -32,6 +32,7 @@ dependencies {
     api(projects.micronautJacksonDatabind)
     api(projects.micronautRouter)
     api(projects.micronautRuntime)
+    api(projects.micronautCoreReactive)
 
     api(platform(libs.test.boms.micronaut.validation))
     api(libs.managed.reactor)

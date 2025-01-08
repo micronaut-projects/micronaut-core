@@ -164,14 +164,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
+    public <R> ExecutionFlow<R> flatMap(FlatMapFn<? super Object, ? extends R> transformer) {
         value = value.flatMap(value -> toMono(transformer.apply(value)));
         return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
-        value = value.then(Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono));
+    public <R> ExecutionFlow<R> then(FlowSupplier<? extends R> supplier) {
+        value = value.then(Mono.fromSupplier(supplier::get).flatMap(ReactorExecutionFlowImpl::toMono));
         return (ExecutionFlow<R>) this;
     }
 
@@ -182,7 +182,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
+    public ExecutionFlow<Object> onErrorResume(FlatMapFn<? super Throwable, ?> fallback) {
         value = value.onErrorResume(throwable -> toMono(fallback.apply(throwable)));
         return this;
     }
@@ -328,7 +328,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
+        }
+        ImperativeExecutionFlow<?> imperativeFlow = next.tryComplete();
+        if (imperativeFlow != null) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
                 m = Mono.error(imperativeFlow.getError());
@@ -347,9 +349,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
-        } else {
-            return new FlowAsMono<>(next);
         }
+        return new FlowAsMono<>(next);
     }
 
     static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {

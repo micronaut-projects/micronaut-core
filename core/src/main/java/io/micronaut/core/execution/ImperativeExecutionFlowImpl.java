@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The imperative execution flow implementation.
@@ -65,7 +64,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     }
 
     @Override
-    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
+    public <R> ExecutionFlow<R> flatMap(FlatMapFn<? super Object, ? extends R> transformer) {
         if (error == null) {
             try {
                 if (value != null) {
@@ -80,7 +79,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     }
 
     @Override
-    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
+    public <R> ExecutionFlow<R> then(FlowSupplier<? extends R> supplier) {
         if (error == null) {
             try {
                 return (ExecutionFlow<R>) supplier.get();
@@ -106,7 +105,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     }
 
     @Override
-    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends Object>> fallback) {
+    public ExecutionFlow<Object> onErrorResume(FlatMapFn<? super Throwable, ?> fallback) {
         if (error != null) {
             try {
                 return (ExecutionFlow<Object>) fallback.apply(error);

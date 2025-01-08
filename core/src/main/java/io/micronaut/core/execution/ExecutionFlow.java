@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The execution flow class represents a data flow which state can be represented as a simple imperative flow or an async/reactive.
@@ -87,7 +86,7 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      */
     @NonNull
-    static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
+    static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull FlowSupplier<T> supplier) {
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
         executor.execute(() -> supplier.get().onComplete(completableFuture::complete));
         return completableFuture;
@@ -111,7 +110,7 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      */
     @NonNull
-    <R> ExecutionFlow<R> flatMap(@NonNull Function<? super T, ? extends ExecutionFlow<? extends R>> transformer);
+    <R> ExecutionFlow<R> flatMap(@NonNull FlatMapFn<? super T, ? extends R> transformer);
 
     /**
      * Supply a new flow after the existing flow value is resolved.
@@ -121,7 +120,7 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      */
     @NonNull
-    <R> ExecutionFlow<R> then(@NonNull Supplier<? extends ExecutionFlow<? extends R>> supplier);
+    <R> ExecutionFlow<R> then(@NonNull FlowSupplier<? extends R> supplier);
 
     /**
      * Supply a new flow if the existing flow is erroneous.
@@ -130,7 +129,7 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      */
     @NonNull
-    ExecutionFlow<T> onErrorResume(@NonNull Function<? super Throwable, ? extends ExecutionFlow<? extends T>> fallback);
+    ExecutionFlow<T> onErrorResume(@NonNull FlatMapFn<? super Throwable, ? extends T> fallback);
 
     /**
      * Store a contextual value.
@@ -277,6 +276,37 @@ public interface ExecutionFlow<T> {
      * @since 4.8.0
      */
     default void cancel() {
+    }
+
+    /**
+     * The flat map function interface.
+     * @param <I> The input
+     * @param <O> The output
+     * @since 4.8
+     */
+    @FunctionalInterface
+    interface FlatMapFn<I, O> {
+
+        /**
+         * Apply the flat map.
+         * @param input The input
+         * @return The flow
+         */
+        ExecutionFlow<? extends O> apply(I input);
+    }
+
+    /**
+     * The execution flow supplier.
+     * @param <O> The output
+     * @since 4.8
+     */
+    @FunctionalInterface
+    interface FlowSupplier<O> {
+
+        /**
+         * @return The flow
+         */
+        ExecutionFlow<O> get();
     }
 }
 
