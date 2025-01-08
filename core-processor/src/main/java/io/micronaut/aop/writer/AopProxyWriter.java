@@ -94,6 +94,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -982,7 +983,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         } else {
             executableMethodsInstance = executableMethodsType.instantiate();
         }
-        int[] index = {0};
+        AtomicInteger index = new AtomicInteger();
         return executableMethodsInstance.newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
@@ -1008,7 +1009,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                                 // First argument. The interceptor registry
                                 parameters.get(interceptorRegistryArgumentIndex),
                                 // Second argument i.e. proxyMethods[0]
-                                aThis.field(proxyMethodsField).arrayElement(index[0]++),
+                                aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
                                 // Third argument i.e. interceptors
                                 parameters.get(interceptorsListArgumentIndex)
                             );
@@ -1025,7 +1026,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         if (proxiedMethods.size() != proxyMethodCount) {
             throw new IllegalStateException("Expected proxy methods count to match actual methods");
         }
-        int[] index = {0};
+        AtomicInteger index = new AtomicInteger();
         return StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
@@ -1050,7 +1051,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                             // First argument. The interceptor registry
                             parameters.get(interceptorRegistryArgumentIndex),
                             // Second argument i.e. proxyMethods[0]
-                            aThis.field(proxyMethodsField).arrayElement(index[0]++),
+                            aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
                             // Third argument i.e. interceptors
                             parameters.get(interceptorsListArgumentIndex)
                         )

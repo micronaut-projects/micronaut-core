@@ -53,6 +53,9 @@ public final class MethodGenUtils {
             Object[].class
     );
 
+    private MethodGenUtils() {
+    }
+
     /**
      * The number of Kotlin defaults masks.
      *
@@ -73,24 +76,6 @@ public final class MethodGenUtils {
      */
     public static boolean hasKotlinDefaultsParameters(List<ParameterElement> arguments) {
         return arguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
-    }
-
-    public static ExpressionDef invokeKotlinDefaultMethod(ClassElement declaringType,
-                                                          MethodElement methodElement,
-                                                          ExpressionDef target,
-                                                          List<? extends ExpressionDef> values,
-                                                          List<? extends ExpressionDef> hasValuesExpressions) {
-        int numberOfMasks = MethodGenUtils.calculateNumberOfKotlinDefaultsMasks(List.of(methodElement.getSuspendParameters()));
-        ExpressionDef[] masks = MethodGenUtils.computeKotlinDefaultsMask(numberOfMasks, List.of(methodElement.getSuspendParameters()), hasValuesExpressions);
-        List<ExpressionDef> newValues = new ArrayList<>();
-        newValues.add(target);
-        newValues.addAll(values);
-        newValues.addAll(List.of(masks)); // Bit mask of defaults
-        newValues.add(ExpressionDef.nullValue()); // Last parameter is just a marker and is always null
-
-        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.of(declaringType), methodElement, numberOfMasks);
-
-        return ClassTypeDef.of(declaringType).invokeStatic(defaultKotlinMethod, newValues);
     }
 
     public static ExpressionDef invokeKotlinDefaultMethod(ClassElement declaringType,
@@ -168,6 +153,24 @@ public final class MethodGenUtils {
         throw new IllegalStateException("Unknown constructor");
     }
 
+    private static ExpressionDef invokeKotlinDefaultMethod(ClassElement declaringType,
+                                                           MethodElement methodElement,
+                                                           ExpressionDef target,
+                                                           List<? extends ExpressionDef> values,
+                                                           List<? extends ExpressionDef> hasValuesExpressions) {
+        int numberOfMasks = MethodGenUtils.calculateNumberOfKotlinDefaultsMasks(List.of(methodElement.getSuspendParameters()));
+        ExpressionDef[] masks = MethodGenUtils.computeKotlinDefaultsMask(numberOfMasks, List.of(methodElement.getSuspendParameters()), hasValuesExpressions);
+        List<ExpressionDef> newValues = new ArrayList<>();
+        newValues.add(target);
+        newValues.addAll(values);
+        newValues.addAll(List.of(masks)); // Bit mask of defaults
+        newValues.add(ExpressionDef.nullValue()); // Last parameter is just a marker and is always null
+
+        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.of(declaringType), methodElement, numberOfMasks);
+
+        return ClassTypeDef.of(declaringType).invokeStatic(defaultKotlinMethod, newValues);
+    }
+
     private static List<ExpressionDef> constructorValues(ParameterElement[] constructorArguments,
                                                          @Nullable
                                                          List<? extends ExpressionDef> values,
@@ -220,15 +223,7 @@ public final class MethodGenUtils {
         return parameters;
     }
 
-    /**
-     * Create a method for Kotlin default invocation.
-     *
-     * @param owningType    The owing type
-     * @param method        The method
-     * @param numberOfMasks The number of default masks
-     * @return A new method
-     */
-    static MethodDef asDefaultKotlinMethod(TypeDef owningType, MethodElement method, int numberOfMasks) {
+    private static MethodDef asDefaultKotlinMethod(TypeDef owningType, MethodElement method, int numberOfMasks) {
         ParameterElement[] prevParameters = method.getSuspendParameters();
         List<TypeDef> parameters = new ArrayList<>(1 + prevParameters.length + numberOfMasks + 1);
         parameters.add(owningType);
@@ -245,7 +240,7 @@ public final class MethodGenUtils {
                 .build();
     }
 
-    public static ExpressionDef[] computeKotlinDefaultsMask(int numberOfMasks,
+    private static ExpressionDef[] computeKotlinDefaultsMask(int numberOfMasks,
                                                             List<ParameterElement> parameters,
                                                             @Nullable
                                                             List<? extends ExpressionDef> hasValuesExpressions) {

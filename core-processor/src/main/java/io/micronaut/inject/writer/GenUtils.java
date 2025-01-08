@@ -40,11 +40,14 @@ import java.util.stream.Collectors;
  * @since 4.8
  */
 @Internal
-public final class ExpressionsUtils {
+public final class GenUtils {
 
     private static final ClassTypeDef MAP_TYPE = ClassTypeDef.of(Map.class);
     private static final ClassTypeDef MAP_ENTRY_TYPE = ClassTypeDef.of(Map.Entry.class);
     private static final ClassTypeDef LIST_TYPE = ClassTypeDef.of(List.class);
+
+    private GenUtils() {
+    }
 
     /**
      * Create a map of a string key expression.

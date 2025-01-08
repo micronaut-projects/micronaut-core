@@ -53,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -238,6 +239,8 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
         ClassTypeDef thisType = ClassTypeDef.of(className);
 
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(thisType, loadTypeMethods);
+
         classDefBuilder = ClassDef.builder(className)
             .addAnnotation(Generated.class)
             .superclass(ClassTypeDef.of(AbstractExecutableMethodsDefinition.class));
@@ -261,7 +264,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             metadataMethods.add(MethodDef.builder(methodName)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .returns(methodReferenceType)
-                .build((aThis, methodParameters) -> newNewMethodReference((ClassElement) declaringType, methodElement, loadTypeMethods).returning()));
+                .build((aThis, methodParameters) -> newNewMethodReference((ClassElement) declaringType, methodElement, loadClassValueExpressionFn).returning()));
         }
 
         metadataMethods.forEach(classDefBuilder::addMethod);
@@ -370,7 +373,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
     private ExpressionDef newNewMethodReference(ClassElement declaringType,
                                                 MethodElement methodElement,
-                                                Map<String, MethodDef> loadTypeMethods) {
+                                                Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         ClassTypeDef methodReferenceType = ClassTypeDef.of(AbstractExecutableMethodsDefinition.MethodReference.class);
 
@@ -394,18 +397,18 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             // 1: declaringType
             ExpressionDef.constant(ClassTypeDef.of(declaringType)),
             // 2: annotationMetadata
-            annotationMetadata(annotationMetadataWithDefaults, annotationMetadata, loadTypeMethods),
+            annotationMetadata(annotationMetadataWithDefaults, annotationMetadata, loadClassValueExpressionFn),
             // 3: methodName
             ExpressionDef.constant(methodElement.getName()),
             // 4: return argument
-            ArgumentExpUtils.pushReturnTypeArgument(annotationMetadataWithDefaults, thisType, declaringType, methodElement.getGenericReturnType(), loadTypeMethods),
+            ArgumentExpUtils.pushReturnTypeArgument(annotationMetadataWithDefaults, thisType, declaringType, methodElement.getGenericReturnType(), loadClassValueExpressionFn),
             // 5: arguments
             (methodElement.getSuspendParameters().length == 0 ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
                 annotationMetadataWithDefaults,
                 declaringType.getType(),
                 thisType,
                 Arrays.asList(methodElement.getSuspendParameters()),
-                loadTypeMethods
+                loadClassValueExpressionFn
             )),
             // 6: isAbstract
             ExpressionDef.constant(methodElement.isAbstract()),
@@ -416,27 +419,29 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
     private ExpressionDef annotationMetadata(AnnotationMetadata annotationMetadataWithDefaults,
                                              AnnotationMetadata annotationMetadata,
-                                             Map<String, MethodDef> loadTypeMethods) {
+                                             Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             return ExpressionDef.nullValue();
-        } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
+        }
+        if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
             return AnnotationMetadataGenUtils.annotationMetadataReference(annotationMetadataReference);
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+        }
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
                 annotationMetadataHierarchy
             );
-            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(thisType, annotationMetadataHierarchy, loadTypeMethods);
-        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
+        }
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
                 annotationMetadata
             );
-            return AnnotationMetadataGenUtils.instantiateNewMetadata(thisType, mutableAnnotationMetadata, loadTypeMethods);
-        } else {
-            throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
+            return AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
         }
+        throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
     }
 
     /**

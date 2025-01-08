@@ -26,6 +26,7 @@ import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
@@ -37,8 +38,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
-import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.getAnnotationMetadataMethodDef;
+import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.createGetAnnotationMetadataMethodDef;
 
 /**
  * Generates Runtime executed Graal configuration.
@@ -71,26 +73,26 @@ final class GraalReflectionMetadataWriter implements ClassOutputWriter {
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", GraalReflectionConfigurer.class.getName()).build())
                 .addSuperinterface(ClassTypeDef.of(GraalReflectionConfigurer.class))
-                .addMethod(getAnnotationMetadataMethodDef(thisType, annotationMetadata));
+                .addMethod(createGetAnnotationMetadataMethodDef(thisType, annotationMetadata));
 
             Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
+            Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(thisType, loadTypeMethods);
             // write the static initializers for the annotation metadata
             List<StatementDef> staticInit = new ArrayList<>();
-            AnnotationMetadataGenUtils.writeAnnotationDefault(staticInit, thisType, annotationMetadata, loadTypeMethods);
+            AnnotationMetadataGenUtils.addAnnotationDefaults(staticInit, annotationMetadata, loadClassValueExpressionFn);
 
-            FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(
-                thisType,
+            FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataFieldAndInitialize(
                 annotationMetadata,
-                loadTypeMethods
+                loadClassValueExpressionFn
             );
 
             loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
             if (annotationMetadataField != null) {
                 classDefBuilder.addField(annotationMetadataField);
-                if (!staticInit.isEmpty()) {
-                    classDefBuilder.addStaticInitializer(StatementDef.multi(staticInit));
-                }
+            }
+            if (!staticInit.isEmpty()) {
+                classDefBuilder.addStaticInitializer(StatementDef.multi(staticInit));
             }
             outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
         }

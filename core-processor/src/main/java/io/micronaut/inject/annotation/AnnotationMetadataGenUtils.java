@@ -26,7 +26,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.writer.ExpressionsUtils;
+import io.micronaut.inject.writer.GenUtils;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
@@ -47,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Responsible for writing class files that are instances of {@link AnnotationMetadata}.
@@ -55,7 +56,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Internal
-public class AnnotationMetadataGenUtils {
+public final class AnnotationMetadataGenUtils {
 
     /**
      * Field name for annotation metadata.
@@ -141,18 +142,32 @@ public class AnnotationMetadataGenUtils {
         "ANNOTATION_DEFAULT_VALUES_PROVIDER"
     );
 
-    @Internal
-    public static ExpressionDef instantiateNewMetadata(ClassTypeDef owningType,
-                                                       MutableAnnotationMetadata annotationMetadata,
-                                                       Map<String, MethodDef> loadTypeMethods) {
-        return instantiateInternal(owningType, annotationMetadata, true, loadTypeMethods);
+    private AnnotationMetadataGenUtils() {
     }
 
-    @Internal
-    public static ExpressionDef instantiateNewMetadataHierarchy(
-        ClassTypeDef owningType,
-        AnnotationMetadataHierarchy hierarchy,
-        Map<String, MethodDef> loadTypeMethods) {
+    /**
+     * Instantiate new metadata expression.
+     *
+     * @param annotationMetadata         The annotation metadata
+     * @param loadClassValueExpressionFn The load type expression fn
+     * @return The expression
+     */
+    @NonNull
+    public static ExpressionDef instantiateNewMetadata(MutableAnnotationMetadata annotationMetadata,
+                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return instantiateInternal(annotationMetadata, loadClassValueExpressionFn);
+    }
+
+    /**
+     * Instantiate new metadata hierarchy expression.
+     *
+     * @param hierarchy                  The annotation metadata hierarchy
+     * @param loadClassValueExpressionFn The load type expression fn
+     * @return The expression
+     */
+    @NonNull
+    public static ExpressionDef instantiateNewMetadataHierarchy(AnnotationMetadataHierarchy hierarchy,
+                                                                Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         if (hierarchy.isEmpty()) {
             return emptyMetadata();
@@ -160,59 +175,183 @@ public class AnnotationMetadataGenUtils {
         List<AnnotationMetadata> notEmpty = CollectionUtils.iterableToList(hierarchy)
             .stream().filter(h -> !h.isEmpty()).toList();
         if (notEmpty.size() == 1) {
-            return pushNewAnnotationMetadataOrReference(owningType, loadTypeMethods, notEmpty.get(0));
+            return pushNewAnnotationMetadataOrReference(notEmpty.get(0), loadClassValueExpressionFn);
         }
 
         return TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY.instantiate(
             CONSTRUCTOR_ANNOTATION_METADATA_HIERARCHY,
 
             TYPE_ANNOTATION_METADATA.array().instantiate(
-                pushNewAnnotationMetadataOrReference(owningType, loadTypeMethods, hierarchy.getRootMetadata()),
-                pushNewAnnotationMetadataOrReference(owningType, loadTypeMethods, hierarchy.getDeclaredMetadata())
+                pushNewAnnotationMetadataOrReference(hierarchy.getRootMetadata(), loadClassValueExpressionFn),
+                pushNewAnnotationMetadataOrReference(hierarchy.getDeclaredMetadata(), loadClassValueExpressionFn)
             )
         );
     }
 
-    @Internal
+    /**
+     * The annotation metadata reference expression.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @return The expression
+     */
+    @NonNull
     public static ExpressionDef annotationMetadataReference(AnnotationMetadataReference annotationMetadata) {
         return ClassTypeDef.of(annotationMetadata.getClassName()).getStaticField(FIELD_ANNOTATION_METADATA);
     }
 
-    @Internal
-    private static ExpressionDef pushNewAnnotationMetadataOrReference(
-        ClassTypeDef owningType,
-        Map<String, MethodDef> loadTypeMethods,
-        AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            // Synthetic property getters / setters can consist of field + (setter / getter) annotation hierarchy
-            annotationMetadata = MutableAnnotationMetadata.of(annotationMetadataHierarchy);
+    /**
+     * The empty annotation metadata expression.
+     *
+     * @return The expression
+     */
+    @NonNull
+    public static ExpressionDef emptyMetadata() {
+        return TYPE_ANNOTATION_METADATA.getStaticField("EMPTY_METADATA", TYPE_ANNOTATION_METADATA);
+    }
+
+    /**
+     * Create a new load class value expression function.
+     *
+     * @param declaringType   The declaring type
+     * @param loadTypeMethods The load type methods
+     * @return The function
+     */
+    @NonNull
+    public static Function<String, ExpressionDef> createLoadClassValueExpressionFn(ClassTypeDef declaringType,
+                                                                                   Map<String, MethodDef> loadTypeMethods) {
+        return typeName -> invokeLoadClassValueMethod(declaringType, loadTypeMethods, typeName);
+    }
+
+    /**
+     * Creates a `getAnnotationMetadata` method.
+     *
+     * @param owningType         The owning type
+     * @param annotationMetadata The annotation metadata
+     * @return The new method
+     */
+    @NonNull
+    public static MethodDef createGetAnnotationMetadataMethodDef(ClassTypeDef owningType, AnnotationMetadata annotationMetadata) {
+        return MethodDef.builder("getAnnotationMetadata").returns(TYPE_ANNOTATION_METADATA)
+            .addModifiers(Modifier.PUBLIC)
+            .build((aThis, methodParameters) -> {
+                // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
+                // then we set up an annotation metadata reference from the method to the class (or inherited method) metadata
+                AnnotationMetadata targetAnnotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+                if (targetAnnotationMetadata.isEmpty()) {
+                    return AnnotationMetadataGenUtils.EMPTY_METADATA.returning();
+                }
+                if (targetAnnotationMetadata instanceof AnnotationMetadataReference reference) {
+                    return annotationMetadataReference(reference).returning();
+                }
+                return owningType.getStaticField(FIELD_ANNOTATION_METADATA).returning();
+            });
+    }
+
+    /**
+     * Create annotation metadata field and initialize it to the metadata provided.
+     *
+     * @param annotationMetadata         The annotation metadata
+     * @param loadClassValueExpressionFn The function to get the class value
+     * @return The new field
+     */
+    @Nullable
+    public static FieldDef createAnnotationMetadataFieldAndInitialize(AnnotationMetadata annotationMetadata,
+                                                                      Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        if (annotationMetadata instanceof AnnotationMetadataReference) {
+            return null;
         }
+        FieldDef.FieldDefBuilder fieldDefBuilder = FieldDef.builder(FIELD_ANNOTATION_METADATA_NAME, TYPE_ANNOTATION_METADATA)
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL, Modifier.STATIC);
+
+        ExpressionDef initializer;
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
-            return emptyMetadata();
+            initializer = AnnotationMetadataGenUtils.EMPTY_METADATA;
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            return instantiateNewMetadata(owningType, mutableAnnotationMetadata, loadTypeMethods);
-        } else if (annotationMetadata instanceof AnnotationMetadataReference reference) {
-            return annotationMetadataReference(reference);
+            initializer = AnnotationMetadataGenUtils.instantiateNewMetadata(
+                mutableAnnotationMetadata,
+                loadClassValueExpressionFn
+            );
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            initializer = AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
+        } else {
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
+        }
+        fieldDefBuilder.initializer(initializer);
+
+        return fieldDefBuilder.build();
+    }
+
+    /**
+     * Adds the annotation metadata defaults statement/s.
+     *
+     * @param statements                 The statements
+     * @param annotationMetadata         The annotation metadata
+     * @param loadClassValueExpressionFn The load type expression fn
+     */
+    public static void addAnnotationDefaults(List<StatementDef> statements,
+                                             AnnotationMetadata annotationMetadata,
+                                             Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata.isEmpty()) {
+            return;
+        }
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            annotationMetadata = annotationMetadataHierarchy.merge();
+        }
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            AnnotationMetadataGenUtils.addAnnotationDefaults(
+                statements,
+                mutableAnnotationMetadata,
+                loadClassValueExpressionFn
+            );
         } else {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
         }
     }
 
-    public static ExpressionDef emptyMetadata() {
-        return TYPE_ANNOTATION_METADATA.getStaticField("EMPTY_METADATA", TYPE_ANNOTATION_METADATA);
+    @NonNull
+    private static ExpressionDef.InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
+                                                                               Map<String, MethodDef> loadTypeMethods,
+                                                                               String typeName) {
+        final MethodDef loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
+
+            final String methodName = LOAD_CLASS_PREFIX + loadTypeMethods.size();
+
+            // This logic will generate a method such as the following, allowing non-dynamic classloading:
+            //
+            // AnnotationClassValue $micronaut_load_class_value_0() {
+            //     try {
+            //          return new AnnotationClassValue(test.MyClass.class);
+            //     } catch(Throwable e) {
+            //          return new AnnotationClassValue("test.MyClass");
+            //     }
+            // }
+
+            return MethodDef.builder(methodName)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .returns(TYPE_ANNOTATION_CLASS_VALUE)
+                .buildStatic(methodParameters -> StatementDef.doTry(
+                    TYPE_ANNOTATION_CLASS_VALUE.instantiate(
+                        CONSTRUCTOR_CLASS_VALUE_WITH_CLASS,
+                        ExpressionDef.constant(TypeDef.of(typeName))
+                    ).returning()
+                ).doCatch(Throwable.class, exceptionVar -> TYPE_ANNOTATION_CLASS_VALUE.instantiate(
+                    CONSTRUCTOR_CLASS_VALUE,
+                    ExpressionDef.constant(typeName)
+                ).returning()));
+        });
+
+        return declaringType.invokeStatic(loadTypeGeneratorMethod);
     }
 
-    @Internal
-    public static void writeAnnotationDefaults(
-        List<StatementDef> statements,
-        ClassTypeDef owningType,
-        MutableAnnotationMetadata annotationMetadata,
-        Map<String, MethodDef> loadTypeMethods) {
+    private static void addAnnotationDefaults(List<StatementDef> statements,
+                                              MutableAnnotationMetadata annotationMetadata,
+                                              Function<String, ExpressionDef> loadClassValueExpressionFn) {
         final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
 
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
-            writeAnnotationDefaultsInternal(statements, owningType, loadTypeMethods, annotationDefaultValues, new HashSet<>());
+            writeAnnotationDefaultsInternal(statements, annotationDefaultValues, new HashSet<>(), loadClassValueExpressionFn);
         }
         if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
             Map<String, String> annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
@@ -222,7 +361,7 @@ public class AnnotationMetadataGenUtils {
                 statements.add(
                     TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
                         METHOD_REGISTER_REPEATABLE_ANNOTATIONS,
-                        stringMapOf(owningType, annotationRepeatableContainer, loadTypeMethods)
+                        stringMapOf(annotationRepeatableContainer, loadClassValueExpressionFn)
                     )
                 );
             }
@@ -230,27 +369,24 @@ public class AnnotationMetadataGenUtils {
     }
 
     private static void writeAnnotationDefaultsInternal(List<StatementDef> statements,
-                                                        ClassTypeDef owningType,
-                                                        Map<String, MethodDef> loadTypeMethods,
                                                         Map<String, Map<CharSequence, Object>> annotationDefaultValues,
-                                                        Set<String> writtenAnnotations) {
+                                                        Set<String> writtenAnnotations,
+                                                        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
-            writeAnnotationDefaultsInternal(statements,
-                owningType,
-                loadTypeMethods,
+            addAnnotationDefaultsInternal(statements,
                 writtenAnnotations,
                 entry.getKey(),
-                entry.getValue());
+                entry.getValue(),
+                loadClassValueExpressionFn);
         }
     }
 
     @NonNull
-    private static void writeAnnotationDefaultsInternal(List<StatementDef> statements,
-                                                        ClassTypeDef owningType,
-                                                        Map<String, MethodDef> loadTypeMethods,
-                                                        Set<String> writtenAnnotations,
-                                                        String annotationName,
-                                                        Map<CharSequence, Object> annotationValues) {
+    private static void addAnnotationDefaultsInternal(List<StatementDef> statements,
+                                                      Set<String> writtenAnnotations,
+                                                      String annotationName,
+                                                      Map<CharSequence, Object> annotationValues,
+                                                      Function<String, ExpressionDef> loadClassValueExpressionFn) {
         final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
 
         // skip already registered
@@ -265,13 +401,12 @@ public class AnnotationMetadataGenUtils {
         for (Map.Entry<CharSequence, Object> values : annotationValues.entrySet()) {
             Object value = values.getValue();
             if (value instanceof AnnotationValue<?> annotationValue && CollectionUtils.isNotEmpty(annotationValue.getDefaultValues())) {
-                writeAnnotationDefaultsInternal(
+                addAnnotationDefaultsInternal(
                     statements,
-                    owningType,
-                    loadTypeMethods,
                     writtenAnnotations,
                     annotationValue.getAnnotationName(),
-                    annotationValue.getDefaultValues()
+                    annotationValue.getDefaultValues(),
+                    loadClassValueExpressionFn
                 );
             }
         }
@@ -280,29 +415,24 @@ public class AnnotationMetadataGenUtils {
             statements.add(
                 TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
                     METHOD_REGISTER_ANNOTATION_DEFAULTS,
-                    invokeLoadClassValueMethod(owningType, loadTypeMethods, new AnnotationClassValue<>(annotationName)),
-                    stringMapOf(owningType, annotationValues, loadTypeMethods)
+                    loadClassValueExpressionFn.apply(annotationName),
+                    stringMapOf(annotationValues, loadClassValueExpressionFn)
                 )
             );
         } else {
             statements.add(
                 TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
                     METHOD_REGISTER_ANNOTATION_TYPE,
-                    invokeLoadClassValueMethod(owningType, loadTypeMethods, new AnnotationClassValue<>(annotationName))
+                    loadClassValueExpressionFn.apply(annotationName)
                 )
             );
         }
         writtenAnnotations.add(annotationName);
     }
 
-    private static ExpressionDef instantiateInternal(
-        ClassTypeDef owningType,
-        MutableAnnotationMetadata annotationMetadata,
-        boolean isNew,
-        Map<String, MethodDef> loadTypeMethods) {
-        if (!isNew) {
-            throw new IllegalStateException();
-        }
+    @NonNull
+    private static ExpressionDef instantiateInternal(MutableAnnotationMetadata annotationMetadata,
+                                                     Function<String, ExpressionDef> loadClassValueExpressionFn) {
         Map<String, List<String>> annotationsByStereotype = annotationMetadata.annotationsByStereotype;
         if (annotationMetadata.getSourceRetentionAnnotations() != null && annotationsByStereotype != null) {
             annotationsByStereotype = new LinkedHashMap<>(annotationsByStereotype);
@@ -315,15 +445,15 @@ public class AnnotationMetadataGenUtils {
                 CONSTRUCTOR_ANNOTATION_METADATA,
 
                 // 1st argument: the declared annotations
-                pushCreateAnnotationData(owningType, annotationMetadata.declaredAnnotations, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations()),
+                pushCreateAnnotationData(annotationMetadata.declaredAnnotations, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
                 // 2nd argument: the declared stereotypes
-                pushCreateAnnotationData(owningType, annotationMetadata.declaredStereotypes, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations()),
+                pushCreateAnnotationData(annotationMetadata.declaredStereotypes, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
                 // 3rd argument: all stereotypes
-                pushCreateAnnotationData(owningType, annotationMetadata.allStereotypes, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations()),
+                pushCreateAnnotationData(annotationMetadata.allStereotypes, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
                 // 4th argument: all annotations
-                pushCreateAnnotationData(owningType, annotationMetadata.allAnnotations, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations()),
+                pushCreateAnnotationData(annotationMetadata.allAnnotations, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
                 // 5th argument: annotations by stereotype,
-                ExpressionsUtils.stringMapOf(annotationsByStereotype, false, Collections.emptyList(), ExpressionsUtils::listOfString),
+                GenUtils.stringMapOf(annotationsByStereotype, false, Collections.emptyList(), GenUtils::listOfString),
                 // 6th argument: has property expressions,
                 ExpressionDef.constant(annotationMetadata.hasPropertyExpressions()),
                 // 7th argument: has evaluated expressions
@@ -331,11 +461,10 @@ public class AnnotationMetadataGenUtils {
             );
     }
 
-    private static ExpressionDef pushCreateAnnotationData(
-        ClassTypeDef declaringType,
-        Map<String, Map<CharSequence, Object>> annotationData,
-        Map<String, MethodDef> loadTypeMethods,
-        Set<String> sourceRetentionAnnotations) {
+    @NonNull
+    private static ExpressionDef pushCreateAnnotationData(Map<String, Map<CharSequence, Object>> annotationData,
+                                                          Set<String> sourceRetentionAnnotations,
+                                                          Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (annotationData != null) {
             annotationData = new LinkedHashMap<>(annotationData);
             for (String sourceRetentionAnnotation : sourceRetentionAnnotations) {
@@ -343,16 +472,16 @@ public class AnnotationMetadataGenUtils {
             }
         }
 
-        return ExpressionsUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
-            attributes -> ExpressionsUtils.stringMapOf(attributes, true, null,
-                value -> asValueExpression(declaringType, value, loadTypeMethods)));
+        return GenUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
+            attributes -> GenUtils.stringMapOf(attributes, true, null,
+                value -> asValueExpression(value, loadClassValueExpressionFn)));
     }
 
-    private static ExpressionDef asValueExpression(ClassTypeDef declaringType,
-                                                   Object value,
-                                                   Map<String, MethodDef> loadTypeMethods) {
+    @NonNull
+    private static ExpressionDef asValueExpression(Object value,
+                                                   Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (value == null) {
-            throw new IllegalStateException("Cannot map null value in: " + declaringType.getName());
+            throw new IllegalStateException("Cannot map null value");
         }
         if (value instanceof Enum<?> anEnum) {
             return ExpressionDef.constant(anEnum.name());
@@ -367,7 +496,7 @@ public class AnnotationMetadataGenUtils {
                         ClassTypeDef.of(acv.getName()).instantiate()
                     );
             } else {
-                return invokeLoadClassValueMethod(declaringType, loadTypeMethods, acv);
+                return loadClassValueExpressionFn.apply(acv.getName());
             }
         }
         if (value.getClass().isArray()) {
@@ -377,7 +506,7 @@ public class AnnotationMetadataGenUtils {
                 arrayComponentType = String.class;
             }
             return TypeDef.of(arrayComponentType).array().instantiate(Arrays.stream(getArray(value))
-                .map(v -> asValueExpression(declaringType, v, loadTypeMethods))
+                .map(v -> asValueExpression(v, loadClassValueExpressionFn))
                 .toList());
         }
         if (value instanceof Collection<?> collection) {
@@ -398,14 +527,14 @@ public class AnnotationMetadataGenUtils {
                 componentType = String.class;
             }
             return TypeDef.of(componentType).array()
-                .instantiate(collection.stream().map(i -> asValueExpression(declaringType, i, loadTypeMethods)).toList());
+                .instantiate(collection.stream().map(i -> asValueExpression(i, loadClassValueExpressionFn)).toList());
         }
         if (value instanceof AnnotationValue<?> data) {
             return ClassTypeDef.of(AnnotationValue.class)
                 .instantiate(
                     CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP,
                     ExpressionDef.constant(data.getAnnotationName()),
-                    stringMapOf(declaringType, data.getValues(), loadTypeMethods),
+                    stringMapOf(data.getValues(), loadClassValueExpressionFn),
                     ClassTypeDef.of(AnnotationMetadataSupport.class).getStaticField(ANNOTATION_DEFAULT_VALUES_PROVIDER)
                 );
         }
@@ -425,6 +554,37 @@ public class AnnotationMetadataGenUtils {
         throw new IllegalStateException("Unsupported Map value:  " + value + " " + value.getClass().getName());
     }
 
+    @NonNull
+    private static <T> ExpressionDef stringMapOf(Map<? extends CharSequence, T> annotationData,
+                                                 Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return GenUtils.stringMapOf(
+            annotationData,
+            true,
+            null,
+            AnnotationMetadataGenUtils::isSupportedMapValue,
+            o -> asValueExpression(o, loadClassValueExpressionFn)
+        );
+    }
+
+    @NonNull
+    private static ExpressionDef pushNewAnnotationMetadataOrReference(AnnotationMetadata annotationMetadata,
+                                                                      Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            // Synthetic property getters / setters can consist of field + (setter / getter) annotation hierarchy
+            annotationMetadata = MutableAnnotationMetadata.of(annotationMetadataHierarchy);
+        }
+        if (annotationMetadata.isEmpty()) {
+            return emptyMetadata();
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            return instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
+        } else if (annotationMetadata instanceof AnnotationMetadataReference reference) {
+            return annotationMetadataReference(reference);
+        } else {
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
+        }
+    }
+
     private static Object[] getArray(Object val) {
         if (val instanceof Object[]) {
             return (Object[]) val;
@@ -436,7 +596,7 @@ public class AnnotationMetadataGenUtils {
         return outputArray;
     }
 
-    public static boolean isSupportedMapValue(Object value) {
+    private static boolean isSupportedMapValue(Object value) {
         if (value == null) {
             return false;
         } else if (value instanceof Boolean) {
@@ -476,125 +636,6 @@ public class AnnotationMetadataGenUtils {
             return false;
         }
         return false;
-    }
-
-    @NonNull
-    public static ExpressionDef.InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
-                                                                              Map<String, MethodDef> loadTypeMethods,
-                                                                              AnnotationClassValue<?> acv) {
-        final String typeName = acv.getName();
-
-        final MethodDef loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
-
-            final String methodName = LOAD_CLASS_PREFIX + loadTypeMethods.size();
-
-            // This logic will generate a method such as the following, allowing non-dynamic classloading:
-            //
-            // AnnotationClassValue $micronaut_load_class_value_0() {
-            //     try {
-            //          return new AnnotationClassValue(test.MyClass.class);
-            //     } catch(Throwable e) {
-            //          return new AnnotationClassValue("test.MyClass");
-            //     }
-            // }
-
-            return MethodDef.builder(methodName)
-                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-                .returns(TYPE_ANNOTATION_CLASS_VALUE)
-                .buildStatic(methodParameters -> StatementDef.doTry(
-                    TYPE_ANNOTATION_CLASS_VALUE.instantiate(
-                        CONSTRUCTOR_CLASS_VALUE_WITH_CLASS,
-                        ExpressionDef.constant(TypeDef.of(typeName))
-                    ).returning()
-                ).doCatch(Throwable.class, exceptionVar -> TYPE_ANNOTATION_CLASS_VALUE.instantiate(
-                    CONSTRUCTOR_CLASS_VALUE,
-                    ExpressionDef.constant(typeName)
-                ).returning()));
-        });
-
-        return declaringType.invokeStatic(loadTypeGeneratorMethod);
-    }
-
-    public static MethodDef getAnnotationMetadataMethodDef(ClassTypeDef owningType, AnnotationMetadata am) {
-        return MethodDef.builder("getAnnotationMetadata").returns(TYPE_ANNOTATION_METADATA)
-            .addModifiers(Modifier.PUBLIC)
-            .build((aThis, methodParameters) -> {
-                // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
-                // then we set up an annotation metadata reference from the method to the class (or inherited method) metadata
-                AnnotationMetadata annotationMetadata = am.getTargetAnnotationMetadata();
-                if (annotationMetadata.isEmpty()) {
-                    return AnnotationMetadataGenUtils.EMPTY_METADATA.returning();
-                }
-                if (annotationMetadata instanceof AnnotationMetadataReference reference) {
-                    return annotationMetadataReference(reference).returning();
-                }
-                return owningType.getStaticField(FIELD_ANNOTATION_METADATA).returning();
-            });
-    }
-
-    @Nullable
-    public static FieldDef createAnnotationMetadataField(ClassTypeDef targetType,
-                                                         AnnotationMetadata annotationMetadata,
-                                                         Map<String, MethodDef> loadTypeMethods) {
-        if (annotationMetadata instanceof AnnotationMetadataReference) {
-            return null;
-        }
-        FieldDef.FieldDefBuilder fieldDefBuilder = FieldDef.builder(FIELD_ANNOTATION_METADATA_NAME, TYPE_ANNOTATION_METADATA)
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL, Modifier.STATIC);
-
-        ExpressionDef initializer;
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata.isEmpty()) {
-            initializer = AnnotationMetadataGenUtils.EMPTY_METADATA;
-        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            initializer = AnnotationMetadataGenUtils.instantiateNewMetadata(
-                targetType,
-                mutableAnnotationMetadata,
-                loadTypeMethods
-            );
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            initializer = AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(targetType, annotationMetadataHierarchy, loadTypeMethods);
-        } else {
-            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
-        }
-        fieldDefBuilder.initializer(initializer);
-
-        return fieldDefBuilder.build();
-    }
-
-    public static void writeAnnotationDefault(List<StatementDef> statements,
-                                              ClassTypeDef targetClassType,
-                                              AnnotationMetadata annotationMetadata,
-                                              Map<String, MethodDef> loadTypeMethods) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata.isEmpty()) {
-            return;
-        }
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            annotationMetadata = annotationMetadataHierarchy.merge();
-        }
-        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            AnnotationMetadataGenUtils.writeAnnotationDefaults(
-                statements,
-                targetClassType,
-                mutableAnnotationMetadata,
-                loadTypeMethods
-            );
-        } else {
-            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
-        }
-    }
-
-    private static <T> ExpressionDef stringMapOf(ClassTypeDef declaringType,
-                                                 Map<? extends CharSequence, T> annotationData,
-                                                 Map<String, MethodDef> loadTypeMethods) {
-        return ExpressionsUtils.stringMapOf(
-            annotationData,
-            true,
-            null,
-            AnnotationMetadataGenUtils::isSupportedMapValue,
-            o -> asValueExpression(declaringType, o, loadTypeMethods)
-        );
     }
 
 }

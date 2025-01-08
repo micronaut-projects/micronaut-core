@@ -655,6 +655,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private ConfigBuilderInjectCommand configBuilderInjectCommand;
     private boolean validated;
 
+    private final Function<String, ExpressionDef> loadClassValueExpressionFn;
+
     /**
      * Creates a bean definition writer.
      *
@@ -803,6 +805,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanDefinitionReference.class.getName()).build())
             .superclass(TypeDef.parameterized(superType, argumentType));
+
+        loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods);
     }
 
     /**
@@ -1592,7 +1596,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        BuildMethodDefinition buildMethodDefinition,
                                        Function<ExpressionDef, StatementDef> onBeanInstance,
                                        boolean isParametrized) {
-        StatementDef.DefineAndAssign[] constructorDef= new StatementDef.DefineAndAssign[] { null };
+        StatementDef.DefineAndAssign[] constructorDef = new StatementDef.DefineAndAssign[] { null };
         Supplier<VariableDef> constructorDefSupplier = new Supplier<VariableDef>() {
 
             @Override
@@ -1889,7 +1893,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StaticBlock getStaticInitializer() {
         List<StatementDef> statements = new ArrayList<>();
 
-        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(beanDefinitionTypeDef, annotationMetadata, loadTypeMethods);
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataFieldAndInitialize(annotationMetadata, loadClassValueExpressionFn);
 
         classDefBuilder.addField(annotationMetadataField);
 
@@ -1969,13 +1973,13 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             classDefBuilder.addField(typeArgumentsField);
 
             initStatements.add(beanDefinitionTypeDef.getStaticField(typeArgumentsField)
-                .put(ExpressionsUtils.stringMapOf(
+                .put(GenUtils.stringMapOf(
                     typeArguments, true, null, el -> ArgumentExpUtils.pushTypeArgumentElements(
                         annotationMetadata,
                         beanDefinitionTypeDef,
                         ClassElement.of(beanDefinitionName),
                         el,
-                        loadTypeMethods
+                        loadClassValueExpressionFn
                     ))
                 ));
             failStatements.add(beanDefinitionTypeDef.getStaticField(typeArgumentsField).put(ExpressionDef.nullValue()));
@@ -2066,7 +2070,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         // Defaults can be contributed by other static initializers, it should be at the end
-        AnnotationMetadataGenUtils.writeAnnotationDefault(statements, beanDefinitionTypeDef, annotationMetadata, loadTypeMethods);
+        AnnotationMetadataGenUtils.addAnnotationDefaults(statements, annotationMetadata, loadClassValueExpressionFn);
 
         return new StaticBlock(
             StatementDef.multi(statements),
@@ -2239,7 +2243,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
 
             private ExpressionDef getAnnotationClassValue(AnnotationClassValue<?> annotationClassValue) {
-                return AnnotationMetadataGenUtils.invokeLoadClassValueMethod(beanDefinitionTypeDef, loadTypeMethods, annotationClassValue);
+                return loadClassValueExpressionFn.apply(annotationClassValue.getName());
             }
 
             private ExpressionDef newRecord(Class<?> classType, ExpressionDef... values) {
@@ -2973,7 +2977,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     propertyType,
                     generics,
                     new HashSet<>(),
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 ),
                 ExpressionDef.constant(propertyPath)
             );
@@ -3484,7 +3488,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             entry.getGenericType(),
             annotationMetadata,
             entry.getGenericType().getTypeArguments(),
-            loadTypeMethods
+            loadClassValueExpressionFn
         );
     }
 
@@ -3498,7 +3502,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 fieldElement.getGenericType(),
                 annotationMetadata,
                 fieldElement.getGenericType().getTypeArguments(),
-                loadTypeMethods
+                loadClassValueExpressionFn
             );
         }
         return resolveFieldArgument(fieldIndex);
@@ -4356,7 +4360,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     ClassElement.of(beanFullClassName),
                     beanDefinitionTypeDef,
                     Arrays.asList(methodElement.getParameters()),
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 ),
                 // 4: annotationMetadata
                 getAnnotationMetadataExpression(annotationMetadata)
@@ -4396,7 +4400,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     fieldElement.getGenericType(),
                     annotationMetadata,
                     fieldElement.getGenericType().getTypeArguments(),
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 )
             );
     }
@@ -4426,15 +4430,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             return ExpressionDef.nullValue();
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(
-                beanDefinitionTypeDef,
-                annotationMetadataHierarchy,
-                loadTypeMethods);
+            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            return AnnotationMetadataGenUtils.instantiateNewMetadata(
-                beanDefinitionTypeDef,
-                mutableAnnotationMetadata,
-                loadTypeMethods);
+            return AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
         } else {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata.getClass().getName());
         }

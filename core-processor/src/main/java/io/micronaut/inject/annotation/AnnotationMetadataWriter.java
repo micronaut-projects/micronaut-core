@@ -22,6 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Responsible for writing class files that are instances of {@link AnnotationMetadataProvider}.
@@ -55,10 +57,11 @@ public class AnnotationMetadataWriter {
     public static byte[] write(String className, AnnotationMetadata annotationMetadata) {
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
         ClassTypeDef type = ClassTypeDef.of(className + AnnotationMetadata.CLASS_NAME_SUFFIX);
-        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(type, annotationMetadata, loadTypeMethods);
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(type, loadTypeMethods);
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataFieldAndInitialize(annotationMetadata, loadClassValueExpressionFn);
 
         List<StatementDef> statements = new ArrayList<>();
-        AnnotationMetadataGenUtils.writeAnnotationDefault(statements, type, annotationMetadata, loadTypeMethods);
+        AnnotationMetadataGenUtils.addAnnotationDefaults(statements,  annotationMetadata, loadClassValueExpressionFn);
 
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(type.getName())
             .addSuperinterface(TypeDef.of(AnnotationMetadataProvider.class))

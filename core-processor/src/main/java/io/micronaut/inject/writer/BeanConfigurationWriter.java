@@ -38,8 +38,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
-import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.getAnnotationMetadataMethodDef;
+import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.createGetAnnotationMetadataMethodDef;
 
 /**
  * Writes configuration classes for configuration packages using ASM.
@@ -99,19 +100,22 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
         ClassDef configurationClass = configurationClassBuilder
             .addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, methodParameters)
                 -> aThis.superRef().invokeConstructor(ExpressionDef.constant(packageName))))
-            .addMethod(getAnnotationMetadataMethodDef(targetType, annotationMetadata))
+            .addMethod(createGetAnnotationMetadataMethodDef(targetType, annotationMetadata))
             .build();
 
 
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
+
+
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(targetType, loadTypeMethods);
+
         // write the static initializers for the annotation metadata
         List<StatementDef> staticInit = new ArrayList<>();
-        AnnotationMetadataGenUtils.writeAnnotationDefault(staticInit, targetType, annotationMetadata, loadTypeMethods);
+        AnnotationMetadataGenUtils.addAnnotationDefaults(staticInit, annotationMetadata, loadClassValueExpressionFn);
 
-        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(
-            targetType,
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataFieldAndInitialize(
             annotationMetadata,
-            loadTypeMethods
+            loadClassValueExpressionFn
         );
 
         loadTypeMethods.values().forEach(configurationClassBuilder::addMethod);

@@ -35,7 +35,6 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
-import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.TypeDef;
 
 import java.lang.reflect.Method;
@@ -47,6 +46,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * The argument expression utils.
@@ -126,14 +126,14 @@ public final class ArgumentExpUtils {
      * @param owningType                     The owning type
      * @param declaringType                  The declaring type name
      * @param argument                       The argument
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load type method fn
      * @return The expression
      */
     public static ExpressionDef pushReturnTypeArgument(AnnotationMetadata annotationMetadataWithDefaults,
                                                        ClassTypeDef owningType,
                                                        ClassElement declaringType,
                                                        ClassElement argument,
-                                                       Map<String, MethodDef> loadTypeMethods) {
+                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
         // Persist only type annotations added
         AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
 
@@ -162,7 +162,7 @@ public final class ArgumentExpUtils {
             argument,
             annotationMetadata,
             argument.getTypeArguments(),
-            loadTypeMethods
+            loadClassValueExpressionFn
         );
     }
 
@@ -174,7 +174,7 @@ public final class ArgumentExpUtils {
      * @param owningType                     The owning type
      * @param argumentName                   The argument name
      * @param argument                       The argument
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load type methods fn
      * @return The expression
      */
     public static ExpressionDef pushCreateArgument(
@@ -183,7 +183,7 @@ public final class ArgumentExpUtils {
         ClassTypeDef owningType,
         String argumentName,
         ClassElement argument,
-        Map<String, MethodDef> loadTypeMethods) {
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         return pushCreateArgument(
             annotationMetadataWithDefaults,
@@ -193,7 +193,7 @@ public final class ArgumentExpUtils {
             argument,
             argument.getAnnotationMetadata(),
             argument.getTypeArguments(),
-            loadTypeMethods
+            loadClassValueExpressionFn
         );
     }
 
@@ -207,7 +207,7 @@ public final class ArgumentExpUtils {
      * @param argumentType                   The argument type
      * @param annotationMetadata             The annotation metadata
      * @param typeArguments                  The type arguments
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load class value expression fn
      * @return The expression
      */
     static ExpressionDef pushCreateArgument(
@@ -218,7 +218,7 @@ public final class ArgumentExpUtils {
         TypedElement argumentType,
         AnnotationMetadata annotationMetadata,
         Map<String, ClassElement> typeArguments,
-        Map<String, MethodDef> loadTypeMethods) {
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
 
@@ -262,9 +262,8 @@ public final class ArgumentExpUtils {
             );
 
             values.add(AnnotationMetadataGenUtils.instantiateNewMetadata(
-                owningType,
                 (MutableAnnotationMetadata) annotationMetadata,
-                loadTypeMethods
+                loadClassValueExpressionFn
             ));
         } else {
             values.add(ExpressionDef.nullValue());
@@ -277,7 +276,7 @@ public final class ArgumentExpUtils {
                 owningType,
                 declaringType,
                 typeArguments,
-                loadTypeMethods
+                loadClassValueExpressionFn
             ));
         } else {
             values.add(ExpressionDef.nullValue());
@@ -338,7 +337,7 @@ public final class ArgumentExpUtils {
      * @param owningType                     The owning type
      * @param declaringType                  The declaring class element of the generics
      * @param types                          The type references
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load type expression fn
      * @return The expression
      */
     static ExpressionDef pushTypeArgumentElements(
@@ -346,7 +345,7 @@ public final class ArgumentExpUtils {
         ClassTypeDef owningType,
         ClassElement declaringType,
         Map<String, ClassElement> types,
-        Map<String, MethodDef> loadTypeMethods) {
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (types == null || types.isEmpty()) {
             return TYPE_ARGUMENT_ARRAY.instantiate();
         }
@@ -357,7 +356,7 @@ public final class ArgumentExpUtils {
             null,
             types,
             new HashSet<>(5),
-            loadTypeMethods);
+            loadClassValueExpressionFn);
     }
 
     @SuppressWarnings("java:S1872")
@@ -369,7 +368,7 @@ public final class ArgumentExpUtils {
         ClassElement element,
         Map<String, ClassElement> types,
         Set<Object> visitedTypes,
-        Map<String, MethodDef> loadTypeMethods) {
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (element == null) {
             if (visitedTypes.contains(declaringType.getName())) {
                 return TYPE_ARGUMENT.getStaticField(ZERO_ARGUMENTS_CONSTANT, TYPE_ARGUMENT_ARRAY);
@@ -390,7 +389,7 @@ public final class ArgumentExpUtils {
                     classElement,
                     typeArguments,
                     visitedTypes,
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 );
             }
             return buildArgument(argumentName, classElement);
@@ -406,7 +405,7 @@ public final class ArgumentExpUtils {
      * @param argumentType                   The argument type
      * @param typeArguments                  The nested type arguments
      * @param visitedTypes                   The visited types
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load type method fn
      * @return The expression
      */
     static ExpressionDef buildArgumentWithGenerics(
@@ -416,7 +415,7 @@ public final class ArgumentExpUtils {
         ClassElement argumentType,
         Map<String, ClassElement> typeArguments,
         Set<Object> visitedTypes,
-        Map<String, MethodDef> loadTypeMethods) {
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
 
         List<ExpressionDef> values = new ArrayList<>();
@@ -466,9 +465,8 @@ public final class ArgumentExpUtils {
 
             values.add(
                 AnnotationMetadataGenUtils.instantiateNewMetadata(
-                    owningType,
                     (MutableAnnotationMetadata) annotationMetadata,
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 )
             );
         } else {
@@ -484,7 +482,7 @@ public final class ArgumentExpUtils {
                 argumentType,
                 typeArguments,
                 visitedTypes,
-                loadTypeMethods
+                loadClassValueExpressionFn
             )
         );
 
@@ -579,15 +577,14 @@ public final class ArgumentExpUtils {
      * @param declaringElement               The declaring element name
      * @param owningType                     The owning type
      * @param argumentTypes                  The argument types
-     * @param loadTypeMethods                The load type methods
+     * @param loadClassValueExpressionFn     The load type method expression fn
      * @return The expression
      */
-    public static ExpressionDef pushBuildArgumentsForMethod(
-        AnnotationMetadata annotationMetadataWithDefaults,
-        ClassElement declaringElement,
-        ClassTypeDef owningType,
-        Collection<ParameterElement> argumentTypes,
-        Map<String, MethodDef> loadTypeMethods) {
+    public static ExpressionDef pushBuildArgumentsForMethod(AnnotationMetadata annotationMetadataWithDefaults,
+                                                            ClassElement declaringElement,
+                                                            ClassTypeDef owningType,
+                                                            Collection<ParameterElement> argumentTypes,
+                                                            Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         return TYPE_ARGUMENT_ARRAY.instantiate(argumentTypes.stream().map(parameterElement -> {
             ClassElement genericType = parameterElement.getGenericType();
@@ -622,7 +619,7 @@ public final class ArgumentExpUtils {
                 genericType,
                 annotationMetadata,
                 typeArguments,
-                loadTypeMethods
+                loadClassValueExpressionFn
             );
         }).toList());
 

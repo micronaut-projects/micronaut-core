@@ -79,6 +79,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -411,7 +412,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         }
     }
 
-    private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData, List<StatementDef> staticStatements, Map<String, MethodDef> loadTypeMethods) {
+    private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData,
+                                                    List<StatementDef> staticStatements,
+                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
         ClassTypeDef beanPropertyRefDef = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
 
         boolean mutable = !beanPropertyData.isReadOnly || hasAssociatedConstructorArgument(beanPropertyData.name, beanPropertyData.type);
@@ -422,7 +425,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             introspectionTypeDef,
             beanPropertyData.name,
             beanPropertyData.type,
-            loadTypeMethods
+            loadClassValueExpressionFn
         ).newLocal(beanPropertyData.name + "Arg");
 
         staticStatements.add(defineAndAssign);
@@ -445,7 +448,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                 introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.readType,
-                loadTypeMethods
+                loadClassValueExpressionFn
             );
             writeArgument = beanPropertyData.writeType == null ? null : ArgumentExpUtils.pushCreateArgument(
                 annotationMetadata,
@@ -453,7 +456,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                 introspectionTypeDef,
                 beanPropertyData.name,
                 beanPropertyData.writeType,
-                loadTypeMethods
+                loadClassValueExpressionFn
             );
         }
         return beanPropertyRefDef.instantiate(
@@ -470,7 +473,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         );
     }
 
-    private ExpressionDef newBeanMethodRef(BeanMethodData beanMethodData, Map<String, MethodDef> loadTypeMethods) {
+    private ExpressionDef newBeanMethodRef(BeanMethodData beanMethodData, Function<String, ExpressionDef> loadClassValueExpressionFn) {
         return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class)
             .instantiate(
                 BEAN_METHOD_REF_CONSTRUCTOR,
@@ -481,38 +484,38 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     introspectionTypeDef,
                     beanMethodData.methodElement.getOwningType(),
                     beanMethodData.methodElement.getGenericReturnType(),
-                    loadTypeMethods),
+                    loadClassValueExpressionFn),
                 // 2: name
                 ExpressionDef.constant(beanMethodData.methodElement.getName()),
                 // 3: annotation metadata
-                getAnnotationMetadataExpression(beanMethodData.methodElement.getAnnotationMetadata(), loadTypeMethods),
+                getAnnotationMetadataExpression(beanMethodData.methodElement.getAnnotationMetadata(), loadClassValueExpressionFn),
                 // 4: arguments
                 beanMethodData.methodElement.getParameters().length == 0 ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
                     annotationMetadata,
                     beanClassElement,
                     introspectionTypeDef,
                     Arrays.asList(beanMethodData.methodElement.getParameters()),
-                    loadTypeMethods
+                    loadClassValueExpressionFn
                 ),
                 // 5: method index
                 ExpressionDef.constant(beanMethodData.dispatchIndex)
             );
     }
 
-    private ExpressionDef newEnumConstantRef(EnumConstantElement enumConstantElement, Map<String, MethodDef> loadTypeMethods) {
+    private ExpressionDef newEnumConstantRef(EnumConstantElement enumConstantElement, Function<String, ExpressionDef> loadClassValueExpressionFn) {
         return ClassTypeDef.of(
             AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class
         ).instantiate(
             ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR,
 
             // 1: push annotation class value
-            AnnotationMetadataGenUtils.invokeLoadClassValueMethod(introspectionTypeDef, loadTypeMethods, new AnnotationClassValue<>(enumConstantElement.getOwningType().getName())),
+            loadClassValueExpressionFn.apply(enumConstantElement.getOwningType().getName()),
             // 2: push enum name
             ExpressionDef.constant(enumConstantElement.getName()),
             // 3: annotation metadata
             enumConstantElement.getAnnotationMetadata() == null ? (
                 ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class))
-            ) : getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadTypeMethods)
+            ) : getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadClassValueExpressionFn)
         );
     }
 
@@ -534,6 +537,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
 
         ClassTypeDef thisType = ClassTypeDef.of(introspectionName);
+
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(introspectionTypeDef, loadTypeMethods);
+
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).addModifiers(Modifier.FINAL, Modifier.PUBLIC);
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
 
@@ -555,7 +561,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             if (!constructor.getAnnotationMetadata().isEmpty()) {
                 constructorAnnotationMetadataField = FieldDef.builder(FIELD_CONSTRUCTOR_ANNOTATION_METADATA, AnnotationMetadata.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-                    .initializer(getAnnotationMetadataExpression(constructor.getAnnotationMetadata(), loadTypeMethods))
+                    .initializer(getAnnotationMetadataExpression(constructor.getAnnotationMetadata(), loadClassValueExpressionFn))
                     .build();
                 classDefBuilder.addField(
                     constructorAnnotationMetadataField
@@ -572,7 +578,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                             constructor.getOwningType(),
                             introspectionTypeDef,
                             Arrays.asList(constructor.getParameters()),
-                            loadTypeMethods
+                            loadClassValueExpressionFn
                         )
                     )
                     .build();
@@ -596,7 +602,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class).array()
                         .instantiate(
                             beanProperties.stream()
-                                .map(e -> pushBeanPropertyReference(e, staticStatements, loadTypeMethods))
+                                .map(e -> pushBeanPropertyReference(e, staticStatements, loadClassValueExpressionFn))
                                 .toList()
                         )
                 )
@@ -611,7 +617,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class).array()
                         .instantiate(
                             beanMethods.stream()
-                                .map(e -> newBeanMethodRef(e, loadTypeMethods))
+                                .map(e -> newBeanMethodRef(e, loadClassValueExpressionFn))
                                 .toList()
                         )
                 )
@@ -627,7 +633,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class).array()
                         .instantiate(
                             ((EnumElement) beanClassElement).elements().stream()
-                                .map(e -> newEnumConstantRef(e, loadTypeMethods))
+                                .map(e -> newEnumConstantRef(e, loadClassValueExpressionFn))
                                 .toList()
                         )
                 )
@@ -660,9 +666,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             annotationIndexFields.put(annotationName, field);
         }
 
-        AnnotationMetadataGenUtils.writeAnnotationDefault(staticStatements, introspectionTypeDef, annotationMetadata, loadTypeMethods);
+        AnnotationMetadataGenUtils.addAnnotationDefaults(staticStatements, annotationMetadata, loadClassValueExpressionFn);
 
-        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataField(introspectionTypeDef, annotationMetadata, loadTypeMethods);
+        FieldDef annotationMetadataField = AnnotationMetadataGenUtils.createAnnotationMetadataFieldAndInitialize(annotationMetadata, loadClassValueExpressionFn);
         if (annotationMetadataField != null) {
             classDefBuilder.addField(
                 annotationMetadataField
@@ -889,7 +895,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             });
     }
 
-    private ExpressionDef getAnnotationMetadataExpression(AnnotationMetadata annotationMetadata, Map<String, MethodDef> loadTypeMethods) {
+    private ExpressionDef getAnnotationMetadataExpression(AnnotationMetadata annotationMetadata, Function<String, ExpressionDef> loadClassValueExpressionFn) {
         MutableAnnotationMetadata.contributeDefaults(
             this.annotationMetadata,
             annotationMetadata
@@ -901,15 +907,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
             return AnnotationMetadataGenUtils.annotationMetadataReference(annotationMetadataReference);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(
-                introspectionTypeDef,
-                annotationMetadataHierarchy,
-                loadTypeMethods);
+            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            return AnnotationMetadataGenUtils.instantiateNewMetadata(
-                introspectionTypeDef,
-                mutableAnnotationMetadata,
-                loadTypeMethods);
+            return AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
         } else {
             throw new IllegalStateException("Unknown annotation metadata:  " + annotationMetadata);
         }

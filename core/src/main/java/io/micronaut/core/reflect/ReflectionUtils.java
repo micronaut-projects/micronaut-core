@@ -208,6 +208,7 @@ public class ReflectionUtils {
      * @param <R>       The return type
      * @param <T>       The instance type
      * @return The result
+     * @since 4.8
      */
     @UsedByGeneratedCode
     public static <R, T> R invokeInaccessibleMethod(T instance, Method method, Object... arguments) {
