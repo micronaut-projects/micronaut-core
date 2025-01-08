@@ -16,7 +16,6 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +23,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The completable future execution flow implementation.
@@ -41,7 +41,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
     }
 
     @Override
-    public <R> ExecutionFlow<R> flatMap(@NonNull FlatMapFn<? super Object, ? extends R> transformer) {
+    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
         ImperativeExecutionFlow<Object> completedFlow = tryComplete();
         if (completedFlow != null) {
             return completedFlow.flatMap(transformer);
@@ -56,7 +56,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
     }
 
     @Override
-    public <R> ExecutionFlow<R> then(FlowSupplier<? extends R> supplier) {
+    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
         ImperativeExecutionFlow<Object> completedFlow = tryComplete();
         if (completedFlow != null) {
             return completedFlow.then(supplier);
@@ -76,7 +76,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
     }
 
     @Override
-    public ExecutionFlow<Object> onErrorResume(FlatMapFn<? super Throwable, ?> fallback) {
+    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
         ImperativeExecutionFlow<Object> completedFlow = tryComplete();
         if (completedFlow != null) {
             return completedFlow.onErrorResume(fallback);

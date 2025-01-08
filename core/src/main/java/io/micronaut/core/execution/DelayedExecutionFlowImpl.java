@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @SuppressWarnings("rawtypes")
 final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
@@ -111,17 +112,17 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     @Override
-    public <R> ExecutionFlow<R> flatMap(FlatMapFn<? super T, ? extends R> transformer) {
+    public <R> ExecutionFlow<R> flatMap(Function<? super T, ? extends ExecutionFlow<? extends R>> transformer) {
         return next(new FlatMap<>(transformer));
     }
 
     @Override
-    public <R> ExecutionFlow<R> then(FlowSupplier<? extends R> supplier) {
+    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
         return next(new Then<>(supplier));
     }
 
     @Override
-    public ExecutionFlow<T> onErrorResume(FlatMapFn<? super Throwable, ? extends T> fallback) {
+    public ExecutionFlow<T> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends T>> fallback) {
         return next(new OnErrorResume<>(fallback));
     }
 
@@ -315,9 +316,9 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     private static final class FlatMap<I, O>  extends Step<I, O> {
-        private final FlatMapFn<? super I, ? extends O> transformer;
+        private final Function<? super I, ? extends ExecutionFlow<? extends O>> transformer;
 
-        private FlatMap(FlatMapFn<? super I, ? extends O> transformer) {
+        private FlatMap(Function<? super I, ? extends ExecutionFlow<? extends O>> transformer) {
             this.transformer = transformer;
         }
 
@@ -332,9 +333,9 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     private static final class Then<I, O> extends Step<I, O> {
-        private final FlowSupplier<? extends O> transformer;
+        private final Supplier<? extends ExecutionFlow<? extends O>> transformer;
 
-        private Then(FlowSupplier<? extends O> transformer) {
+        private Then(Supplier<? extends ExecutionFlow<? extends O>> transformer) {
             this.transformer = transformer;
         }
 
@@ -349,9 +350,9 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     private static final class OnErrorResume<I> extends Step<I, I> {
-        private final FlatMapFn<? super Throwable, ? extends I> fallback;
+        private final Function<? super Throwable, ? extends ExecutionFlow<? extends I>> fallback;
 
-        private OnErrorResume(FlatMapFn<? super Throwable, ? extends I> fallback) {
+        private OnErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends I>> fallback) {
             this.fallback = fallback;
         }
 

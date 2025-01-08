@@ -25,8 +25,6 @@ import io.micronaut.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -529,12 +527,6 @@ public class Publishers {
     @NonNull
     public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @NonNull Object object) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
-        if (object instanceof Mono<?> mono) {
-            return (Publisher<T>) mono;
-        }
-        if (object instanceof Flux<?> flux) {
-            return (Publisher<T>) flux;
-        }
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;
         }
