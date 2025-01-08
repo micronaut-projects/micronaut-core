@@ -208,6 +208,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 queued.handler.discardOutbound();
             }
         }
+        inboundHandler.discard();
         outboundQueue.clear();
         requestHandler.removed();
     }
@@ -337,6 +338,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @see #channelReadComplete
          */
         void readComplete() {
+        }
+
+        void discard() {
         }
     }
 
@@ -515,6 +519,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
+        }
+
+        @Override
+        void discard() {
+            for (HttpContent content : buffer) {
+                content.release();
+            }
+            buffer.clear();
         }
     }
 
