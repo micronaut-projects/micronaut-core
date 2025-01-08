@@ -30,6 +30,7 @@ import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
 
+import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -67,6 +68,7 @@ final class GraalReflectionMetadataWriter implements ClassOutputWriter {
         ClassTypeDef thisType = ClassTypeDef.of(className);
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElement)) {
             ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(className)
+                .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", GraalReflectionConfigurer.class.getName()).build())
                 .addSuperinterface(ClassTypeDef.of(GraalReflectionConfigurer.class))
                 .addMethod(getAnnotationMetadataMethodDef(thisType, annotationMetadata));
