@@ -268,10 +268,7 @@ public final class AnnotationMetadataGenUtils {
         if (annotationMetadata.isEmpty()) {
             initializer = AnnotationMetadataGenUtils.EMPTY_METADATA;
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            initializer = AnnotationMetadataGenUtils.instantiateNewMetadata(
-                mutableAnnotationMetadata,
-                loadClassValueExpressionFn
-            );
+            initializer = AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             initializer = AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
         } else {
@@ -351,7 +348,7 @@ public final class AnnotationMetadataGenUtils {
         final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
 
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
-            writeAnnotationDefaultsInternal(statements, annotationDefaultValues, new HashSet<>(), loadClassValueExpressionFn);
+            addAnnotationDefaultsInternal(statements, annotationDefaultValues, new HashSet<>(), loadClassValueExpressionFn);
         }
         if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
             Map<String, String> annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
@@ -368,10 +365,10 @@ public final class AnnotationMetadataGenUtils {
         }
     }
 
-    private static void writeAnnotationDefaultsInternal(List<StatementDef> statements,
-                                                        Map<String, Map<CharSequence, Object>> annotationDefaultValues,
-                                                        Set<String> writtenAnnotations,
-                                                        Function<String, ExpressionDef> loadClassValueExpressionFn) {
+    private static void addAnnotationDefaultsInternal(List<StatementDef> statements,
+                                                      Map<String, Map<CharSequence, Object>> annotationDefaultValues,
+                                                      Set<String> writtenAnnotations,
+                                                      Function<String, ExpressionDef> loadClassValueExpressionFn) {
         for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
             addAnnotationDefaultsInternal(statements,
                 writtenAnnotations,
@@ -390,7 +387,8 @@ public final class AnnotationMetadataGenUtils {
         final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
 
         // skip already registered
-        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent() || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
+        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()
+            || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
             return;
         }
 

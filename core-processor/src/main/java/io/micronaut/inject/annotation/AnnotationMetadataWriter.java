@@ -64,6 +64,7 @@ public class AnnotationMetadataWriter {
         AnnotationMetadataGenUtils.addAnnotationDefaults(statements,  annotationMetadata, loadClassValueExpressionFn);
 
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(type.getName())
+            .synthetic()
             .addSuperinterface(TypeDef.of(AnnotationMetadataProvider.class))
             .addField(annotationMetadataField)
             .addStaticInitializer(StatementDef.multi(statements))

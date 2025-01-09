@@ -70,6 +70,7 @@ final class GraalReflectionMetadataWriter implements ClassOutputWriter {
         ClassTypeDef thisType = ClassTypeDef.of(className);
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElement)) {
             ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(className)
+                .synthetic()
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", GraalReflectionConfigurer.class.getName()).build())
                 .addSuperinterface(ClassTypeDef.of(GraalReflectionConfigurer.class))

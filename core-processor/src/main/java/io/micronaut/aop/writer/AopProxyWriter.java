@@ -294,7 +294,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         proxyBeanDefinitionWriter.setRequiresMethodProcessing(parent.requiresMethodProcessing());
         proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
 
-        proxyBuilder = ClassDef.builder(proxyFullName);
+        proxyBuilder = ClassDef.builder(proxyFullName).synthetic();
 
         interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
@@ -402,7 +402,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
         }
 
-        proxyBuilder = ClassDef.builder(proxyFullName);
+        proxyBuilder = ClassDef.builder(proxyFullName).synthetic();
 
         interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)

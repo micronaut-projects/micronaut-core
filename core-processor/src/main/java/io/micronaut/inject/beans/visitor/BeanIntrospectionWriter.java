@@ -540,7 +540,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
 
         Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(introspectionTypeDef, loadTypeMethods);
 
-        ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).addModifiers(Modifier.FINAL, Modifier.PUBLIC);
+        ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).synthetic().addModifiers(Modifier.FINAL, Modifier.PUBLIC);
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
 
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, beanClassElement);

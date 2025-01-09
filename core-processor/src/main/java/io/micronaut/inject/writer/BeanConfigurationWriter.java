@@ -92,7 +92,7 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
     private byte[] generateClassBytes() {
         ClassTypeDef targetType = ClassTypeDef.of(configurationClassName);
 
-        ClassDef.ClassDefBuilder configurationClassBuilder = ClassDef.builder(configurationClassName)
+        ClassDef.ClassDefBuilder configurationClassBuilder = ClassDef.builder(configurationClassName).synthetic()
             .superclass(ClassTypeDef.of(AbstractBeanConfiguration.class))
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanConfiguration.class.getName()).build());

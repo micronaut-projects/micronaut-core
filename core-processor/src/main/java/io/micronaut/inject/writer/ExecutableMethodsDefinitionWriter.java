@@ -242,6 +242,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(thisType, loadTypeMethods);
 
         classDefBuilder = ClassDef.builder(className)
+            .synthetic()
             .addAnnotation(Generated.class)
             .superclass(ClassTypeDef.of(AbstractExecutableMethodsDefinition.class));
 

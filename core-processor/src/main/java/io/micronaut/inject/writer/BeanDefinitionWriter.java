@@ -802,6 +802,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         classDefBuilder = ClassDef.builder(beanDefinitionName)
+            .synthetic()
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanDefinitionReference.class.getName()).build())
             .superclass(TypeDef.parameterized(superType, argumentType));
@@ -1812,6 +1813,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private ClassTypeDef createConstructorInterceptor(ConstructorBuildMethodDefinition constructorBuildMethodDefinition) {
         String interceptedConstructorWriterName = "ConstructorInterceptor";
         ClassDef.ClassDefBuilder innerClassBuilder = ClassDef.builder(interceptedConstructorWriterName)
+            .synthetic()
             .addModifiers(Modifier.FINAL)
             .superclass(ClassTypeDef.of(AbstractBeanDefinitionBeanConstructor.class))
             .addAnnotation(Generated.class);
@@ -1845,6 +1847,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         String interceptedConstructorWriterName = "ConstructorInterceptor";
 
         ClassDef.ClassDefBuilder innerClassBuilder = ClassDef.builder(interceptedConstructorWriterName)
+            .synthetic()
             .addModifiers(Modifier.FINAL)
             .superclass(ClassTypeDef.of(AbstractBeanDefinitionBeanConstructor.class))
             .addAnnotation(Generated.class);
@@ -3623,9 +3626,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private ClassTypeDef createExecutableMethodInterceptor(MethodDef interceptMethod, String name) {
         // if there is method interception in place we need to construct an inner executable method class that invokes the "initialize"
         // method and apply interception
-        String interceptedConstructorWriterName = name;
 
-        ClassDef.ClassDefBuilder innerClassBuilder = ClassDef.builder(interceptedConstructorWriterName)
+        ClassDef.ClassDefBuilder innerClassBuilder = ClassDef.builder(name)
+            .synthetic()
             .addModifiers(Modifier.FINAL)
             .superclass(ClassTypeDef.of(AbstractExecutableMethod.class))
             .addAnnotation(Generated.class);
@@ -3692,7 +3695,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         classDefBuilder.addInnerType(innerClassBuilder.build());
 
-        return ClassTypeDef.of(beanDefinitionName + "$" + interceptedConstructorWriterName);
+        return ClassTypeDef.of(beanDefinitionName + "$" + name);
     }
 
     private StatementDef interceptAndReturn(VariableDef.This aThis,
