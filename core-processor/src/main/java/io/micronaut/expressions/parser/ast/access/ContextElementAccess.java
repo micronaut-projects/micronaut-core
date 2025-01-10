@@ -25,7 +25,8 @@ import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.List;
 
@@ -55,8 +56,8 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        contextOperation.compile(ctx);
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return contextOperation.compile(ctx);
     }
 
     @Override
@@ -65,7 +66,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return resolveContextOperation(ctx).resolveType(ctx);
     }
 
