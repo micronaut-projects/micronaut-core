@@ -301,7 +301,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String, PropertySource.PropertyEntry>[] copiedCatalog = copyCatalog();
+        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog();
         refresh();
         return diffCatalog(copiedCatalog, catalog);
     }
@@ -599,11 +599,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
-    public Optional<PropertySource.PropertyEntry> getPropertyEntry(String name) {
+    public Optional<PropertyEntry> getPropertyEntry(String name) {
         for (PropertyCatalog propertyCatalog : PropertyCatalog.values()) {
-            Map<String, PropertySource.PropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
+            Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
             if (entries != null) {
-                PropertySource.PropertyEntry entry = entries.get(name);
+                DefaultPropertyEntry entry = entries.get(name);
                 if (entry != null) {
                     return Optional.of(entry);
                 }
@@ -845,11 +845,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    private Map<String, Object> diffCatalog(Map<String, PropertySource.PropertyEntry>[] original, Map<String, PropertySource.PropertyEntry>[] newCatalog) {
+    private Map<String, Object> diffCatalog(Map<String, DefaultPropertyEntry>[] original, Map<String, DefaultPropertyEntry>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
         for (int i = 0; i < original.length; i++) {
-            Map<String, PropertySource.PropertyEntry> map = original[i];
-            Map<String, PropertySource.PropertyEntry> newMap = newCatalog[i];
+            Map<String, DefaultPropertyEntry> map = original[i];
+            Map<String, DefaultPropertyEntry> newMap = newCatalog[i];
             boolean hasNew = newMap != null;
             boolean hasOld = map != null;
             if (!hasOld && hasNew) {
@@ -864,7 +864,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         if (!changes.isEmpty()) {
             Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
-            for (Map<String, PropertySource.PropertyEntry> map :
+            for (Map<String, DefaultPropertyEntry> map :
                 newCatalog) {
                 if (map != null) {
                     map.forEach((key, v) -> {
@@ -883,14 +883,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return changes;
     }
 
-    private void diffMap(Map<String, PropertySource.PropertyEntry> map, Map<String, PropertySource.PropertyEntry> newMap, Map<String, Object> changes) {
-        for (Map.Entry<String, PropertySource.PropertyEntry> entry : newMap.entrySet()) {
+    private void diffMap(Map<String, DefaultPropertyEntry> map, Map<String, DefaultPropertyEntry> newMap, Map<String, Object> changes) {
+        for (Map.Entry<String, DefaultPropertyEntry> entry : newMap.entrySet()) {
             String key = entry.getKey();
             Object newValue = entry.getValue().value();
             if (!map.containsKey(key)) {
                 changes.put(key, newValue);
             } else {
-                Object oldValue = map.getOrDefault(key, PropertySource.PropertyEntry.NULL_ENTRY).value();
+                Object oldValue = map.getOrDefault(key, PropertySourcePropertyResolver.NULL_ENTRY).value();
                 boolean hasNew = newValue != null;
                 boolean hasOld = oldValue != null;
                 if (hasNew && !hasOld) {
@@ -908,10 +908,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return !Objects.deepEquals(newValue, oldValue);
     }
 
-    private Map<String, PropertySource.PropertyEntry>[] copyCatalog() {
-        Map<String, PropertySource.PropertyEntry>[] newCatalog = new Map[catalog.length];
+    private Map<String, DefaultPropertyEntry>[] copyCatalog() {
+        Map<String, DefaultPropertyEntry>[] newCatalog = new Map[catalog.length];
         for (int i = 0; i < catalog.length; i++) {
-            Map<String, PropertySource.PropertyEntry> entry = catalog[i];
+            Map<String, DefaultPropertyEntry> entry = catalog[i];
             if (entry != null) {
                 newCatalog[i] = new LinkedHashMap<>(entry);
             }

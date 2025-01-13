@@ -25,6 +25,7 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -92,17 +93,13 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder traceMode(BeanResolutionTraceMode traceMode) {
+    public ApplicationContextBuilder beanResolutionTrace(
+        BeanResolutionTraceMode traceMode,
+        String... classPatterns) {
         this.traceMode = traceMode == null ? BeanResolutionTraceMode.NONE : traceMode;
-        return this;
-    }
-
-    @Override
-    public ApplicationContextBuilder traceClasses(String... classPatterns) {
-        if (traceMode == BeanResolutionTraceMode.NONE) {
-            traceMode = BeanResolutionTraceMode.STANDARD_OUT;
+        if (ArrayUtils.isNotEmpty(classPatterns)) {
+            this.traceClasses = Set.of(classPatterns);
         }
-        this.traceClasses = Set.of(classPatterns);
         return this;
     }
 

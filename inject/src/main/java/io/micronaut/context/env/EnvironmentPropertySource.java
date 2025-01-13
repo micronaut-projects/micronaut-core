@@ -38,7 +38,7 @@ public class EnvironmentPropertySource extends MapPropertySource {
      * Constant for Environment property source.
      */
     public static final String NAME = "env";
-    public static final Origin ORIGIN = new Origin("System.env");
+    public static final Origin ORIGIN = Origin.of("System.env");
 
     /**
      * Default constructor.

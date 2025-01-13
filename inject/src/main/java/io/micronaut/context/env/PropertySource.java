@@ -21,6 +21,7 @@ import io.micronaut.core.order.Ordered;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A PropertySource is a location to resolve property values from. The property keys are available via the
@@ -54,7 +55,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @since 4.8.0
      */
     default @NonNull Origin getOrigin() {
-        return new Origin(getName());
+        return Origin.of(getName());
     }
 
     /**
@@ -101,7 +102,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @return The {@link PropertySource}
      * @deprecated Use {@link #of(String, Map, PropertyConvention, Origin)}
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     static PropertySource of(
         String name,
         Map<String, Object> map,
@@ -251,24 +252,20 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @since 4.8.0
      */
     @Experimental
-    record Origin(@NonNull String location) {}
+    sealed interface Origin permits DefaultOrigin {
+        /**
+         * @return The location.
+         */
+        String location();
 
-    /**
-     * A property entry models
-     * @param property The normalized property key
-     * @param value The property value
-     * @param raw The raw property key that originated the property
-     * @param origin
-     */
-    @Experimental
-    record PropertyEntry(
-        String property,
-        Object value,
-        String raw,
-        Origin origin
-    ) {
-        public static final PropertyEntry NULL_ENTRY = new PropertyEntry(
-            "NULL", null, null, null
-        );
+        /**
+         * Create an origin from a location.
+         * @param location The location
+         * @return The origin
+         */
+        static @NonNull Origin of(@NonNull String location) {
+            Objects.requireNonNull(location, "Location cannot be null");
+            return new DefaultOrigin(location);
+        }
     }
 }

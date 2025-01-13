@@ -17,7 +17,7 @@ class FieldInjectionSpec extends Specification {
     void "test bean injection via private field"() {
         given:
         BeanContext context = ApplicationContext.builder()
-            .traceMode(BeanResolutionTraceMode.STANDARD_OUT)
+            .beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT)
             .start()
 
         when:"A bean is obtained that has a setter with @Inject"

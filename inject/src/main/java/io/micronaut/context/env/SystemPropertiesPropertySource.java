@@ -47,6 +47,6 @@ public class SystemPropertiesPropertySource extends MapPropertySource {
 
     @Override
     public Origin getOrigin() {
-        return new Origin("System.properties");
+        return Origin.of("System.properties");
     }
 }

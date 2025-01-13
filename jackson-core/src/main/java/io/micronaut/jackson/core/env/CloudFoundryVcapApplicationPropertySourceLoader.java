@@ -91,6 +91,6 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
 
     @Override
     protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order, PropertySource.Origin origin) {
-        return super.createPropertySource("cloudfoundry-vcap-application", map, order, new PropertySource.Origin("env.VCAP_APPLICATION"));
+        return super.createPropertySource("cloudfoundry-vcap-application", map, order, PropertySource.Origin.of("env.VCAP_APPLICATION"));
     }
 }

@@ -78,7 +78,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
 
                 if (!finalMap.isEmpty()) {
                     return Optional.of(
-                        createPropertySource(fileName, finalMap, order, new PropertySource.Origin(fileExt))
+                        createPropertySource(fileName, finalMap, order, PropertySource.Origin.of(fileExt))
                     );
                 }
             }

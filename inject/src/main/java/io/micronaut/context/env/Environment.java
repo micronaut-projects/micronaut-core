@@ -289,7 +289,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * @return This environment
      * @deprecated Use {@link #addPropertySource(PropertySource)}
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     default Environment addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
         if (StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
             return addPropertySource(PropertySource.of(name, values));
@@ -373,7 +373,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * @since 4.8.0
      */
     @Experimental
-    default Optional<PropertySource.PropertyEntry> getPropertyEntry(@NonNull String name) {
+    default Optional<PropertyEntry> getPropertyEntry(@NonNull String name) {
         return Optional.empty();
     }
 }

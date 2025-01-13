@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertyEntry;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -59,13 +60,7 @@ public enum BeanResolutionTraceMode {
     /**
      * With standard out debug output will be written to {@link System#out} avoiding any log formatting.
      */
-    STANDARD_OUT,
-
-    /**
-     * Interactive mode will leverage both {@link System#out} and {@link System#in}
-     * to allow pausing and resuming bean resolution and inspecting state.
-     */
-    INTERACTIVE;
+    STANDARD_OUT;
 
     static final Logger LOGGER = LoggerFactory.getLogger("io.micronaut.inject");
     private static final String MODE_SYS_PROP = "micronaut.inject.trace.mode";
@@ -215,7 +210,7 @@ public enum BeanResolutionTraceMode {
         if (context instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             PropertySource.Origin origin = environment.getPropertyEntry(property)
-                .map(PropertySource.PropertyEntry::origin)
+                .map(PropertyEntry::origin)
                 .orElse(null);
             String prefix = padLeft(resolutionContext, 1) + RIGHT_ARROW;
             StringWriter sw = new StringWriter();
@@ -231,7 +226,6 @@ public enum BeanResolutionTraceMode {
             } catch (IOException e) {
                 // ignore, should not happen
             }
-            // TODO: other output methods
             switch (this) {
                 case STANDARD_OUT -> System.out.println(sw);
                 case LOG -> LOGGER.trace(sw.toString());
@@ -410,7 +404,7 @@ public enum BeanResolutionTraceMode {
                     try {
                         writer.write(" ✚ ");
                         writer.write(AnsiColour.formatObject(entry));
-                        PropertySource.PropertyEntry pe = environment.getPropertyEntry(entry).orElse(null);
+                        PropertyEntry pe = environment.getPropertyEntry(entry).orElse(null);
                         if (pe != null) {
                             String text = " Origin(" + AnsiColour.formatObject(pe.raw()) + " from " + AnsiColour.brightYellow(pe.origin().location()) + ")";
                             writer.write(text);

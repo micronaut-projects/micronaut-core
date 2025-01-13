@@ -46,7 +46,7 @@ class Bar {
     void "test injection via field with interface"() {
         given:
         ApplicationContext context = ApplicationContext.builder()
-                                            .traceMode(BeanResolutionTraceMode.STANDARD_OUT)
+                                            .beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT)
                                             .start()
 
         when:"Alpha bean is obtained that has a field with @Inject"

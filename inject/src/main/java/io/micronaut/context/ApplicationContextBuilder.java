@@ -39,21 +39,14 @@ public interface ApplicationContextBuilder {
     /**
      * Sets the trace mode for bean resolution.
      * @param traceMode The debug mode
+     * @param classPatterns The patterns
      * @since 4.8.0
      * @see BeanResolutionTraceMode
      * @return This builder
      */
-    default @NonNull ApplicationContextBuilder traceMode(@NonNull BeanResolutionTraceMode traceMode) {
-        return this;
-    }
-
-    /**
-     * The patterns of the classes to trace using Ant style-patterns ({@code com.example.* }). Can be a regular expression.
-     * @param classPatterns The class patterns.
-     * @return The class patterns to trace
-     * @since 4.8.0
-     */
-    default ApplicationContextBuilder traceClasses(String... classPatterns) {
+    default @NonNull ApplicationContextBuilder beanResolutionTrace(
+        @NonNull BeanResolutionTraceMode traceMode,
+        String... classPatterns) {
         return this;
     }
 

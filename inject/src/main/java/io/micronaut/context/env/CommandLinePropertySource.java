@@ -49,7 +49,7 @@ public class CommandLinePropertySource extends MapPropertySource {
 
     @Override
     public Origin getOrigin() {
-        return new Origin("main(String...args)");
+        return Origin.of("main(String...args)");
     }
 
     @Override
