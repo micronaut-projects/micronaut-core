@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @TypeHint(value = MediaType[].class)
-public class MediaType implements CharSequence, Comparable<MediaType> {
+public class MediaType implements CharSequence {
 
     /**
      * Default file extension used for JSON.
@@ -1273,8 +1273,27 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
                 }
             }
         }
-        mediaTypes.sort(null);
+        mediaTypes.sort(MediaType::naturalSort);
         return Collections.unmodifiableList(mediaTypes);
+    }
+
+    private static int naturalSort(MediaType o1, MediaType o2)  {
+        //The */* type is always last
+        boolean fullWildcard1 = o1.type.equals(WILDCARD);
+        boolean fullWildcard2 = o2.type.equals(WILDCARD);
+        if (fullWildcard1 && fullWildcard2) {
+            return 0;
+        } else if (fullWildcard1) {
+            return 1;
+        } else if (fullWildcard2) {
+            return -1;
+        }
+        if (o2.subtype.equals(WILDCARD) && !o1.subtype.equals(WILDCARD)) {
+            return -1;
+        } else if (o1.subtype.equals(WILDCARD) && !o2.subtype.equals(WILDCARD)) {
+            return 1;
+        }
+        return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
     }
 
     /**
@@ -1396,26 +1415,5 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
         }
 
         return Collections.emptyMap();
-    }
-
-    @Override
-    public int compareTo(@NonNull MediaType o2) {
-        //The */* type is always last
-        MediaType o1 = this;
-        boolean fullWildcard1 = o1.type.equals(WILDCARD);
-        boolean fullWildcard2 = o2.type.equals(WILDCARD);
-        if (fullWildcard1 && fullWildcard2) {
-            return 0;
-        } else if (fullWildcard1) {
-            return 1;
-        } else if (fullWildcard2) {
-            return -1;
-        }
-        if (o2.subtype.equals(WILDCARD) && !o1.subtype.equals(WILDCARD)) {
-            return -1;
-        } else if (o1.subtype.equals(WILDCARD) && !o2.subtype.equals(WILDCARD)) {
-            return 1;
-        }
-        return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
     }
 }
