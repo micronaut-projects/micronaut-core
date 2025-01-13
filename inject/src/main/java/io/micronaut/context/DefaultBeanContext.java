@@ -1036,13 +1036,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (candidate.isPresent()) {
             BeanDefinition<T> beanDefinition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
-                T bean;
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                } else {
-                    throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+                    T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
+                    return postBeanCreated(resolutionContext, beanDefinition, qualifier, bean);
                 }
-                return postBeanCreated(resolutionContext, beanDefinition, qualifier, bean);
             }
         }
         throw newNoSuchBeanException(
@@ -1082,14 +1079,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (LOG.isTraceEnabled()) {
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
-        T bean;
         if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-            bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
+            T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
+            return postBeanCreated(resolutionContext, definition, qualifier, bean);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
         }
-        return postBeanCreated(resolutionContext, definition, qualifier, bean);
-
     }
 
     @NonNull
@@ -1397,13 +1392,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                T bean;
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                    T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                    return postBeanCreated(context, candidate, qualifier, bean);
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
-                return postBeanCreated(context, candidate, qualifier, bean);
             }
         }
         throw newNoSuchBeanException(
