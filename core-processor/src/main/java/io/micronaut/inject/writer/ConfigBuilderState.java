@@ -18,8 +18,6 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.Type;
 
 /**
  * Stores data to be used when visiting a configuration builder method.
@@ -32,7 +30,7 @@ import org.objectweb.asm.Type;
 class ConfigBuilderState {
 
     private final String name;
-    private final Type type;
+    private final ClassElement type;
     private final boolean invokeMethod;
     private final AnnotationMetadata annotationMetadata;
     private final boolean isInterface;
@@ -46,7 +44,7 @@ class ConfigBuilderState {
      * @param isInterface        Whether the type is an interface or not
      */
     ConfigBuilderState(ClassElement type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, boolean isInterface) {
-        this.type = JavaModelUtils.getTypeReference(type);
+        this.type = type;
         this.name = name;
         this.invokeMethod = isMethod;
         this.annotationMetadata = annotationMetadata;
@@ -63,7 +61,7 @@ class ConfigBuilderState {
     /**
      * @return The type
      */
-    public Type getType() {
+    public ClassElement getType() {
         return type;
     }
 

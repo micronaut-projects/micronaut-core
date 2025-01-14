@@ -14,6 +14,10 @@ micronautBuild {
 dependencies {
     api(projects.micronautCoreProcessor)
 
+    // We use ASM API for some type conversions
+    implementation(platform(libs.boms.micronaut.sourcegen))
+    implementation(libs.asm)
+
     implementation(libs.managed.ksp.api)
 
     kspTest(project)

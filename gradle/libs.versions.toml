@@ -1,5 +1,4 @@
 [versions]
-asm = "9.7.1"
 awaitility = "4.2.2"
 bcpkix = "1.70"
 blaze = "1.6.14"
@@ -64,7 +63,7 @@ tomlj="1.1.1"
 vertx = "4.5.11"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-sourcegen-bytecode-generator = "1.6.1"
+micronaut-sourcegen = "1.6.1"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -105,6 +104,7 @@ boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "manag
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
 
 #
 # Libraries which start with managed- are managed by Micronaut in the sense
@@ -171,9 +171,9 @@ managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snak
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
-asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
-asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
-asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+asm = { module = "org.ow2.asm:asm" }
+asm-commons = { module = "org.ow2.asm:asm-commons" }
+asm-util = { module = "org.ow2.asm:asm-util" }
 
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 
@@ -302,7 +302,7 @@ mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 
-sourcegen-bytecode-generator = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bytecode-writer", version.ref = "sourcegen-bytecode-generator" }
+sourcegen-bytecode-generator = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bytecode-writer" }
 
 [bundles]
 asm = ["asm", "asm-commons"]

@@ -141,7 +141,6 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
-import org.objectweb.asm.Type;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -977,8 +976,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     @Override
-    public Optional<Type> getInterceptedType() {
-        throw new IllegalStateException("Not supported!");
+    public Optional<String> getInterceptedType() {
+        return Optional.ofNullable(interceptedType);
     }
 
     @Override

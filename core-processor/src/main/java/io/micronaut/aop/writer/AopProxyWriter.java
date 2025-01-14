@@ -75,7 +75,6 @@ import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
-import org.objectweb.asm.Type;
 
 import javax.lang.model.element.Modifier;
 import java.io.File;
@@ -495,7 +494,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     }
 
     @Override
-    public Optional<Type> getInterceptedType() {
+    public Optional<String> getInterceptedType() {
         return proxyBeanDefinitionWriter.getInterceptedType();
     }
 
