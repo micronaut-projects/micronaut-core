@@ -9,8 +9,7 @@ dependencies {
         exclude(group = "org.javassist", module = "javassist")
         exclude(group = "com.google.guava", module = "guava")
     }
-    api(platform(libs.boms.micronaut.sourcegen))
-    api(libs.sourcegen.bytecode.generator)
+    api(mnSourcegen.micronaut.sourcegen.bytecode.writer)
     implementation(projects.micronautCoreReactive)
 
     compileOnly(libs.managed.kotlin.stdlib.jdk8)

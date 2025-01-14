@@ -171,10 +171,6 @@ managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snak
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
-asm = { module = "org.ow2.asm:asm" }
-asm-commons = { module = "org.ow2.asm:asm-commons" }
-asm-util = { module = "org.ow2.asm:asm-util" }
-
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
@@ -301,11 +297,6 @@ httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.r
 mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
-
-sourcegen-bytecode-generator = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bytecode-writer" }
-
-[bundles]
-asm = ["asm", "asm-commons"]
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
