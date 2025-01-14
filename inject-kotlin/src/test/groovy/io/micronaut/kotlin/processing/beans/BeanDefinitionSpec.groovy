@@ -1279,6 +1279,7 @@ annotation class NotNull
                     .filter {f -> !f.isSynthetic()}
                     .findFirst().orElseThrow()
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
+                    .findAll { !it.name.contains('$jacoco')}
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
     }
