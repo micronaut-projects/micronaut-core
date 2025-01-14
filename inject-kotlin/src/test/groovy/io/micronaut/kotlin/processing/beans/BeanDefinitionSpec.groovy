@@ -1281,7 +1281,7 @@ annotation class NotNull
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
                     .findAll { !it.name.contains('$jacoco')}
         then:
-            supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+            supertypeMethods.every {doWorkMethod.name.contains(it.name)}
     }
 
     void "test java class value annotation"() {
