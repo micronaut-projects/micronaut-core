@@ -134,14 +134,8 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     }
 
     private ExpressionDef.ComparisonOperation.OpType invert(ExpressionDef.ComparisonOperation.OpType instruction) {
+        // INVESTIGATE: LESS_THEN should be inverted to GREATER_THAN_OR_EQUAL and the opposites
         return switch (instruction) {
-//            case EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO;
-//            case NOT_EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.EQUAL_TO;
-//            case GREATER_THAN -> ExpressionDef.ComparisonOperation.OpType.LESS_THAN_OR_EQUAL;
-//            case LESS_THAN -> ExpressionDef.ComparisonOperation.OpType.GREATER_THAN_OR_EQUAL;
-//            case GREATER_THAN_OR_EQUAL -> ExpressionDef.ComparisonOperation.OpType.LESS_THAN;
-//            case LESS_THAN_OR_EQUAL -> ExpressionDef.ComparisonOperation.OpType.GREATER_THAN;
-//        };
             case EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO;
             case NOT_EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.EQUAL_TO;
             case GREATER_THAN -> ExpressionDef.ComparisonOperation.OpType.LESS_THAN;
