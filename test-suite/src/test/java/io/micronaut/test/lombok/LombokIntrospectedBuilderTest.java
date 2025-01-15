@@ -16,6 +16,19 @@ import java.util.UUID;
 public class LombokIntrospectedBuilderTest {
 
     @Test
+    void testNoArgsAndAllArgsConstructor() {
+        BeanIntrospection<BarCommand> introspection = BeanIntrospection.getIntrospection(BarCommand.class);
+
+        BeanIntrospection.Builder<BarCommand> builder = introspection.builder();
+
+        builder.with("foo", "one");
+        builder.with("bar", "two");
+        builder.with("baz", "three");
+        BarCommand result = builder.build();
+        assertEquals("BarCommand(foo=one, bar=two, baz=three)", result.toString());
+    }
+
+    @Test
     void testLombokNoArgsConstructor() {
         BeanIntrospection<Book> introspection = BeanIntrospection.getIntrospection(Book.class);
         assertEquals(0, introspection.getConstructorArguments().length);
