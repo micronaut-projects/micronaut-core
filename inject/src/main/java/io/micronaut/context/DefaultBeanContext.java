@@ -305,8 +305,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beanContextConfiguration = contextConfiguration;
-        this.traceMode = beanContextConfiguration.getTraceMode();
-        this.tracePatterns = beanContextConfiguration.getTraceClasses();
+        BeanResolutionTraceConfiguration traceConfiguration = beanContextConfiguration
+            .getTraceConfiguration();
+        this.traceMode = traceConfiguration.mode();
+        this.tracePatterns = traceConfiguration.classPatterns();
     }
 
     /**

@@ -144,11 +144,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
             configurer.configure(this)
         );
         if (traceMode != BeanResolutionTraceMode.NONE) {
-            traceMode.traceConfiguration(
-                this.environment,
-                this.getBeanDefinitionReferences(),
-                this.getDisabledBeans()
-            );
+            traceMode.getTracer().ifPresent(tracer -> {
+                tracer.traceInitialConfiguration(
+                    this.environment,
+                    this.getBeanDefinitionReferences(),
+                    this.getDisabledBeans()
+                );
+            });
         }
     }
 

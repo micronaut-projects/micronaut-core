@@ -25,6 +25,8 @@ import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * An interface for building an application context.
@@ -47,6 +49,25 @@ public interface ApplicationContextBuilder {
     default @NonNull ApplicationContextBuilder beanResolutionTrace(
         @NonNull BeanResolutionTraceMode traceMode,
         String... classPatterns) {
+        Objects.requireNonNull(traceMode, "Trace mode cannot be null");
+        return beanResolutionTrace(
+            new BeanResolutionTraceConfiguration(
+                traceMode,
+                Set.of(classPatterns),
+                null
+            )
+        );
+    }
+
+    /**
+     * Sets the trace mode for bean resolution.
+     * @param configuration The trace configuration
+     * @since 4.8.0
+     * @see BeanResolutionTraceMode
+     * @return This builder
+     */
+    default @NonNull ApplicationContextBuilder beanResolutionTrace(
+        @NonNull BeanResolutionTraceConfiguration configuration) {
         return this;
     }
 
