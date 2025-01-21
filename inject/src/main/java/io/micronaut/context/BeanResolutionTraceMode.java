@@ -41,7 +41,12 @@ public enum BeanResolutionTraceMode {
     /**
      * With standard out debug output will be written to {@link System#out} avoiding any log formatting.
      */
-    STANDARD_OUT(new ConsoleBeanResolutionTracer.SystemOutBeanResolutionTracer());
+    STANDARD_OUT(new ConsoleBeanResolutionTracer.SystemOutBeanResolutionTracer()),
+
+    /**
+     * Write a trace into a flame graph that can be used to diagnose startup issues.
+     */
+    FLAME_GRAPH(new FlameGraphBeanResolutionTracer());
 
     static final Logger LOGGER = LoggerFactory.getLogger("io.micronaut.inject");
     private static final String MODE_SYS_PROP = "micronaut.inject.trace.mode";

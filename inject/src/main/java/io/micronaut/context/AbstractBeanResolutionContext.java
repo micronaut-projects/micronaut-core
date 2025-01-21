@@ -154,11 +154,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             Object propertyValue = value.orElse(null);
             traceMode.getTracer().ifPresent(tracer ->
                 tracer.traceValueResolved(
-                this,
-                (Argument<? super Object>) argument,
-                propertyName,
-                propertyValue
-            ));
+                    this,
+                    (Argument<? super Object>) argument,
+                    propertyName,
+                    propertyValue
+                ));
         }
 
         if (argument.isOptional()) {
@@ -808,13 +808,25 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public void close() {
-            Path.super.close();
-            if (traceEnabled && isEmpty()) {
-                traceMode.getTracer().ifPresent(tracer -> tracer.traceBeanCreated(
-                    AbstractBeanResolutionContext.this,
-                    rootDefinition
-                ));
+            if (traceEnabled) {
+                traceMode.getTracer().ifPresent(tracer -> {
+                    if (isEmpty()) {
+                        tracer.traceBeanCreated(
+                            AbstractBeanResolutionContext.this,
+                            rootDefinition
+                        );
+                    } else {
+                        Segment<?, ?> segment = peek();
+                        if (segment != null) {
+                            tracer.traceInjectComplete(
+                                AbstractBeanResolutionContext.this,
+                                segment
+                            );
+                        }
+                    }
+                });
             }
+            Path.super.close();
         }
     }
 

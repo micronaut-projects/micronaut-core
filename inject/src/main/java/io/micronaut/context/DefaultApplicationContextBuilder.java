@@ -73,7 +73,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
-    private BeanResolutionTraceConfiguration traceConfiguration;
+    private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
 
     /**
      * Default constructor.

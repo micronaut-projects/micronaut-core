@@ -36,10 +36,12 @@ public interface BeanResolutionTracer {
      * @param beanReferences The loaded bean references
      * @param disabledBeans The disabled beans
      */
-    void traceInitialConfiguration(
+    default void traceInitialConfiguration(
         @NonNull Environment environment,
         @NonNull Collection<BeanDefinitionReference<?>> beanReferences,
-        @NonNull Collection<DisabledBean<?>> disabledBeans);
+        @NonNull Collection<DisabledBean<?>> disabledBeans) {
+        // no-op
+    }
 
     /**
      * Start tracing the creation of a bean.
@@ -61,12 +63,14 @@ public interface BeanResolutionTracer {
      * @param bean The bean (can be {@code null} if a factory resolved to {@code null}
      * @param <T> The bean generic type
      */
-    <T> void traceBeanResolved(
+    default <T> void traceBeanResolved(
         @NonNull BeanResolutionContext resolutionContext,
         @NonNull Argument<T> beanType,
         @Nullable Qualifier<T> qualifier,
         @Nullable T bean
-    );
+    ) {
+        // no-op
+    }
 
     /**
      * Callback to trace when bean resolution detected disabled beans that
@@ -77,11 +81,13 @@ public interface BeanResolutionTracer {
      * @param disabledBeanMessage The message
      * @param <T> The bean generic type
      */
-    <T> void traceBeanDisabled(
+    default <T> void traceBeanDisabled(
         @NonNull BeanResolutionContext resolutionContext,
         @NonNull Argument<T> beanType,
         @NonNull Qualifier<T> qualifier,
-        @NonNull String disabledBeanMessage);
+        @NonNull String disabledBeanMessage) {
+        // no-op
+    }
 
     /**
      * Trace when a value is resolved.
@@ -94,12 +100,14 @@ public interface BeanResolutionTracer {
      * @param value The value
      * @param <T> The value generic type
      */
-    <T> void traceValueResolved(
+    default <T> void traceValueResolved(
         @NonNull BeanResolutionContext resolutionContext,
         @NonNull Argument<T> argument,
         @NonNull String property,
         @NonNull T value
-    );
+    ) {
+        // no-op
+    }
 
     /**
      * Trace when a bean has been created and all bean creation listeners fired.
@@ -124,4 +132,25 @@ public interface BeanResolutionTracer {
     <B, T> void traceInjectBean(
         @NonNull BeanResolutionContext resolutionContext,
         @NonNull BeanResolutionContext.Segment<B, T> segment);
+
+    /**
+     * Called on the completion of resolution of an injection point.
+     * @param resolutionContext The resolution context
+     * @param segment The segment
+     * @param <B> The bean type
+     * @param <T> The injection point type
+     */
+    default <B, T> void traceInjectComplete(
+        BeanResolutionContext resolutionContext,
+        BeanResolutionContext.Segment<B, T> segment) {
+        // no-op
+    }
+
+    /**
+     * Trace the shutdown of the context.
+     * @param beanContext The bean context
+     */
+    default void traceContextShutdown(BeanContext beanContext) {
+        // no-op
+    }
 }

@@ -484,6 +484,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             terminating.set(false);
             running.set(false);
             configured.set(false);
+            if (traceMode != BeanResolutionTraceMode.NONE) {
+                traceMode.getTracer().ifPresent(tracer -> {
+                    tracer.traceContextShutdown(this);
+                });
+            }
         }
         return this;
     }

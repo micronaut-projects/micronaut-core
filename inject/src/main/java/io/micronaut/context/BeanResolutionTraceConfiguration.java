@@ -41,6 +41,9 @@ public record BeanResolutionTraceConfiguration(
     }
 
     public BeanResolutionTraceConfiguration() {
-        this(BeanResolutionTraceMode.NONE, Set.of(), null);
+        this(
+            BeanResolutionTraceMode.getDefaultMode(
+            BeanResolutionTraceMode.getDefaultTraceClasses()),
+            BeanResolutionTraceMode.getDefaultTraceClasses(), null);
     }
 }
