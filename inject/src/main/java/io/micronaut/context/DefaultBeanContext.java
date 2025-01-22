@@ -1673,6 +1673,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     @Override
+    public BeanContext registerBeanConfiguration(BeanConfiguration configuration) {
+        Objects.requireNonNull(configuration, "Configuration cannot be null");
+        this.beanConfigurations.put(configuration.getName(), configuration);
+        return this;
+    }
+
+    @Override
     @NonNull
     public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");

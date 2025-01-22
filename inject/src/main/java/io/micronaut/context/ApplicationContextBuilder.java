@@ -21,6 +21,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.BeanConfiguration;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
@@ -142,6 +143,16 @@ public interface ApplicationContextBuilder {
      * @since 4.5.0
      */
     default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        return this;
+    }
+
+    /**
+     * Register additional bean configurations.
+     * @param configurations The configurations.
+     * @return This builder
+     * @since 4.8.0
+     */
+    default @NonNull ApplicationContextBuilder beanConfigurations(@NonNull BeanConfiguration... configurations) {
         return this;
     }
 
