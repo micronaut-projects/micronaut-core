@@ -19,6 +19,10 @@ public class FlagAppender extends AppenderBase<ILoggingEvent> {
 
     @Override
     protected void append(ILoggingEvent eventObject) {
+        if (eventObject.getLoggerName().equals(BufferLeakDetection.class.getName())) {
+            // ignore 'Canary leak detection failed.' messages
+            return;
+        }
         triggered = true;
     }
 }

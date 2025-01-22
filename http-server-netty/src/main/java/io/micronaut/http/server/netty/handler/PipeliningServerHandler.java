@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.EOFException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -557,6 +558,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        void discard() {
+            // note: this has to match RoutingInBoundHandler#IGNORABLE_ERROR_MESSAGE
+            handleUpstreamError(new EOFException("Connection closed before full body was received"));
+        }
+
+        @Override
         void handleUpstreamError(Throwable cause) {
             if (inboundHandler instanceof DecompressingInboundHandler dih) {
                 dih.dispose();
@@ -699,6 +706,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void handleUpstreamError(Throwable cause) {
             delegate.handleUpstreamError(cause);
+        }
+
+        @Override
+        void discard() {
+            dispose();
+            delegate.discard();
         }
     }
 
