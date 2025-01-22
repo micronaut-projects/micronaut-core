@@ -95,7 +95,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
         }
     }
 
-    protected  SslContextBuilder createSslContextBuilder(SslConfiguration ssl, HttpVersionSelection versionSelection) {
+    protected SslContextBuilder createSslContextBuilder(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
