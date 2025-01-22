@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.fuzzing
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -84,8 +85,10 @@ class FuzzyInputSpec extends Specification {
         when:
         def embeddedChannel = embeddedServer.buildEmbeddedChannel(false)
 
-        embeddedChannel.writeInbound(Unpooled.wrappedBuffer(input));
-        embeddedChannel.runPendingTasks();
+        def b = embeddedChannel.alloc().buffer(input.length)
+        b.writeBytes(input)
+        embeddedChannel.writeInbound(b)
+        embeddedChannel.runPendingTasks()
 
         embeddedChannel.releaseOutbound()
         // don't release inbound, that doesn't happen normally either
@@ -110,6 +113,7 @@ class FuzzyInputSpec extends Specification {
                 Base64.decoder.decode("VCB4dCBQLzUuMQoKUDIg/CBIUFRQLzEuMgotdHlwZTo3ClRyYX5zZmVyLUVuRVRUbmc6ZGVmbGF0ZQoKL7lFUDIg/CBIUFRQLzEuMQotdHlwZTotdHlwZTo3ClRyYW5zZmVyeXBlOjf///////////////////////////////////////////////////////////////////////////////////////////8KVHJhbnNmZXItRW5jb2Rpbmc6ZGVmbGF0ZQpjb250ZW50LWxlbmd0aDo4CgoNSU9OUyAvILiqVFAvCgovuUVQMkdHR0d3AC07biE="),
                 Base64.decoder.decode("UyAvIFAvMC4xMQpjb250ZW50LWxlbmd0aDo0ClRyYW5zZmVyLUVuY29kaW5nOmRlZmxhdGUKCi+5RVAyIPwgSC8xLjEK"),
                 Base64.decoder.decode("cA1ACUhUVFAvOC4wCkhvc3Q6OgpPcmlnaW46Cgo="),
+                Base64.decoder.decode("SEVDc3QNQP/9P/8JSFRUUC8wLjEKZXB0OgoKcG9zdA1A/T/9Oi8v/y9lY2hvLXB1Ymxpc2hlcglIVFRQLzAuMQp0OgpDb250ZW50LUxlbmd0aDo1Cgr/"),
         ]
     }
 
@@ -125,6 +129,11 @@ class FuzzyInputSpec extends Specification {
         @Post
         public Publisher<String> index(Publisher<String> foo) {
             return foo
+        }
+
+        @Post("/echo-publisher")
+        public Publisher<byte[]> echo(@Body Publisher<byte[]> foo) {
+            return foo;
         }
     }
 }
