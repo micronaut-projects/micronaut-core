@@ -230,6 +230,7 @@ junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engi
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
+jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
