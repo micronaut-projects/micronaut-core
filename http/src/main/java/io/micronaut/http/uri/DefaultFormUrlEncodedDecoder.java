@@ -36,7 +36,9 @@ final class DefaultFormUrlEncodedDecoder implements FormUrlEncodedDecoder {
     @NonNull
     public Map<String, Object> decode(@NonNull String formUrlEncodedString,
                                       @NonNull Charset charset) {
-        QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncodedString, charset, false, formConfiguration.getMaxDecodedKeyValueParameters());
+        QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncodedString, charset, false,
+                                                            formConfiguration.getMaxDecodedKeyValueParameters(),
+                                                            formConfiguration.isSemicolonIsNormalChar());
         return flatten(decoder.parameters());
     }
 }

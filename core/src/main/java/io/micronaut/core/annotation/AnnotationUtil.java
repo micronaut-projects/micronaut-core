@@ -136,6 +136,11 @@ public class AnnotationUtil {
     public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
 
     /**
+     * The adapter annotation type.
+     */
+    public static final String ANN_ADAPTER = "io.micronaut.aop.Adapter";
+
+    /**
      * Name of the interceptor binding type.
      */
     public static final String ANN_INTERCEPTOR_BINDING = "io.micronaut.aop.InterceptorBinding";

@@ -127,6 +127,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DISPATCH_OPTIONS_REQUESTS = false;
+
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_SEMICOLON_IS_NORMAL_CHAR = false;
+
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_PARAMS = 1024;
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -155,6 +161,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
     private boolean notFoundOnMissingBody = true;
+    private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
      * Default constructor.
@@ -597,6 +605,45 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     public void setNotFoundOnMissingBody(boolean notFoundOnMissingBody) {
         this.notFoundOnMissingBody = notFoundOnMissingBody;
     }
+
+    /**
+     * Returns whether the semicolon is considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @return {@code true} if the semicolon is a normal character, {@code false} otherwise.
+     * @since 4.8
+     */
+    public boolean isSemicolonIsNormalChar() {
+        return semicolonIsNormalChar;
+    }
+
+    /**
+     * Sets whether the semicolon should be considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @param semicolonIsNormalChar {@code true} if the semicolon should be a normal character, {@code false} otherwise.
+     * @since 4.8
+     */
+    public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * @return the maximum parameter count.
+     * @since 4.8
+     */
+    public int getMaxParams() {
+        return maxParams;
+    }
+
+    /**
+     * @param maxParams the maximum parameter count.
+     * @since 4.8
+     */
+    public void setMaxParams(int maxParams) {
+        this.maxParams = maxParams;
+    }
+
 
     /**
      * Configuration for multipart handling.

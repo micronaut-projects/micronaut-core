@@ -21,13 +21,10 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isBoolean;
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.IFNE;
 
 /**
  * Expression node for unary '!' operator.
@@ -42,12 +39,12 @@ public final class NotOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (nodeType != null) {
             return nodeType;
         }
 
-        Type nodeType = super.doResolveType(ctx);
+        TypeDef nodeType = super.doResolveType(ctx);
         if (!isBoolean(nodeType)) {
             throw new ExpressionCompilationException(
                 "Invalid unary '!' operation. Unary '!' can only be applied to boolean types");
@@ -58,19 +55,7 @@ public final class NotOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label returnLabel = new Label();
-
-        operand.compile(ctx);
-        mv.visitJumpInsn(IFNE, falseLabel);
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, returnLabel);
-
-        mv.visitLabel(falseLabel);
-        mv.push(false);
-
-        mv.visitLabel(returnLabel);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return operand.compile(ctx).isFalse();
     }
 }

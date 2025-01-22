@@ -19,25 +19,20 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
-import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isPrimitive;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
-import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
 
 /**
  * Abstract expression AST node for method calls.
@@ -47,7 +42,7 @@ import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
  */
 @Internal
 public abstract sealed class AbstractMethodCall extends ExpressionNode permits ContextMethodCall,
-                                                                               ElementMethodCall {
+    ElementMethodCall {
     protected final String name;
     protected final List<ExpressionNode> arguments;
 
@@ -60,7 +55,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (usedMethod == null) {
             usedMethod = resolveUsedMethod(ctx);
         }
@@ -79,10 +74,10 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @param ctx Expression compilation context
      * @return AST node candidate method
      * @throws io.micronaut.expressions.parser.exception.ExpressionCompilationException if no
-     * candidate method can be found or if there is more than one candidate method.
+     *                                                                                  candidate method can be found or if there is more than one candidate method.
      */
     @NonNull
-    protected abstract CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx);
+    abstract CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx);
 
     /**
      * Builds candidate method for method element.
@@ -90,12 +85,11 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @param ctx           expression compilation context
      * @param methodElement method element
      * @param argumentTypes types of arguments used for method invocation in expression
-     *
      * @return candidate method
      */
-    protected CandidateMethod toCandidateMethod(ExpressionVisitorContext ctx,
-                                                MethodElement methodElement,
-                                                List<Type> argumentTypes) {
+    CandidateMethod toCandidateMethod(ExpressionVisitorContext ctx,
+                                      MethodElement methodElement,
+                                      List<TypeDef> argumentTypes) {
         VisitorContext visitorContext = ctx.visitorContext();
 
         List<ClassElement> arguments =
@@ -141,68 +135,38 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * Resolve types of method invocation arguments.
      *
      * @param ctx expression evaluation context
-     *
      * @return types of method arguments
      */
-    protected List<Type> resolveArgumentTypes(ExpressionVisitorContext ctx) {
+    protected List<TypeDef> resolveArgumentTypes(ExpressionVisitorContext ctx) {
         return arguments.stream()
-                   .map(argument -> argument instanceof TypeIdentifier
-                       ? TypeDescriptors.CLASS
-                       : argument.resolveType(ctx))
-                   .toList();
+            .map(argument -> argument instanceof TypeIdentifier ? TypeDef.CLASS : argument.resolveType(ctx))
+            .toList();
     }
 
     /**
      * Compiles method arguments.
      *
      * @param ctx expression evaluation context
+     * @return expressions
      */
-    protected void compileArguments(ExpressionCompilationContext ctx) {
+    protected List<ExpressionDef> compileArguments(ExpressionCompilationContext ctx) {
         List<ExpressionNode> arguments = this.arguments;
         if (usedMethod.isVarArgs()) {
             arguments = prepareVarargsArguments();
         }
-
-        for (int i = 0; i < arguments.size(); i++) {
-            compileArgument(ctx, i, arguments.get(i));
-        }
-    }
-
-    /**
-     * Compiles given method argument.
-     *
-     * @param ctx           expression evaluation context
-     * @param argumentIndex argument index
-     * @param argument      compiled argument
-     */
-    private void compileArgument(ExpressionCompilationContext ctx,
-                                 int argumentIndex,
-                                 ExpressionNode argument) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        if (usedMethod.getParameters().size() > argumentIndex) {
-            Type parameterType = getTypeReference(usedMethod.getParameters().get(argumentIndex));
-            Type argumentType = argument.resolveType(ctx);
-
-            argument.compile(ctx);
-            if (isPrimitive(parameterType)) {
-                pushUnboxPrimitiveIfNecessary(argumentType, mv);
-            } else {
-                pushBoxPrimitiveIfNecessary(argumentType, mv);
-            }
-        }
+        return arguments.stream().map(argument -> argument.compile(ctx)).collect(Collectors.toList());
     }
 
     /**
      * Prepares arguments string for logging purposes.
      *
      * @param ctx expression compilation context
-     *
      * @return arguments string
      */
     protected String stringifyArguments(ExpressionVisitorContext ctx) {
         return arguments.stream()
-                   .map(argument -> argument.resolveType(ctx))
-                   .map(Type::getClassName)
-                   .collect(Collectors.joining(", ", "(", ")"));
+            .map(argument -> argument.resolveType(ctx))
+            .map(Object::toString)
+            .collect(Collectors.joining(", ", "(", ")"));
     }
 }

@@ -69,7 +69,6 @@ configurations.all {
 }
 
 dependencies {
-    annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {
         if (micronautCore.documented.get()) {
             it
@@ -82,10 +81,8 @@ dependencies {
 
     api libs.slf4j.api
     compileOnly libs.caffeine
-    compileOnly libs.bundles.asm
 
     testAnnotationProcessor projects.micronautHttpValidation
-    testAnnotationProcessor libs.bundles.asm
 
     testImplementation libs.caffeine
     testImplementation libs.managed.groovy
@@ -94,7 +91,6 @@ dependencies {
     }
 
     testImplementation libs.groovy.test.junit5
-    testImplementation libs.bundles.asm
 }
 
 spotless {

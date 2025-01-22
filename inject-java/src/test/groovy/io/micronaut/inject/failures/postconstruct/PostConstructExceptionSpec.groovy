@@ -35,7 +35,7 @@ Error instantiating bean of type  [io.micronaut.inject.failures.postconstruct.My
 
 Message: bad
 Path Taken:
-new i.m.i.f.p.MyClassB()'''
+new @j.i.Singleton i.m.i.f.p.MyClassB()'''
 
         cleanup:
         context.close()

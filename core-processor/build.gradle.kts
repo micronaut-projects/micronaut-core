@@ -5,13 +5,13 @@ plugins {
 dependencies {
     api(projects.micronautInject)
     api(projects.micronautAop)
-    api(libs.asm.tree)
-    api(libs.bundles.asm)
     api(libs.managed.java.parser.core) {
         exclude(group = "org.javassist", module = "javassist")
         exclude(group = "com.google.guava", module = "guava")
     }
+    api(mnSourcegen.micronaut.sourcegen.bytecode.writer)
     implementation(projects.micronautCoreReactive)
 
     compileOnly(libs.managed.kotlin.stdlib.jdk8)
 }
+

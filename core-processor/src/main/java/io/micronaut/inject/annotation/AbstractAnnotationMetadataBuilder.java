@@ -1243,11 +1243,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected boolean isRepeatableAnnotationContainer(AnnotationValue<?> annotationValue) {
         List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-        return !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
-                .allMatch(value -> {
-                    T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
-                    return annotationMirror != null && getRepeatableContainerNameForType(annotationMirror) != null;
-                });
+        if (repeatableAnnotations.isEmpty()) {
+            return false;
+        }
+        String repeatableAnnotationName = null;
+        for (AnnotationValue<Annotation> repeatableAnnotation : repeatableAnnotations) {
+            if (repeatableAnnotationName == null) {
+                repeatableAnnotationName = repeatableAnnotation.getAnnotationName();
+            } else if (!repeatableAnnotationName.equals(repeatableAnnotation.getAnnotationName())) {
+                // Unexpected state: different repeatable name
+                return false;
+            }
+        }
+        // The container should be this annotation value name
+        return findRepeatableContainerNameForType(repeatableAnnotationName) != null;
     }
 
     @NonNull

@@ -19,9 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Abstract expression node for unary operators.
@@ -38,17 +36,8 @@ public abstract sealed class UnaryOperator extends ExpressionNode permits EmptyO
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return operand.resolveType(ctx);
     }
 
-    @Override
-    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        Type type = doResolveType(ctx);
-        try {
-            return PrimitiveElement.valueOf(type.getClassName());
-        } catch (IllegalArgumentException e) {
-            return ClassElement.of(type.getClassName());
-        }
-    }
 }

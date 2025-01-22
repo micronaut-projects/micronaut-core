@@ -18,10 +18,9 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isBoolean;
-import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
  * Abstract expression AST node for binary logical operator.
@@ -37,13 +36,13 @@ public abstract sealed class LogicalOperator extends BinaryOperator permits AndO
     }
 
     @Override
-    protected Type resolveOperationType(Type leftOperandType,
-                                        Type rightOperandType) {
+    protected TypeDef resolveOperationType(TypeDef leftOperandType,
+                                           TypeDef rightOperandType) {
         if (!isBoolean(leftOperandType) && !isBoolean(rightOperandType)) {
             throw new ExpressionCompilationException(
                 "Logical operation can only be applied to boolean types");
         }
 
-        return BOOLEAN_TYPE;
+        return TypeDef.Primitive.BOOLEAN;
     }
 }

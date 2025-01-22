@@ -17,6 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -24,9 +25,8 @@ import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -43,7 +43,9 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 @Internal
 public final class MatchesOperator extends ExpressionNode {
 
-    private static final Method MATCHES = new Method("matches", BOOLEAN, new Type[]{STRING});
+    private static final java.lang.reflect.Method MATCHES = ReflectionUtils.getRequiredMethod(
+        String.class, "matches", String.class
+    );
 
     private final ExpressionNode operand;
     private final StringLiteral pattern;
@@ -54,11 +56,9 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        operand.compile(ctx);
-        pattern.compile(ctx);
-        mv.invokeVirtual(STRING, MATCHES);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return operand.compile(ctx)
+            .invoke(MATCHES, pattern.compile(ctx));
     }
 
     @Override
@@ -67,7 +67,7 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         if (!operand.resolveType(ctx).equals(STRING)) {
             throw new ExpressionCompilationException(
                 "Operator 'matches' can only be applied to String operand");

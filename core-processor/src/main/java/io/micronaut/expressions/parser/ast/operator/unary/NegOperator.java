@@ -21,24 +21,10 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE_WRAPPER;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT_WRAPPER;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.INT;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.INT_WRAPPER;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG_WRAPPER;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
-import static org.objectweb.asm.Opcodes.DNEG;
-import static org.objectweb.asm.Opcodes.FNEG;
-import static org.objectweb.asm.Opcodes.INEG;
-import static org.objectweb.asm.Opcodes.LNEG;
 
 /**
  * Expression node for unary '-' operator.
@@ -53,8 +39,8 @@ public final class NegOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type nodeType = super.doResolveType(ctx);
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef nodeType = super.doResolveType(ctx);
         if (!isNumeric(nodeType)) {
             throw new ExpressionCompilationException(
                 "Invalid unary '-' operation. Unary '-' can only be applied to numeric types");
@@ -63,23 +49,7 @@ public final class NegOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        operand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(operand.resolveType(ctx), mv);
-
-        if (isOneOf(operand.resolveType(ctx), INT, INT_WRAPPER)) {
-            mv.visitInsn(INEG);
-        } else if (isOneOf(operand.resolveType(ctx), DOUBLE, DOUBLE_WRAPPER)) {
-            mv.visitInsn(DNEG);
-        } else if (isOneOf(operand.resolveType(ctx), FLOAT, FLOAT_WRAPPER)) {
-            mv.visitInsn(FNEG);
-        } else if (isOneOf(operand.resolveType(ctx), LONG, LONG_WRAPPER)) {
-            mv.visitInsn(LNEG);
-        } else {
-            throw new ExpressionCompilationException(
-                "Invalid unary '-' operation. Unary '-' can only be applied to numeric types");
-        }
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return operand.compile(ctx).math(ExpressionDef.MathUnaryOperation.OpType.NEGATE);
     }
 }

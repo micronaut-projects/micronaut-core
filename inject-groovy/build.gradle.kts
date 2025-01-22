@@ -11,6 +11,12 @@ micronautBuild {
 
 dependencies {
     api(projects.micronautCoreProcessor)
+    // We need to replicate these dependencies from Micronaut Sourcegen Bytecode writer in the API scope
+    // so they are included on the compileOnly scope
+    api(mnSourcegen.asm)
+    api(mnSourcegen.asm.util)
+    api(mnSourcegen.asm.commons)
+
     api(libs.managed.groovy)
     testImplementation(projects.micronautContext)
     testImplementation(libs.javax.inject)

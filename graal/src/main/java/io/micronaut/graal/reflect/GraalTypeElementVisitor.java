@@ -212,8 +212,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 );
                 GraalReflectionMetadataWriter writer = new GraalReflectionMetadataWriter(
                     element,
-                    annotationMetadata,
-                    context
+                    annotationMetadata
                 );
                 try {
                     writer.accept(context);

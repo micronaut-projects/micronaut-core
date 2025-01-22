@@ -608,6 +608,16 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
 
+    @Override
+    protected int getMaxParams() {
+        return serverConfiguration.getMaxParams();
+    }
+
+    @Override
+    protected boolean isSemicolonIsNormalChar() {
+        return serverConfiguration.isSemicolonIsNormalChar();
+    }
+
     /**
      * @return Return true if the request is form data.
      */

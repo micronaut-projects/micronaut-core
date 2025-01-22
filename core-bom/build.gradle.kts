@@ -2,8 +2,8 @@ plugins {
     id("io.micronaut.build.internal.bom")
 }
 
-group = properties["projectGroupId"]
-version = properties["projectVersion"]
+group = properties["projectGroupId"].toString()
+version = properties["projectVersion"].toString()
 
 micronautBom {
     extraExcludedProjects = listOf(

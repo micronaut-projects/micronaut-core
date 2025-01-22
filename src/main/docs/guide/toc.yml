@@ -15,9 +15,10 @@ quickStart:
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
-  title: Inversion of Control
+  title: Dependency Injection
   beans: Defining Beans
   how: How Does it Work?
+  iocDebugging: Debugging Dependency Injection
   beanContext: The BeanContext
   injection:
     title: Dependency Injection Types
@@ -224,6 +225,7 @@ httpClient:
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
+  nettyPooling: Connection pooling in the netty client
 contextPropagation:
   title: Context propagation
   reactorContextPropagation: Reactor context propagation

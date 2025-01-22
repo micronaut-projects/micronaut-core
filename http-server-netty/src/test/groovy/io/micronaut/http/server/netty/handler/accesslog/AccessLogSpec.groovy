@@ -282,7 +282,7 @@ class AccessLogSpec extends Specification {
                 'spec.name': 'AccessLogSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.ssl.enabled': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
