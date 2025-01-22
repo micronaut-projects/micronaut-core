@@ -566,6 +566,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void handleUpstreamError(Throwable cause) {
+            inboundHandler = droppingInboundHandler;
             dest.error(cause);
         }
 
