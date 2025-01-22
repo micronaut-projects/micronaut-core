@@ -88,6 +88,14 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     @NonNull
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
+        try {
+            return createSslContextBuilder(ssl, versionSelection).build();
+        } catch (SSLException ex) {
+            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
+        }
+    }
+
+    protected  SslContextBuilder createSslContextBuilder(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
@@ -122,12 +130,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
                 versionSelection.getAlpnSupportedProtocols()
             ));
         }
-
-        try {
-            return sslBuilder.build();
-        } catch (SSLException ex) {
-            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
-        }
+        return sslBuilder;
     }
 
     @Override
