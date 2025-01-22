@@ -62,7 +62,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PackageNode;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.objectweb.asm.Opcodes;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
@@ -98,6 +97,8 @@ import java.util.stream.StreamSupport;
  */
 @Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
+
+    private static final int ACC_SYNTHETIC = 0x1000; // class, field, method, parameter, module *
 
     private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m -> {
         String methodName = m.getName();
@@ -754,26 +755,26 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             } else if (elementType == MethodElement.class) {
                 return classNode.getMethods()
                     .stream()
-                    .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0 && (includeAbstract || isNonAbstract(classNode, methodNode)))
+                    .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & ACC_SYNTHETIC) == 0 && (includeAbstract || isNonAbstract(classNode, methodNode)))
                     .<AnnotatedNode>map(m -> m)
                     .toList();
             } else if (elementType == FieldElement.class) {
                 return classNode.getFields().stream()
-                    .filter(fieldNode -> (!fieldNode.isEnum() || result.isIncludeEnumConstants()) && !JUNK_FIELD_FILTER.test(fieldNode) && (fieldNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0)
+                    .filter(fieldNode -> (!fieldNode.isEnum() || result.isIncludeEnumConstants()) && !JUNK_FIELD_FILTER.test(fieldNode) && (fieldNode.getModifiers() & ACC_SYNTHETIC) == 0)
                     .<AnnotatedNode>map(m -> m)
                     .toList();
 
             } else if (elementType == ConstructorElement.class) {
                 return classNode.getDeclaredConstructors()
                     .stream()
-                    .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0)
+                    .filter(methodNode -> !JUNK_METHOD_FILTER.test(methodNode) && (methodNode.getModifiers() & ACC_SYNTHETIC) == 0)
                     .<AnnotatedNode>map(m -> m)
                     .toList();
             } else if (elementType == ClassElement.class) {
                 return StreamSupport.stream(
                         Spliterators.spliteratorUnknownSize(classNode.getInnerClasses(), Spliterator.ORDERED),
                         false)
-                    .filter(innerClassNode -> (innerClassNode.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0)
+                    .filter(innerClassNode -> (innerClassNode.getModifiers() & ACC_SYNTHETIC) == 0)
                     .<AnnotatedNode>map(m -> m)
                     .toList();
             } else {

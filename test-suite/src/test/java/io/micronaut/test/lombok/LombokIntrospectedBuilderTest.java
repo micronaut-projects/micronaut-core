@@ -16,6 +16,14 @@ import java.util.UUID;
 public class LombokIntrospectedBuilderTest {
 
     @Test
+    void testLombokNoArgsConstructor() {
+        BeanIntrospection<Book> introspection = BeanIntrospection.getIntrospection(Book.class);
+        assertEquals(0, introspection.getConstructorArguments().length);
+        Book book = introspection.instantiate();
+        assertNotNull(book);
+    }
+
+    @Test
     void testLombokRecordBuilder() {
         BeanIntrospection<RobotRecord> introspection = BeanIntrospection.getIntrospection(RobotRecord.class);
 

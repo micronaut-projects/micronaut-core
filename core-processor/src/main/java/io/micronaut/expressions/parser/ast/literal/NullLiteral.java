@@ -21,10 +21,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.OBJECT;
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Expression AST node for null literal.
@@ -35,8 +33,8 @@ import static org.objectweb.asm.Opcodes.ACONST_NULL;
 @Internal
 public final class NullLiteral extends ExpressionNode {
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        ctx.methodVisitor().visitInsn(ACONST_NULL);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ExpressionDef.nullValue();
     }
 
     @Override
@@ -45,7 +43,7 @@ public final class NullLiteral extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return OBJECT;
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.OBJECT;
     }
 }

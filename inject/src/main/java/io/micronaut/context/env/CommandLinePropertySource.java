@@ -48,6 +48,11 @@ public class CommandLinePropertySource extends MapPropertySource {
     }
 
     @Override
+    public Origin getOrigin() {
+        return Origin.of("main(String...args)");
+    }
+
+    @Override
     public int getOrder() {
         return POSITION;
     }

@@ -1,3 +1,6 @@
+https://en.wikipedia.org/wiki/Dependency_injection[Dependency Injection] (often referred to as https://en.wikipedia.org/wiki/Inversion_of_control[Inversion of Control]) is a pattern that allows your code to remain independent of configuration and allows the definition of loosely coupled applications. Reducing coupling increases the ability to test your application by ensuring code is not tied directly to an external systems (like a database).
+
+
 Unlike other frameworks which rely on runtime reflection and proxies, the Micronaut framework uses compile time data to implement dependency injection.
 
 This is a similar approach taken by tools such as Google https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as other frameworks but without using reflection or caching excessive amounts of reflection metadata.
@@ -5,7 +8,7 @@ This is a similar approach taken by tools such as Google https://google.github.i
 The goals of the Micronaut IoC container are summarized as:
 
 * Use reflection as a last resort
-* Avoid proxies
+* Avoid runtime-generated proxies
 * Optimize start-up time
 * Reduce memory footprint
 * Provide clear, understandable error handling

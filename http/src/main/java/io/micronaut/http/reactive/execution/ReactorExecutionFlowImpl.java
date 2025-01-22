@@ -328,7 +328,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
+        }
+        ImperativeExecutionFlow<?> imperativeFlow = next.tryComplete();
+        if (imperativeFlow != null) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
                 m = Mono.error(imperativeFlow.getError());
@@ -347,9 +349,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
-        } else {
-            return new FlowAsMono<>(next);
         }
+        return new FlowAsMono<>(next);
     }
 
     static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {

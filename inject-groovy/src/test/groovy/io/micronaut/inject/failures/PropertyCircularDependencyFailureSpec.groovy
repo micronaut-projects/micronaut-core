@@ -39,9 +39,9 @@ Failed to inject value for parameter [propA] of method [setPropA] of class: io.m
 
 Message: Circular dependency detected
 Path Taken:
-new i.m.i.f.P$MyClassB()
-      \\---> i.m.i.f.P$MyClassB#setPropA([MyClassA propA])
-            ^  \\---> i.m.i.f.P$MyClassA#setPropB([MyClassB propB])
+new @j.i.Singleton i.m.i.f.P$MyClassB()
+      \\---> @j.i.Singleton i.m.i.f.P$MyClassB#setPropA([MyClassA propA])
+            ^  \\---> @j.i.Singleton i.m.i.f.P$MyClassA#setPropB([MyClassB propB])
             |        |
             +--------+'''
 

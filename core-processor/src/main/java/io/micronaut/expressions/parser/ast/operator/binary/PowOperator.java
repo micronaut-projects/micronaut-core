@@ -16,12 +16,13 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
@@ -29,8 +30,6 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.toUnboxedIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 
 /**
  * Expression AST node for '^' operator. '^' operator in evaluated
@@ -42,46 +41,35 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
 @Internal
 public final class PowOperator extends BinaryOperator {
 
-    private static final Type MATH_TYPE = Type.getType(Math.class);
-    private static final Method POW_METHOD = new Method("pow", DOUBLE, new Type[]{DOUBLE, DOUBLE});
+    private static final ClassTypeDef MATH_TYPE = ClassTypeDef.of(Math.class);
+    private static final java.lang.reflect.Method POW_METHOD = ReflectionUtils.getRequiredMethod(Math.class, "pow", double.class, double.class);
 
     public PowOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
         super(leftOperand, rightOperand);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
-
-        leftOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(leftType, mv);
-        pushPrimitiveCastIfNecessary(leftType, DOUBLE, mv);
-
-        rightOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(leftType, mv);
-        pushPrimitiveCastIfNecessary(rightType, DOUBLE, mv);
-
-        mv.invokeStatic(MATH_TYPE, POW_METHOD);
-
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        ExpressionDef.InvokeStaticMethod result = MATH_TYPE.invokeStatic(
+            POW_METHOD,
+            leftOperand.compile(ctx),
+            rightOperand.compile(ctx)
+        );
         if (resolveType(ctx) == LONG) {
-            pushPrimitiveCastIfNecessary(DOUBLE, LONG, mv);
+            return result.cast(LONG);
         }
+        return result;
     }
 
     @Override
-    protected Type resolveOperationType(Type leftOperandType, Type rightOperandType) {
+    protected TypeDef resolveOperationType(TypeDef leftOperandType, TypeDef rightOperandType) {
         if (!isNumeric(leftOperandType) || !isNumeric(rightOperandType)) {
             throw new ExpressionCompilationException("Power operation can only be applied to numeric types");
         }
-
         if (isOneOf(toUnboxedIfNecessary(leftOperandType), DOUBLE, FLOAT) ||
-                isOneOf(toUnboxedIfNecessary(rightOperandType), DOUBLE, FLOAT)) {
+            isOneOf(toUnboxedIfNecessary(rightOperandType), DOUBLE, FLOAT)) {
             return DOUBLE;
         }
-
         // Int power operation result might not fit in int value
         return LONG;
     }
