@@ -3,7 +3,7 @@ The Micronaut framework ships with several built-in handlers:
 |===
 |Exception|Handler
 | `jakarta.validation.ConstraintViolationException`
-| api:validation.exceptions.ConstraintExceptionHandler[]
+| https://micronaut-projects.github.io/micronaut-validation/latest/api/io/micronaut/validation/exceptions/ConstraintExceptionHandler.html[ConstraintExceptionHandler]
 | api:http.exceptions.ContentLengthExceededException[]
 | api:http.server.exceptions.ContentLengthExceededHandler[]
 | api:core.convert.exceptions.ConversionErrorException[]
