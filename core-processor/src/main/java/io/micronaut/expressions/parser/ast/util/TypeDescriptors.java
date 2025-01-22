@@ -17,9 +17,9 @@ package io.micronaut.expressions.parser.ast.util;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.Map;
 
@@ -34,34 +34,33 @@ import static java.util.stream.Collectors.toMap;
  */
 @Internal
 public final class TypeDescriptors {
-    public static final Type EVALUATION_CONTEXT_TYPE = Type.getType(ExpressionEvaluationContext.class);
 
-    public static final Type STRING = Type.getType(String.class);
-    public static final Type OBJECT = Type.getType(Object.class);
-    public static final Type CLASS = Type.getType(Class.class);
-    public static final Type VOID = Type.VOID_TYPE;
+    public static final TypeDef STRING = TypeDef.STRING;
+    public static final TypeDef OBJECT = TypeDef.OBJECT;
+    public static final TypeDef CLASS = TypeDef.CLASS;
+    public static final TypeDef VOID = TypeDef.VOID;
 
     // Primitives
-    public static final Type DOUBLE = Type.DOUBLE_TYPE;
-    public static final Type FLOAT = Type.FLOAT_TYPE;
-    public static final Type INT = Type.INT_TYPE;
-    public static final Type LONG = Type.LONG_TYPE;
-    public static final Type BOOLEAN = Type.BOOLEAN_TYPE;
-    public static final Type CHAR = Type.CHAR_TYPE;
-    public static final Type SHORT = Type.SHORT_TYPE;
-    public static final Type BYTE = Type.BYTE_TYPE;
+    public static final TypeDef DOUBLE = TypeDef.Primitive.DOUBLE;
+    public static final TypeDef FLOAT = TypeDef.Primitive.FLOAT;
+    public static final TypeDef INT = TypeDef.Primitive.INT;
+    public static final TypeDef LONG = TypeDef.Primitive.LONG;
+    public static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
+    public static final TypeDef CHAR = TypeDef.Primitive.CHAR;
+    public static final TypeDef SHORT = TypeDef.Primitive.SHORT;
+    public static final TypeDef BYTE = TypeDef.Primitive.BYTE;
 
     // Wrappers
-    public static final Type BOOLEAN_WRAPPER = Type.getType(Boolean.class);
-    public static final Type INT_WRAPPER = Type.getType(Integer.class);
-    public static final Type LONG_WRAPPER = Type.getType(Long.class);
-    public static final Type DOUBLE_WRAPPER = Type.getType(Double.class);
-    public static final Type FLOAT_WRAPPER = Type.getType(Float.class);
-    public static final Type SHORT_WRAPPER = Type.getType(Short.class);
-    public static final Type BYTE_WRAPPER = Type.getType(Byte.class);
-    public static final Type CHAR_WRAPPER = Type.getType(Character.class);
+    public static final ClassTypeDef BOOLEAN_WRAPPER = TypeDef.Primitive.BOOLEAN.wrapperType();
+    public static final ClassTypeDef INT_WRAPPER = TypeDef.Primitive.INT.wrapperType();
+    public static final ClassTypeDef LONG_WRAPPER = TypeDef.Primitive.LONG.wrapperType();
+    public static final ClassTypeDef DOUBLE_WRAPPER = TypeDef.Primitive.DOUBLE.wrapperType();
+    public static final ClassTypeDef FLOAT_WRAPPER = TypeDef.Primitive.FLOAT.wrapperType();
+    public static final ClassTypeDef SHORT_WRAPPER = TypeDef.Primitive.SHORT.wrapperType();
+    public static final ClassTypeDef BYTE_WRAPPER = TypeDef.Primitive.BYTE.wrapperType();
+    public static final ClassTypeDef CHAR_WRAPPER = TypeDef.Primitive.CHAR.wrapperType();
 
-    public static final Map<Type, Type> PRIMITIVE_TO_WRAPPER = Map.of(
+    private static final Map<TypeDef, ClassTypeDef> PRIMITIVE_TO_WRAPPER = Map.of(
         BOOLEAN, BOOLEAN_WRAPPER,
         INT, INT_WRAPPER,
         DOUBLE, DOUBLE_WRAPPER,
@@ -71,10 +70,10 @@ public final class TypeDescriptors {
         CHAR, CHAR_WRAPPER,
         BYTE, BYTE_WRAPPER);
 
-    public static final Map<Type, Type> WRAPPER_TO_PRIMITIVE =
+    public static final Map<String, TypeDef> WRAPPER_TO_PRIMITIVE =
         PRIMITIVE_TO_WRAPPER.entrySet()
             .stream()
-            .collect(toMap(Map.Entry::getValue, Map.Entry::getKey));
+            .collect(toMap(e -> e.getValue().getName(), Map.Entry::getKey));
 
     /**
      * Checks if passed type is a primitive.
@@ -82,8 +81,8 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    public static boolean isPrimitive(@NonNull Type type) {
-        return PRIMITIVE_TO_WRAPPER.containsKey(type);
+    public static boolean isPrimitive(@NonNull TypeDef type) {
+        return type.isPrimitive();
     }
 
     /**
@@ -92,7 +91,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    public static boolean isBoolean(@NonNull Type type) {
+    public static boolean isBoolean(@NonNull TypeDef type) {
         return isOneOf(type, BOOLEAN, BOOLEAN_WRAPPER);
     }
 
@@ -103,7 +102,7 @@ public final class TypeDescriptors {
      * @return true if it is
      */
     @NonNull
-    public static boolean isNumeric(@NonNull Type type) {
+    public static boolean isNumeric(@NonNull TypeDef type) {
         return isOneOf(type,
             DOUBLE, DOUBLE_WRAPPER,
             FLOAT, FLOAT_WRAPPER,
@@ -122,9 +121,9 @@ public final class TypeDescriptors {
      * @return unboxed type or original passed type
      */
     @NonNull
-    public static Type toUnboxedIfNecessary(@NonNull Type type) {
-        if (WRAPPER_TO_PRIMITIVE.containsKey(type)) {
-            return WRAPPER_TO_PRIMITIVE.get(type);
+    public static TypeDef toUnboxedIfNecessary(@NonNull TypeDef type) {
+        if (type instanceof ClassTypeDef classTypeDef) {
+            return WRAPPER_TO_PRIMITIVE.getOrDefault(classTypeDef.getName(), type);
         }
         return type;
     }
@@ -137,11 +136,14 @@ public final class TypeDescriptors {
      * @return boxed type or original passed type
      */
     @NonNull
-    public static Type toBoxedIfNecessary(@NonNull Type type) {
+    public static ClassTypeDef toBoxedIfNecessary(@NonNull TypeDef type) {
         if (PRIMITIVE_TO_WRAPPER.containsKey(type)) {
             return PRIMITIVE_TO_WRAPPER.get(type);
         }
-        return type;
+        if (type instanceof ClassTypeDef classTypeDef) {
+            return classTypeDef;
+        }
+        throw new IllegalArgumentException("Unsupported type: " + type);
     }
 
     /**
@@ -154,8 +156,8 @@ public final class TypeDescriptors {
      * @throws ExpressionCompilationException if ony of the passed types is not a numeric type
      */
     @NonNull
-    public static Type computeNumericOperationTargetType(@NonNull Type leftOperandType,
-                                                         @NonNull Type rightOperandType) {
+    public static TypeDef computeNumericOperationTargetType(@NonNull TypeDef leftOperandType,
+                                                         @NonNull TypeDef rightOperandType) {
         if (!isNumeric(leftOperandType) || !isNumeric(rightOperandType)) {
             throw new ExpressionCompilationException("Numeric operation can only be applied to numeric types");
         }
@@ -182,8 +184,8 @@ public final class TypeDescriptors {
      * @param comparedTypes types against which checked types is compared
      * @return true if checked type is amount compared types
      */
-    public static boolean isOneOf(Type type, Type... comparedTypes) {
-        for (Type comparedType: comparedTypes) {
+    public static boolean isOneOf(TypeDef type, TypeDef... comparedTypes) {
+        for (TypeDef comparedType: comparedTypes) {
             if (type.equals(comparedType)) {
                 return true;
             }

@@ -17,17 +17,17 @@ package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
-import static org.objectweb.asm.Opcodes.CHECKCAST;
+import java.lang.reflect.Method;
 
 /**
  * Expression AST node used for to retrieve beans from bean context.
@@ -39,8 +39,7 @@ import static org.objectweb.asm.Opcodes.CHECKCAST;
 public class BeanContextAccess extends ExpressionNode {
 
     private static final Method GET_BEAN_METHOD =
-        new Method("getBean", Type.getType(Object.class),
-            new Type[]{Type.getType(Class.class)});
+        ReflectionUtils.getRequiredMethod(ExpressionEvaluationContext.class, "getBean", Class.class);
 
     private final TypeIdentifier typeIdentifier;
 
@@ -49,18 +48,11 @@ public class BeanContextAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        mv.loadArg(0);
-
-        Type beanType = typeIdentifier.resolveType(ctx);
-        mv.push(beanType);
-
-        // invoke getBean method
-        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_BEAN_METHOD);
-
-        // cast the return value to the correct type
-        mv.visitTypeInsn(CHECKCAST, beanType.getInternalName());
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        TypeDef beanType = typeIdentifier.resolveType(ctx);
+        return ctx.expressionEvaluationContextVar()
+            .invoke(GET_BEAN_METHOD, ExpressionDef.constant(beanType))
+            .cast(beanType);
     }
 
     @Override
@@ -69,7 +61,7 @@ public class BeanContextAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         return typeIdentifier.doResolveType(ctx);
     }
 }

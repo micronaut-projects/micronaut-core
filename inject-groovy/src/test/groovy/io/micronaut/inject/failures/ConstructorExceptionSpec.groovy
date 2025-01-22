@@ -42,7 +42,7 @@ Message: bad
 Path Taken:
 new i.m.i.f.C$MyClassB()
 \\---> i.m.i.f.C$MyClassB#propA
-      \\---> new i.m.i.f.C$MyClassA([MyClassC propC])'''
+      \\---> new @j.i.Singleton i.m.i.f.C$MyClassA([MyClassC propC])'''
 
         cleanup:
         context.close()

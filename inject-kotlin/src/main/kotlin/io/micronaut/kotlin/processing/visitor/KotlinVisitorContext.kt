@@ -61,6 +61,18 @@ internal class KotlinVisitorContext(
     private val expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
     var aggregating: Boolean = false
+
+    val extraOpenAnnotations: Array<String> by lazy {
+        var allOpenAnnotations = environment.options["kotlin.allopen.annotations"]
+        if (allOpenAnnotations.isNullOrEmpty()) {
+            allOpenAnnotations = System.getProperty("kotlin.allopen.annotations")
+        }
+        if (allOpenAnnotations == null) {
+            allOpenAnnotations = ""
+        }
+        allOpenAnnotations.split(",", "|").toTypedArray()
+    }
+
     init {
         try {
             // Workaround for bug in KSP https://github.com/google/ksp/issues/1493
@@ -71,6 +83,7 @@ internal class KotlinVisitorContext(
         } catch (e: Exception) {
             // Ignore
         }
+
     }
 
     fun updateResolver(resolver: Resolver) {

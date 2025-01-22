@@ -180,6 +180,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             BeanIntrospection.class,
         "isBuildable"
     );
+    private static final java.lang.reflect.Method HAS_CONSTRUCTOR_METHOD = ReflectionUtils.getRequiredMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "hasConstructor"
+    );
 
     private final String introspectionName;
     private final ClassTypeDef introspectionTypeDef;
@@ -732,7 +736,13 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         }
 
         boolean hasBuilder = annotationMetadata != null &&
-            (annotationMetadata.isPresent(Introspected.class, "builder") || annotationMetadata.hasDeclaredAnnotation("lombok.Builder"));        if (defaultConstructor != null) {
+            (annotationMetadata.isPresent(Introspected.class, "builder") || annotationMetadata.hasDeclaredAnnotation("lombok.Builder"));
+        if (defaultConstructor != null || constructor != null) {
+            classDefBuilder.addMethod(
+                getBooleanMethod(HAS_CONSTRUCTOR_METHOD, true)
+            );
+        }
+        if (defaultConstructor != null) {
             classDefBuilder.addMethod(
                 getInstantiateMethod(defaultConstructor, INSTANTIATE_METHOD)
             );

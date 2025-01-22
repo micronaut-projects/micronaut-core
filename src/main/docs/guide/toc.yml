@@ -15,9 +15,10 @@ quickStart:
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
-  title: Inversion of Control
+  title: Dependency Injection
   beans: Defining Beans
   how: How Does it Work?
+  iocDebugging: Debugging Dependency Injection
   beanContext: The BeanContext
   injection:
     title: Dependency Injection Types

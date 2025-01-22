@@ -40,10 +40,10 @@ Failed to inject value for parameter [stations] of class: io.micronaut.inject.fa
 
 Message: Circular dependency detected
 Path Taken:
-new i.m.i.f.F$ElectricalGrid(List<ElectricStation E> stations)
-      \\---> new i.m.i.f.F$ElectricalGrid([List<ElectricStation E> stations])
-            ^  \\---> i.m.i.f.F$ElectricStationFactory#nuclearStation([MeasuringEquipment equipment])
-            |        \\---> i.m.i.f.F$MeasuringEquipment#grid
+new i.m.i.f.F$ElectricalGrid(List<ElectricStation> stations)
+      \\---> new i.m.i.f.F$ElectricalGrid([List<ElectricStation> stations])
+            ^  \\---> @j.i.Singleton i.m.i.f.F$ElectricStation i.m.i.f.F$ElectricStationFactory.nuclearStation#nuclearStation([MeasuringEquipment equipment])
+            |        \\---> @j.i.Singleton i.m.i.f.F$MeasuringEquipment#grid
             |              |
             +--------------+'''
 

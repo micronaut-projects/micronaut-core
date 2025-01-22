@@ -37,6 +37,20 @@ import java.util.Map;
 public interface ApplicationContextBuilder {
 
     /**
+     * Sets the trace mode for bean resolution.
+     * @param traceMode The debug mode
+     * @param classPatterns The patterns
+     * @since 4.8.0
+     * @see BeanResolutionTraceMode
+     * @return This builder
+     */
+    default @NonNull ApplicationContextBuilder beanResolutionTrace(
+        @NonNull BeanResolutionTraceMode traceMode,
+        String... classPatterns) {
+        return this;
+    }
+
+    /**
      * Whether to eager initialize {@link io.micronaut.context.annotation.ConfigurationProperties} beans.
      * @param eagerInitConfiguration True if configuration properties should be eagerly initialized
      * @return The context builder

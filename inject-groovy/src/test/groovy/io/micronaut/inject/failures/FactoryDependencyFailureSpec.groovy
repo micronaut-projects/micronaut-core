@@ -41,9 +41,9 @@ Error instantiating bean of type  [io.micronaut.inject.failures.FactoryDependenc
 
 Message: Outdated equipment
 Path Taken:
-new i.m.i.f.F$ElectricalGrid(List<ElectricStation E> stations)
-\\---> new i.m.i.f.F$ElectricalGrid([List<ElectricStation E> stations])
-      \\---> i.m.i.f.F$ElectricStationFactory#nuclearStation([MeasuringEquipment equipment])'''
+new i.m.i.f.F$ElectricalGrid(List<ElectricStation> stations)
+\\---> new i.m.i.f.F$ElectricalGrid([List<ElectricStation> stations])
+      \\---> @j.i.Singleton i.m.i.f.F$ElectricStation i.m.i.f.F$ElectricStationFactory.nuclearStation#nuclearStation([MeasuringEquipment equipment])'''
 
         cleanup:
         context.close()

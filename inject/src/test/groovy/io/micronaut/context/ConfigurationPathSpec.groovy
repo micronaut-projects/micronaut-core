@@ -15,8 +15,11 @@ class ConfigurationPathSpec extends Specification {
         given:
         def bc = BeanContext.build()
 
+
+        def mock = RuntimeBeanDefinition.of(ConfigurationPathSpec.class, {-> this})
+
         when:
-        def context = new DefaultBeanResolutionContext(bc, Mock(BeanDefinition))
+        def context = new DefaultBeanResolutionContext(bc, mock)
         ConfigurationPath configurationPath = context.configurationPath
 
         then:

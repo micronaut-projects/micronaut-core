@@ -1,10 +1,9 @@
 [versions]
-asm = "9.7.1"
 awaitility = "4.2.2"
 bcpkix = "1.70"
 blaze = "1.6.14"
 brotli4j = "1.16.0"
-bytebuddy = "1.15.11"
+bytebuddy = "1.16.1"
 caffeine = "2.9.3"
 classgraph = "4.8.179"
 compile-testing = "0.21.0"
@@ -24,7 +23,7 @@ javax-inject = "1"
 javax-persistence = "2.2"
 jakarta-persistence = "3.2.0"
 jetbrains-annotations = "23.1.0"
-jetty = "9.4.56.v20240826"
+jetty = "9.4.57.v20241219"
 jmh = "1.37"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
@@ -40,7 +39,7 @@ lombok = "1.18.36"
 logbook-netty = "3.10.0"
 log4j = "2.24.3"
 micronaut-aws = "4.8.0"
-micronaut-build-plugins="7.3.0"
+micronaut-build-plugins="7.3.2"
 micronaut-groovy = "4.5.0"
 micronaut-session = "4.5.0"
 micronaut-sql = "5.3.0"
@@ -52,7 +51,7 @@ micronaut-reactor = "3.5.0"
 micronaut-kotlin = "4.5.0"
 native-gradle-plugin = "0.10.4"
 neo4j-java-driver = "5.17.0"
-selenium = "4.23.1"
+selenium = "4.27.0"
 okio = "3.9.1"
 slf4j = "2.0.16"
 smallrye = "6.7.3"
@@ -64,7 +63,7 @@ tomlj="1.1.1"
 vertx = "4.5.11"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-sourcegen-bytecode-generator = "1.5.5"
+micronaut-sourcegen = "1.6.1"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -78,7 +77,7 @@ managed-jackson-databind = "2.17.0"
 managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.116.Final"
+managed-netty = "4.1.117.Final"
 managed-netty-iouring = "0.0.26.Final"
 managed-netty-http3 = "0.0.28.Final"
 managed-netty-tcnative = "2.0.69.Final"
@@ -88,6 +87,7 @@ managed-reactor = "3.6.10"
 managed-snakeyaml = "2.3"
 managed-java-parser-core = "3.26.3"
 managed-ksp = "1.9.25-1.0.20"
+sonatype-scan = "2.8.3"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -105,6 +105,7 @@ boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "manag
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
 
 #
 # Libraries which start with managed- are managed by Micronaut in the sense
@@ -168,13 +169,10 @@ managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref 
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
+sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", version.ref = "sonatype-scan" }
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
-asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
-asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
-asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
-
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
@@ -301,11 +299,6 @@ httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.r
 mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
-
-sourcegen-bytecode-generator = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bytecode-writer", version.ref = "sourcegen-bytecode-generator" }
-
-[bundles]
-asm = ["asm", "asm-commons"]
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

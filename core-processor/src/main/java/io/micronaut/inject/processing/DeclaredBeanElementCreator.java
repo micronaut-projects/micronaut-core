@@ -655,13 +655,13 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
 
         AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
-            .map(p -> new AnnotationClassValue<>(JavaModelUtils.getClassname(p.getGenericType())))
+            .map(p -> new AnnotationClassValue<>(getClassName(p.getGenericType())))
             .toArray(AnnotationClassValue[]::new);
 
         targetMethod = targetMethod.withNewOwningType(classElement);
 
         targetMethod.annotate(Adapter.class, builder -> {
-            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
+            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(getClassName(classElement)));
             builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
             builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
             String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
@@ -673,6 +673,13 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
 
         beanDefinitionWriters.add(aopProxyWriter);
+    }
+
+    private static String getClassName(ClassElement element) {
+        if (element.isArray()) {
+            return getClassName(element.fromArray()) + "[]";
+        }
+        return element.getName();
     }
 
 }

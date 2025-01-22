@@ -3,15 +3,6 @@ plugins {
     id "io.micronaut.build.internal.convention-base"
 }
 
-configurations.all {
-    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-        String group = details.requested.group
-        if (group == 'org.ow2.asm') {
-            details.useVersion(libs.versions.asm.get())
-        }
-    }
-}
-
 // Workaround for javadoc not finding java source
 // files for classes written in an alternate language (Kotlin, Groovy)
 configurations {
