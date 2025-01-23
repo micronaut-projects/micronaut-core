@@ -523,6 +523,8 @@ internal open class KotlinClassElement(
         super<AbstractKotlinElement>.isStatic()
     }
 
+    override fun isEnum() = declaration.classKind == ClassKind.ENUM_CLASS
+
     override fun isInterface() = declaration.classKind == ClassKind.INTERFACE
 
     override fun isTypeVariable() = typeVariable

@@ -42,6 +42,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
     private Map<String, Object> variables;
+
     /**
      * @param matchInfo The URI match info
      * @param routeInfo The URI route

@@ -26,16 +26,19 @@ class ConstructorExceptionSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        MyClassB b =  context.getBean(MyClassB)
 
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
         //e.cause.message == 'bad'
         e.message.normalize() == '''\
-Error instantiating bean of type  [io.micronaut.inject.failures.ctorexception.A]
+Error instantiating bean of type  [io.micronaut.inject.failures.ctorexception.MyClassA]
 
 Message: bad
-Path Taken: new B() --> B.a --> new A([C c])'''
+Path Taken:
+new i.m.i.f.c.MyClassB()
+\\---> i.m.i.f.c.MyClassB#propA
+      \\---> new @j.i.Singleton i.m.i.f.c.MyClassA([MyClassC propC])'''
 
         cleanup:
         context.close()

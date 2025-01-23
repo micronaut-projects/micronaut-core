@@ -1,6 +1,6 @@
-=== Getting Started with the Micronaut framework and GraalVM
+=== Getting Started with Micronaut Framework and GraalVM
 
-Since Micronaut framework 2.2, any Micronaut application is ready to be built into a native image using the Micronaut Gradle or Maven plugins. To get started, create a new application:
+Starting with Micronaut framework 2.2, any Micronaut application can be built into a native image using the Micronaut Gradle or Maven plugins. To get started, create a new application.
 
 .Creating a GraalVM Native Microservice
 [source,bash]
@@ -12,7 +12,7 @@ You can use `--build maven` for a Maven build.
 
 ==== Building a Native Image Using Docker
 
-To build your native image using Gradle and Docker, run:
+To build your native image using Docker and Gradle, run:
 
 .Building a Native Image with Docker and Gradle
 [source,bash]
@@ -20,7 +20,7 @@ To build your native image using Gradle and Docker, run:
 $ ./gradlew dockerBuildNative
 ----
 
-To build your native image using Maven and Docker, run:
+To build your native image using Docker and Maven, run:
 
 .Building a Native Image with Docker and Maven
 [source,bash]
@@ -30,62 +30,96 @@ $ ./mvnw package -Dpackaging=docker-native
 
 ==== Building a Native Image Without Using Docker
 
-To build your native image without using Docker, install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using https://sdkman.io/[Sdkman!]:
+To build your native image without using Docker, install a GraalVM JDK. The easiest way to install GraalVM on Linux or Mac is to use https://sdkman.io/[SDKMAN!]. For other installation options, visit the https://www.graalvm.org/downloads/[Downloads page].
 
-.Installing GraalVM {graalVersion} with SDKman
+.Installing GraalVM {graalVersion} with SDKMAN!
 [source,bash,subs="attributes+"]
 ----
-$ sdk install java {graalVersion}.r11-grl
-$ sdk use java {graalVersion}.r11-grl
+$ sdk install java {graalVersion}-graal
+$ sdk use java {graalVersion}-graal
 ----
 
-The `native-image` tool was extracted from the base GraalVM distribution and is available as a plugin. To install it, run:
+Once you install GraalVM, the `native-image` tool becomes available.
 
-.Installing `native-image` tool
-[source,bash]
-----
-$ gu install native-image
-----
+===== Gradle
 
-Now you can build a native image with Gradle by running the `nativeCompile` task:
+You can build a native image with Gradle by running the `nativeCompile` task:
 
-.Creating native image with Gradle
+.Creating a native image with Gradle
 [source,bash]
 ----
 $ ./gradlew nativeCompile
 ----
 
-The native image will be built in the `build/native/nativeCompile` directory.
+The native executable file is created in the _build/native/nativeCompile_ directory.
+You can then run it from that directory: `./build/native/nativeCompile/hello-world`.
 
-To create a native image with Maven and the Micronaut Maven plugin, use the `native-image` packaging format:
+It is possible to pass additional build arguments to `native-image` using the https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html[Gradle plugin for Native Image building].
+Add the following configuration to _build.gradle_:
 
-.Creating native image with Maven
+.build.gradle
+[source,groovy]
+----
+graalvmNative {
+    binaries {
+        main {
+            imageName.set('myApp') // <1>
+            buildArgs.add('-Ob') // <2>
+        }
+    }
+}
+----
+<1> Use `imageName.set()` to specify a custom name.
+<2> Use `buildArgs.add()` to pass extra build arguments to `native-image`. For example, `-Ob` enables the quick build mode.
+
+===== Maven
+
+To create a native image with Maven, use the `native-image` packaging format:
+
+.Creating a native image with Maven
 [source,bash]
 ----
 $ ./mvnw package -Dpackaging=native-image
 ----
 
-which builds the native image in the `target` directory.
+The native executable file is created in the _target/_ directory.
+You can then run it from that directory: `./target/hello-world`.
 
-You can then run the native image from the directory where you built it.
+It is possible to pass additional build arguments to `native-image` using the https://graalvm.github.io/native-build-tools/latest/maven-plugin.html[Maven plugin for Native Image building].
+Declare the plugin as following:
 
-.Run native image
-[source,bash]
+.pom.xml
+[source,xml]
 ----
-$ ./hello-world
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+    <version>${native-maven-plugin.version}</version>
+    <configuration>
+        <!-- <1> -->
+        <imageName>myApp</imageName> 
+        <buildArgs>
+              <!-- <2> -->
+          <buildArg>-Ob</buildArg>
+        </buildArgs>
+    </configuration>
+</plugin>
 ----
 
-=== Understanding Micronaut framework and GraalVM
+<1> Use `<imageName>` to specify a custom name.
+<2> Use `buildArg` to pass extra build arguments to `native-image`. For example, `-Ob` enables the quick build mode.
 
-The Micronaut framework itself does not rely on reflection or dynamic classloading, so it works automatically with GraalVM native, however certain third-party libraries used by Micronaut may require additional input about uses of reflection.
+=== Understanding Micronaut Framework and GraalVM
+
+The Micronaut framework itself does not rely on reflection or dynamic class loading, so it works automatically with GraalVM Native Image. However certain third-party libraries used by Micronaut may require additional input about uses of reflection.
 
 The Micronaut framework includes an annotation processor that helps to generate reflection configuration that is automatically picked up by the `native-image` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
-This processor generates additional classes that implement the api:core.graal.GraalReflectionConfigurer[] inteface and programmatically register reflection configuration.
+This processor generates additional classes that implement the api:core.graal.GraalReflectionConfigurer[] interface and programmatically register reflection configuration.
 
-For example the following class:
+For example, see the following class:
 
 [source,java]
 ----
@@ -99,19 +133,20 @@ class Test {
 }
 ----
 
-The above example results in the public methods, declared fields and declared constructors of `example.Test` being registered for reflective access.
+The above example results in the public methods, declared fields, and declared constructors of `example.Test` being registered for reflective access.
 
-If you have more advanced requirements and only wish to include certain fields or methods, use the annotation on any constructor, field or method to include only the specific field, constructor or method.
+If you have more advanced requirements and wish to include only certain fields or methods, use the annotation on any constructor, field, or method to include only the specific field, constructor, or method.
 
 === Adding Additional Classes for Reflective Access
 
-To inform the Micronaut framework of additional classes to be included in the generated reflection configuration a number of annotations are available including:
+The Micronaut framework provides several annotations to specify additional classes that should be included in the generated reflection configuration, such as:
 
-* ann:core.annotation.ReflectiveAccess[] - An annotation that can be declared on a specific type, constructor, method or field to enable reflective access just for the annotated element.
-* ann:core.annotation.TypeHint[] - An annotation that allows to bulk configuration of reflective access to one or many types
-* ann:core.annotation.ReflectionConfig[] - A repeatable annotation that directly models the https://www.graalvm.org/22.0/reference-manual/native-image/Reflection/#manual-configuration[GraalVM reflection config JSON format]
+* ann:core.annotation.ReflectiveAccess[] - An annotation that can be declared on a specific type, constructor, method, or field to enable reflective access just for the annotated element.
+* ann:core.annotation.TypeHint[] - An annotation that allows to bulk configuration of reflective access to one or many types.
+* ann:core.annotation.ReflectionConfig[] - A repeatable annotation that directly models the https://www.graalvm.org/reference-manual/native-image/metadata/#reflection[reflection configuration in JSON format].
 
-The `@ReflectiveAccess` annotation is typically used on a particular type, constructor, method or field whilst the latter two are typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module with `@TypeHint`:
+The `@ReflectiveAccess` annotation is typically used on a particular type, constructor, method, or field whilst the latter two are typically used on a module or `Application` class to include classes that are needed reflectively.
+See the following example from Micronaut's Jackson module with `@TypeHint`:
 
 .Using the `@TypeHint` annotation
 [source,java]
@@ -128,9 +163,9 @@ The `@ReflectiveAccess` annotation is typically used on a particular type, const
 ----
 
 <1> The `value` member specifies which classes require reflection.
-<2> The `accessType` member specifies if only classloading access is needed or whether full reflection on all public members is needed.
+<2> The `accessType` member specifies if only class loading access is needed or whether full reflection on all public members is needed.
 
-Or alternatively with the `@ReflectionConfig` annotation which is repeatable and allows distinct configuration per type:
+Alternatively, use the `@ReflectionConfig` annotation which is repeatable and allows distinct configuration per type:
 
 .Using the `@ReflectionConfig` annotation
 [source,java]
@@ -162,19 +197,19 @@ GraalVM's `native-image` command generates native images. You can use this comma
 ----
 native-image --class-path build/libs/hello-world-0.1-all.jar # <1>
 ----
-<1> The `class-path` argument refers to the Micronaut shaded JAR
+<1> The `class-path` argument refers to the Micronaut shaded JAR.
 
-Once the image is built, run the application using the native image name:
+Once the image is built, run the application using its name:
 
-.Running the Native Application
+.Running the native application
 [source,bash]
 ----
 $ ./hello-world
 15:15:15.153 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 14ms. Server Running: http://localhost:8080
 ----
 
-As you can see, the native image startup completes in milliseconds, and memory consumption does not include the overhead of the JVM (a native Micronaut application runs with just 20mb of memory).
+As you can see, the native image startup completes in milliseconds, and memory consumption does not include the overhead of the JVM (a native Micronaut application runs with just 20MB of memory).
 
-=== Resource file generation
+=== Resource File Generation
 
-Starting in Micronaut framework 3.0 the automatic generation of the `resource-config.json` file is now part of the https://github.com/micronaut-projects/micronaut-gradle-plugin[Gradle] and https://github.com/micronaut-projects/micronaut-maven-plugin[Maven] plugins.
+Starting with Micronaut framework 3.0, the automatic generation of the _resource-config.json_ file is now integrated into the https://github.com/micronaut-projects/micronaut-gradle-plugin[Gradle] and https://github.com/micronaut-projects/micronaut-maven-plugin[Maven] plugins.

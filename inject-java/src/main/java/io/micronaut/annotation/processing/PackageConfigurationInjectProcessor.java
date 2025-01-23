@@ -91,8 +91,7 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
                 var writer = new BeanConfigurationWriter(
                     packageName,
                     javaPackageElement,
-                    javaPackageElement.getAnnotationMetadata(),
-                    javaVisitorContext
+                    javaPackageElement.getAnnotationMetadata()
                 );
                 try {
                     writer.accept(classWriterOutputVisitor);

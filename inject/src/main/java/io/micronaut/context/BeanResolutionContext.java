@@ -301,6 +301,25 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     ConfigurationPath setConfigurationPath(@Nullable ConfigurationPath configurationPath);
 
     /**
+     * Resolve a property value.
+     * @param argument The argument
+     * @param stringValue The string value
+     * @param cliProperty The CLI property
+     * @param isPlaceholder Whether it is a place holder
+     * @return The resolved value
+     */
+    @Nullable Object resolvePropertyValue(Argument<?> argument, String stringValue, String cliProperty, boolean isPlaceholder);
+
+    /**
+     * Callback when a value is resolved in some other context.
+     * @param argument The argument
+     * @param qualifier The qualifier
+     * @param property The property
+     * @param value The value
+     */
+    void valueResolved(Argument<?> argument, Qualifier<?> qualifier, String property, @Nullable Object value);
+
+    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
     interface Path extends Deque<Segment<?, ?>>, AutoCloseable {
@@ -355,6 +374,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments);
 
         /**
+         * Push resolution of an event listener
+         * @param declaringType The declaration type
+         * @param eventType The event type
+         * @return The path
+         */
+        Path pushEventListenerResolve(BeanDefinition<?> declaringType, Argument<?> eventType);
+
+        /**
          * Push an unresolved field onto the queue.
          *
          * @param declaringType       declaring type
@@ -372,6 +399,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          */
         Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument);
 
+        /**
+         * Push resolution of a bean from an annotation.
+         * @param beanDefinition The bean definition
+         * @param annotationMemberBeanAsArgument The annotation member
+         * @return The path
+         */
         Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument);
 
         /**
@@ -380,6 +413,28 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The circular string
          */
         String toCircularString();
+
+        /**
+         * Converts the path to a circular string.
+         *
+         * @param ansiSupported  Whether ANSI colour is supported
+         * @return The circular string
+         * @since 4.8.0
+         */
+        default String toConsoleCircularString(boolean ansiSupported) {
+            return toCircularString();
+        }
+
+        /**
+         * Converts the path to a string.
+         *
+         * @param ansiSupported  Whether ANSI colour is supported
+         * @return The string
+         * @since 4.8.0
+         */
+        default String toConsoleString(boolean ansiSupported) {
+            return toString();
+        }
 
         /**
          * @return The current path segment
@@ -399,6 +454,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param <T> the injected type
      */
     interface Segment<B, T> {
+
+        /**
+         * To a console string.
+         * @param ansiSupported Whether ansi is supported
+         * @return The string
+         */
+        default String toConsoleString(boolean ansiSupported) {
+            return toString();
+        }
 
         /**
          * @return The type requested

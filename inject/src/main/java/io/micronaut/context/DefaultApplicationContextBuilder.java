@@ -25,6 +25,7 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -72,6 +73,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
+    private Set<String> traceClasses = BeanResolutionTraceMode.getDefaultTraceClasses();
+    private BeanResolutionTraceMode traceMode = BeanResolutionTraceMode.getDefaultMode(traceClasses);
 
     /**
      * Default constructor.
@@ -87,6 +90,27 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         applicationContextConfigurer.configure(this);
         this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanResolutionTrace(
+        BeanResolutionTraceMode traceMode,
+        String... classPatterns) {
+        this.traceMode = traceMode == null ? BeanResolutionTraceMode.NONE : traceMode;
+        if (ArrayUtils.isNotEmpty(classPatterns)) {
+            this.traceClasses = Set.of(classPatterns);
+        }
+        return this;
+    }
+
+    @Override
+    public BeanResolutionTraceMode getTraceMode() {
+        return this.traceMode;
+    }
+
+    @Override
+    public Set<String> getTraceClasses() {
+        return traceClasses;
     }
 
     private ClassLoader resolveClassLoader() {

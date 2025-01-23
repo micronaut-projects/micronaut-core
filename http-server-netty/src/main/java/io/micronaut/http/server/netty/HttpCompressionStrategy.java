@@ -39,4 +39,9 @@ public interface HttpCompressionStrategy extends Toggleable {
     default int getCompressionLevel() {
         return StandardCompressionOptions.gzip().compressionLevel();
     }
+
+    /**
+     * @return The maximum size of data that can be encoded using the zstd algorithm.
+     */
+    int getMaxZstdEncodeSize();
 }

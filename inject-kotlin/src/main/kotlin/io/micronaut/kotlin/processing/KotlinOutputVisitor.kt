@@ -32,17 +32,19 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
 
     override fun visitClass(classname: String, vararg originatingElements: Element): OutputStream {
         return environment.codeGenerator.createNewFile(
-            getNativeElements(originatingElements),
+            getNativeElements(classname, originatingElements),
             classname.substringBeforeLast('.'),
             classname.substringAfterLast('.'),
             "class")
     }
 
     override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        val fileName = "${type}${File.separator}${classname}"
+        val packageName = "META-INF.micronaut"
         environment.codeGenerator.createNewFile(
-            getNativeElements(arrayOf(originatingElement)),
-            "META-INF.micronaut",
-            "${type}${File.separator}${classname}",
+            getNativeElements("$packageName.$fileName", arrayOf(originatingElement)),
+            packageName,
+            fileName,
             "").use {
             it.bufferedWriter().write("")
         }
@@ -50,7 +52,7 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
 
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         val elements = normalizePath("META-INF/$path")
-        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(path, originatingElements)))
     }
 
     override fun visitGeneratedFile(path: String): Optional<GeneratedFile> {
@@ -60,18 +62,22 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
 
     override fun visitGeneratedFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         val elements = normalizePath(path)
-        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(path, originatingElements)))
     }
 
     override fun visitGeneratedSourceFile(packageName: String, fileNameWithoutExtension: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         val elements = packageName.split('.').toMutableList()
-        elements.add("${fileNameWithoutExtension}.kt")
-        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
+        val fileName = "${fileNameWithoutExtension}.kt"
+        elements.add(fileName)
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements("$packageName.$fileName", originatingElements)))
     }
 
     private fun normalizePath(path: String) = path.replace("\\\\", "/").split("/").toMutableList()
 
-    private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {
+    private fun getNativeElements(fileName: String, originatingElements: Array<out Element>): Dependencies {
+        if (context.aggregating) {
+            return Dependencies.ALL_FILES
+        }
         val sources: Array<KSFile> = if (originatingElements.isNotEmpty()) {
             val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
             for (originatingElement in originatingElements) {
@@ -84,8 +90,12 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
             }
             originatingFiles.toTypedArray()
         } else {
+            context.warn(
+                "File $fileName is generated from a non-aggregating visitor and without any originating elements",
+                null as Element?
+            )
             emptyArray()
         }
-        return Dependencies(aggregating = context.aggregating || originatingElements.size > 1, sources = sources)
+        return Dependencies(false, sources = sources)
     }
 }

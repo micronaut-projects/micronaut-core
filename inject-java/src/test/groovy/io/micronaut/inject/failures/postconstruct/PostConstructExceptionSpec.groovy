@@ -16,7 +16,6 @@
 package io.micronaut.inject.failures.postconstruct
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.CachedEnvironment
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
@@ -27,14 +26,16 @@ class PostConstructExceptionSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
-        def ls = CachedEnvironment.getProperty("line.separator")
-        e.message == 'Error instantiating bean of type  [io.micronaut.inject.failures.postconstruct.B]' + ls + ls +
-                'Message: bad' + ls +
-                'Path Taken: new B()'
+        e.message.normalize() == '''\
+Error instantiating bean of type  [io.micronaut.inject.failures.postconstruct.MyClassB]
+
+Message: bad
+Path Taken:
+new @j.i.Singleton i.m.i.f.p.MyClassB()'''
 
         cleanup:
         context.close()

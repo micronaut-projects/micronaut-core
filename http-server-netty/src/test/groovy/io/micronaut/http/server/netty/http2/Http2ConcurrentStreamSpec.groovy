@@ -24,7 +24,7 @@ class Http2ConcurrentStreamSpec extends Specification {
                 'spec.name'                    : 'Http2ConcurrentStreamSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.ssl.enabled'        : true,
-                'micronaut.ssl.port'           : -1,
+                'micronaut.server.ssl.port'           : -1,
                 'micronaut.ssl.buildSelfSigned': true,
         ])
         def server = ctx.getBean(EmbeddedServer)
