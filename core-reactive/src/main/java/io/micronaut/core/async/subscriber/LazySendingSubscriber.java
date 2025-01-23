@@ -46,6 +46,7 @@ public final class LazySendingSubscriber<T> implements CoreSubscriber<T>, CorePu
     private Subscription upstream;
     private volatile CoreSubscriber<? super T> downstream;
     private Signal<? extends T> heldBackSignal;
+    private long heldBackDemand = 0;
 
     private LazySendingSubscriber() {
     }
@@ -136,9 +137,30 @@ public final class LazySendingSubscriber<T> implements CoreSubscriber<T>, CorePu
         subscribe(Operators.toCoreSubscriber(s));
     }
 
+    private static long saturatingAdd(long a, long b) {
+        long sum = a + b;
+        if (sum < a) {
+            return Long.MAX_VALUE;
+        }
+        return sum;
+    }
+
     @Override
     public void request(long n) {
-        if (!sentFirst && !sendingFirst) {
+        if (!sentFirst) {
+            if (sendingFirst) {
+                // we're currently running onNext, need to wait with the request() call.
+                synchronized (this) {
+                    if (!sentFirst) {
+                        // hold back demand until onNext is done
+                        heldBackDemand = saturatingAdd(heldBackDemand, n);
+                        return;
+                    }
+                }
+                // sentFirst became true
+                upstream.request(n);
+                return;
+            }
             sendingFirst = true;
             if (first != null) {
                 downstream.onNext(first); // note: this can trigger reentrancy!
@@ -148,6 +170,7 @@ public final class LazySendingSubscriber<T> implements CoreSubscriber<T>, CorePu
             synchronized (this) {
                 sentFirst = true;
                 heldBackSignal = this.heldBackSignal;
+                n = saturatingAdd(n, heldBackDemand);
             }
             if (heldBackSignal != null) {
                 heldBackSignal.accept(downstream);
