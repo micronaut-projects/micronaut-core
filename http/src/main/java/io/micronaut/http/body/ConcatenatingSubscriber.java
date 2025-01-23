@@ -48,6 +48,7 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
     private BufferConsumer.Upstream currentComponent;
     private boolean start = false;
     private boolean delayedSubscriberCompletion = false;
+    private boolean currentComponentDone = false;
 
     @Override
     public final void onSubscribe(Subscription s) {
@@ -171,6 +172,7 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
     public final void onBytesConsumed(long bytesConsumed) {
         long delta;
         Upstream currentComponent;
+        boolean requestNewComponent;
         synchronized (this) {
             long newConsumed = consumed + bytesConsumed;
             if (newConsumed < consumed) {
@@ -181,9 +183,13 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
             consumed = newConsumed;
 
             currentComponent = this.currentComponent;
+            requestNewComponent = currentComponent == null && currentComponentDone && newConsumed >= forwarded;
         }
         if (currentComponent != null && delta > 0) {
             currentComponent.onBytesConsumed(bytesConsumed);
+        } else if (requestNewComponent) {
+            // Previous component is now fully consumed, request a new one.
+            subscription.request(1);
         }
     }
 
@@ -219,17 +225,21 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
     @Override
     public final void complete() {
         boolean delayedSubscriberCompletion;
+        boolean requestNextComponent;
         synchronized (this) {
             currentComponent = null;
             delayedSubscriberCompletion = this.delayedSubscriberCompletion;
+            requestNextComponent = !delayedSubscriberCompletion && (disregardBackpressure || consumed >= forwarded);
+            currentComponentDone = !requestNextComponent;
         }
         if (delayedSubscriberCompletion) {
             // onComplete was held back, call it now
             onComplete();
-        } else {
+        } else if (requestNextComponent) {
             // current component completed. request the next ByteBody
             subscription.request(1);
         }
+        // if requestNextComponent is false, then the last component has not been fully consumed yet. we'll request the next later.
     }
 
     @Override
