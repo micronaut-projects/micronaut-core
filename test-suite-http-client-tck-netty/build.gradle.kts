@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    testImplementation(projects.httpServerNetty)
-    implementation(projects.jacksonDatabind)
-    testImplementation(projects.httpClient)
-    testImplementation(projects.httpClientTck)
+    testImplementation(projects.micronautHttpServerNetty)
+    implementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautHttpClient)
+    testImplementation(projects.micronautHttpClientTck)
     testImplementation(libs.junit.platform.engine)
 }
 

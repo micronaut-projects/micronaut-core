@@ -155,7 +155,7 @@ final class HttpPipelineBuilder implements Closeable {
     }
 
     boolean supportsSsl() {
-        return sslContext != null;
+        return sslContext != null || quicSslContext != null;
     }
 
     @Override
@@ -340,6 +340,7 @@ final class HttpPipelineBuilder implements Closeable {
                         ch.pipeline().addLast(new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
                             @Override
                             protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                                ch.config().setAutoRead(false);
                                 StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                                 streamPipeline.insertHttp3FrameHandlers();
                                 streamPipeline.streamCustomizer.onStreamPipelineBuilt();

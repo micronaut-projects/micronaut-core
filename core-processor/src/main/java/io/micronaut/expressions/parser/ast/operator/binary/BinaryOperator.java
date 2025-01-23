@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Abstract expression AST node for binary operators.
@@ -29,10 +29,10 @@ import org.objectweb.asm.Type;
  */
 @Internal
 public abstract sealed class BinaryOperator extends ExpressionNode permits AddOperator,
-                                                                           EqOperator,
-                                                                           LogicalOperator,
-                                                                           MathOperator,
-                                                                           PowOperator {
+    EqOperator,
+    LogicalOperator,
+    MathOperator,
+    PowOperator {
     protected final ExpressionNode leftOperand;
     protected final ExpressionNode rightOperand;
 
@@ -42,12 +42,12 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits AddOp
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef leftType = leftOperand.resolveType(ctx);
+        TypeDef rightType = rightOperand.resolveType(ctx);
         return resolveOperationType(leftType, rightType);
     }
 
-    protected abstract Type resolveOperationType(Type leftOperandType,
-                                                 Type rightOperandType);
+    protected abstract TypeDef resolveOperationType(TypeDef leftOperandType,
+                                                    TypeDef rightOperandType);
 }

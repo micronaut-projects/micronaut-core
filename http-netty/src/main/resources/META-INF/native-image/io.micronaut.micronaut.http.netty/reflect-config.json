@@ -1,0 +1,14 @@
+[
+  {
+    "name":"io.netty.util.internal.shaded.org.jctools.queues.unpadded.MpscUnpaddedArrayQueueConsumerIndexField",
+    "fields":[{"name":"consumerIndex"}]
+  },
+  {
+    "name":"io.netty.util.internal.shaded.org.jctools.queues.unpadded.MpscUnpaddedArrayQueueProducerIndexField",
+    "fields":[{"name":"producerIndex"}]
+  },
+  {
+    "name":"io.netty.util.internal.shaded.org.jctools.queues.unpadded.MpscUnpaddedArrayQueueProducerLimitField",
+    "fields":[{"name":"producerLimit"}]
+  }
+]

@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.type.TypeInformation
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -338,8 +339,10 @@ class TestInterceptor implements MethodInterceptor<Object, Object> {
 ''')
 
         def barBean = getBean(context, 'test.Bar')
+        def definition = context.getBeanDefinition(context.classLoader.loadClass('test.Foo'))
 
         expect:
+        definition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Primary @j.i.Singleton t.Foo t.T$TestField.one'
         barBean.test("good") == 'GOOD' // proxied
         getBean(context, "test.Foo").name == 'one'
         getBean(context, "test.Foo", Qualifiers.byName("two")).name == 'two'

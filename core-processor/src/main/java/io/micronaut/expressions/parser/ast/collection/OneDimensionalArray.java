@@ -16,21 +16,16 @@
 package io.micronaut.expressions.parser.ast.collection;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
 
 import java.util.List;
 
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
-import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
-import static org.objectweb.asm.Opcodes.AASTORE;
 
 /**
  * Expression AST node for array instantiation. This node is not used when
@@ -54,34 +49,12 @@ public final class OneDimensionalArray extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        int arraySize = initializer.size();
-
-        mv.push(arraySize);
-        mv.newArray(elementTypeIdentifier.resolveType(ctx));
-
-        if (arraySize > 0) {
-            mv.dup();
-        }
-
-        for (int i = 0; i < arraySize; i++) {
-            ExpressionNode element = initializer.get(i);
-            boolean isLastElement = i == arraySize - 1;
-            mv.push(i);
-
-            Type elementType = element.resolveType(ctx);
-            element.compile(ctx);
-            if (!elementTypeIdentifier.isPrimitive()) {
-                pushBoxPrimitiveIfNecessary(elementType, mv);
-                mv.visitInsn(AASTORE);
-            } else {
-                mv.arrayStore(elementType);
-            }
-            if (!isLastElement) {
-                mv.dup();
-            }
-        }
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return elementTypeIdentifier.resolveType(ctx)
+            .array()
+            .instantiate(
+                initializer.stream().map(e -> e.compile(ctx)).toList()
+            );
     }
 
     @Override
@@ -90,8 +63,4 @@ public final class OneDimensionalArray extends ExpressionNode {
                     .toArray();
     }
 
-    @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return getTypeReference(doResolveClassElement(ctx));
-    }
 }

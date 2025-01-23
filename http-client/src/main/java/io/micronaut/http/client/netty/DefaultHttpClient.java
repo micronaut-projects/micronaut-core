@@ -788,7 +788,7 @@ public class DefaultHttpClient implements
     }
 
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
-        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(() -> flow)));
+        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
     }
 
     @Override
@@ -2207,7 +2207,7 @@ public class DefaultHttpClient implements
     /**
      * Used as a holder for the current SSE event.
      */
-    private static class CurrentEvent {
+    private static final class CurrentEvent {
         byte[] data;
         String id;
         String name;

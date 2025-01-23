@@ -67,6 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.EOFException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -209,6 +210,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 queued.handler.discardOutbound();
             }
         }
+        inboundHandler.discard();
         outboundQueue.clear();
         requestHandler.removed();
     }
@@ -338,6 +340,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @see #channelReadComplete
          */
         void readComplete() {
+        }
+
+        void discard() {
         }
     }
 
@@ -517,6 +522,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
+
+        @Override
+        void discard() {
+            for (HttpContent content : buffer) {
+                content.release();
+            }
+            buffer.clear();
+        }
     }
 
     /**
@@ -546,7 +559,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        void discard() {
+            // note: this has to match RoutingInBoundHandler#IGNORABLE_ERROR_MESSAGE
+            handleUpstreamError(new EOFException("Connection closed before full body was received"));
+        }
+
+        @Override
         void handleUpstreamError(Throwable cause) {
+            inboundHandler = droppingInboundHandler;
             dest.error(cause);
         }
 
@@ -685,6 +705,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void handleUpstreamError(Throwable cause) {
             delegate.handleUpstreamError(cause);
         }
+
+        @Override
+        void discard() {
+            dispose();
+            delegate.discard();
+        }
     }
 
     /**
@@ -805,6 +831,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             EventLoop eventLoop = ctx.channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> write(handler));
+                return;
+            }
+
+            if (ctx.isRemoved()) {
+                handler.discardOutbound();
                 return;
             }
 
@@ -1142,6 +1173,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
                 if (!writtenLast) {
                     writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writtenLast = true;
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();

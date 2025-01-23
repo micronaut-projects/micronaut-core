@@ -29,6 +29,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
@@ -132,6 +134,11 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.stringValue(Endpoint.class).orElse(null);
+                    final EndpointConfiguration endpointConfiguration = beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
+                        .orElse(null);
+                    if (endpointConfiguration != null && StringUtils.isNotEmpty(endpointConfiguration.getPath())) {
+                        return Optional.of(endpointConfiguration.getPath());
+                    }
                     if (id == null || !ENDPOINT_ID_PATTERN.matcher(id).matches()) {
                         id = NameUtils.hyphenate(beanDefinition.getName());
                     }

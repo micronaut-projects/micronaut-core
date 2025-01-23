@@ -18,59 +18,53 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
+import java.lang.reflect.Method;
 import java.util.Optional;
 
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.toBoxedIfNecessary;
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.IFGE;
-import static org.objectweb.asm.Opcodes.IFGT;
-import static org.objectweb.asm.Opcodes.IFLE;
-import static org.objectweb.asm.Opcodes.IFLT;
-import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
  * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * types that implement {@link Comparable} interface.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public final class ComparablesComparisonOperation extends ExpressionNode {
 
-    private static final String COMPARABLE_CLASS_NAME = Comparable.class.getName();
+    private static final ClassTypeDef COMPARABLE_TYPE = ClassTypeDef.of(Comparable.class);
+
+    private static final Method COMPARE_METHOD =
+        ReflectionUtils.getRequiredMethod(Comparable.class, "compareTo", Object.class);
 
     private final ExpressionNode leftOperand;
     private final ExpressionNode rightOperand;
-    private final int comparisonOpcode;
-
-    private ClassElement comparableTypeArgument;
+    private final ExpressionDef.ComparisonOperation.OpType type;
     private ComparisonType comparisonType;
 
     public ComparablesComparisonOperation(ExpressionNode leftOperand,
                                           ExpressionNode rightOperand,
-                                          int comparisonOpcode) {
+                                          ExpressionDef.ComparisonOperation.OpType type) {
         this.leftOperand = leftOperand;
         this.rightOperand = rightOperand;
-        this.comparisonOpcode = comparisonOpcode;
+        this.type = type;
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         // resolving non-primitive class elements is necessary to handle cases
         // when one of expression nodes is of primitive type, but other expression node
         // is comparable to respective boxed type
@@ -82,17 +76,14 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
 
         if (leftComparableTypeArgument != null && rightClassElement.isAssignable(leftComparableTypeArgument)) {
             comparisonType = ComparisonType.LEFT;
-            comparableTypeArgument = leftComparableTypeArgument;
         } else if (rightComparableTypeArgument != null && leftClassElement.isAssignable(rightComparableTypeArgument)) {
             comparisonType = ComparisonType.RIGHT;
-            comparableTypeArgument = rightComparableTypeArgument;
         } else {
             throw new ExpressionCompilationException(
                 "Comparison operation can only be applied to numeric types or types that are " +
                     "Comparable to each other");
         }
-
-        return BOOLEAN_TYPE;
+        return BOOLEAN;
     }
 
     /**
@@ -105,8 +96,8 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
         ClassElement classElement = expressionNode.resolveClassElement(ctx);
         if (classElement instanceof PrimitiveElement) {
             return ctx.visitorContext()
-                       .getClassElement(toBoxedIfNecessary(expressionNode.resolveType(ctx)).getClassName())
-                       .orElseThrow();
+                .getClassElement(toBoxedIfNecessary(expressionNode.resolveType(ctx)).getName())
+                .orElseThrow();
         }
         return classElement;
     }
@@ -114,68 +105,44 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     @Nullable
     private ClassElement resolveComparableTypeArgument(ClassElement classElement) {
         return Optional.ofNullable(classElement
-                                       .getAllTypeArguments()
-                                       .get(COMPARABLE_CLASS_NAME))
-                   .map(types -> types.get("T"))
-                   .orElse(null);
+                .getAllTypeArguments()
+                .get(COMPARABLE_TYPE.getName()))
+            .map(types -> types.get("T"))
+            .orElse(null);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
-
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
         if (comparisonType == ComparisonType.LEFT) {
-            pushCompareToMethodCall(leftOperand, rightOperand, ctx);
-            mv.visitJumpInsn(comparisonOpcode, elseLabel);
+            return compareComparable(leftOperand, rightOperand, ctx)
+                .compare(type, ExpressionDef.constant(0));
         } else {
-            pushCompareToMethodCall(rightOperand, leftOperand, ctx);
-            mv.visitJumpInsn(invertInstruction(comparisonOpcode), elseLabel);
-        }
-
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, endOfCmpLabel);
-        mv.visitLabel(elseLabel);
-        mv.push(false);
-        mv.visitLabel(endOfCmpLabel);
-    }
-
-    private void pushCompareToMethodCall(ExpressionNode comparableNode,
-                                         ExpressionNode comparedNode,
-                                         ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        ClassElement comparableClass = comparableNode.resolveClassElement(ctx);
-
-        Type comparableType = comparableNode.resolveType(ctx);
-        Type comparedType = comparedNode.resolveType(ctx);
-
-        comparableNode.compile(ctx);
-        pushBoxPrimitiveIfNecessary(comparableType, mv);
-
-        comparedNode.compile(ctx);
-        pushBoxPrimitiveIfNecessary(comparedType, mv);
-
-        if (comparableClass.isInterface()) {
-            mv.invokeInterface(comparableType,
-                new Method("compareTo", TypeDescriptors.INT,
-                    new org.objectweb.asm.Type[]{TypeDescriptors.OBJECT}));
-        } else {
-            mv.invokeVirtual(comparableType,
-                new Method("compareTo", TypeDescriptors.INT,
-                new org.objectweb.asm.Type[]{JavaModelUtils.getTypeReference(comparableTypeArgument)}));
+            return compareComparable(rightOperand, leftOperand, ctx)
+                .compare(invert(type), ExpressionDef.constant(0));
         }
     }
 
-    private Integer invertInstruction(Integer instruction) {
+    private ExpressionDef compareComparable(ExpressionNode comparableNode,
+                                            ExpressionNode comparedNode,
+                                            ExpressionCompilationContext ctx) {
+        return comparableNode.compile(ctx)
+            .cast(COMPARABLE_TYPE).invoke(
+                COMPARE_METHOD,
+
+                comparedNode.compile(ctx)
+            );
+    }
+
+    private ExpressionDef.ComparisonOperation.OpType invert(ExpressionDef.ComparisonOperation.OpType instruction) {
+        // INVESTIGATE: LESS_THEN should be inverted to GREATER_THAN_OR_EQUAL and the opposites
         return switch (instruction) {
-                       case IFLE -> IFGE;
-                       case IFLT -> IFGT;
-                       case IFGE -> IFLE;
-                       case IFGT -> IFLT;
-                       default -> instruction;
-                   };
+            case EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO;
+            case NOT_EQUAL_TO -> ExpressionDef.ComparisonOperation.OpType.EQUAL_TO;
+            case GREATER_THAN -> ExpressionDef.ComparisonOperation.OpType.LESS_THAN;
+            case LESS_THAN -> ExpressionDef.ComparisonOperation.OpType.GREATER_THAN;
+            case GREATER_THAN_OR_EQUAL -> ExpressionDef.ComparisonOperation.OpType.LESS_THAN_OR_EQUAL;
+            case LESS_THAN_OR_EQUAL -> ExpressionDef.ComparisonOperation.OpType.GREATER_THAN_OR_EQUAL;
+        };
     }
 
     private enum ComparisonType {

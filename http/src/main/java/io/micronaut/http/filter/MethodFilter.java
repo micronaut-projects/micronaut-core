@@ -457,14 +457,14 @@ record MethodFilter<T>(FilterOrder order,
                 if (returnValue == null && !nullable) {
                     return next.handle(context, null, continuation);
                 }
-                Publisher<?> publisher = ReactivePropagation.propagate(
-                    context.propagatedContext(),
-                    Publishers.convertToPublisher(conversionService, returnValue)
-                );
+                Publisher<Object> converted = Publishers.convertToPublisher(conversionService, returnValue);
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(publisher);
+                    return resultAwareContinuation.processResult(ReactivePropagation.propagate(
+                        context.propagatedContext(),
+                        converted
+                    ));
                 }
-                return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
+                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext()).flatMap(v -> {
                     try {
                         return next.handle(context, v, continuation);
                     } catch (Throwable e) {

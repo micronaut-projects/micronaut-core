@@ -2,7 +2,6 @@ package io.micronaut.inject.beanimport
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.smallrye.faulttolerance.CdiFaultToleranceSpi
 import io.smallrye.faulttolerance.CircuitBreakerMaintenanceImpl
 import io.smallrye.faulttolerance.DefaultAsyncExecutorProvider
 import io.smallrye.faulttolerance.DefaultExistingCircuitBreakerNames
@@ -54,9 +53,7 @@ class Application {}
         expect:
         context.containsBean(DefaultAsyncExecutorProvider)
         context.containsBean(CircuitBreakerMaintenanceImpl)
-        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultExistingCircuitBreakerNames)
-        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)
                 .injectedFields.size() == 1
@@ -79,7 +76,6 @@ import io.smallrye.faulttolerance.*;
 @io.micronaut.context.annotation.Import(classes={
     DefaultAsyncExecutorProvider.class,
     CircuitBreakerMaintenanceImpl.class,
-    CdiFaultToleranceSpi.EagerDependencies.class,
     DefaultExistingCircuitBreakerNames.class,
     DefaultFallbackHandlerProvider.class,
     DefaultFaultToleranceOperationProvider.class,
@@ -91,7 +87,6 @@ class Application {}
         expect:
         context.containsBean(DefaultAsyncExecutorProvider)
         context.containsBean(CircuitBreakerMaintenanceImpl)
-        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultExistingCircuitBreakerNames)
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)

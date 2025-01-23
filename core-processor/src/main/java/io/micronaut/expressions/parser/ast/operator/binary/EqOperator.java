@@ -18,15 +18,10 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
-
-import java.util.Objects;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.OBJECT;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
 
 /**
  * Expression AST node for binary '==' operator.
@@ -41,22 +36,12 @@ public sealed class EqOperator extends BinaryOperator permits NeqOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Type lefType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
-
-        leftOperand.compile(ctx);
-        pushBoxPrimitiveIfNecessary(lefType, mv);
-
-        rightOperand.compile(ctx);
-        pushBoxPrimitiveIfNecessary(rightType, mv);
-
-        mv.invokeStatic(Type.getType(Objects.class), new Method("equals", BOOLEAN, new Type[]{OBJECT, OBJECT}));
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return leftOperand.compile(ctx).equalsStructurally(rightOperand.compile(ctx));
     }
 
     @Override
-    protected Type resolveOperationType(Type leftOperandType, Type rightOperandType) {
+    protected TypeDef resolveOperationType(TypeDef leftOperandType, TypeDef rightOperandType) {
         return BOOLEAN;
     }
 }

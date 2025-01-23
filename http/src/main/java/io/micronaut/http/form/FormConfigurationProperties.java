@@ -34,7 +34,15 @@ final class FormConfigurationProperties implements FormConfiguration {
     @SuppressWarnings("WeakerAccess")
     private static final int DEFAULT_MAX_DECODED_KEY_VALUE_PARAMETERS = 1024;
 
+    /**
+     * Default value indicating whether the semicolon is treated as a normal character
+     * used in {@link io.micronaut.http.form.FormUrlEncodedDecoder}.
+     */
+    @SuppressWarnings("WeakerAccess")
+    private static final boolean DEFAULT_SEMICOLON_IS_NORMAL_CHAR = false;
+
     private int maxDecodedKeyValueParameters = DEFAULT_MAX_DECODED_KEY_VALUE_PARAMETERS;
+    private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
 
     /**
      *
@@ -45,11 +53,27 @@ final class FormConfigurationProperties implements FormConfiguration {
         return maxDecodedKeyValueParameters;
     }
 
+
+    /**
+     * @return true if the semicolon is treated as a normal character, false otherwise
+     */
+    @Override
+    public boolean isSemicolonIsNormalChar() {
+        return semicolonIsNormalChar;
+    }
+
     /**
      * default maximum of decoded key value parameters. Default value {@link #DEFAULT_MAX_DECODED_KEY_VALUE_PARAMETERS}.
      * @param maxDecodedKeyValueParameters default maximum of decoded key value parameters
      */
     public void setMaxDecodedKeyValueParameters(int maxDecodedKeyValueParameters) {
         this.maxDecodedKeyValueParameters = maxDecodedKeyValueParameters;
+    }
+
+    /**
+     * @param semicolonIsNormalChar true if the semicolon should be treated as a normal character, false otherwise
+     */
+    public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
     }
 }

@@ -110,6 +110,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
 
     /**
+     * The default size of the largest data that can be encoded using the zstd algorithm.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_ZSTD_ENCODE_SIZE = 1024 * 1024 * 32;
+
+    /**
      * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
@@ -200,6 +206,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
+    private int maxZstdEncodeSize = DEFAULT_MAX_ZSTD_ENCODE_SIZE;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
@@ -473,6 +480,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * The default maximum size of data that can be encoded using the zstd algorithm.
+     * Default value ({@value #DEFAULT_MAX_ZSTD_ENCODE_SIZE}).
+     *
+     * @return The maximum size of data that can be encoded using the zstd algorithm.
+     */
+    public int getMaxZstdEncodeSize() {
+        return maxZstdEncodeSize;
+    }
+
+    /**
      * @return The Netty child channel options.
      * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
@@ -655,6 +672,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setCompressionLevel(@ReadableBytes int compressionLevel) {
         this.compressionLevel = compressionLevel;
+    }
+
+    /**
+     * Sets the maximum size of data that can be encoded using the zstd algorithm. Default value ({@value #DEFAULT_MAX_ZSTD_ENCODE_SIZE}).
+     *
+     * @param maxZstdEncodeSize The maximum size of block.
+     */
+    public void setMaxZstdEncodeSize(int maxZstdEncodeSize) {
+        this.maxZstdEncodeSize = maxZstdEncodeSize;
     }
 
     /**

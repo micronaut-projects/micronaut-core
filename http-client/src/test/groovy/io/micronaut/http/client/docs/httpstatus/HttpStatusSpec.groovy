@@ -91,6 +91,8 @@ class HttpStatusSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.message == "success"
         e.status == HttpStatus.NOT_FOUND
+        HttpStatus.NOT_FOUND.code == e.code()
+        HttpStatus.NOT_FOUND.reason == e.reason()
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5348")

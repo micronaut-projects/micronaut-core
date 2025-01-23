@@ -25,17 +25,13 @@ import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.StatementDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.List;
 import java.util.Optional;
-
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
-import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
 /**
  * Expression AST node used for method invocation.
@@ -48,8 +44,7 @@ import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 @Internal
 public sealed class ElementMethodCall extends AbstractMethodCall permits PropertyAccess {
 
-    private static final Type TYPE_OPTIONAL = Type.getType(Optional.class);
-    private static final Method METHOD_OR_ELSE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(Optional.class, "orElse", Object.class));
+    private static final java.lang.reflect.Method METHOD_OR_ELSE = ReflectionUtils.getRequiredInternalMethod(Optional.class, "orElse", Object.class);
     protected final ExpressionNode callee;
     private final boolean nullSafe;
 
@@ -70,55 +65,36 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
         ClassElement calleeClass = callee.resolveClassElement(ctx);
-        Method method = usedMethod.toAsmMethod();
-        Type calleeType = JavaModelUtils.getTypeReference(calleeClass);
 
         if (callee instanceof TypeIdentifier) {
-            compileArguments(ctx);
-            if (calleeClass.isInterface()) {
-                mv.visitMethodInsn(INVOKESTATIC, calleeType.getInternalName(), name,
-                    usedMethod.getDescriptor(), true);
-            } else {
-                mv.invokeStatic(calleeType, method);
-            }
-        } else {
-            callee.compile(ctx);
-            if (nullSafe) {
-                if (calleeClass.isAssignable(Optional.class)) {
-                    mv.checkCast(TYPE_OPTIONAL);
-                    // safe navigate optional
-                    mv.visitInsn(ACONST_NULL);
-                    mv.invokeVirtual(TYPE_OPTIONAL, METHOD_OR_ELSE);
-                    // recompute new return type
-                    calleeClass = calleeClass.getFirstTypeArgument().orElse(ClassElement.of(Object.class));
-                    calleeType = JavaModelUtils.getTypeReference(calleeClass);
-                    mv.checkCast(calleeType);
-                }
-                // null safe operator is used, so we need to check the result is null
-                mv.storeLocal(2, calleeType);
-                mv.loadLocal(2, calleeType);
-                Label proceed = new Label();
-                mv.ifNonNull(proceed);
-                mv.visitInsn(ACONST_NULL);
-                mv.returnValue();
-                mv.visitLabel(proceed);
-                mv.loadLocal(2, calleeType);
-            }
-            compileArguments(ctx);
-            if (calleeClass.isInterface()) {
-                mv.invokeInterface(calleeType, method);
-            } else {
-                mv.invokeVirtual(calleeType, method);
-            }
+            return ClassTypeDef.of(calleeClass)
+                .invokeStatic(usedMethod.getMethodElement(), compileArguments(ctx));
         }
+        ExpressionDef exp = callee.compile(ctx);
+        if (nullSafe) {
+            if (calleeClass.isAssignable(Optional.class)) {
+                // safe navigate optional
+                // recompute new return type
+                calleeClass = calleeClass.getFirstTypeArgument().orElse(ClassElement.of(Object.class));
+                exp = exp.invoke(METHOD_OR_ELSE, ExpressionDef.nullValue())
+                    .cast(TypeDef.erasure(calleeClass));
+            }
+            StatementDef.DefineAndAssign local = exp.newLocal(name + "Var");
+            ctx.additionalStatements().add(local);
+            ctx.additionalStatements().add(
+                local.variable().isNull()
+                    .doIf(ExpressionDef.nullValue().returning())
+            );
+            exp = local.variable();
+        }
+        return exp.invoke(usedMethod.getMethodElement(), compileArguments(ctx));
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
-        List<Type> argumentTypes = resolveArgumentTypes(ctx);
+    CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
+        List<TypeDef> argumentTypes = resolveArgumentTypes(ctx);
         ClassElement classElement = callee.resolveClassElement(ctx);
 
         if (isNullSafe() && classElement.isAssignable(Optional.class)) {
@@ -129,7 +105,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
         ElementQuery<MethodElement> methodQuery = buildMethodQuery();
         List<CandidateMethod> candidateMethods = classElement.getEnclosedElements(methodQuery).stream()
                 .map(method -> toCandidateMethod(ctx, method, argumentTypes))
-                .filter(method -> method.isMatching(ctx.visitorContext()))
+                .filter(CandidateMethod::isMatching)
                 .toList();
 
         if (candidateMethods.isEmpty()) {

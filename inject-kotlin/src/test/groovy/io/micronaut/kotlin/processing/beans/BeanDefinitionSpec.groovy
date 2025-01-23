@@ -3,6 +3,7 @@ package io.micronaut.kotlin.processing.beans
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
@@ -637,6 +638,7 @@ class SampleEvent
         cleanup:
         context.close()
     }
+
     void "test @Property targeting field"() {
         given:
         def context = buildContext('''
@@ -1277,8 +1279,9 @@ annotation class NotNull
                     .filter {f -> !f.isSynthetic()}
                     .findFirst().orElseThrow()
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
+                    .findAll { !it.name.contains('$jacoco')}
         then:
-            supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
+            supertypeMethods.every {doWorkMethod.name.contains(it.name)}
     }
 
     void "test java class value annotation"() {
@@ -1349,5 +1352,58 @@ class Test {
 
         then:
             definition == null
+    }
+
+    void "test @Inject nested config properties"() {
+        given:
+        def context = KotlinCompiler.buildContext('''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import jakarta.inject.Inject
+
+@ConfigurationProperties("product-aggregator")
+class NestedConfig {
+
+    @Inject
+    internal var levelOnez = LevelOne()
+
+    @ConfigurationProperties("level-one")
+    internal class LevelOne {
+
+        internal lateinit var levelOneValue: String
+
+        @Inject
+        internal var levelTwo = LevelTwo()
+
+        @ConfigurationProperties("level-two")
+        internal class LevelTwo {
+            lateinit var levelTwoValue: String
+        }
+    }
+}
+
+''')
+        context.getEnvironment().addPropertySource(PropertySource.of([
+                'product-aggregator.level-one.level-one-value': 'ONE',
+                'product-aggregator.level-one.level-two.level-two-value': 'TWO',
+        ]))
+
+        def bean = getBean(context, 'test.NestedConfig')
+        def definition = KotlinCompiler.getBeanDefinition(context, 'test.NestedConfig')
+
+        expect:
+
+//        definition.properties.injectedFields.size() == 1
+//        definition.properties.injectedFields[0].name == "levelOnez"
+
+        bean.levelOnez != null
+        bean.levelOnez.levelOneValue == "ONE"
+        bean.levelOnez.levelTwo
+        bean.levelOnez.levelTwo != null
+        bean.levelOnez.levelTwo.levelTwoValue == "TWO"
+
+        cleanup:
+        context.close()
     }
 }

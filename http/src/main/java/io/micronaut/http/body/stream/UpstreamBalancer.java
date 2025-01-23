@@ -313,7 +313,17 @@ public final class UpstreamBalancer {
         }
     }
 
-    public record UpstreamPair(BufferConsumer.Upstream left, BufferConsumer.Upstream right) {
+    /**
+     * Pair of {@link BufferConsumer.Upstream} objects.
+     *
+     * @param left left {@link BufferConsumer.Upstream} object
+     * @param right right {@link BufferConsumer.Upstream} object
+     */
+    public record UpstreamPair(
+        BufferConsumer.Upstream left,
+        BufferConsumer.Upstream right
+    ) {
+
         UpstreamPair flip() {
             return new UpstreamPair(right, left);
         }

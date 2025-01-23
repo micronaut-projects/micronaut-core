@@ -95,6 +95,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         if (state != fromState) {
             throw new IllegalStateException("Wrong source state");
         }
+        fromState.leave(ctx);
         state = nextState;
     }
 
@@ -109,6 +110,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         void channelInactive(ChannelHandlerContext ctx) {
             exceptionCaught(ctx, new ResponseClosedException("Connection closed before response was received"));
+        }
+
+        void leave(ChannelHandlerContext ctx) {
         }
     }
 
@@ -226,6 +230,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private final ResponseListener listener;
         private final ChannelHandlerContext streamingContext;
         private final StreamingNettyByteBody.SharedBuffer streaming;
+        private final boolean wasAutoRead;
         private long demand;
 
         UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx, HttpResponse response) {
@@ -235,6 +240,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                 streaming.setExpectedLengthFrom(response.headers());
             }
             streamingContext = ctx;
+            wasAutoRead = ctx.channel().config().isAutoRead();
+            ctx.channel().config().setAutoRead(false);
+        }
+
+        @Override
+        void leave(ChannelHandlerContext ctx) {
+            ctx.channel().config().setAutoRead(wasAutoRead);
         }
 
         void add(ByteBuf buf) {
@@ -278,14 +290,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         }
 
         private void start0() {
-            if (state != this) {
-                return;
-            }
-
-            demand++;
-            if (demand == 1) {
-                streamingContext.read();
-            }
+            onBytesConsumed0(1);
         }
 
         @Override
@@ -306,7 +311,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             long newDemand = oldDemand + bytesConsumed;
             if (newDemand < oldDemand) {
                 // overflow
-                newDemand = oldDemand;
+                newDemand = Long.MAX_VALUE;
             }
             this.demand = newDemand;
             if (oldDemand <= 0 && newDemand > 0) {

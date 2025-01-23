@@ -8,6 +8,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice
 import io.micronaut.logback.clients.TeapotClient
+import io.micronaut.logback.controllers.TeapotController
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.slf4j.LoggerFactory
@@ -46,6 +47,21 @@ class LoggerClientExceptionSpec extends Specification {
         assert appender.list.size() == 1
         assert appender.list[0].formattedMessage == LOG_MESSAGE
         assert appender.list[0].level == Level.DEBUG
+    }
+
+    void "client custom http status should log received error"() {
+        when:
+        def response = client.customStatus()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.code() == TeapotController.RESPONSE_WITH_CUSTOM_STATUS.code()
+        ex.reason() == TeapotController.RESPONSE_WITH_CUSTOM_STATUS.reason()
+        response == null
+
+        appender.list.size() == 1
+        appender.list[0].formattedMessage == "Client [io.micronaut.logback.clients.TeapotClient] received HTTP error response: Client '/teapot': My custom reason"
+        appender.list[0].level == Level.DEBUG
     }
 
     void "client synchronous response type should log received error"() {

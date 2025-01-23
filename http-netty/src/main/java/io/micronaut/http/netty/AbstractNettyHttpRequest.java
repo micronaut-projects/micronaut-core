@@ -26,6 +26,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.HttpConstants;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
@@ -192,13 +193,27 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected abstract Charset initCharset(Charset characterEncoding);
 
     /**
+     * @return the maximum number of parameters.
+     */
+    protected abstract int getMaxParams();
+
+    /**
+     * @return {@code true} if yes, {@code false} otherwise.
+     */
+    protected abstract boolean isSemicolonIsNormalChar();
+
+    /**
      * @param uri The URI
      * @return The query string decoder
      */
     @SuppressWarnings("ConstantConditions")
     protected final QueryStringDecoder createDecoder(URI uri) {
         Charset cs = getCharacterEncoding();
-        return cs != null ? new QueryStringDecoder(uri, cs) : new QueryStringDecoder(uri);
+        boolean semicolonIsNormalChar = isSemicolonIsNormalChar();
+        int maxParams = getMaxParams();
+        return cs != null ?
+            new QueryStringDecoder(uri, cs, maxParams, semicolonIsNormalChar) :
+            new QueryStringDecoder(uri, HttpConstants.DEFAULT_CHARSET, maxParams, semicolonIsNormalChar);
     }
 
     private NettyHttpParameters decodeParameters() {

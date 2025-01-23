@@ -43,6 +43,7 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<
 
     /**
      * @param conversionService conversionService
+     * @param argument argument
      */
     public RequestAttributeAnnotationBinder(ConversionService conversionService,
                                             Argument<T> argument) {

@@ -73,6 +73,7 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
@@ -274,6 +275,9 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
+        if (cause instanceof ClosedChannelException) {
+            return true;
+        }
         String message = cause.getMessage();
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
     }

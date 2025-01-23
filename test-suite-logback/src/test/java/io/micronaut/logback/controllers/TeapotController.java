@@ -11,8 +11,11 @@ import java.util.concurrent.CompletableFuture;
 @Controller("/teapot")
 public class TeapotController {
 
-    private HttpResponse<String> teapotResponse() {
-        return HttpResponse.status(HttpStatus.I_AM_A_TEAPOT);
+    public static final HttpResponse<String> RESPONSE_WITH_CUSTOM_STATUS = HttpResponse.status(999, "My custom reason");
+
+    @Get("/custom-status")
+    public HttpResponse<String> customStatus() {
+        return RESPONSE_WITH_CUSTOM_STATUS;
     }
 
     @Get("/sync-teapot")
@@ -28,5 +31,9 @@ public class TeapotController {
     @Get("/reactive-teapot")
     public Mono<HttpResponse<String>> reactiveNotFound() {
         return Mono.just(teapotResponse());
+    }
+
+    private HttpResponse<String> teapotResponse() {
+        return HttpResponse.status(HttpStatus.I_AM_A_TEAPOT);
     }
 }

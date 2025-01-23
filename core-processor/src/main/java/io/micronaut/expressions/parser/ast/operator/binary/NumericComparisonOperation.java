@@ -21,99 +21,50 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.computeNumericOperationTargetType;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
-import static org.objectweb.asm.Opcodes.DCMPL;
-import static org.objectweb.asm.Opcodes.FCMPL;
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.LCMP;
-import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
  * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * numeric types.
  *
- * @since 4.0.0
  * @author Sergey Gavrilov
+ * @since 4.0.0
  */
 @Internal
 public final class NumericComparisonOperation extends ExpressionNode {
 
     private final ExpressionNode leftOperand;
     private final ExpressionNode rightOperand;
-    private final int intComparisonOpcode;
-    private final int nonIntComparisonOpcode;
+    private final ExpressionDef.ComparisonOperation.OpType type;
 
     public NumericComparisonOperation(ExpressionNode leftOperand,
                                       ExpressionNode rightOperand,
-                                      int intComparisonOpcode,
-                                      int nonIntComparisonOpcode) {
+                                      ExpressionDef.ComparisonOperation.OpType type) {
         this.leftOperand = leftOperand;
         this.rightOperand = rightOperand;
-        this.intComparisonOpcode = intComparisonOpcode;
-        this.nonIntComparisonOpcode = nonIntComparisonOpcode;
+        this.type = type;
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef leftType = leftOperand.resolveType(ctx);
+        TypeDef rightType = rightOperand.resolveType(ctx);
 
         if (!isNumeric(leftType) || !isNumeric(rightType)) {
             throw new ExpressionCompilationException(
                 "Numeric comparison operation can only be applied to numeric types");
         }
 
-        return BOOLEAN_TYPE;
+        return BOOLEAN;
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
-
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
-
-        Type targetType = computeNumericOperationTargetType(leftType, rightType);
-
-        leftOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(leftType, mv);
-        pushPrimitiveCastIfNecessary(leftType, targetType, mv);
-
-        rightOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(rightType, mv);
-        pushPrimitiveCastIfNecessary(rightType, targetType, mv);
-
-        if (isOneOf(targetType, DOUBLE, FLOAT, LONG)) {
-            String targetDescriptor = targetType.getDescriptor();
-            switch (targetDescriptor) {
-                case "D" -> mv.visitInsn(DCMPL);
-                case "F" -> mv.visitInsn(FCMPL);
-                case "J" -> mv.visitInsn(LCMP);
-                default -> { }
-            }
-            mv.visitJumpInsn(nonIntComparisonOpcode, elseLabel);
-        } else {
-            mv.visitJumpInsn(intComparisonOpcode, elseLabel);
-        }
-
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, endOfCmpLabel);
-        mv.visitLabel(elseLabel);
-        mv.push(false);
-        mv.visitLabel(endOfCmpLabel);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return leftOperand.compile(ctx)
+            .compare(type, rightOperand.compile(ctx));
     }
 }

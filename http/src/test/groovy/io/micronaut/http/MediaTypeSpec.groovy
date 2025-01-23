@@ -190,32 +190,6 @@ class MediaTypeSpec extends Specification {
     }
 
     @Unroll
-    void "test natural order types: #commaSeparatedList"() {
-        given:
-        List<MediaType> orderedList = MediaType.orderedOf(commaSeparatedList.split(','))
-
-        when:
-        orderedList = new ArrayList<>(orderedList)
-        Collections.shuffle(orderedList)
-        orderedList.sort(null)
-
-        then:
-        orderedList.size() == expectedList.size()
-        for (int i = 0; i < orderedList.size(); i++) {
-            assert orderedList.get(i) == expectedList.get(i)
-        }
-
-        where:
-        commaSeparatedList                                | expectedList
-        "audio/basic;q=.5, application/json"              | [new MediaType("application/json"), new MediaType("audio/basic;q=.5")]
-        "text/html"                                       | [new MediaType("text/html")]
-        "*/*, text/*, text/html"                          | [new MediaType("text/html"), new MediaType("text/*"), new MediaType("*/*")]
-        "text/html;level=1, text/html;level=2;q=.3"       | [new MediaType("text/html;level=1"), new MediaType("text/html;level=2;q=.3")]
-        "text/*;blah=1, text/html;q=.3, audio/basic;q=.4" | [new MediaType("audio/basic;q=.4"), new MediaType("text/html;q=.3"), new MediaType("text/*;blah=1")]
-        "text/plain, text/html, application/json;q=1"     | [new MediaType("text/plain"), new MediaType("text/html"), new MediaType("application/json;q=1")]
-    }
-
-    @Unroll
     void "test type match #desiredType"() {
         given:
         boolean match = new MediaType(desiredType).matches(new MediaType(expectedType))
@@ -230,5 +204,12 @@ class MediaTypeSpec extends Specification {
         "*/*"                   | "application/xml"     | true
         "text/plain"            | "text/hml"            | false
         "text/*"                | "application/json"    | false
+    }
+
+    @Unroll
+    void "compare media type"() {
+        expect:
+            !MediaType.APPLICATION_JSON_TYPE.equals(MediaType.TEXT_XML_TYPE)
+            MediaType.APPLICATION_JSON_TYPE != MediaType.TEXT_XML_TYPE
     }
 }

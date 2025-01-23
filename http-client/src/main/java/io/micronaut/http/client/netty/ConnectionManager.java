@@ -300,6 +300,11 @@ public class ConnectionManager {
         return (ByteBufAllocator) bootstrap.config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
     }
 
+    /**
+     * Returns event loop group.
+     *
+     * @return the group
+     */
     EventLoopGroup getGroup() {
         return group;
     }
@@ -1377,7 +1382,7 @@ public class ConnectionManager {
             }
 
             @Override
-            public boolean dispatch(PendingRequest sink) {
+            public final boolean dispatch(PendingRequest sink) {
                 if (!tryEarmarkForRequest()) {
                     return false;
                 }
@@ -1610,7 +1615,7 @@ public class ConnectionManager {
             }
 
             @Override
-            void dispatch0(PendingRequest sink) {
+            final void dispatch0(PendingRequest sink) {
                 if (!channel.isActive() || windDownConnection) {
                     // make sure the request isn't dispatched to this connection again
                     windDownConnection();

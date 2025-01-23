@@ -21,7 +21,7 @@ class PcapLoggingSpec extends Specification {
                 'micronaut.http.client.pcap-logging-path-pattern': tmp.toString() + '/{localAddress}-{remoteAddress}-{qualifier}-{random}-{timestamp}.pcap',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
         def server = ctx.getBean(EmbeddedServer)

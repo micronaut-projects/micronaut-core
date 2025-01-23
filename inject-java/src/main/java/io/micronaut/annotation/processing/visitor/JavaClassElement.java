@@ -185,6 +185,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String getCanonicalName() {
+        return classElement.getQualifiedName().toString();
+    }
+
+    @Override
     public JavaNativeElement.@NonNull Class getNativeType() {
         return (JavaNativeElement.Class) super.getNativeType();
     }

@@ -52,6 +52,65 @@ import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test inner introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test$Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @Introspected
+    record Foo(String name) {}
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD)
+    static class Bar {
+        String name;
+    }
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanType().simpleName == 'Foo'
+    }
+
+    void "test inner introspection - without outer annotation"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test$Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+class Test {
+    @Introspected
+    record Foo(String name) {}
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD)
+    static class Bar {
+        String name;
+    }
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanType().simpleName == 'Foo'
+    }
+
     void "test annotations"() {
         when:
         def introspection = buildBeanIntrospection('test.Test', '''
@@ -740,6 +799,59 @@ class Test {
 ''')
         expect:
         introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test read property by type is defined by its reader field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getReadProperty("foo", String.class).isEmpty()
+        introspection.getReadProperty("foo", Optional.class).get().type == Optional.class
+
+    }
+
+    void "test read property type is defined by its field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public void setFoo(Optional<String> foo) {
+        this.foo = foo.orElse(null);
+    }
+
+}
+''')
+        expect:
+        introspection.getReadProperty("foo", String.class).get().type == String.class
+        introspection.getReadProperty("foo", Optional.class).isEmpty()
     }
 
     void "test optional property type is defined by its setter"() {
