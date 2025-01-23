@@ -31,5 +31,5 @@ public interface ThrowingConsumer<T, E extends Throwable> {
      * @param t The value
      * @throws E The generic exception
      */
-    void accept(T t) throws E;
+    void accept(T t) throws E; // parameter nullability is inherited from TYPE_USE on T
 }

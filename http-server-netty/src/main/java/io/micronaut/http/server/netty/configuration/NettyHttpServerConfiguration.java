@@ -1198,7 +1198,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @since 3.1.0
      * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration}
      */
-    @Deprecated
+    @Deprecated(since = "4.8.0", forRemoval = true)
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {
 
@@ -1262,10 +1262,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
         /**
          * Configuration for the Cache-Control header.
-         * 
+         *
          * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration}
          */
-        @Deprecated
+        @Deprecated(since = "4.8.0", forRemoval = true)
         @ConfigurationProperties("cache-control")
         public static class CacheControlConfiguration {
 
