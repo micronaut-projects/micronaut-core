@@ -108,7 +108,8 @@ public final class RouteAttributes {
     @NonNull
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<RouteInfo<?>> getRouteInfo(@NonNull HttpResponse<?> response) {
-        return (Optional) response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
+        // don't convert to RouteInfo to avoid type pollution
+        return (Optional) response.getAttribute(HttpAttributes.ROUTE_INFO);
     }
 
     /**
