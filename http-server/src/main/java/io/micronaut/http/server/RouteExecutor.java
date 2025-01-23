@@ -568,7 +568,9 @@ public final class RouteExecutor {
                 referenceCounted.release();
             }
             response.body(null);
-            RouteAttributes.setHeadBody(response, o);
+            if (o != null) {
+                RouteAttributes.setHeadBody(response, o);
+            }
         }
         applyConfiguredHeaders(response.getHeaders());
         if (routeMatch != null) {
