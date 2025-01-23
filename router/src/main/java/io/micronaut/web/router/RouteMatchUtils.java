@@ -26,7 +26,7 @@ import java.util.Optional;
  * @since 1.0
  * @deprecated Moved to {@link RouteAttributes}
  */
-@Deprecated
+@Deprecated(since = "4.8.0")
 public class RouteMatchUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteMatchUtils.class);

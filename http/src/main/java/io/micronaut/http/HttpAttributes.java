@@ -26,7 +26,7 @@ import java.security.Principal;
  * accessed through their static method accessors (such as those in {@link BasicHttpAttributes})
  * instead of directly through {@link io.micronaut.core.attr.AttributeHolder}.
  */
-@Deprecated(forRemoval = true)
+@Deprecated(forRemoval = true, since = "4.8.0")
 public enum HttpAttributes implements CharSequence {
 
     /**
@@ -34,15 +34,13 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use {@link HttpRequest#getUserPrincipal()} and {@link HttpRequest#setUserPrincipal(Principal)}
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     PRINCIPAL("micronaut.AUTHENTICATION"),
 
     /**
      * Attribute used to store any exception that may have occurred during request processing.
-     *
-     * @deprecated Use
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ERROR(Constants.PREFIX + ".error"),
 
     /**
@@ -50,7 +48,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Please use the accessors in RouteAttributes
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
@@ -58,7 +56,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Please use the accessors in RouteAttributes
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ROUTE_INFO(Constants.PREFIX + ".route.info"),
 
     /**
@@ -66,7 +64,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use {@link BasicHttpAttributes#getUriTemplate} instead
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),
 
     /**
@@ -74,7 +72,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated No replacement. Use your own attribute if necessary
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     METHOD_NAME(Constants.PREFIX + ".method.name"),
 
     /**
@@ -82,7 +80,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use {@link BasicHttpAttributes#getServiceId}
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     SERVICE_ID(Constants.PREFIX + ".serviceId"),
 
     /**
@@ -90,7 +88,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Unused
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     MEDIA_TYPE_CODEC(Constants.PREFIX + ".mediaType.codec"),
 
     /**
@@ -98,7 +96,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Please use accessors in ClientAttributes instead
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext"),
 
     /**
@@ -106,7 +104,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Please use the accessors in RouteAttributes
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     EXCEPTION(Constants.PREFIX + ".exception"),
 
     /**
@@ -114,7 +112,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use {@link HttpRequest#getCertificate()} instead
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     X509_CERTIFICATE("javax.servlet.request.X509Certificate"),
 
     /**
@@ -129,7 +127,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use accessors in {@link HttpMessage} instead
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(forRemoval = true, since = "4.8.0")
     MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter"),
 
     /**
