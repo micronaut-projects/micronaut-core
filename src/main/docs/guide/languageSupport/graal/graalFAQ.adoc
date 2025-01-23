@@ -1,16 +1,17 @@
-==== How does Micronaut framework manage to run on GraalVM?
+==== How does Micronaut Framework manage to run on GraalVM?
 
-The Micronaut framework features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Compatibility.md[compatibility] concerns particularly around https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Reflection.md[reflection] in Native Images.
+The Micronaut framework features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. 
+This makes it easier for Micronaut applications to run on GraalVM since there are https://www.graalvm.org/reference-manual/native-image/metadata/Compatibility/[compatibility] concerns particularly around https://www.graalvm.org/reference-manual/native-image/metadata/#reflection[reflection] in Native Image.
 
-==== How can I make a Micronaut application that uses picocli run on GraalVM?
+==== How can I make a Micronaut application that uses Picocli run on GraalVM?
 
 Picocli provides a `picocli-codegen` module with a tool for generating a GraalVM reflection configuration file. The tool can be run https://picocli.info/picocli-on-graalvm.html[manually] or automatically as part of the build. The module's https://github.com/remkop/picocli/tree/master/picocli-codegen[README] has usage instructions with code snippets for configuring Gradle and Maven to generate a `cli-reflect.json` file automatically as part of the build. Add the generated file to the `-H:ReflectionConfigurationFiles` option when running the `native-image` tool.
 
-==== What about other Third-Party Libraries?
+==== What about other third-party libraries?
 
-The Micronaut framework cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
+The Micronaut framework cannot guarantee that third-party libraries work with GraalVM Native Image. It is up to each individual library to implement support.
 
-==== I Get a "Class XXX is instantiated reflectively..." Exception. What do I do?
+==== I Get a "Class XXX is instantiated reflectively..." exception. What do I do?
 
 If you get an error such as:
 
@@ -18,7 +19,7 @@ If you get an error such as:
 Class myclass.Foo[] is instantiated reflectively but was never registered. Register the class by using org.graalvm.nativeimage.RuntimeReflection
 ----
 
-You may need to manually tweak the generated `reflect.json` file. For regular classes you need to add an entry into the array:
+You may need to manually tweak the generated _reflect.json_ file. For regular classes you need to add an entry into the array:
 
 [source,json]
 ----
@@ -31,7 +32,8 @@ You may need to manually tweak the generated `reflect.json` file. For regular cl
 ]
 ----
 
-For arrays this must use the Java JVM internal array representation. For example:
+Learn more about providing reflection configuration in the https://www.graalvm.org/reference-manual/native-image/metadata/[Native Image Reachability documentation].
+For arrays, this must use the Java JVM internal array representation. For example:
 
 [source,json]
 ----
@@ -44,7 +46,7 @@ For arrays this must use the Java JVM internal array representation. For example
 ]
 ----
 
-==== What if I want to set the heap's maximum size with `-Xmx`, but I get an `OutOfMemoryError`?
+==== What if I want to set the maximum heap size with `-Xmx`, but I get an `OutOfMemoryError`?
 
 If you set the maximum heap size in the Dockerfile that you use to build your native image, you will probably get a runtime error like this:
 
@@ -59,7 +61,7 @@ The problem is that Netty tries to allocate 16MB of memory per chunk with its de
 int defaultChunkSize = DEFAULT_PAGE_SIZE << DEFAULT_MAX_ORDER; // 8192 << 11 = 16MB
 ----
 
-The simplest solution is to specify `io.netty.allocator.maxOrder` explicitly in your Dockerfile's entrypoint. A working example with `-Xmx64m`:
+The simplest solution is to specify `io.netty.allocator.maxOrder` explicitly in your Dockerfile's entrypoint. See below a working example with `-Xmx64m`:
 
 [source, dockerfile]
 ----

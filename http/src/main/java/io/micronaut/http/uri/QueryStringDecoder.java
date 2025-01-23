@@ -63,6 +63,7 @@ final class QueryStringDecoder {
     private final Charset charset;
     private final String uri;
     private final int maxParams;
+    private final boolean semicolonIsNormalChar;
     private int pathEndIdx;
     private String path;
     private Map<String, List<String>> params;
@@ -121,9 +122,14 @@ final class QueryStringDecoder {
      * @param maxParams The maximum number of params
      */
     QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams) {
+        this(uri, charset, hasPath, maxParams, false);
+    }
+
+    QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams, boolean semicolonIsNormalChar) {
         this.uri = Objects.requireNonNull(uri, "uri");
         this.charset = Objects.requireNonNull(charset, "charset");
         this.maxParams = maxParams;
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
 
         // `-1` means that path end index will be initialized lazily
         pathEndIdx = hasPath ? -1 : 0;
@@ -159,6 +165,10 @@ final class QueryStringDecoder {
      * @param maxParams The maximum number of params
      */
     QueryStringDecoder(URI uri, Charset charset, int maxParams) {
+        this(uri, charset, maxParams, false);
+    }
+
+    QueryStringDecoder(URI uri, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
         String rawPath = uri.getRawPath();
         if (rawPath == null) {
             rawPath = EMPTY_STRING;
@@ -166,6 +176,7 @@ final class QueryStringDecoder {
         this.uri = uriToString(uri);
         this.charset = Objects.requireNonNull(charset, "charset");
         this.maxParams = ArgumentUtils.requirePositive("maxParams", maxParams);
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
         pathEndIdx = rawPath.length();
     }
 
@@ -196,7 +207,7 @@ final class QueryStringDecoder {
      */
     public Map<String, List<String>> parameters() {
         if (params == null) {
-            params = decodeParams(uri, pathEndIdx(), charset, maxParams);
+            params = decodeParams(uri, pathEndIdx(), charset, maxParams, semicolonIsNormalChar);
         }
         return params;
     }
@@ -260,6 +271,10 @@ final class QueryStringDecoder {
     }
 
     private static Map<String, List<String>> decodeParams(String s, int from, Charset charset, int paramsLimit) {
+        return decodeParams(s, from, charset, paramsLimit, false);
+    }
+
+    private static Map<String, List<String>> decodeParams(String s, int from, Charset charset, int paramsLimit, boolean semicolonIsNormalChar) {
         int len = s.length();
         if (from >= len) {
             return Collections.emptyMap();
@@ -283,6 +298,9 @@ final class QueryStringDecoder {
                     break;
                 case '&':
                 case ';':
+                    if (semicolonIsNormalChar) {
+                        continue;
+                    }
                     if (addParam(s, nameStart, valueStart, i, params, charset)) {
                         paramsLimit--;
                         if (paramsLimit == 0) {

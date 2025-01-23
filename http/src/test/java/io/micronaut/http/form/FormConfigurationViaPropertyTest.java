@@ -7,8 +7,10 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Property(name = "micronaut.http.forms.max-decoded-key-value-parameters", value = "512")
+@Property(name = "micronaut.http.forms.semicolon-is-normal-char", value = "true")
 @MicronautTest(startApplication = false)
 class FormConfigurationViaPropertyTest {
 
@@ -18,5 +20,10 @@ class FormConfigurationViaPropertyTest {
     @Test
     void maxParamCanBeSetViaProperty() {
         assertEquals(512, formConfiguration.getMaxDecodedKeyValueParameters());
+    }
+
+    @Test
+    void semicolonIsNormalCharCanBeSetViaProperty() {
+        assertTrue(formConfiguration.isSemicolonIsNormalChar());
     }
 }

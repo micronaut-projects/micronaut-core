@@ -36,6 +36,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
 
     /**
      * @return The current status
+     * To support custom status codes. Use {@link #code()} instead of {@link #getStatus()} and {@link HttpStatus#getCode()}  and {@link #reason()} instead of {@link #getStatus()} and {@link HttpStatus#getReason()}
      */
     default HttpStatus getStatus() {
         return HttpStatus.valueOf(code());
@@ -68,6 +69,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
 
     /**
      * @return The HTTP status
+     * To support custom status codes. Use {@link #code()} instead of {@link #status()} and {@link HttpStatus#getCode()}  and {@link #reason()} instead of {@link #status()} and {@link HttpStatus#getReason()}
      */
     default HttpStatus status() {
         return getStatus();

@@ -48,7 +48,8 @@ import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
-import java.util.Optional
+import java.util.*
+import kotlin.collections.HashSet
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -134,7 +135,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     private fun shouldBeOpen(annotationMetadata: AnnotationMetadata): Boolean {
-        if (extraOpenAnnotations != null && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
+        val extraOpenAnnotations = visitorContext.extraOpenAnnotations
+        if (extraOpenAnnotations.isNotEmpty() && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
             return true
         }
         return annotationMetadata.declaredMetadata.hasDeclaredStereotype(
@@ -611,7 +613,6 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     companion object {
-        val extraOpenAnnotations = System.getProperty("kotlin.allopen.annotations")?.split(",")?.toTypedArray()
 
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,

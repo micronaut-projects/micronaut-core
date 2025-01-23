@@ -16,32 +16,36 @@
 package io.micronaut.expressions;
 
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.parser.CompoundEvaluatedExpressionParser;
-import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.AbstractClassFileWriter;
+import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.sourcegen.model.ClassDef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.StatementDef;
 
+import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 
 /**
  * Writer for compile-time expressions.
@@ -50,12 +54,11 @@ import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
  * @since 4.0.0
  */
 @Internal
-public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
-    private static final Method EVALUATED_EXPRESSIONS_CONSTRUCTOR =
-        new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(Object.class));
+public final class EvaluatedExpressionWriter implements ClassOutputWriter {
 
-    private static final Type EVALUATED_EXPRESSION_TYPE =
-        Type.getType(AbstractEvaluatedExpression.class);
+    private static final ByteCodeWriter BYTE_CODE_WRITER = new ByteCodeWriter();
+    private static final Method DO_EVALUATE_METHOD
+        = ReflectionUtils.getRequiredMethod(AbstractEvaluatedExpression.class, "doEvaluate", ExpressionEvaluationContext.class);
 
     private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
 
@@ -77,56 +80,59 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         if (WRITTEN_CLASSES.contains(expressionClassName)) {
             return;
         }
-        try (OutputStream outputStream = outputVisitor.visitClass(expressionClassName,
-            getOriginatingElements())) {
-            ClassWriter classWriter = generateClassBytes(expressionClassName);
-            outputStream.write(classWriter.toByteArray());
+        try (OutputStream outputStream = outputVisitor.visitClass(expressionClassName, originatingElement)) {
+            ClassDef objectDef = generateClassDef(expressionClassName);
+            outputStream.write(
+                BYTE_CODE_WRITER.write(
+                    objectDef
+                )
+            );
             WRITTEN_CLASSES.add(expressionClassName);
         }
     }
 
-    private ClassWriter generateClassBytes(String expressionClassName) {
-        ClassWriter classWriter = new ClassWriter(COMPUTE_MAXS | COMPUTE_FRAMES);
+    private ClassDef generateClassDef(String expressionClassName) {
+        return ClassDef.builder(expressionClassName)
+            .synthetic()
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addAnnotation(Generated.class)
+            .superclass(ClassTypeDef.of(AbstractEvaluatedExpression.class))
+            .addMethod(MethodDef.constructor()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(Object.class)
+                .build((aThis, methodParameters) ->
+                    aThis.superRef().invokeConstructor(methodParameters.get(0)))
+            )
+            .addMethod(MethodDef.override(DO_EVALUATE_METHOD)
+                .build((aThis, methodParameters) -> {
 
-        startPublicClass(
-            classWriter,
-            getInternalName(expressionClassName),
-            EVALUATED_EXPRESSION_TYPE);
+                    List<StatementDef> statements = new ArrayList<>();
 
-        GeneratorAdapter cv = startConstructor(classWriter, Object.class);
-        cv.loadThis();
-        cv.loadArg(0);
+                    ExpressionCompilationContext ctx = new ExpressionCompilationContext(
+                        new ExpressionVisitorContext(expressionMetadata.evaluationContext(), visitorContext),
+                        methodParameters.get(0),
+                        statements
+                    );
 
-        cv.invokeConstructor(EVALUATED_EXPRESSION_TYPE, EVALUATED_EXPRESSIONS_CONSTRUCTOR);
-        // RETURN
-        cv.returnValue();
-        // MAXSTACK = 2
-        // MAXLOCALS = 1
-        cv.visitMaxs(2, 1);
+                    Object annotationValue = expressionMetadata.annotationValue();
 
-        GeneratorAdapter evaluateMethodVisitor = startProtectedMethod(classWriter, "doEvaluate",
-            Object.class.getName(), ExpressionEvaluationContext.class.getName());
+                    try {
+                        statements.add(
+                            new CompoundEvaluatedExpressionParser(annotationValue)
+                                .parse()
+                                .compile(ctx)
+                                .returning()
+                        );
+                    } catch (ExpressionParsingException | ExpressionCompilationException ex) {
+                        throw failCompilation(ex, annotationValue);
+                    }
+                    return StatementDef.multi(statements);
+                }))
 
-        ExpressionCompilationContext ctx = new ExpressionCompilationContext(
-            new ExpressionVisitorContext(expressionMetadata.evaluationContext(), visitorContext),
-            evaluateMethodVisitor);
-
-        Object annotationValue = expressionMetadata.annotationValue();
-
-        try {
-            ExpressionNode ast = new CompoundEvaluatedExpressionParser(annotationValue).parse();
-            ast.compile(ctx);
-            pushBoxPrimitiveIfNecessary(ast.resolveType(ctx), evaluateMethodVisitor);
-        } catch (ExpressionParsingException | ExpressionCompilationException ex) {
-            failCompilation(ex, annotationValue);
-        }
-
-        evaluateMethodVisitor.visitMaxs(2, 3);
-        evaluateMethodVisitor.returnValue();
-        return classWriter;
+            .build();
     }
 
-    private void failCompilation(Throwable ex, Object initialAnnotationValue) {
+    private ProcessingException failCompilation(Throwable ex, Object initialAnnotationValue) {
         String strRepresentation = null;
 
         if (initialAnnotationValue instanceof String str) {
@@ -138,12 +144,12 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         String message = null;
         if (ex instanceof ExpressionParsingException parsingException) {
             message = "Failed to parse evaluated expression [" + strRepresentation + "]. " +
-                          "Cause: " + parsingException.getMessage();
+                "Cause: " + parsingException.getMessage();
         } else if (ex instanceof ExpressionCompilationException compilationException) {
             message = "Failed to compile evaluated expression [" + strRepresentation + "]. " +
-                          "Cause: " + compilationException.getMessage();
+                "Cause: " + compilationException.getMessage();
         }
-
-        visitorContext.fail(message, originatingElement);
+        return new ProcessingException(originatingElement, message, ex);
     }
+
 }

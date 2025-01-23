@@ -8,6 +8,10 @@ import java.util.concurrent.CompletableFuture;
 
 @Client("/teapot")
 public interface TeapotClient {
+
+    @Get("/custom-status")
+    String customStatus();
+
     @Get("/sync-teapot")
     String syncTeapot();
 

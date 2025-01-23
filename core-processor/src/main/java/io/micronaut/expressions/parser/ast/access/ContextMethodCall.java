@@ -16,21 +16,17 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
+import java.lang.reflect.Method;
 import java.util.List;
-
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
-import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 /**
  * Expression node used for invocation of method from expression
@@ -43,23 +39,22 @@ import static org.objectweb.asm.Opcodes.CHECKCAST;
 public final class ContextMethodCall extends AbstractMethodCall {
 
     private static final Method GET_BEAN_METHOD =
-        new Method("getBean", Type.getType(Object.class),
-            new Type[]{Type.getType(Class.class)});
+        ReflectionUtils.getRequiredMethod(io.micronaut.core.expressions.ExpressionEvaluationContext.class, "getBean", Class.class);
 
     public ContextMethodCall(String name, List<ExpressionNode> arguments) {
         super(name, arguments);
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
-        List<Type> argumentTypes = resolveArgumentTypes(ctx);
+    CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
+        List<TypeDef> argumentTypes = resolveArgumentTypes(ctx);
 
         ExpressionEvaluationContext evaluationContext = ctx.evaluationContext();
         List<CandidateMethod> candidateMethods =
             evaluationContext.findMethods(name)
                 .stream()
                 .map(method -> toCandidateMethod(ctx, method, argumentTypes))
-                .filter(method -> method.isMatching(ctx.visitorContext()))
+                .filter(CandidateMethod::isMatching)
                 .toList();
 
         if (candidateMethods.isEmpty()) {
@@ -75,35 +70,12 @@ public final class ContextMethodCall extends AbstractMethodCall {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Type calleeType = usedMethod.getOwningType();
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        TypeDef calleeType = usedMethod.getOwningType();
 
-        ClassElement calleeClass = getRequiredClassElement(calleeType, ctx.visitorContext());
-
-        pushGetBeanFromContext(mv, calleeType);
-        compileArguments(ctx);
-        if (calleeClass.isInterface()) {
-            mv.invokeInterface(calleeType, usedMethod.toAsmMethod());
-        } else {
-            mv.invokeVirtual(calleeType, usedMethod.toAsmMethod());
-        }
-    }
-
-    /**
-     * Pushing method obtaining bean of provided type from beanContext.
-     *
-     * @param mv       methodVisitor
-     * @param beanType required bean typ
-     */
-    private void pushGetBeanFromContext(GeneratorAdapter mv, Type beanType) {
-        mv.loadArg(0);
-        mv.push(beanType);
-
-        // invoke getBean method
-        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_BEAN_METHOD);
-
-        // cast the return value to the correct type
-        mv.visitTypeInsn(CHECKCAST, beanType.getInternalName());
+        return ctx.expressionEvaluationContextVar()
+            .invoke(GET_BEAN_METHOD, ExpressionDef.constant(calleeType))
+            .cast(calleeType)
+            .invoke(usedMethod.getMethodElement(), compileArguments(ctx));
     }
 }

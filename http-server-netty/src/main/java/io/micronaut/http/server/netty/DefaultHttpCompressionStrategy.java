@@ -37,6 +37,7 @@ public final class DefaultHttpCompressionStrategy implements HttpCompressionStra
 
     private final int compressionThreshold;
     private final int compressionLevel;
+    private final int maxZstdEncodeSize;
 
     /**
      * @param serverConfiguration The netty server configuration
@@ -45,15 +46,17 @@ public final class DefaultHttpCompressionStrategy implements HttpCompressionStra
     DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
         this.compressionLevel = serverConfiguration.getCompressionLevel();
+        this.maxZstdEncodeSize = serverConfiguration.getMaxZstdEncodeSize();
     }
 
     /**
      * @param compressionThreshold The compression threshold
      * @param compressionLevel The compression level (0-9)
      */
-    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel) {
+    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel, int maxZstdEncodeSize) {
         this.compressionThreshold = compressionThreshold;
         this.compressionLevel = compressionLevel;
+        this.maxZstdEncodeSize = maxZstdEncodeSize;
     }
 
     @Override
@@ -86,5 +89,10 @@ public final class DefaultHttpCompressionStrategy implements HttpCompressionStra
     @Override
     public int getCompressionLevel() {
         return compressionLevel;
+    }
+
+    @Override
+    public int getMaxZstdEncodeSize() {
+        return maxZstdEncodeSize;
     }
 }

@@ -18,11 +18,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.commons.GeneratorAdapter;
-
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.IFEQ;
+import io.micronaut.sourcegen.model.ExpressionDef;
 
 /**
  * Expression node for binary '||' operator.
@@ -37,19 +33,10 @@ public final class OrOperator extends LogicalOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label returnLabel = new Label();
-
-        leftOperand.compile(ctx);
-        mv.visitJumpInsn(IFEQ, falseLabel);
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, returnLabel);
-
-        mv.visitLabel(falseLabel);
-        rightOperand.compile(ctx);
-
-        mv.visitLabel(returnLabel);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return leftOperand.compile(ctx).isTrue()
+            .or(
+                rightOperand.compile(ctx).isTrue()
+            );
     }
 }

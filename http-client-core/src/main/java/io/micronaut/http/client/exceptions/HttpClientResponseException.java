@@ -83,9 +83,24 @@ public class HttpClientResponseException extends HttpClientException implements 
 
     /**
      * @return The {@link io.micronaut.http.HttpStatus} returned
+     * To support custom status codes. Use {@link #code()} instead of {@link #getStatus()} and {@link HttpStatus#getCode()}  and {@link #reason()} instead of {@link #getStatus()} and {@link HttpStatus#getReason()}.
      */
     public HttpStatus getStatus() {
         return getResponse().getStatus();
+    }
+
+    /**
+     * @return The response status code
+     */
+    public int code() {
+        return getResponse().code();
+    }
+
+    /**
+     * @return The HTTP status reason phrase
+     */
+    public String reason() {
+        return getResponse().reason();
     }
 
     @SuppressWarnings("MagicNumber")

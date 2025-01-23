@@ -47,6 +47,21 @@ import spock.util.environment.Jvm
 
 class ClassElementSpec extends AbstractTypeElementSpec {
 
+    void "test canonical name"() {
+        expect:
+        buildClassElement('''
+package test;
+
+record Outer() {
+    record Inner() {}
+}
+''') { ClassElement classElement ->
+            assert classElement.canonicalName == 'test.Outer'
+            assert classElement.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get().canonicalName == 'test.Outer.Inner'
+            classElement
+        }
+    }
+
     void "test package-private methods with broken different package"() {
         when:
         ClassElement classElement = buildClassElement('''

@@ -46,7 +46,7 @@ public final class PropertyAccess extends ElementMethodCall {
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
+    CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         ClassElement classElement = callee.resolveClassElement(ctx);
 
         if (isNullSafe() && classElement.isAssignable(Optional.class)) {

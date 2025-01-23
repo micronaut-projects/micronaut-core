@@ -2,10 +2,10 @@ plugins {
     id("io.micronaut.build.internal.convention-test-library")
 }
 dependencies {
-    testImplementation(projects.httpServerNetty)
-    implementation(projects.jacksonDatabind)
-    testImplementation(projects.httpClientJdk)
-    testImplementation(projects.httpServerTck)
+    testImplementation(projects.micronautHttpServerNetty)
+    implementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautHttpClientJdk)
+    testImplementation(projects.micronautHttpServerTck)
     testImplementation(libs.junit.platform.engine)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation) {

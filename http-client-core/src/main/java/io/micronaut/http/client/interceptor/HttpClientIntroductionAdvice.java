@@ -288,7 +288,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 if (t instanceof HttpClientResponseException e) {
-                    if (e.getStatus() == HttpStatus.NOT_FOUND) {
+                    if (e.code() == HttpStatus.NOT_FOUND.getCode()) {
                         if (reactiveValueType == Optional.class) {
                             future.complete(Optional.empty());
                         } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
@@ -637,7 +637,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
             }
 
-            if (t instanceof HttpClientResponseException exception && exception.getStatus() == HttpStatus.NOT_FOUND) {
+            if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {
                 if (returnType == Optional.class) {
                     return Optional.empty();
                 } else if (HttpResponse.class.isAssignableFrom(returnType)) {

@@ -28,44 +28,49 @@ class NestedDependencyFailureSpec extends Specification {
     void "test injection via setter with interface"() {
         given:
         ApplicationContext context = ApplicationContext.run()
+        var space = " "
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         DependencyInjectionException e = thrown()
 
-        e.message.normalize().contains( '''\
-Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.NestedDependencyFailureSpec$C
+        e.message.normalize() == """\
+Failed to inject value for parameter [propD] of class: io.micronaut.inject.failures.NestedDependencyFailureSpec\$MyClassC
 
-Message: No bean of type [io.micronaut.inject.failures.NestedDependencyFailureSpec$D] exists.''')
-        e.message.normalize().contains('Path Taken: new B() --> B.a --> new A([C c]) --> new C([D d])')
+Message: No bean of type [io.micronaut.inject.failures.NestedDependencyFailureSpec\$MyClassD] exists.$space
+Path Taken:$space
+new i.m.i.f.N\$MyClassB()
+\\---> i.m.i.f.N\$MyClassB#propA
+      \\---> new @j.i.Singleton i.m.i.f.N\$MyClassA([MyClassC propC])
+            \\---> new @j.i.Singleton i.m.i.f.N\$MyClassC([MyClassD propD])"""
 
         cleanup:
         context.close()
     }
 
-    static class D {}
+    static class MyClassD {}
 
     @Singleton
-    static class C {
-        C(D d) {
+    static class MyClassC {
+        MyClassC(MyClassD propD) {
 
         }
     }
     @Singleton
-    static class A {
-        A(C c) {
+    static class MyClassA {
+        MyClassA(MyClassC propC) {
 
         }
     }
 
-    static class B {
+    static class MyClassB {
         @Inject
-        private A a
+        private MyClassA propA
 
-        A getA() {
-            return this.a
+        MyClassA getA() {
+            return this.propA
         }
     }
 

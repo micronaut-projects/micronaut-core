@@ -17,16 +17,18 @@ package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
+import java.lang.reflect.Method;
+
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 
 /**
@@ -41,8 +43,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     private static final ClassElement STRING_ELEMENT = ClassElement.of(String.class);
 
     private static final Method GET_PROPERTY_METHOD =
-        new Method("getProperty", Type.getType(String.class),
-            new Type[]{Type.getType(String.class)});
+        ReflectionUtils.getRequiredMethod(ExpressionEvaluationContext.class, "getProperty", String.class);
 
     private final ExpressionNode propertyName;
 
@@ -51,12 +52,9 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        mv.loadArg(0);
-        propertyName.compile(ctx);
-        // invoke getProperty method
-        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_PROPERTY_METHOD);
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ctx.expressionEvaluationContextVar()
+            .invoke(GET_PROPERTY_METHOD, propertyName.compile(ctx));
     }
 
     @Override
@@ -66,11 +64,11 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type propertyNameType = propertyName.resolveType(ctx);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef propertyNameType = propertyName.resolveType(ctx);
         if (!propertyNameType.equals(STRING)) {
             throw new ExpressionCompilationException("Invalid environment access operation. The expression inside environment " +
-                                                         "access must resolve to String value of property name");
+                "access must resolve to String value of property name");
         }
 
         // Property value is always returned as string

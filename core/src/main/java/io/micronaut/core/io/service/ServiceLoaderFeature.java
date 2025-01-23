@@ -89,6 +89,12 @@ class ServiceLoaderFeature implements Feature {
                             }
                             Class<?> beanType = beanInfo.getBeanType();
                             List<AnnotationValue<Annotation>> values = beanInfo.getAnnotationMetadata().getAnnotationValuesByName("io.micronaut.context.annotation.Requires");
+                            if (values.isEmpty()) {
+                                AnnotationValue<Annotation> requirements = beanInfo.getAnnotationMetadata().getAnnotation("io.micronaut.context.annotation.Requirements");
+                                if (requirements != null) {
+                                    values = requirements.getAnnotations("value");
+                                }
+                            }
                             if (!values.isEmpty()) {
                                 for (AnnotationValue<Annotation> value : values) {
                                     String[] classNames = EMPTY_STRING_ARRAY;

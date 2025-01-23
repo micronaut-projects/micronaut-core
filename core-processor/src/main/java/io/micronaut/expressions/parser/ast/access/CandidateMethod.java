@@ -21,18 +21,13 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.isAssignable;
-import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
 
 /**
  * Class representing candidate method used in evaluated expression.
@@ -92,16 +87,16 @@ final class CandidateMethod {
      * @return Returns candidate method return type.
      */
     @NonNull
-    public Type getReturnType() {
-        return getTypeReference(methodElement.getReturnType());
+    public TypeDef getReturnType() {
+        return TypeDef.erasure(methodElement.getReturnType());
     }
 
     /**
      * @return Type of class that owns candidate method.
      */
     @NonNull
-    public Type getOwningType() {
-        return getTypeReference(methodElement.getOwningType());
+    public TypeDef getOwningType() {
+        return TypeDef.erasure(methodElement.getOwningType());
     }
 
     /**
@@ -110,14 +105,6 @@ final class CandidateMethod {
     @NonNull
     public ClassElement getLastParameter() {
         return CollectionUtils.last(parameterTypes);
-    }
-
-    /**
-     * @return candidate method descriptor.
-     */
-    @NonNull
-    public String getDescriptor() {
-        return toAsmMethod().getDescriptor();
     }
 
     /**
@@ -133,10 +120,9 @@ final class CandidateMethod {
      * a match. This check also supports varargs resolution for cases when method is explicitly
      * defined as varargs method or when last method parameter is a one-dimensional array.
      *
-     * @param ctx
      * @return
      */
-    public boolean isMatching(VisitorContext ctx) {
+    public boolean isMatching() {
         int totalParams = parameterTypes.size();
         int totalArguments = argumentTypes.size();
 
@@ -159,7 +145,7 @@ final class CandidateMethod {
                 return true;
             }
 
-            if (isMatchingVarargs(ctx)) {
+            if (isMatchingVarargs()) {
                 this.varargsIndex = calculateVarargsIndex();
                 return true;
             }
@@ -182,32 +168,13 @@ final class CandidateMethod {
         return true;
     }
 
-    /**
-     * Returns {@link Method} representation of this candidate method.
-     *
-     * @return asm method
-     */
-    public Method toAsmMethod() {
-        StringBuilder builder = new StringBuilder();
-        builder.append('(');
-
-        for (TypedElement parameterType : parameterTypes) {
-            builder.append(getTypeReference(parameterType).getDescriptor());
-        }
-
-        builder.append(')');
-
-        builder.append(getTypeReference(methodElement.getReturnType()).getDescriptor());
-        return new Method(methodElement.getSimpleName(), builder.toString());
-    }
-
-    private boolean isMatchingVarargs(VisitorContext ctx) {
+    private boolean isMatchingVarargs() {
         for (int paramIndex = 0; paramIndex < parameterTypes.size(); paramIndex++) {
             ClassElement parameterType = parameterTypes.get(paramIndex);
 
             boolean isLastParameter = paramIndex == parameterTypes.size() - 1;
             if (isLastParameter) {
-                parameterType = getRequiredClassElement(getTypeReference(parameterType).getElementType(), ctx);
+                parameterType = parameterType.fromArray();
 
                 if (argumentTypes.size() < paramIndex) {
                     // if we got here it means that last parameter is varargs but methods

@@ -66,7 +66,11 @@ final class Compressor {
         this.gzipOptions = StandardCompressionOptions.gzip(strategy.getCompressionLevel(), stdGzip.windowBits(), stdGzip.memLevel());
         DeflateOptions stdDeflate = StandardCompressionOptions.deflate();
         this.deflateOptions = StandardCompressionOptions.deflate(strategy.getCompressionLevel(), stdDeflate.windowBits(), stdDeflate.memLevel());
-        this.zstdOptions = Zstd.isAvailable() ? StandardCompressionOptions.zstd() : null;
+        this.zstdOptions = Zstd.isAvailable()
+            ? StandardCompressionOptions.zstd(strategy.getCompressionLevel(),
+            StandardCompressionOptions.zstd().blockSize(),
+            strategy.getMaxZstdEncodeSize())
+            : null;
         this.snappyOptions = StandardCompressionOptions.snappy();
     }
 
@@ -97,7 +101,7 @@ final class Compressor {
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
         ChannelHandler handler = switch (encoding) {
             case BR -> makeBrotliEncoder();
-            case ZSTD -> new ZstdEncoder(zstdOptions.compressionLevel(), zstdOptions.blockSize(), zstdOptions.maxEncodeSize());
+            case ZSTD -> new ZstdEncoder(zstdOptions.compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
             case SNAPPY -> new SnappyFrameEncoder();
             case GZIP -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
             case DEFLATE -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());

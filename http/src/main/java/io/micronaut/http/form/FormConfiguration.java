@@ -26,4 +26,12 @@ public interface FormConfiguration {
      * @return default maximum of decoded key value parameters. It defaults to 1024.
      */
     int getMaxDecodedKeyValueParameters();
+
+    /**
+     * @return true if the semicolon handle as a normal character, false otherwise.
+     */
+    default boolean isSemicolonIsNormalChar() {
+        return false;
+    }
+
 }
