@@ -38,6 +38,7 @@ public class EnvironmentPropertySource extends MapPropertySource {
      * Constant for Environment property source.
      */
     public static final String NAME = "env";
+    public static final Origin ORIGIN = Origin.of("System.env");
 
     /**
      * Default constructor.
@@ -59,6 +60,11 @@ public class EnvironmentPropertySource extends MapPropertySource {
     @Override
     public int getOrder() {
         return POSITION;
+    }
+
+    @Override
+    public Origin getOrigin() {
+        return ORIGIN;
     }
 
     @Override

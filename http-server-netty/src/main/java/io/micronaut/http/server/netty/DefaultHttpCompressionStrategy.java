@@ -21,6 +21,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -32,10 +33,11 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
+public final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
     private final int compressionLevel;
+    private final int maxZstdEncodeSize;
 
     /**
      * @param serverConfiguration The netty server configuration
@@ -44,15 +46,17 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
         this.compressionLevel = serverConfiguration.getCompressionLevel();
+        this.maxZstdEncodeSize = serverConfiguration.getMaxZstdEncodeSize();
     }
 
     /**
      * @param compressionThreshold The compression threshold
      * @param compressionLevel The compression level (0-9)
      */
-    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel) {
+    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel, int maxZstdEncodeSize) {
         this.compressionThreshold = compressionThreshold;
         this.compressionLevel = compressionLevel;
+        this.maxZstdEncodeSize = maxZstdEncodeSize;
     }
 
     @Override
@@ -66,17 +70,29 @@ final class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
             return false;
         }
 
+        return shouldCompress(response, HttpUtil.getContentLength(response, -1));
+    }
+
+    public boolean shouldCompress(HttpResponse response, long contentLength) {
+        if (!isEnabled()) {
+            return false;
+        }
+
         HttpHeaders headers = response.headers();
         String contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
-        Integer contentLength = headers.getInt(HttpHeaderNames.CONTENT_LENGTH);
 
         return contentType != null &&
-                (contentLength == null || contentLength >= compressionThreshold) &&
-                MediaType.isTextBased(contentType);
+            (contentLength == -1 || contentLength >= compressionThreshold) &&
+            MediaType.isTextBased(contentType);
     }
 
     @Override
     public int getCompressionLevel() {
         return compressionLevel;
+    }
+
+    @Override
+    public int getMaxZstdEncodeSize() {
+        return maxZstdEncodeSize;
     }
 }

@@ -23,9 +23,11 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.exceptions.BufferLengthExceededException;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.PublisherAsBlocking;
+import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.PublisherAsBlocking;
+import io.micronaut.http.body.stream.UpstreamBalancer;
 import io.micronaut.http.netty.PublisherAsStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -38,13 +40,10 @@ import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
@@ -74,7 +73,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     private BufferConsumer.Upstream upstream;
 
     public StreamingNettyByteBody(SharedBuffer sharedBuffer) {
-        this(sharedBuffer, false, sharedBuffer.rootUpstream);
+        this(sharedBuffer, false, sharedBuffer.getRootUpstream());
     }
 
     private StreamingNettyByteBody(SharedBuffer sharedBuffer, boolean forceDelaySubscribe, BufferConsumer.Upstream upstream) {
@@ -83,12 +82,13 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         this.upstream = upstream;
     }
 
-    public BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(ByteBufConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         this.upstream = null;
+        BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream, forceDelaySubscribe);
         return upstream;
     }
@@ -97,7 +97,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
@@ -109,7 +109,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     public @NonNull StreamingNettyByteBody allowDiscard() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         upstream.allowDiscard();
         return this;
@@ -117,54 +117,25 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     protected Flux<ByteBuf> toByteBufPublisher() {
-        AtomicLong unconsumed = new AtomicLong(0);
-        Sinks.Many<ByteBuf> sink = Sinks.many().unicast().onBackpressureBuffer();
-        BufferConsumer.Upstream upstream = primary(new BufferConsumer() {
-            @Override
-            public void add(ByteBuf buf) {
-                long newLength = unconsumed.addAndGet(buf.readableBytes());
-                if (newLength > sharedBuffer.limits.maxBufferSize()) {
-                    sink.tryEmitError(new BufferLengthExceededException(sharedBuffer.limits.maxBufferSize(), newLength));
-                    buf.release();
-                } else {
-                    if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                        buf.release();
-                    }
-                }
-            }
-
-            @Override
-            public void complete() {
-                sink.tryEmitComplete();
-            }
-
-            @Override
-            public void error(Throwable e) {
-                sink.tryEmitError(e);
-            }
-        });
-        return sink.asFlux()
-            .doOnSubscribe(s -> upstream.start())
-            .doOnNext(bb -> {
-                unconsumed.addAndGet(-bb.readableBytes());
-                upstream.onBytesConsumed(bb.readableBytes());
-            })
-            .doOnDiscard(ByteBuf.class, ReferenceCounted::release)
-            .doOnCancel(() -> {
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-            });
+        AsFlux asFlux = new AsFlux(sharedBuffer);
+        BufferConsumer.Upstream upstream = primary(asFlux);
+        return asFlux.asFlux(upstream)
+            .doOnDiscard(ByteBuf.class, ReferenceCounted::release);
     }
 
     @Override
     public @NonNull OptionalLong expectedLength() {
-        long l = sharedBuffer.expectedLength;
-        return l < 0 ? OptionalLong.empty() : OptionalLong.of(l);
+        return sharedBuffer.getExpectedLength();
     }
 
     @Override
     public @NonNull InputStream toInputStream() {
-        PublisherAsBlocking<ByteBuf> blocking = new PublisherAsBlocking<>();
+        PublisherAsBlocking<ByteBuf> blocking = new PublisherAsBlocking<>() {
+            @Override
+            protected void release(ByteBuf item) {
+                item.release();
+            }
+        };
         toByteBufPublisher().subscribe(blocking);
         return new PublisherAsStream(blocking);
     }
@@ -173,9 +144,10 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         this.upstream = null;
+        BaseSharedBuffer.logClaim();
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
         return sharedBuffer.subscribeFull(upstream, forceDelaySubscribe).map(AvailableNettyByteBody::new);
@@ -185,7 +157,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     public @NonNull CloseableByteBody move() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         this.upstream = null;
         return new StreamingNettyByteBody(sharedBuffer, forceDelaySubscribe, upstream);
@@ -198,20 +170,39 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             return;
         }
         this.upstream = null;
+        BaseSharedBuffer.logClaim();
         upstream.allowDiscard();
         upstream.disregardBackpressure();
         upstream.start();
         sharedBuffer.subscribe(null, upstream, forceDelaySubscribe);
     }
 
+    private static final class AsFlux extends BaseSharedBuffer.AsFlux<ByteBuf> implements ByteBufConsumer {
+        public AsFlux(BaseSharedBuffer<?, ?> sharedBuffer) {
+            super(sharedBuffer);
+        }
+
+        @Override
+        public void add(ByteBuf buf) {
+            if (!add0(buf)) {
+                buf.release();
+            }
+        }
+
+        @Override
+        protected int size(ByteBuf buf) {
+            return buf.readableBytes();
+        }
+    }
+
     /**
      * This class buffers input data and distributes it to multiple {@link StreamingNettyByteBody}
      * instances.
-     * <p>Thread safety: The {@link BufferConsumer} methods <i>must</i> only be called from one
+     * <p>Thread safety: The {@link ByteBufConsumer} methods <i>must</i> only be called from one
      * thread, the {@link #eventLoop} thread. The other methods (subscribe, reserve) can be
      * called from any thread.
      */
-    public static final class SharedBuffer implements BufferConsumer {
+    public static final class SharedBuffer extends BaseSharedBuffer<ByteBufConsumer, ByteBuf> implements ByteBufConsumer {
         private static final Supplier<ResourceLeakDetector<SharedBuffer>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(SharedBuffer.class));
 
@@ -219,93 +210,27 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         private final ResourceLeakTracker<SharedBuffer> tracker = LEAK_DETECTOR.get().track(this);
 
         private final EventLoop eventLoop;
-        private final BodySizeLimits limits;
-        /**
-         * Upstream of all subscribers. This is only used to cancel incoming data if the max
-         * request size is exceeded.
-         */
-        private final Upstream rootUpstream;
         /**
          * Buffered data. This is forwarded to new subscribers.
          */
         private CompositeByteBuf buffer;
         /**
-         * Whether the input is complete.
-         */
-        private boolean complete;
-        /**
-         * Any stream error.
-         */
-        private Throwable error;
-        /**
-         * Number of reserved subscriber spots. A new subscription MUST be preceded by a
-         * reservation, and every reservation MUST have a subscription.
-         */
-        private int reserved = 1;
-        /**
-         * Active subscribers.
-         */
-        private List<@NonNull BufferConsumer> subscribers;
-        /**
          * Active subscribers that need the fully buffered body.
          */
         private List<@NonNull DelayedExecutionFlow<ByteBuf>> fullSubscribers;
-        /**
-         * This flag is only used in tests, to verify that the BufferConsumer methods arent called
-         * in a reentrant fashion.
-         */
-        private boolean working = false;
-        /**
-         * {@code true} during {@link #add(ByteBuf)} to avoid reentrant subscribe or reserve calls.
-         * Field must only be accessed on the event loop.
-         */
-        private boolean adding = false;
-        /**
-         * Number of bytes received so far.
-         */
-        private long lengthSoFar = 0;
-        /**
-         * The expected length of the whole body. This is -1 if we're uncertain, otherwise it must
-         * be accurate. This can come from a content-length header, but it's also set once the full
-         * body has been received.
-         */
-        private volatile long expectedLength = -1;
+        private ByteBuf addingBuffer;
 
         public SharedBuffer(EventLoop loop, BodySizeLimits limits, Upstream rootUpstream) {
+            super(limits, rootUpstream);
             this.eventLoop = loop;
-            this.limits = limits;
-            this.rootUpstream = rootUpstream;
         }
 
         public void setExpectedLengthFrom(HttpHeaders headers) {
-            String s = headers.get(HttpHeaderNames.CONTENT_LENGTH);
-            if (s == null) {
-                return;
-            }
-            long parsed;
-            try {
-                parsed = Long.parseLong(s);
-            } catch (NumberFormatException e) {
-                return;
-            }
-            if (parsed < 0) {
-                return;
-            }
-            if (parsed > limits.maxBodySize()) {
-                error(new ContentLengthExceededException(limits.maxBodySize(), parsed));
-            }
-            setExpectedLength(parsed);
-        }
-
-        public void setExpectedLength(long length) {
-            if (length < 0) {
-                throw new IllegalArgumentException("Should be > 0");
-            }
-            this.expectedLength = length;
+            setExpectedLengthFrom(headers.get(HttpHeaderNames.CONTENT_LENGTH));
         }
 
         boolean reserve() {
-            if (eventLoop.inEventLoop() && !adding) {
+            if (eventLoop.inEventLoop() && addingBuffer == null) {
                 reserve0();
                 return false;
             } else {
@@ -314,11 +239,9 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             }
         }
 
-        private void reserve0() {
-            if (reserved == 0) {
-                throw new IllegalStateException("Cannot go from streaming state back to buffering state");
-            }
-            reserved++;
+        @Override
+        protected void reserve0() {
+            super.reserve0();
             if (tracker != null) {
                 tracker.record();
             }
@@ -331,28 +254,17 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
          * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
          * @param forceDelay       Whether to require an {@link EventLoop#execute} call to ensure serialization with previous {@link #reserve()} call
          */
-        void subscribe(@Nullable BufferConsumer subscriber, Upstream specificUpstream, boolean forceDelay) {
-            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
+        void subscribe(@Nullable ByteBufConsumer subscriber, Upstream specificUpstream, boolean forceDelay) {
+            if (!forceDelay && eventLoop.inEventLoop() && addingBuffer == null) {
                 subscribe0(subscriber, specificUpstream);
             } else {
                 eventLoop.execute(() -> subscribe0(subscriber, specificUpstream));
             }
         }
 
-        private void subscribe0(@Nullable BufferConsumer subscriber, Upstream specificUpstream) {
-            assert !working;
-
-            if (reserved == 0) {
-                throw new IllegalStateException("Need to reserve a spot first");
-            }
-
-            working = true;
-            boolean last = --reserved == 0;
+        @Override
+        protected void forwardInitialBuffer(@Nullable ByteBufConsumer subscriber, boolean last) {
             if (subscriber != null) {
-                if (subscribers == null) {
-                    subscribers = new ArrayList<>(1);
-                }
-                subscribers.add(subscriber);
                 if (buffer != null) {
                     if (last) {
                         subscriber.add(buffer.slice());
@@ -361,21 +273,16 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
                         subscriber.add(buffer.retainedSlice());
                     }
                 }
-                if (error != null) {
-                    subscriber.error(error);
-                } else if (lengthSoFar > limits.maxBufferSize()) {
-                    subscriber.error(new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar));
-                    specificUpstream.allowDiscard();
-                }
-                if (complete) {
-                    subscriber.complete();
-                }
             } else {
                 if (buffer != null && last) {
                     buffer.release();
                     buffer = null;
                 }
             }
+        }
+
+        @Override
+        protected void afterSubscribe(boolean last) {
             if (tracker != null) {
                 if (last) {
                     tracker.close(this);
@@ -383,7 +290,19 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
                     tracker.record();
                 }
             }
-            working = false;
+        }
+
+        @Override
+        protected ByteBuf subscribeFullResult(boolean last) {
+            if (buffer == null) {
+                return Unpooled.EMPTY_BUFFER;
+            } else if (last) {
+                ByteBuf buf = buffer;
+                buffer = null;
+                return buf;
+            } else {
+                return buffer.retainedSlice();
+            }
         }
 
         /**
@@ -396,7 +315,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
          */
         ExecutionFlow<ByteBuf> subscribeFull(Upstream specificUpstream, boolean forceDelay) {
             DelayedExecutionFlow<ByteBuf> asyncFlow = DelayedExecutionFlow.create();
-            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
+            if (!forceDelay && eventLoop.inEventLoop() && addingBuffer == null) {
                 return subscribeFull0(asyncFlow, specificUpstream, true);
             } else {
                 eventLoop.execute(() -> {
@@ -407,187 +326,38 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
             }
         }
 
-        /**
-         * On-loop version of {@link #subscribeFull}. The returned flow will complete when the
-         * input is buffered. The returned flow will always be identical to the {@code targetFlow}
-         * parameter IF {@code canReturnImmediate} is false. If {@code canReturnImmediate} is true,
-         * this method will SOMETIMES return an immediate ExecutionFlow instead as an optimization.
-         *
-         * @param targetFlow The delayed flow to use if {@code canReturnImmediate} is false and/or
-         *                   we have to wait for the result
-         * @param canReturnImmediate Whether we can return an immediate ExecutionFlow instead of
-         *                  {@code targetFlow}, when appropriate
-         */
-        private ExecutionFlow<ByteBuf> subscribeFull0(DelayedExecutionFlow<ByteBuf> targetFlow, Upstream specificUpstream, boolean canReturnImmediate) {
-            assert !working;
-
-            if (reserved <= 0) {
-                throw new IllegalStateException("Need to reserve a spot first. This should not happen, StreamingNettyByteBody should guard against it");
-            }
-
-            ExecutionFlow<ByteBuf> ret = targetFlow;
-
-            working = true;
-            boolean last = --reserved == 0;
-            Throwable error = this.error;
-            if (error == null && lengthSoFar > limits.maxBufferSize()) {
-                error = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
-                specificUpstream.allowDiscard();
-            }
-            if (error != null) {
-                if (canReturnImmediate) {
-                    ret = ExecutionFlow.error(error);
-                } else {
-                    targetFlow.completeExceptionally(error);
-                }
-            } else if (complete) {
-                ByteBuf buf;
-                if (buffer == null) {
-                    buf = Unpooled.EMPTY_BUFFER;
-                } else if (last) {
-                    buf = buffer;
-                    buffer = null;
-                } else {
-                    buf = buffer.retainedSlice();
-                }
-                if (canReturnImmediate) {
-                    ret = ExecutionFlow.just(buf);
-                } else {
-                    targetFlow.complete(buf);
-                }
-            } else {
-                if (fullSubscribers == null) {
-                    fullSubscribers = new ArrayList<>(1);
-                }
-                fullSubscribers.add(targetFlow);
-            }
-            if (tracker != null) {
-                if (last) {
-                    tracker.close(this);
-                } else {
-                    tracker.record();
-                }
-            }
-            working = false;
-
-            return ret;
-        }
-
         @Override
         public void add(ByteBuf buf) {
-            assert !working;
-
-            buf.touch();
-
-            // calculate the new total length
-            long newLength = lengthSoFar + buf.readableBytes();
-            long expectedLength = this.expectedLength;
-            if (expectedLength != -1 && newLength > expectedLength) {
-                throw new IllegalStateException("Received more bytes than specified by Content-Length");
-            }
-            lengthSoFar = newLength;
-
-            // drop messages if we're done with all subscribers
-            if (complete || error != null) {
-                buf.release();
-                return;
-            }
-            adding = true;
-            if (newLength > limits.maxBodySize()) {
-                // for maxBodySize, all subscribers get the error
-                buf.release();
-                error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
-                rootUpstream.allowDiscard();
-                adding = false;
-                return;
-            }
-
-            working = true;
-            if (subscribers != null) {
-                for (BufferConsumer subscriber : subscribers) {
-                    subscriber.add(buf.retainedSlice());
-                }
-            }
-            if (reserved > 0 || fullSubscribers != null) {
-                if (newLength > limits.maxBufferSize()) {
-                    // new subscribers will recognize that the limit has been exceeded. Streaming
-                    // subscribers can proceed normally. Need to notify buffering subscribers
-                    buf.release();
-                    if (buffer != null) {
-                        buffer.release();
-                        buffer = null;
-                    }
-                    if (fullSubscribers != null) {
-                        Exception e = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
-                        for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
-                            fullSubscriber.completeExceptionally(e);
-                        }
-                    }
-                } else {
-                    if (buffer == null) {
-                        buffer = buf.alloc().compositeBuffer();
-                    }
-                    buffer.addComponent(true, buf);
-                }
-            } else {
-                buf.release();
-            }
-            adding = false;
-            working = false;
+            addingBuffer = buf.touch();
+            add(buf.readableBytes());
+            addingBuffer = null;
         }
 
         @Override
-        public void complete() {
-            if (expectedLength > lengthSoFar) {
-                throw new IllegalStateException("Received fewer bytes than specified by Content-Length");
-            }
-            complete = true;
-            expectedLength = lengthSoFar;
-            if (subscribers != null) {
-                for (BufferConsumer subscriber : subscribers) {
-                    subscriber.complete();
-                }
-            }
-            if (fullSubscribers != null) {
-                boolean release;
-                ByteBuf buf;
-                if (buffer == null) {
-                    buf = Unpooled.EMPTY_BUFFER;
-                    release = false;
-                } else {
-                    buf = buffer;
-                    if (reserved > 0) {
-                        release = false;
-                    } else {
-                        this.buffer = null;
-                        release = true;
-                    }
-                }
-                for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
-                    fullSubscriber.complete(buf.retainedSlice());
-                }
-                if (release) {
-                    buf.release();
-                }
+        protected void addForward(List<ByteBufConsumer> consumers) {
+            for (ByteBufConsumer consumer : consumers) {
+                consumer.add(addingBuffer.retainedSlice());
             }
         }
 
         @Override
-        public void error(Throwable e) {
-            error = e;
+        protected void addBuffer() {
+            if (buffer == null) {
+                buffer = addingBuffer.alloc().compositeBuffer();
+            }
+            buffer.addComponent(true, addingBuffer);
+        }
+
+        @Override
+        protected void addDoNotBuffer() {
+            addingBuffer.release();
+        }
+
+        @Override
+        protected void discardBuffer() {
             if (buffer != null) {
                 buffer.release();
                 buffer = null;
-            }
-            if (subscribers != null) {
-                for (BufferConsumer subscriber : subscribers) {
-                    subscriber.error(e);
-                }
-            }
-            if (fullSubscribers != null) {
-                for (DelayedExecutionFlow<ByteBuf> fullSubscriber : fullSubscribers) {
-                    fullSubscriber.completeExceptionally(e);
-                }
             }
         }
     }

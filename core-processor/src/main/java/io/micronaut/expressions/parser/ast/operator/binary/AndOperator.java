@@ -18,11 +18,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.commons.GeneratorAdapter;
-
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.IFEQ;
+import io.micronaut.sourcegen.model.ExpressionDef;
 
 /**
  * Expression AST node for binary {@code &&} operator.
@@ -37,31 +33,8 @@ public final class AndOperator extends LogicalOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Label falseLabel = new Label();
-        Label trueLabel = new Label();
-
-        pushOperand(ctx, leftOperand, falseLabel);
-        pushOperand(ctx, rightOperand, falseLabel);
-
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, trueLabel);
-
-        mv.visitLabel(falseLabel);
-        mv.push(false);
-
-        mv.visitLabel(trueLabel);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return leftOperand.compile(ctx).isTrue().and(rightOperand.compile(ctx).isTrue());
     }
 
-    private void pushOperand(ExpressionCompilationContext ctx, ExpressionNode operand, Label falseLabel) {
-        if (operand instanceof AndOperator andOperator) {
-            pushOperand(ctx, andOperator.leftOperand, falseLabel);
-            pushOperand(ctx, andOperator.rightOperand, falseLabel);
-        } else if (operand != null) {
-            GeneratorAdapter mv = ctx.methodVisitor();
-            operand.compile(ctx);
-            mv.visitJumpInsn(IFEQ, falseLabel);
-        }
-    }
 }

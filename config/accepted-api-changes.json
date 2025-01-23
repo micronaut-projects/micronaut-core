@@ -1096,5 +1096,35 @@
   {
     "type": "io.micronaut.http.server.netty.jackson.$JsonHttpContentSubscriberFactory$Definition",
     "reason": "Internal class removed"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Field RAW",
+    "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Field NORMALIZED",
+    "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Field GENERATED",
+    "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Implemented interface java.lang.constant.Constable",
+    "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Implemented interface java.lang.Comparable",
+    "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Deprecated internal type"
   }
 ]

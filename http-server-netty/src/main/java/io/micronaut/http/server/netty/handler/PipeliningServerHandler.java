@@ -19,10 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.BodySizeLimits;
-import io.micronaut.http.netty.body.BufferConsumer;
+import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -66,6 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.EOFException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -208,6 +210,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 queued.handler.discardOutbound();
             }
         }
+        inboundHandler.discard();
         outboundQueue.clear();
         requestHandler.removed();
     }
@@ -337,6 +340,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @see #channelReadComplete
          */
         void readComplete() {
+        }
+
+        void discard() {
         }
     }
 
@@ -516,6 +522,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
+
+        @Override
+        void discard() {
+            for (HttpContent content : buffer) {
+                content.release();
+            }
+            buffer.clear();
+        }
     }
 
     /**
@@ -545,7 +559,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        void discard() {
+            // note: this has to match RoutingInBoundHandler#IGNORABLE_ERROR_MESSAGE
+            handleUpstreamError(new EOFException("Connection closed before full body was received"));
+        }
+
+        @Override
         void handleUpstreamError(Throwable cause) {
+            inboundHandler = droppingInboundHandler;
             dest.error(cause);
         }
 
@@ -684,6 +705,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void handleUpstreamError(Throwable cause) {
             delegate.handleUpstreamError(cause);
         }
+
+        @Override
+        void discard() {
+            dispose();
+            delegate.discard();
+        }
     }
 
     /**
@@ -807,6 +834,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
+            if (ctx.isRemoved()) {
+                handler.discardOutbound();
+                return;
+            }
+
             if (this.handler instanceof ContinueOutboundHandler cont) {
                 cont.next = handler;
                 writeSome();
@@ -841,7 +873,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             preprocess(response);
             FullOutboundHandler oh = new FullOutboundHandler(this, response);
             if (response.content().isReadable()) {
-                prepareCompression(response, oh);
+                prepareCompression(response, oh, response.content().readableBytes());
             }
             write(oh);
         }
@@ -870,17 +902,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                prepareCompression(response, oh);
+                prepareCompression(response, oh, expectedLength.orElse(-1));
                 oh.upstream = ((StreamingNettyByteBody) nbb).primary(oh);
                 write(oh);
             }
         }
 
-        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler) {
+        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
             if (compressor == null) {
                 return;
             }
-            Compressor.Session compressionSession = compressor.prepare(ctx, request, response);
+            Compressor.Session compressionSession = compressor.prepare(ctx, request, response, contentLength);
             if (compressionSession != null) {
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
@@ -1033,7 +1065,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Handler that writes a {@link StreamedHttpResponse}.
      */
-    private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
+    private final class StreamingOutboundHandler extends OutboundHandler implements ByteBufConsumer {
         private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         private HttpResponse initialMessage;
@@ -1141,6 +1173,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
                 if (!writtenLast) {
                     writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    writtenLast = true;
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();

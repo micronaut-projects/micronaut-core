@@ -1,6 +1,5 @@
 package io.micronaut.http.client
 
-
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
@@ -10,12 +9,20 @@ import io.micronaut.http.BasicAuth
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Specification
+
+import static io.micronaut.http.client.annotation.Client.DefinitionType.SERVER
 
 class ClientIntroductionAdviceSpec extends Specification {
 
@@ -147,6 +154,19 @@ class ClientIntroductionAdviceSpec extends Specification {
         myService.index("ZZZ") == 'success ZZZ XYZ from default method'
         myService.defaultMethod() == 'success from default method mutated'
         myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
+    }
+
+    void "test client interface definition type"() {
+        given:
+        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+
+        when:
+        var inverseClient = server.applicationContext.getBean(SingleInterfaceClient)
+        var myObject = new MyObject()
+        myObject.code = "client code"
+
+        then:
+        inverseClient.post(myObject) == "success"
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
@@ -302,6 +322,26 @@ class ClientIntroductionAdviceSpec extends Specification {
     @Introspected
     static class MyObject {
         String code
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    static interface SingleInterfaceApi {
+        @Post(uri = "/method-path", produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_JSON)
+        String post(@Body MyObject data)
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Client(id = "test-service", path = "/single-interface", definitionType = SERVER)
+    static interface SingleInterfaceClient extends SingleInterfaceApi {
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Controller("/single-interface")
+    static class SingleInterfaceController implements SingleInterfaceApi {
+        @Override
+        String post(@Body MyObject data) {
+            return "success"
+        }
     }
 
     class TestServiceInstanceList implements ServiceInstanceList {

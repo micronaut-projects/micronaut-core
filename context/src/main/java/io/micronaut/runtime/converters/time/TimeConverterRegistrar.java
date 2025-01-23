@@ -355,13 +355,19 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                 }
                                 context.reject(
                                     value,
-                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0)
+                                );
                                 return Optional.empty();
                             }
                         }
                     } catch (NumberFormatException e) {
                         context.reject(value, e);
                     }
+                } else {
+                    context.reject(
+                        value,
+                        new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0)
+                    );
                 }
             }
             return Optional.empty();
@@ -401,13 +407,19 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                             default -> {
                                 context.reject(
                                     value,
-                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0)
+                                );
                                 return Optional.empty();
                             }
                         }
                     } catch (NumberFormatException e) {
                         context.reject(value, e);
                     }
+                } else {
+                    context.reject(
+                        value,
+                        new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0)
+                    );
                 }
             }
             return Optional.empty();

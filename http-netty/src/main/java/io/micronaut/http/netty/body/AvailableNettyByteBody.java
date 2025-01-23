@@ -24,6 +24,9 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -113,12 +116,10 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     private ByteBuf claim() {
         ByteBuf b = buffer;
         if (b == null) {
-            failClaim();
+            BaseSharedBuffer.failClaim();
         }
         this.buffer = null;
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Body claimed at this location. This is not an error, but may aid in debugging other errors", new Exception());
-        }
+        BaseSharedBuffer.logClaim();
         return b;
     }
 
@@ -175,10 +176,7 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     public @NonNull CloseableAvailableByteBody split() {
         ByteBuf b = buffer;
         if (b == null) {
-            failClaim();
-        }
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Body split at this location. This is not an error, but may aid in debugging other errors", new Exception());
+            BaseSharedBuffer.failClaim();
         }
         return new AvailableNettyByteBody(b.retainedSlice());
     }

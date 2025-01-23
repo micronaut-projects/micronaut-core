@@ -17,6 +17,7 @@ package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
@@ -105,11 +106,30 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
     @NonNull
     Publisher<T> toPublisher();
 
-    static <K> Publisher<K> toPublisher(Supplier<ExecutionFlow<K>> flowSupplier) {
+    /**
+     * Convert the given flow to a reactive publisher. The supplier is called for every
+     * subscription to the publisher.
+     *
+     * @param flowSupplier The flow supplier
+     * @param <K>          The element type
+     * @return The publisher
+     */
+    @NonNull
+    @SingleResult
+    static <K> Publisher<K> toPublisher(@NonNull Supplier<@NonNull ExecutionFlow<K>> flowSupplier) {
         return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flowSupplier);
     }
 
-    static <K> Publisher<K> toPublisher(ExecutionFlow<K> flow) {
+    /**
+     * Convert the given flow to a reactive publisher.
+     *
+     * @param flow The flow
+     * @param <K>  The element type
+     * @return The publisher
+     */
+    @NonNull
+    @SingleResult
+    static <K> Publisher<K> toPublisher(@NonNull ExecutionFlow<K> flow) {
         return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flow);
     }
 }

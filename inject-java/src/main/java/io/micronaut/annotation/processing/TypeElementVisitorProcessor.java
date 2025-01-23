@@ -27,6 +27,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -34,6 +35,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -41,6 +43,7 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
@@ -240,7 +243,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
 
-            postponedTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
+            for (Object nativeType : postponedTypes.values()) {
+                AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+            }
+            postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
             postponedTypes.clear();
 
             if (!elements.isEmpty()) {
@@ -271,7 +277,16 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            postponedTypes.add(javaClassElement.getName());
+                            postponedTypes.put(javaClassElement.getCanonicalName(), e.getErrorElement());
+                        } catch (ElementPostponedToNextRoundException e) {
+                            Object nativeType = e.getOriginatingElement().getNativeType();
+                            if (nativeType instanceof JavaNativeElement jne) {
+                                Element element = jne.element();
+                                postponedTypes.put(javaClassElement.getCanonicalName(), element);
+                            } else {
+                                // should never happen.
+                                throw e;
+                            }
                         }
                     }
                 }

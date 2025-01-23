@@ -17,28 +17,25 @@ package io.micronaut.expressions.parser.compilation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.StatementDef;
+
+import java.util.List;
 
 /**
  * Context class used for compiling expressions.
  *
  * @param evaluationVisitorContext evaluation visitor context
- * @param methodVisitor            method visitor for compiled expression class
+ * @param expressionEvaluationContextVar The context variable
+ * @param additionalStatements The additional statements
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
 public record ExpressionCompilationContext(@NonNull ExpressionVisitorContext evaluationVisitorContext,
-                                           @NonNull GeneratorAdapter methodVisitor) {
-
-    /**
-     * @return The evaluation context
-     */
-    public ExpressionEvaluationContext evaluationContext() {
-        return evaluationVisitorContext.evaluationContext();
-    }
+                                           @NonNull ExpressionDef expressionEvaluationContextVar,
+                                           @NonNull List<StatementDef> additionalStatements) {
 
     /**
      * @return The visitor context

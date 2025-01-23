@@ -1,0 +1,7 @@
+If you need to write a filter, e.g., security-related, which needs to proceed with requests in some scenarios or stop the request execution
+and return an HTTP Response directly in the filter; you can use, for example,  a `CompletableFuture` as the filter method's response type.
+
+[source, java]
+----
+include::http-server-tck/src/main/java/io/micronaut/http/server/tck/tests/filter/RequestFilterCompletableFutureFutureProceedTest.java[tags=clazz;methods,indent=0]
+----

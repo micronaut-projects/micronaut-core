@@ -77,7 +77,9 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 Map<String, Object> finalMap = loadProperties(resourceLoader, fileName, fileExt);
 
                 if (!finalMap.isEmpty()) {
-                    return Optional.of(createPropertySource(fileName, finalMap, order));
+                    return Optional.of(
+                        createPropertySource(fileName, finalMap, order, PropertySource.Origin.of(fileExt))
+                    );
                 }
             }
         }
@@ -92,6 +94,30 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
      * @param order The order of the property source
      * @return property source
      */
+    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order, PropertySource.Origin origin) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public int getOrder() {
+                return order;
+            }
+
+            @Override
+            public Origin getOrigin() {
+                return origin != null ? origin : super.getOrigin();
+            }
+        };
+    }
+
+
+    /**
+     *
+     * @param name The name of the property source
+     * @param map  The map
+     * @param order The order of the property source
+     * @return property source
+     * @deprecated Use {@link #createPropertySource(String, Map, int, PropertySource.Origin)}
+     */
+    @Deprecated(forRemoval = true)
     protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order) {
         return new MapPropertySource(name, map) {
                             @Override

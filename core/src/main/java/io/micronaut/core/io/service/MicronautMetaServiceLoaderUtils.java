@@ -257,7 +257,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
                     S val = instantiate(serviceEntry, classLoader);
-                    if (val != null && predicate != null && !predicate.test(val)) {
+                    if (val != null && (predicate == null || predicate.test(val))) {
                         collection.add(val);
                     }
                 }
@@ -309,7 +309,7 @@ public final class MicronautMetaServiceLoaderUtils {
             if (throwable != null) {
                 throw new SoftServiceLoader.ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);
             }
-            if (result != null && !values.contains(result)) {
+            if (result != null) {
                 values.add(result);
             }
         }

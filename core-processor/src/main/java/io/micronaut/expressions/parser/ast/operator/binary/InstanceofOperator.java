@@ -24,13 +24,11 @@ import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isPrimitive;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushBoxPrimitiveIfNecessary;
-import static org.objectweb.asm.Opcodes.INSTANCEOF;
 
 /**
  * Expression AST node for 'instanceof' operator.
@@ -49,20 +47,13 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        Type targetType = typeIdentifier.resolveType(ctx);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        TypeDef targetType = typeIdentifier.resolveType(ctx);
         if (isPrimitive(targetType)) {
             throw new ExpressionCompilationException(
                 "'instanceof' operation can not be used with primitive right-hand side type");
         }
-
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Type expressionType = operand.resolveType(ctx);
-
-        operand.compile(ctx);
-        pushBoxPrimitiveIfNecessary(expressionType, mv);
-
-        mv.visitTypeInsn(INSTANCEOF, targetType.getInternalName());
+        return operand.compile(ctx).instanceOf((ClassTypeDef) targetType);
     }
 
     @Override
@@ -71,7 +62,7 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return BOOLEAN;
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.Primitive.BOOLEAN;
     }
 }

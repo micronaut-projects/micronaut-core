@@ -219,6 +219,17 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
+            try {
+                value = callable.call();
+            } catch (Exception e) {
+                fn.accept(null, e);
+                return;
+            }
+            fn.accept(value, null);
+            return;
+        }
         value.subscribe(new CoreSubscriber<>() {
 
             Subscription subscription;
@@ -260,6 +271,47 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         });
     }
 
+    @Override
+    public void completeTo(CompletableFuture<Object> completableFuture) {
+        if (value instanceof Fuseable.ScalarCallable callable) {
+            Object value;
+            try {
+                value = callable.call();
+            } catch (Exception e) {
+                completableFuture.completeExceptionally(e);
+                return;
+            }
+            completableFuture.complete(value);
+            return;
+        }
+        value.subscribe(new CoreSubscriber<>() {
+
+            Subscription subscription;
+            Object value;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(Object v) {
+                value = v;
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                completableFuture.completeExceptionally(t);
+            }
+
+            @Override
+            public void onComplete() {
+                completableFuture.complete(value);
+            }
+        });
+    }
+
     @Nullable
     @Override
     public ImperativeExecutionFlow<Object> tryComplete() {
@@ -276,7 +328,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
+        }
+        ImperativeExecutionFlow<?> imperativeFlow = next.tryComplete();
+        if (imperativeFlow != null) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
                 m = Mono.error(imperativeFlow.getError());
@@ -295,9 +349,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
-        } else {
-            return new FlowAsMono<>(next);
         }
+        return new FlowAsMono<>(next);
     }
 
     static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {

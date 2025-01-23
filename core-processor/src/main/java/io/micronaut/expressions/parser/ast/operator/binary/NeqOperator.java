@@ -18,13 +18,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.IFNE;
-import static org.objectweb.asm.Type.BOOLEAN_TYPE;
+import io.micronaut.sourcegen.model.ExpressionDef;
 
 /**
  * Expression AST node for binary '!=' operator.
@@ -39,24 +33,8 @@ public final class NeqOperator extends EqOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        super.generateBytecode(ctx);
-
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
-
-        mv.visitJumpInsn(IFNE, elseLabel);
-
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, endOfCmpLabel);
-        mv.visitLabel(elseLabel);
-        mv.push(false);
-        mv.visitLabel(endOfCmpLabel);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return leftOperand.compile(ctx).notEqualsStructurally(rightOperand.compile(ctx));
     }
 
-    @Override
-    protected Type resolveOperationType(Type leftOperandType, Type rightOperandType) {
-        return BOOLEAN_TYPE;
-    }
 }

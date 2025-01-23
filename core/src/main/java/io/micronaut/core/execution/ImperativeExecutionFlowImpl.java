@@ -133,6 +133,15 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     }
 
     @Override
+    public void completeTo(CompletableFuture<Object> completableFuture) {
+        if (error != null) {
+            completableFuture.completeExceptionally(error);
+        } else {
+            completableFuture.complete(value);
+        }
+    }
+
+    @Override
     public CompletableFuture<Object> toCompletableFuture() {
         if (error != null) {
             return CompletableFuture.failedFuture(error);

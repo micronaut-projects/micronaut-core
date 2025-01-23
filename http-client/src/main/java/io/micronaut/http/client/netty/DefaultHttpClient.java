@@ -45,6 +45,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
@@ -56,6 +57,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -92,7 +94,6 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.BodySizeLimits;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
@@ -124,7 +125,6 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
-import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
@@ -638,6 +638,21 @@ public class DefaultHttpClient implements
                     }
                 }
             }
+
+            @Override
+            public boolean isRunning() {
+                return DefaultHttpClient.this.isRunning();
+            }
+
+            @Override
+            public BlockingHttpClient start() {
+                return DefaultHttpClient.this.start().toBlocking();
+            }
+
+            @Override
+            public BlockingHttpClient stop() {
+                return DefaultHttpClient.this.stop().toBlocking();
+            }
         };
     }
 
@@ -1061,6 +1076,10 @@ public class DefaultHttpClient implements
             mediaTypeCodecRegistry,
             handlerRegistry,
             conversionService);
+
+        if (!isRunning()) {
+            return Mono.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
+        }
 
         return connectionManager.connectForWebsocket(requestKey, handler)
             .then(handler.getHandshakeCompletedMono());
@@ -1570,6 +1589,11 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }
+
+        if (!isRunning()) {
+            return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to send request.")));
+        }
+
         // first: connect
         return connectionManager.connect(requestKey, blockHint)
             .flatMap(poolHandle -> {
@@ -1845,7 +1869,7 @@ public class DefaultHttpClient implements
                 em.onRequest(n -> {
                     try {
                         while (n-- > 0) {
-                            HttpContent chunk = encoder.readChunk(PooledByteBufAllocator.DEFAULT);
+                            HttpContent chunk = encoder.readChunk(ByteBufAllocator.DEFAULT);
                             if (chunk == null) {
                                 assert encoder.isEndOfInput();
                                 em.complete();
@@ -2205,7 +2229,7 @@ public class DefaultHttpClient implements
     /**
      * Used as a holder for the current SSE event.
      */
-    private static class CurrentEvent {
+    private static final class CurrentEvent {
         byte[] data;
         String id;
         String name;

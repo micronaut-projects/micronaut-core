@@ -158,13 +158,15 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
-                propertyElement.getField().ifPresent(processedFields::add);
-                visitPropertyInternal(visitor, propertyElement);
+                if (visitPropertyInternal(visitor, propertyElement)) {
+                    propertyElement.getField().ifPresent(processedFields::add);
+                }
             }
         } else {
             for (PropertyElement propertyElement : classElement.getSyntheticBeanProperties()) {
-                propertyElement.getField().ifPresent(processedFields::add);
-                visitPropertyInternal(visitor, propertyElement);
+                if (visitPropertyInternal(visitor, propertyElement)) {
+                    propertyElement.getField().ifPresent(processedFields::add);
+                }
             }
         }
         List<MemberElement> memberElements = new ArrayList<>(classElement.getEnclosedElements(memberQuery));
@@ -195,13 +197,14 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
     }
 
-    private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+    private boolean visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
         boolean claimed = visitProperty(visitor, propertyElement);
         if (claimed) {
             propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
             propertyElement.getWriteMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
             propertyElement.getField().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
         }
+        return claimed;
     }
 
     /**
@@ -652,13 +655,13 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
 
         AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
-            .map(p -> new AnnotationClassValue<>(JavaModelUtils.getClassname(p.getGenericType())))
+            .map(p -> new AnnotationClassValue<>(getClassName(p.getGenericType())))
             .toArray(AnnotationClassValue[]::new);
 
         targetMethod = targetMethod.withNewOwningType(classElement);
 
         targetMethod.annotate(Adapter.class, builder -> {
-            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
+            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(getClassName(classElement)));
             builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
             builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
             String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
@@ -670,6 +673,13 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
 
         beanDefinitionWriters.add(aopProxyWriter);
+    }
+
+    private static String getClassName(ClassElement element) {
+        if (element.isArray()) {
+            return getClassName(element.fromArray()) + "[]";
+        }
+        return element.getName();
     }
 
 }

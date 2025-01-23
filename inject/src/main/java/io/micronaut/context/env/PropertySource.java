@@ -15,10 +15,13 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A PropertySource is a location to resolve property values from. The property keys are available via the
@@ -48,6 +51,14 @@ public interface PropertySource extends Iterable<String>, Ordered {
     Object get(String key);
 
     /**
+     * @return The origin of the property source.
+     * @since 4.8.0
+     */
+    default @NonNull Origin getOrigin() {
+        return Origin.of(getName());
+    }
+
+    /**
      * @return Whether the property source has upper case underscore separated keys
      */
     default PropertyConvention getConvention() {
@@ -68,12 +79,34 @@ public interface PropertySource extends Iterable<String>, Ordered {
     /**
      * Create a {@link PropertySource} from the given map.
      *
+     * @param name The name of the property source
+     * @param map  The map
+     * @param origin The origin
+     * @return The {@link PropertySource}
+     */
+    static PropertySource of(String name, Map<String, Object> map, Origin origin) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public Origin getOrigin() {
+                return origin != null ? origin : super.getOrigin();
+            }
+        };
+    }
+
+    /**
+     * Create a {@link PropertySource} from the given map.
+     *
      * @param name       The name of the property source
      * @param map        The map
      * @param convention The convention type of the property source
      * @return The {@link PropertySource}
+     * @deprecated Use {@link #of(String, Map, PropertyConvention, Origin)}
      */
-    static PropertySource of(String name, Map<String, Object> map, PropertyConvention convention) {
+    @Deprecated(forRemoval = true, since = "4.8.0")
+    static PropertySource of(
+        String name,
+        Map<String, Object> map,
+        PropertyConvention convention) {
         return new MapPropertySource(name, map) {
             @Override
             public PropertyConvention getConvention() {
@@ -85,11 +118,40 @@ public interface PropertySource extends Iterable<String>, Ordered {
     /**
      * Create a {@link PropertySource} from the given map.
      *
+     * @param name       The name of the property source
+     * @param map        The map
+     * @param convention The convention type of the property source
+     * @param origin     The origin
+     * @return The {@link PropertySource}
+     */
+    static PropertySource of(
+        String name,
+        Map<String, Object> map,
+        PropertyConvention convention,
+        Origin origin) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public PropertyConvention getConvention() {
+                return convention;
+            }
+
+            @Override
+            public Origin getOrigin() {
+                return origin != null ? origin : super.getOrigin();
+            }
+        };
+    }
+
+    /**
+     * Create a {@link PropertySource} from the given map.
+     *
      * @param name The name of the property source
      * @param values The values as an array of alternating key/value entries
      * @return The {@link PropertySource}
      * @since 2.0
+     * @deprecated Use {@link #of(String, Map, Origin)}
      */
+    @Deprecated(forRemoval = true)
     static PropertySource of(String name, Object... values) {
         return new MapPropertySource(name, mapOf(values));
     }
@@ -136,6 +198,30 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
+     * Create a {@link PropertySource} from the given map.
+     *
+     * @param name     The name of the property source
+     * @param map      The map
+     * @param origin   The origin
+     * @param priority The priority to order by
+     * @return The {@link PropertySource}
+     * @since 4.8.0
+     */
+    static PropertySource of(String name, Map<String, Object> map, Origin origin, int priority) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public int getOrder() {
+                return priority;
+            }
+
+            @Override
+            public Origin getOrigin() {
+                return origin != null ? origin : super.getOrigin();
+            }
+        };
+    }
+
+    /**
      * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map.
      *
      * @param map The map
@@ -159,5 +245,27 @@ public interface PropertySource extends Iterable<String>, Ordered {
          * Lower case separated by dots (java properties file style).
          */
         JAVA_PROPERTIES
+    }
+
+    /**
+     * The origin of the property source.
+     * @since 4.8.0
+     */
+    @Experimental
+    sealed interface Origin permits DefaultOrigin {
+        /**
+         * @return The location.
+         */
+        String location();
+
+        /**
+         * Create an origin from a location.
+         * @param location The location
+         * @return The origin
+         */
+        static @NonNull Origin of(@NonNull String location) {
+            Objects.requireNonNull(location, "Location cannot be null");
+            return new DefaultOrigin(location);
+        }
     }
 }

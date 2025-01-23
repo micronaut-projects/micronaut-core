@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
+import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import org.atinject.jakartatck.auto.events.EventHandlerMultipleArguments
@@ -100,9 +101,11 @@ interface Parser {
 ''')
         def adaptedType = context.classLoader.loadClass('issue5054.Parser')
         def parser = context.getBean(adaptedType)
+        def beanDef = context.getBeanDefinition(adaptedType)
         def result = parser.parse("test".getBytes(StandardCharsets.US_ASCII))
 
         expect:
+        beanDef.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@j.i.Singleton i.AsciiParser.parseAsAscii()'
         result == 'test'
     }
 

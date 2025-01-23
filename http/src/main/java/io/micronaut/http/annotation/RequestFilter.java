@@ -54,7 +54,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@code @}{@link Body} parameter of type {@code byte[]}, {@link String} or
  *     {@link ByteBuffer}. Only supported for some HTTP server implementations.</li>
  *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
- *     <li>A RouteMatch of the route that will handle this request. Note: Unless the parameter is
+ *     <li>A RouteMatch or RouteInfo of the route that will handle this request. Note: Unless the parameter is
  *     marked as {@link io.micronaut.core.annotation.Nullable}, the filter method will <b>not</b>
  *     match for requests that do not match a route (e.g. static resources). This parameter is only
  *     supported on the server.</li>
@@ -69,6 +69,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@link HttpResponse} to skip execution of the request</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
  *     delay further execution</li>
+ *     <li>A {@link java.util.concurrent.CompletionStage}.
+ *     <li>A {@link java.util.concurrent.CompletableFuture}. Suppose you must write a filter that proceeds with the request in some scenarios. You can use {@code CompletableFuture<@ Nullable  HttpResponse<?>>} as the return type. Then, to proceed with the request, return  {@code CompletableFuture.completedFuture(null)}.</li>
  * </ul>
  *
  * @since 4.0.0

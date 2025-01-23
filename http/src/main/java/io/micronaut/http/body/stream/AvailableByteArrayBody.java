@@ -56,7 +56,7 @@ public final class AvailableByteArrayBody implements CloseableAvailableByteBody,
     @Override
     public @NonNull CloseableAvailableByteBody split() {
         if (array == null) {
-            InputStreamByteBody.failClaim();
+            BaseSharedBuffer.failClaim();
         }
         return new AvailableByteArrayBody(bufferFactory, array);
     }
@@ -69,7 +69,7 @@ public final class AvailableByteArrayBody implements CloseableAvailableByteBody,
     @Override
     public long length() {
         if (array == null) {
-            InputStreamByteBody.failClaim();
+            BaseSharedBuffer.failClaim();
         }
         return array.length;
     }
@@ -78,9 +78,10 @@ public final class AvailableByteArrayBody implements CloseableAvailableByteBody,
     public byte @NonNull [] toByteArray() {
         byte[] a = array;
         if (a == null) {
-            InputStreamByteBody.failClaim();
+            BaseSharedBuffer.failClaim();
         }
         array = null;
+        BaseSharedBuffer.logClaim();
         return a;
     }
 

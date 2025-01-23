@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -54,32 +55,53 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
-    @SuppressWarnings("Duplicates")
-    public static Optional<Charset> resolveCharset(HttpMessage<?> request) {
+    public static Optional<Charset> resolveCharset(@NonNull HttpMessage<?> request) {
         try {
-            Optional<Charset> contentTypeCharset = request
-                .getContentType()
-                .map(contentType -> {
-                    Optional<String> charset = contentType.getParameters().get(MediaType.CHARSET_PARAMETER);
-                    if (charset.isPresent()) {
-                        try {
-                            return Charset.forName(charset.get());
-                        } catch (Exception e) {
-                            // unsupported charset, default to UTF-8
-                            return StandardCharsets.UTF_8;
-                        }
-                    } else {
-                        return null;
+            MediaType contentType = request
+                .getContentType().orElse(null);
+            if (contentType != null) {
+                String charset = contentType.getParametersMap().get(MediaType.CHARSET_PARAMETER);
+                if (charset != null) {
+                    try {
+                        return Optional.of(Charset.forName(charset));
+                    } catch (Exception e) {
+                        // unsupported charset, default to UTF-8
+                        return Optional.of(Charset.defaultCharset());
                     }
-                });
-
-            if (contentTypeCharset.isPresent()) {
-                return contentTypeCharset;
-            } else {
-                return request.getHeaders().findAcceptCharset();
+                }
             }
         } catch (UnsupportedCharsetException e) {
             return Optional.empty();
         }
+        return request.getHeaders().findAcceptCharset();
+    }
+
+    /**
+     * Resolve the {@link Charset} to use for the request.
+     *
+     * @param request The request
+     * @return An {@link Optional} of {@link Charset}
+     * @since 4.8
+     */
+    @SuppressWarnings("Duplicates")
+    @NonNull
+    public static Charset getCharset(@NonNull HttpMessage<?> request) {
+        try {
+            MediaType contentType = request.getContentType().orElse(null);
+            if (contentType != null) {
+                String charset = contentType.getParametersMap().get(MediaType.CHARSET_PARAMETER);
+                if (charset != null) {
+                    try {
+                        return Charset.forName(charset);
+                    } catch (Exception e) {
+                        // unsupported charset, default to UTF-8
+                        return Charset.defaultCharset();
+                    }
+                }
+            }
+        } catch (UnsupportedCharsetException e) {
+            return StandardCharsets.UTF_8;
+        }
+        return request.getHeaders().findAcceptCharset().orElse(StandardCharsets.UTF_8);
     }
 }

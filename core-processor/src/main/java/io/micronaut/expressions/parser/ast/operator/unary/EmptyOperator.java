@@ -26,9 +26,9 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.Collection;
 import java.util.Map;
@@ -48,86 +48,76 @@ public final class EmptyOperator extends UnaryOperator {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
         ClassElement type = operand.resolveClassElement(ctx);
 
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        operand.compile(ctx);
+        ExpressionDef opExp = operand.compile(ctx);
         if (type.isAssignable(CharSequence.class)) {
-            mv.invokeStatic(
-                Type.getType(StringUtils.class),
-                Method.getMethod(
+            return ClassTypeDef.of(StringUtils.class)
+                .invokeStatic(
                     ReflectionUtils.getRequiredMethod(
                         StringUtils.class,
                         IS_EMPTY,
                         CharSequence.class
-                    )
-                )
-            );
+                    ),
+                    opExp
+                );
         } else if (type.isAssignable(Collection.class)) {
-            mv.invokeStatic(
-                Type.getType(CollectionUtils.class),
-                Method.getMethod(
+            return ClassTypeDef.of(CollectionUtils.class)
+                .invokeStatic(
                     ReflectionUtils.getRequiredMethod(
                         CollectionUtils.class,
                         IS_EMPTY,
                         Collection.class
-                    )
-                )
-            );
+                    ),
+                    opExp
+                );
         } else if (type.isAssignable(Map.class)) {
-            mv.invokeStatic(
-                Type.getType(CollectionUtils.class),
-                Method.getMethod(
+            return ClassTypeDef.of(CollectionUtils.class)
+                .invokeStatic(
                     ReflectionUtils.getRequiredMethod(
                         CollectionUtils.class,
                         IS_EMPTY,
                         Map.class
-                    )
-                )
-            );
+                    ),
+                    opExp
+                );
         } else if (type.isAssignable(Optional.class)) {
-            mv.invokeVirtual(
-                Type.getType(Optional.class),
-                Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(
-                        Optional.class,
-                        IS_EMPTY
-                    )
-                )
-            );
+            return opExp.invoke(
+                        ReflectionUtils.getRequiredMethod(
+                            Optional.class,
+                            IS_EMPTY
+                        )
+                    );
         } else if (type.isArray() && !type.isPrimitive()) {
-            mv.invokeStatic(
-                Type.getType(ArrayUtils.class),
-                Method.getMethod(
+            return ClassTypeDef.of(ArrayUtils.class)
+                .invokeStatic(
                     ReflectionUtils.getRequiredMethod(
                         ArrayUtils.class,
                         IS_EMPTY,
                         Object[].class
-                    )
-                )
-            );
+                    ),
+                    opExp
+                );
         } else if (type.isPrimitive()) {
             // primitives are never empty
-            mv.push(false);
+            return ExpressionDef.falseValue();
         } else {
-            mv.invokeStatic(
-                Type.getType(Objects.class),
-                Method.getMethod(
+            return ClassTypeDef.of(Objects.class)
+                .invokeStatic(
                     ReflectionUtils.getRequiredMethod(
                         Objects.class,
                         "isNull",
                         Object.class
-                    )
-                )
-            );
+                    ),
+                    opExp
+                );
         }
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return Type.BOOLEAN_TYPE;
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.Primitive.BOOLEAN;
     }
 
     @Override

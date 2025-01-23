@@ -24,8 +24,8 @@ import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.Map;
 import java.util.Optional;
@@ -39,7 +39,7 @@ import java.util.Optional;
  */
 @Internal
 public final class TypeIdentifier extends ExpressionNode {
-    private static final Map<String, Type> PRIMITIVES = Map.of(
+    private static final Map<String, TypeDef> PRIMITIVES = Map.of(
         "int", TypeDescriptors.INT,
         "long", TypeDescriptors.LONG,
         "byte", TypeDescriptors.BYTE,
@@ -60,8 +60,8 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        ctx.methodVisitor().push(resolveType(ctx));
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ExpressionDef.constant(resolveType(ctx));
     }
 
     @Override
@@ -79,13 +79,13 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         String name = this.toString();
         if (PRIMITIVES.containsKey(name)) {
             return PRIMITIVES.get(name);
         }
 
-        Type resolvedType = resolveObjectType(ctx, name);
+        TypeDef resolvedType = resolveObjectType(ctx, name);
 
         // may be java.lang type
         if (resolvedType == null && !name.contains(".")) {
@@ -99,9 +99,9 @@ public final class TypeIdentifier extends ExpressionNode {
         return resolvedType;
     }
 
-    private Type resolveObjectType(ExpressionVisitorContext ctx, String name) {
+    private TypeDef resolveObjectType(ExpressionVisitorContext ctx, String name) {
         return ctx.visitorContext().getClassElement(name)
-                   .map(JavaModelUtils::getTypeReference)
+                   .map(TypeDef::erasure)
                    .orElse(null);
     }
 
