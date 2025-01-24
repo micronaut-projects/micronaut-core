@@ -1071,6 +1071,7 @@ public abstract class HttpClientConfiguration {
          * [available in the Netty HTTP client]
          *
          * @return The locality configuration
+         * @since 4.8.0
          */
         public @NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
             return connectionLocality;
@@ -1081,6 +1082,7 @@ public abstract class HttpClientConfiguration {
          * [available in the Netty HTTP client]
          *
          * @param connectionLocality The locality configuration
+         * @since 4.8.0
          */
         public void setConnectionLocality(@NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
             this.connectionLocality = connectionLocality;
@@ -1088,6 +1090,8 @@ public abstract class HttpClientConfiguration {
 
         /**
          * Options for {@link #connectionLocality}.
+         *
+         * @since 4.8.0
          */
         public enum ConnectionLocality {
             /**
