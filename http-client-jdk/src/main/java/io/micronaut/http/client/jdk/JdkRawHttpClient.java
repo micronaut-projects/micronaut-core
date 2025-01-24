@@ -68,7 +68,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                         headerName -> httpRequest.headers().allValues(headerName));
                 }
                 BodySizeLimits bodySizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
-                return client.sendAsync(httpRequest, responseInfo -> new ReactiveByteBufferByteBody.ByteBodySubscriber(bodySizeLimits));
+                return client.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))

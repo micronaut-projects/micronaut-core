@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.server.body;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -28,18 +26,19 @@ import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.scheduling.TaskExecutors;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -69,7 +68,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
 
     private final ExecutorService ioExecutor;
 
-    public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
+    public SystemFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
         super(configuration);
         this.ioExecutor = ioExecutor;
     }
@@ -80,16 +79,21 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, @NonNull MutableHttpResponse<SystemFile> httpResponse, @NonNull Argument<SystemFile> type, @NonNull MediaType mediaType, SystemFile object) throws CodecException {
-        return write(request, httpResponse, object);
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         @NonNull MutableHttpResponse<SystemFile> httpResponse,
+                                         @NonNull Argument<SystemFile> type,
+                                         @NonNull MediaType mediaType,
+                                         SystemFile object) throws CodecException {
+        return write(bodyFactory, request, httpResponse, object);
     }
 
-    public ByteBodyHttpResponse<?> write(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
         if (!systemFile.getFile().canRead()) {
             throw new MessageBodyException("Could not find file");
         }
         if (handleIfModifiedAndHeaders(request, response, systemFile, response)) {
-            return notModified(response);
+            return notModified(bodyFactory, response);
         } else {
 
             // Parse the range headers (if any), and determine the position and content length
@@ -118,9 +122,6 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                     }
                 }
                 response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
-                response.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
-            } else {
-                response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
 
             File file = systemFile.getFile();
@@ -132,8 +133,29 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
             }
 
             @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
-            return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, NettyByteBufferFactory.DEFAULT));
+            return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, bodyFactory));
         }
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<SystemFile> type,
+                                        @NonNull MediaType mediaType,
+                                        SystemFile object) {
+        return writePiece(bodyFactory, object);
+    }
+
+    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, SystemFile object) {
+        long fileLength = object.getLength();
+        InputStream is;
+        try {
+            is = new FileInputStream(object.getFile());
+        } catch (FileNotFoundException e) {
+            throw new MessageBodyException("Could not find file", e);
+        }
+        return InputStreamByteBody.create(is, OptionalLong.of(fileLength), ioExecutor, bodyFactory);
     }
 
     @Nullable

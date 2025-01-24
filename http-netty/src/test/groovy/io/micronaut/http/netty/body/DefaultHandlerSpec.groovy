@@ -9,6 +9,7 @@ import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.body.CharSequenceBodyWriter
 import io.micronaut.http.body.DefaultMessageBodyHandlerRegistry
 import io.micronaut.http.body.MessageBodyHandler
 import io.micronaut.http.body.StringBodyReader
@@ -64,7 +65,7 @@ class DefaultHandlerSpec extends Specification {
 
         then:
             writer.isPresent()
-            writer.get() instanceof NettyCharSequenceBodyWriter
+            writer.get() instanceof CharSequenceBodyWriter
 
         when:
             def reader = bodyHandlerRegistry.findReader(Argument.STRING, List.of(mediaType))

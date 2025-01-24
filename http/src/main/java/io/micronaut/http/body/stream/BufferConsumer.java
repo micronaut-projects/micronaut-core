@@ -63,7 +63,9 @@ public interface BufferConsumer {
         }
 
         /**
-         * Called when a number of bytes has been consumed by the downstream.
+         * Called when a number of bytes has been consumed by the downstream. Note that this can
+         * exceed the actual number of bytes written so far, if the downstream wants to signal it
+         * is ready consume much more data.
          *
          * @param bytesConsumed The number of bytes that were consumed
          */

@@ -115,6 +115,7 @@ class FuzzyInputSpec extends Specification {
                 Base64.decoder.decode("cA1ACUhUVFAvOC4wCkhvc3Q6OgpPcmlnaW46Cgo="),
                 Base64.decoder.decode("SEVDc3QNQP/9P/8JSFRUUC8wLjEKZXB0OgoKcG9zdA1A/T/9Oi8v/y9lY2hvLXB1Ymxpc2hlcglIVFRQLzAuMQp0OgpDb250ZW50LUxlbmd0aDo1Cgr/"),
                 Base64.decoder.decode("SEVDRCBIIEhUVFAvMS4wCiY6MwoKcG9zdA1A//0//wlIVFRQLzAuMQplcHQ6Cgpwb3N0DUD9P/06Ly//L2VjaG8tcHVibGlzaGVyCUhUVFAvMC4xCnQ6CkNvbnRlbnQtTGVuZ3RoOjUKCv8="),
+                Base64.decoder.decode("cG9zdA0vZWNoby1zdHJpbmcJSFRUUC8wLjEKdDpBCkNvbnRlbnQtTGVuZ3RoOjc2Cgpl"),
         ]
     }
 
@@ -134,6 +135,11 @@ class FuzzyInputSpec extends Specification {
 
         @Post("/echo-publisher")
         public Publisher<byte[]> echo(@Body Publisher<byte[]> foo) {
+            return foo;
+        }
+
+        @Post("/echo-string")
+        public String echo(@Body String foo) {
             return foo;
         }
     }

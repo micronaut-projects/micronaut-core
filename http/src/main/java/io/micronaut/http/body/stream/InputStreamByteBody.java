@@ -22,6 +22,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
@@ -62,14 +63,32 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
      * @param ioExecutor An executor where blocking {@link InputStream#read()} may be performed
      * @param bufferFactory A {@link ByteBufferFactory} for buffer-based methods
      * @return The body
+     * @deprecated Please pass a {@link ByteBodyFactory} instead
+     * ({@link #create(InputStream, OptionalLong, Executor, ByteBodyFactory)})
      */
     @NonNull
     public static CloseableByteBody create(@NonNull InputStream stream, @NonNull OptionalLong length, @NonNull Executor ioExecutor, @NonNull ByteBufferFactory<?, ?> bufferFactory) {
+        ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
+        return create(stream, length, ioExecutor, ByteBodyFactory.createDefault(bufferFactory));
+    }
+
+    /**
+     * Create a new stream-based {@link CloseableByteBody}. Ownership of the stream is transferred
+     * to the returned body.
+     *
+     * @param stream The stream backing the body
+     * @param length The expected content length (see {@link #expectedLength()})
+     * @param ioExecutor An executor where blocking {@link InputStream#read()} may be performed
+     * @param bodyFactory A {@link ByteBodyFactory} for buffer-based methods
+     * @return The body
+     */
+    @NonNull
+    public static CloseableByteBody create(@NonNull InputStream stream, @NonNull OptionalLong length, @NonNull Executor ioExecutor, @NonNull ByteBodyFactory bodyFactory) {
         ArgumentUtils.requireNonNull("stream", stream);
         ArgumentUtils.requireNonNull("length", length);
         ArgumentUtils.requireNonNull("ioExecutor", ioExecutor);
-        ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
-        return new InputStreamByteBody(new Context(length, ioExecutor, bufferFactory), ExtendedInputStream.wrap(stream));
+        ArgumentUtils.requireNonNull("bodyFactory", bodyFactory);
+        return new InputStreamByteBody(new Context(length, ioExecutor, bodyFactory), ExtendedInputStream.wrap(stream));
     }
 
     @Override
@@ -146,7 +165,7 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
 
     @Override
     public @NonNull Publisher<ByteBuffer<?>> toByteBufferPublisher() {
-        return toByteArrayPublisher().map(context.bufferFactory::wrap);
+        return toByteArrayPublisher().map(context.bodyFactory.byteBufferFactory()::wrap);
     }
 
     @Override
@@ -154,7 +173,7 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
         ExtendedInputStream s = toInputStream();
         return ExecutionFlow.async(context.ioExecutor, () -> {
             try (ExtendedInputStream t = s) {
-                return ExecutionFlow.just(AvailableByteArrayBody.create(context.bufferFactory(), t.readAllBytes()));
+                return ExecutionFlow.just(context.bodyFactory().copyOf(t));
             } catch (Exception e) {
                 return ExecutionFlow.error(e);
             }
@@ -169,7 +188,7 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
     private record Context(
         OptionalLong expectedLength,
         Executor ioExecutor,
-        ByteBufferFactory<?, ?> bufferFactory
+        ByteBodyFactory bodyFactory
     ) {
     }
 }
