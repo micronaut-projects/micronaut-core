@@ -24,7 +24,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -43,6 +42,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -132,7 +132,7 @@ public abstract class ResponseLifecycle {
         Object body) {
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
-            Object routeInfoO = response.getAttribute(HttpAttributes.ROUTE_INFO).orElse(null);
+            Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
             // usually this is a UriRouteInfo, avoid scalability issues here
             @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
 
