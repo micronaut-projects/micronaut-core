@@ -834,7 +834,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
-            if (ctx.isRemoved()) {
+            if (removed) {
                 handler.discardOutbound();
                 return;
             }

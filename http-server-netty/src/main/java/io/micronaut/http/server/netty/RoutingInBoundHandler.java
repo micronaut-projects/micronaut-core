@@ -43,6 +43,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -246,6 +248,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     LOG.warn("Failed to build error response", t);
                 }
             });
+        } else {
+            // this happens when the connection is already closed, but let's write a fake response
+            // anyway to ensure the request is closed
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), AvailableNettyByteBody.empty());
         }
     }
 
