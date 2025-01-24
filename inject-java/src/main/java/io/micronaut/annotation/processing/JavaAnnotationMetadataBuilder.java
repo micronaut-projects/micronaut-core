@@ -628,6 +628,19 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     String className = JavaModelUtils.getClassName(element);
                     resolvedValue = new AnnotationClassValue<>(className);
                 }
+            } else {
+                resolvedValue = switch (t.getKind()) {
+                    case BOOLEAN -> new AnnotationClassValue<>(boolean.class);
+                    case BYTE -> new AnnotationClassValue<>(byte.class);
+                    case SHORT -> new AnnotationClassValue<>(short.class);
+                    case INT -> new AnnotationClassValue<>(int.class);
+                    case LONG -> new AnnotationClassValue<>(long.class);
+                    case CHAR -> new AnnotationClassValue<>(char.class);
+                    case FLOAT -> new AnnotationClassValue<>(float.class);
+                    case DOUBLE -> new AnnotationClassValue<>(double.class);
+                    case VOID -> new AnnotationClassValue<>(void.class);
+                    default -> null;
+                };
             }
             return null;
         }

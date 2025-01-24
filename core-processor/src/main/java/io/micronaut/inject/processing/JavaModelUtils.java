@@ -36,6 +36,7 @@ import java.util.Optional;
 public class JavaModelUtils {
 
     public static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
+    public static final Map<String, Type> NAME_TO_REAL_TYPE_MAP = new HashMap<>();
     private static final ElementKind RECORD_KIND = ReflectionUtils.findDeclaredField(ElementKind.class, "RECORD").flatMap(field -> {
         try {
             return Optional.of((ElementKind) field.get(ElementKind.class));
@@ -61,6 +62,15 @@ public class JavaModelUtils {
         JavaModelUtils.NAME_TO_TYPE_MAP.put("double", "D");
         JavaModelUtils.NAME_TO_TYPE_MAP.put("float", "F");
         JavaModelUtils.NAME_TO_TYPE_MAP.put("short", "S");
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("void", Type.VOID_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("boolean", Type.BOOLEAN_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("char", Type.CHAR_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("int", Type.INT_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("byte", Type.BYTE_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("long", Type.LONG_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("double", Type.DOUBLE_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("float", Type.FLOAT_TYPE);
+        JavaModelUtils.NAME_TO_REAL_TYPE_MAP.put("short", Type.SHORT_TYPE);
     }
 
     // Primitives

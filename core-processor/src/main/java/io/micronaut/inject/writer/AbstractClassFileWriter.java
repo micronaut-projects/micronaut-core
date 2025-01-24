@@ -853,6 +853,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The {@link Type}
      */
     protected static Type getTypeReferenceForName(String className, String... genericTypes) {
+        Type type = JavaModelUtils.NAME_TO_REAL_TYPE_MAP.get(className);
+        if (type != null) {
+            return type;
+        }
         String referenceString = getTypeDescriptor(className, genericTypes);
         return Type.getType(referenceString);
     }
