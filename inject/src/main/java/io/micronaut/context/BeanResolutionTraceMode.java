@@ -59,7 +59,7 @@ public enum BeanResolutionTraceMode {
      * Obtain the tracer for the mode.
      * @return The tracer.
      */
-    public Optional<BeanResolutionTracer> getTracer() {
+    Optional<BeanResolutionTracer> getTracer() {
         return Optional.ofNullable(resolutionTracer);
     }
 

@@ -16,7 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -27,8 +27,8 @@ import java.util.Collection;
 /**
  * API for tracing bean resolution.
  */
-@Experimental
-public interface BeanResolutionTracer {
+@Internal
+sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
 
     /**
      * Tracing the starting configuration of the context.
