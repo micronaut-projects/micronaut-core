@@ -148,6 +148,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.micronaut.context.MessageUtils.getNormalizedTypeString;
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
 /**
@@ -2863,7 +2864,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 messageBuilder
                     .append(lineSeparator)
                     .append(linePrefix)
-                    .append("* [").append(beanDefinition.asArgument().getTypeString(true));
+                    .append("* [").append(getNormalizedTypeString(beanDefinition));
                 if (!beanDefinition.getBeanType().equals(beanType.getType())) {
                     messageBuilder.append("] a candidate of [")
                         .append(beanType.getTypeString(true));

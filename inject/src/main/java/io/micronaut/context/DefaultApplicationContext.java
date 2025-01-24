@@ -65,6 +65,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.micronaut.context.MessageUtils.getNormalizedTypeString;
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
 /**
@@ -435,7 +436,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
             .append(lineSeparator)
             .append(linePrefix)
             .append("* [")
-            .append(definition.asArgument().getTypeString(true));
+            .append(getNormalizedTypeString(definition));
         if (!definition.getBeanType().equals(beanType.getType())) {
             messageBuilder.append("] a candidate of [")
                 .append(beanType.getTypeString(true));

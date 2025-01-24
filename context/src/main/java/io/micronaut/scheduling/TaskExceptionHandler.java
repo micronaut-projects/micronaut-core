@@ -18,6 +18,8 @@ package io.micronaut.scheduling;
 import io.micronaut.core.exceptions.BeanExceptionHandler;
 import io.micronaut.inject.BeanDefinition;
 
+import static io.micronaut.context.MessageUtils.getNormalizedTypeString;
+
 /**
  * An exception handler interface for task related exceptions.
  *
@@ -38,7 +40,7 @@ public interface TaskExceptionHandler<T, E extends Throwable> extends BeanExcept
         if (DefaultTaskExceptionHandler.LOG.isErrorEnabled()) {
             StringBuilder message = new StringBuilder("Error creating scheduled task ");
             if (beanType != null) {
-                message.append("for bean [").append(beanType.asArgument()).append("] ");
+                message.append("for bean [").append(getNormalizedTypeString(beanType)).append("] ");
             }
             message.append(throwable.getMessage());
             DefaultTaskExceptionHandler.LOG.error(message.toString(), throwable);
