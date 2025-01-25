@@ -69,7 +69,7 @@ micronaut-sourcegen = "1.6.1"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.24"
+managed-groovy = "4.0.25"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.17.2"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
