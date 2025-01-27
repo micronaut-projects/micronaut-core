@@ -40,6 +40,7 @@ import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.PrematureChannelClosureException;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -287,6 +288,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     boolean isIgnorable(Throwable cause) {
         if (cause instanceof ClosedChannelException || cause.getCause() instanceof ClosedChannelException) {
+            return true;
+        }
+        if (cause instanceof PrematureChannelClosureException && "Channel closed while still aggregating message".equals(cause.getMessage())) {
             return true;
         }
         String message = cause.getMessage();

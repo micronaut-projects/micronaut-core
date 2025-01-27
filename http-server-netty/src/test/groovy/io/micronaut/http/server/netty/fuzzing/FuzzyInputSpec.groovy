@@ -119,6 +119,44 @@ class FuzzyInputSpec extends Specification {
         ]
     }
 
+    def 'http2 cleartext embedded channel'() {
+        given:
+        FlagAppender.clear()
+        BufferLeakDetection.startTracking()
+
+        ApplicationContext ctx = ApplicationContext.run([
+                'spec.name': 'FuzzyInputSpec',
+                "micronaut.server.http-version": "2.0"
+        ])
+        def embeddedServer = (NettyHttpServer) ctx.getBean(EmbeddedServer)
+
+        when:
+        def embeddedChannel = embeddedServer.buildEmbeddedChannel(false)
+
+        def b = embeddedChannel.alloc().buffer(input.length)
+        b.writeBytes(input)
+        embeddedChannel.writeInbound(b)
+        embeddedChannel.runPendingTasks()
+
+        embeddedChannel.releaseOutbound()
+        // don't release inbound, that doesn't happen normally either
+        for (Object inboundMessage : embeddedChannel.inboundMessages()) {
+            ReferenceCountUtil.touch(inboundMessage)
+        }
+        embeddedChannel.finish()
+
+        then:
+        embeddedChannel.checkException()
+
+        BufferLeakDetection.stopTrackingAndReportLeaks()
+        FlagAppender.checkTriggered()
+
+        where:
+        input << [
+                Base64.decoder.decode("RSArIEhUVFAvMS4xCkNvbnRlbnQtTGVuZ3RoOjIKdDr/ClVwZ3JhZGU6Cgo="),
+        ]
+    }
+
     @Singleton
     @Controller
     @Requires(property = 'spec.name', value = 'FuzzyInputSpec')
