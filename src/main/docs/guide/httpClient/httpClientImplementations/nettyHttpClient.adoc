@@ -12,4 +12,4 @@ To disable hostname verification in your test classpath, you could create a <<re
 ----
 include::http-client/src/test/java/io/micronaut/http/client/netty/ssl/NettyClientSslBuilderReplacement.java[indent=0]
 ----
-
+WARNING: Disabling host name verification leaves your application potentially vulnerable to Man-in-the-Middle attacks and should only be done with the utmost care typically only in a development / testing environment. Never disable host name verification in production or in a scenario where you are making remote calls over the internet.
