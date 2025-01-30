@@ -1,0 +1,4 @@
+https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#quickStart[Micronaut Serialization] offers reflection-free serialization using build-time <<introspection, Bean Introspections>>. It supports alternative formats such as https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#jsonpQuick[JSON-P or JSON-B]. You need to add the following dependencies:
+
+dependency:micronaut-serde-processor[groupId=io.micronaut.serde,scope=annotationProcessor]
+dependency:micronaut-serde-jackson[groupId=io.micronaut.serde]

@@ -1,0 +1,3 @@
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, you can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in your configuration file (e.g `application.yml`).
+
+Jackson's `@JsonView` annotation lets you control which properties are exposed on a per-response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
