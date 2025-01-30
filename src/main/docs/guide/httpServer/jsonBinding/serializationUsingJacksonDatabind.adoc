@@ -1,0 +1,3 @@
+To serialize using https://github.com/FasterXML/jackson[Jackson] Databind include the following dependency:
+
+dependency:micronaut-jackson-databind[]

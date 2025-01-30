@@ -1,0 +1,23 @@
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, all Jackson's features can be configured with their name as the key and a boolean to indicate enabled or disabled.
+
+|======
+|serialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/SerializationFeature.html[SerializationFeature]
+|deserialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/DeserializationFeature.html[DeserializationFeature]
+|mapper | Map | link:{jackson-databind}com/fasterxml/jackson/databind/MapperFeature.html[MapperFeature]
+|parser | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonParser.Feature.html[JsonParser.Feature]
+|generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
+|factory | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonFactory.Feature.html[JsonFactory.Feature]
+|======
+
+Example:
+
+[configuration]
+----
+jackson:
+  serialization:
+    indentOutput: true
+    writeDatesAsTimestamps: false
+  deserialization:
+    useBigIntegerForInts: true
+    failOnUnknownProperties: false
+----
