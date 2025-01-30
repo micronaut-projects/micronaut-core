@@ -91,7 +91,7 @@ public class FormsJacksonAnnotationsTest {
     }
 
     @Introspected
-    record Book(@NonNull String title, @JsonProperty("paginas") @Nullable Integer pages) {
+    record Book(@JsonProperty("title") @NonNull String title, @JsonProperty("paginas") @Nullable Integer pages) {
     }
 
 }
