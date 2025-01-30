@@ -4,6 +4,8 @@ dependency:micronaut-http-client[]
 
 == Disable hostname verification in ssl config
 
+It may be necessary in a testing or development environment to disable hostname verification.
+
 To disable hostname verification in your test classpath, you could create a <<replaces, Bean Replacement>> in `src/test/java`:
 
 [source,java]
