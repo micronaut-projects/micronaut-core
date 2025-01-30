@@ -20,7 +20,6 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import java.util.Objects;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 /**
  * Runtime implementation of {@link BeanConfiguration}.
@@ -33,9 +32,8 @@ record ConditionalBeanConfiguration(
     ConditionalBeanConfiguration {
         Objects.requireNonNull(packageName, "Package cannot be null");
         Objects.requireNonNull(condition, "Condition cannot be null");
-        if (Stream.of("io.micronaut.context", "io.micronaut.inject", "io.micronaut.runtime")
-            .anyMatch(packageName::startsWith)) {
-            throw new ConfigurationException("Custom bean configurations cannot be added for internal packages: " + packageName);
+        if (packageName.startsWith("io.micronaut.")) {
+            throw new ConfigurationException("Custom bean configurations cannot be added for internal Micronaut packages: " + packageName);
         }
     }
 
