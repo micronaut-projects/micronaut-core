@@ -84,7 +84,7 @@ class RequiresBeanSpec extends Specification {
 
         then:
         def e = thrown(ConfigurationException)
-        e.message == 'Custom bean configurations cannot be added for internal packages: io.micronaut.inject.configurations.requiresconditiontrue'
+        e.message == 'Custom bean configurations cannot be added for internal Micronaut packages: io.micronaut.inject.configurations.requiresconditiontrue'
     }
 
     void "test runtime bean configuration condition returning #condition"() {
