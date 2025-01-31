@@ -22,7 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -68,7 +68,7 @@ public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> i
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // e.g. ?pojo*
-        final UriMatchInfo matchInfo = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class).orElseThrow();
+        final UriMatchInfo matchInfo = BasicHttpAttributes.getRouteMatchInfo(source).orElseThrow();
         boolean bindAll = getBindAll(matchInfo, resolvedParameterName(argument));
 
         final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.getVariableValues(), conversionService);

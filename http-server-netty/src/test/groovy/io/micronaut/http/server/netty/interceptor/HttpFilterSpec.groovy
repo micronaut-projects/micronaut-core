@@ -15,12 +15,15 @@
  */
 package io.micronaut.http.server.netty.interceptor
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.annotation.AliasFor
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.http.*
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.FilterMatcher
@@ -31,6 +34,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.micronaut.web.router.RouteAttributes
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -130,8 +134,7 @@ class HttpFilterSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flux.from(chain.proceed(request)).doOnNext({ response ->
                 if (response.status.code < 300) {
-                    assert response.getAttribute(HttpAttributes.ROUTE_MATCH,
-                            AnnotationMetadata.class).isPresent()
+                    assert RouteAttributes.getRouteMatch(request).isPresent()
                 }
                 response.header("X-Root-Filter", "processed")
             })

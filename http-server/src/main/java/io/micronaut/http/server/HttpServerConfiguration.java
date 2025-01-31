@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -29,6 +30,8 @@ import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.Charset;
@@ -133,6 +136,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_MAX_PARAMS = 1024;
+
+    private static final Logger LOG = LoggerFactory.getLogger(HttpServerConfiguration.class);
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -1090,6 +1096,118 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         public void setHeader(boolean header) {
             this.header = header;
+        }
+    }
+
+    /**
+     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     *
+     * @author James Kleeh
+     * @author graemerocher
+     * @since 3.1.0
+     */
+    @ConfigurationProperties("responses.file")
+    public static class FileTypeHandlerConfiguration {
+
+        /**
+         * The default cache seconds.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_CACHESECONDS = 60;
+
+        private int cacheSeconds = DEFAULT_CACHESECONDS;
+        private CacheControlConfiguration cacheControl = new CacheControlConfiguration();
+
+        /**
+         * Default constructor.
+         */
+        public FileTypeHandlerConfiguration() {
+        }
+
+        @Inject
+        FileTypeHandlerConfiguration(
+            @Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSecondsOld,
+            @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublicOld,
+            @Nullable @Property(name = "micronaut.server.netty.responses.file.cache-seconds") Integer cacheSeconds,
+            @Nullable @Property(name = "micronaut.server.netty.responses.file.cache-control.public") Boolean isPublic
+
+        ) {
+
+            if (cacheSecondsOld != null) {
+                this.cacheSeconds = cacheSecondsOld;
+                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-seconds` instead.");
+            }
+            if (isPublicOld != null) {
+                this.cacheControl.setPublic(isPublicOld);
+                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-control.public` instead.");
+            }
+            if (cacheSeconds != null) {
+                this.cacheSeconds = cacheSeconds;
+                LOG.warn("The configuration `micronaut.server.netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-seconds` instead.");
+            }
+            if (isPublic != null) {
+                this.cacheControl.setPublic(isPublic);
+                LOG.warn("The configuration `micronaut.server.netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-control.public` instead.");
+            }
+        }
+
+        /**
+         * @return the cache seconds
+         */
+        public int getCacheSeconds() {
+            return cacheSeconds;
+        }
+
+        /**
+         * Cache Seconds. Default value ({@value #DEFAULT_CACHESECONDS}).
+         * @param cacheSeconds cache seconds
+         */
+        public void setCacheSeconds(int cacheSeconds) {
+            this.cacheSeconds = cacheSeconds;
+        }
+
+        /**
+         * @return The cache control configuration
+         */
+        public CacheControlConfiguration getCacheControl() {
+            return cacheControl;
+        }
+
+        /**
+         * Sets the cache control configuration.
+         *
+         * @param cacheControl The cache control configuration
+         */
+        public void setCacheControl(CacheControlConfiguration cacheControl) {
+            this.cacheControl = cacheControl;
+        }
+
+        /**
+         * Configuration for the Cache-Control header.
+         */
+        @ConfigurationProperties("cache-control")
+        public static class CacheControlConfiguration {
+
+            private static final boolean DEFAULT_PUBLIC_CACHE = false;
+
+            private boolean publicCache = DEFAULT_PUBLIC_CACHE;
+
+            /**
+             * Sets whether the cache control is public. Default value ({@value #DEFAULT_PUBLIC_CACHE})
+             *
+             * @param publicCache Public cache value
+             */
+            public void setPublic(boolean publicCache) {
+                this.publicCache = publicCache;
+            }
+
+            /**
+             * @return True if the cache control should be public
+             */
+            @NonNull
+            public boolean getPublic() {
+                return publicCache;
+            }
         }
     }
 }

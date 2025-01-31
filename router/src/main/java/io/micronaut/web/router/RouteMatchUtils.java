@@ -15,7 +15,6 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +24,9 @@ import java.util.Optional;
 /**
  * @author Sergio del Amo
  * @since 1.0
+ * @deprecated Moved to {@link RouteAttributes}
  */
+@Deprecated(since = "4.8.0")
 public class RouteMatchUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteMatchUtils.class);
@@ -35,9 +36,9 @@ public class RouteMatchUtils {
      * @return The optional route match
      */
     public static Optional<RouteMatch> findRouteMatch(HttpRequest<?> request) {
-        Optional<RouteMatch> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
+        Optional<RouteMatch<?>> routeMatchAttribute = RouteAttributes.getRouteMatch(request);
         if (routeMatchAttribute.isPresent()) {
-            return routeMatchAttribute;
+            return (Optional) routeMatchAttribute;
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Route match attribute for request ({}) not found", request.getPath());

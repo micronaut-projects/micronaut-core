@@ -21,7 +21,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 
@@ -38,8 +39,8 @@ public final class PosOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type nodeType = super.doResolveType(ctx);
+    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef nodeType = super.doResolveType(ctx);
 
         if (!isNumeric(nodeType)) {
             throw new ExpressionCompilationException("Invalid unary '+' operation");
@@ -49,7 +50,7 @@ public final class PosOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        operand.compile(ctx);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return operand.compile(ctx);
     }
 }

@@ -22,10 +22,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.Collections;
@@ -109,7 +108,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *, e.g. ?pojo*
         String parameterName = resolvedParameterName(argument);
-        boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
+        boolean bindAll = BasicHttpAttributes.getRouteMatchInfo(source)
             .map(umi -> {
                 UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
                 return uriMatchVariable != null && uriMatchVariable.isExploded();

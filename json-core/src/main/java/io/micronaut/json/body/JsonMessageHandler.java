@@ -24,12 +24,20 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
@@ -60,7 +68,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
-public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, CustomizableJsonHandler {
+public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, CustomizableJsonHandler, ResponseBodyWriter<T> {
 
     /**
      * The JSON handler should be preferred if for any type.
@@ -140,6 +148,21 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
             jsonMapper.writeValue(outputStream, type, object);
         } catch (IOException e) {
             throw decorateWrite(object, e);
+        }
+    }
+
+    @Override
+    public @NonNull ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+        httpResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(httpResponse, writePiece(bodyFactory, request, httpResponse, type, mediaType, object));
+    }
+
+    @Override
+    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+        try {
+            return bodyFactory.buffer(s -> jsonMapper.writeValue(s, object));
+        } catch (IOException e) {
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 

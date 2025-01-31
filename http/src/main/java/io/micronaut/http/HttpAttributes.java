@@ -15,62 +15,96 @@
  */
 package io.micronaut.http;
 
+import java.security.Principal;
+
 /**
  * Common HTTP attributes.
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated In order to make future optimizations possible, standard attributes should be
+ * accessed through their static method accessors (such as those in {@link BasicHttpAttributes})
+ * instead of directly through {@link io.micronaut.core.attr.AttributeHolder}.
  */
+@Deprecated(forRemoval = true, since = "4.8.0")
 public enum HttpAttributes implements CharSequence {
 
     /**
      * Attribute used to store the {@link java.security.Principal}.
+     *
+     * @deprecated Use {@link HttpRequest#getUserPrincipal()} and {@link HttpRequest#setUserPrincipal(Principal)}
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     PRINCIPAL("micronaut.AUTHENTICATION"),
 
     /**
      * Attribute used to store any exception that may have occurred during request processing.
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ERROR(Constants.PREFIX + ".error"),
 
     /**
      * Attribute used to store the object that represents the Route match.
+     *
+     * @deprecated Please use the accessors in RouteAttributes
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
      * Attribute used to store the object that represents the Route.
+     *
+     * @deprecated Please use the accessors in RouteAttributes
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     ROUTE_INFO(Constants.PREFIX + ".route.info"),
 
     /**
      * Attribute used to store the URI template defined by the route.
+     *
+     * @deprecated Use {@link BasicHttpAttributes#getUriTemplate} instead
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),
 
     /**
      * Attribute used to store the HTTP method name, if required within the response.
+     *
+     * @deprecated No replacement. Use your own attribute if necessary
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     METHOD_NAME(Constants.PREFIX + ".method.name"),
 
     /**
      * Attribute used to store the service ID a client request is being sent to. Used for tracing purposes.
+     *
+     * @deprecated Use {@link BasicHttpAttributes#getServiceId}
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     SERVICE_ID(Constants.PREFIX + ".serviceId"),
 
     /**
      * Attribute used to store the MediaTypeCodec. Used to override the registered codec per-request.
+     *
+     * @deprecated Unused
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     MEDIA_TYPE_CODEC(Constants.PREFIX + ".mediaType.codec"),
 
     /**
      * Attribute used to store the MethodInvocationContext by declarative client.
+     *
+     * @deprecated Please use accessors in ClientAttributes instead
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext"),
 
     /**
      * Attribute used to store the cause of an error response.
+     *
+     * @deprecated Please use the accessors in RouteAttributes
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     EXCEPTION(Constants.PREFIX + ".exception"),
 
     /**
@@ -78,7 +112,7 @@ public enum HttpAttributes implements CharSequence {
      *
      * @deprecated Use {@link HttpRequest#getCertificate()} instead
      */
-    @Deprecated
+    @Deprecated(forRemoval = true, since = "4.8.0")
     X509_CERTIFICATE("javax.servlet.request.X509Certificate"),
 
     /**
@@ -90,7 +124,10 @@ public enum HttpAttributes implements CharSequence {
 
     /**
      * The message body writer.
+     *
+     * @deprecated Use accessors in {@link HttpMessage} instead
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter"),
 
     /**

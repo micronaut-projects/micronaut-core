@@ -275,7 +275,7 @@ public final class MethodGenUtils {
                                            ExpressionDef maskValue) {
         TypeDef.Primitive intType = TypeDef.Primitive.INT;
         if (hasValuesExpressions != null) {
-            return maskValue.math("|",
+            return maskValue.math(ExpressionDef.MathBinaryOperation.OpType.BITWISE_OR,
                     hasValuesExpressions.get(paramIndex).ifTrue(
                             intType.constant(0),
                             intType.constant(maskIndex)

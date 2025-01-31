@@ -38,7 +38,7 @@ Message: bad
 Path Taken:
 new i.m.i.f.c.MyClassB()
 \\---> i.m.i.f.c.MyClassB#propA
-      \\---> new i.m.i.f.c.MyClassA([MyClassC propC])'''
+      \\---> new @j.i.Singleton i.m.i.f.c.MyClassA([MyClassC propC])'''
 
         cleanup:
         context.close()

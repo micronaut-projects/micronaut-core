@@ -1,5 +1,6 @@
 package io.micronaut.core.execution
 
+
 import org.apache.groovy.internal.util.Function
 import spock.lang.Specification
 
@@ -63,6 +64,27 @@ class DelayedExecutionFlowSpec extends Specification {
 
         where:
         orderOfCompletion << powerSet([0, 1, 2, 3, 4, 5, 6, 7, 8], 4)
+    }
+
+    def "mapping"() {
+        given:
+            DelayedExecutionFlow<String> delayedExecutionFlow = DelayedExecutionFlow.create()
+        when:
+            def flow = delayedExecutionFlow
+                    .map { it + "B"}
+                    .map { it + "C"}
+                    .map { it + "D"}
+                    .map { it + "E"}
+                    .flatMap { ExecutionFlow.just(it + "F")}
+        then:
+            delayedExecutionFlow.complete("A")
+            flow.tryComplete().value == "ABCDEF"
+            delayedExecutionFlow.@head == null
+        when:
+            delayedExecutionFlow.complete("X")
+        then:
+            def e = thrown(IllegalStateException)
+            e.message == "Delayed flow has been completed"
     }
 
     private static <T> List<List<T>> powerSet(List<T> base, int exp) {

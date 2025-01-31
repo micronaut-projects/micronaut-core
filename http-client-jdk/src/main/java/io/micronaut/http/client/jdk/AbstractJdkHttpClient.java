@@ -26,12 +26,13 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -431,8 +432,8 @@ abstract class AbstractJdkHttpClient {
         @NonNull io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
-        if (clientId != null && request.getAttribute(HttpAttributes.SERVICE_ID).isEmpty()) {
-            request.setAttribute(HttpAttributes.SERVICE_ID, clientId);
+        if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
+            ClientAttributes.setServiceId(request, clientId);
         }
 
         return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used

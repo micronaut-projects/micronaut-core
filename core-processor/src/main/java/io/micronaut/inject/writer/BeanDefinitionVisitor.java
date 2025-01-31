@@ -28,7 +28,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.Type;
 
 import java.io.File;
 import java.io.IOException;
@@ -175,7 +174,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * @return The intercepted type
      */
-    Optional<Type> getInterceptedType();
+    Optional<String> getInterceptedType();
 
     /**
      * @return Return whether the bean definition is validated.

@@ -45,7 +45,7 @@ import java.util.Objects;
 class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, EnvironmentConfigurable {
 
     private final BeanDefinition declaringBean;
-    private final Class declaringType;
+    protected final Class declaringType;
     private final Class<T> fieldType;
     private final String field;
     private final AnnotationMetadata annotationMetadata;

@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.filter;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -30,6 +29,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
+import io.micronaut.web.router.RouteAttributes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -338,7 +338,7 @@ public class ResponseFilterTest {
 
         @ResponseFilter("/response-filter/head-body")
         public void responseFilterHeadBody(MutableHttpResponse<?> response) {
-            response.header("X-HEAD-BODY", response.getAttribute(HttpAttributes.HEAD_BODY).map(o -> (String) o).orElse(""));
+            response.header("X-HEAD-BODY", RouteAttributes.getHeadBody(response).map(o -> (String) o).orElse(""));
         }
     }
 

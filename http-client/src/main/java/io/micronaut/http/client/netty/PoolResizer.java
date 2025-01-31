@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -23,13 +24,17 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
@@ -53,8 +58,8 @@ abstract class PoolResizer {
     private final AtomicInteger pendingConnectionCount = new AtomicInteger(0);
 
     private final Deque<PendingRequest> pendingRequests = new ConcurrentLinkedDeque<>();
-    private final List<ResizerConnection> http1Connections = new CopyOnWriteArrayList<>();
-    private final List<ResizerConnection> http2Connections = new CopyOnWriteArrayList<>();
+    private final ConnectionList http1Connections = new ConnectionList();
+    private final ConnectionList http2Connections = new ConnectionList();
 
     PoolResizer(Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration) {
         this.log = log;
@@ -98,6 +103,49 @@ abstract class PoolResizer {
         }
     }
 
+    private ResizerConnection[] sort(PendingRequest request, ConnectionList connections) {
+        ResizerConnection[] items = connections.unsafeItems;
+        if (items.length == 0) {
+            return items;
+        }
+        HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality locality = connectionPoolConfiguration.getConnectionLocality();
+        if (locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.PREFERRED) {
+            // this is a very simple selection sort. There's usually only one or two connections on
+            // the same thread
+            int copies = 0;
+            for (int i = 1; i < items.length; i++) {
+                ResizerConnection connection = items[i];
+                if (connection.inEventLoop(request.requestingThread)) {
+                    // place that connection at the front
+                    System.arraycopy(items, 0, items, 1, i);
+                    items[0] = connection;
+                    if (copies++ > 4) {
+                        // prevent n² worst-case performance
+                        break;
+                    }
+                }
+            }
+        } else if (locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_IF_SAME_GROUP ||
+            locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
+
+            List<ResizerConnection> options = new ArrayList<>();
+            for (ResizerConnection item : items) {
+                if (item.inEventLoop(request.requestingThread)) {
+                    options.add(item);
+                }
+            }
+            if (!options.isEmpty() ||
+                locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS ||
+                containsThread(request.requestingThread)) {
+
+                return options.toArray(new ResizerConnection[0]);
+            }
+            // escape hatch: in ENFORCED_IF_SAME_GROUP, we can use any connection if the
+            // requesting thread is *not* in the same event loop group.
+        }
+        return items;
+    }
+
     private void doSomeWork() {
         BlockHint blockedPendingRequests = null;
         while (true) {
@@ -106,14 +154,14 @@ abstract class PoolResizer {
                 break;
             }
             boolean dispatched = false;
-            for (ResizerConnection c : http2Connections) {
+            for (ResizerConnection c : sort(toDispatch, http2Connections)) {
                 if (dispatchSafe(c, toDispatch)) {
                     dispatched = true;
                     break;
                 }
             }
             if (!dispatched) {
-                for (ResizerConnection c : http1Connections) {
+                for (ResizerConnection c : sort(toDispatch, http1Connections)) {
                     if (dispatchSafe(c, toDispatch)) {
                         dispatched = true;
                         break;
@@ -131,8 +179,8 @@ abstract class PoolResizer {
         // snapshot our fields
         int pendingRequestCount = this.pendingRequests.size();
         int pendingConnectionCount = this.pendingConnectionCount.get();
-        int http1ConnectionCount = this.http1Connections.size();
-        int http2ConnectionCount = this.http2Connections.size();
+        int http1ConnectionCount = this.http1Connections.unsafeItems.length;
+        int http2ConnectionCount = this.http2Connections.unsafeItems.length;
 
         if (pendingRequestCount == 0) {
             // if there are no pending requests, there is nothing to do.
@@ -151,16 +199,26 @@ abstract class PoolResizer {
         }
 
         if (connectionsToOpen > 0) {
+            Iterator<PendingRequest> pendingRequestIterator = this.pendingRequests.iterator();
+            if (!pendingRequestIterator.hasNext()) {
+                // no pending requests now
+                return;
+            }
+            // we need to pass a preferred thread to openNewConnection. This is the best we can do
+            Thread preferredThread = pendingRequestIterator.next().requestingThread;
             this.pendingConnectionCount.addAndGet(connectionsToOpen);
             for (int i = 0; i < connectionsToOpen; i++) {
                 try {
-                    openNewConnection(blockedPendingRequests);
+                    openNewConnection(blockedPendingRequests, preferredThread);
                 } catch (Exception e) {
                     try {
                         onNewConnectionFailure(e);
                     } catch (Exception f) {
                         log.error("Internal error", f);
                     }
+                }
+                if (pendingRequestIterator.hasNext()) {
+                    preferredThread = pendingRequestIterator.next().requestingThread;
                 }
             }
             dirty();
@@ -183,7 +241,9 @@ abstract class PoolResizer {
         }
     }
 
-    abstract void openNewConnection(@Nullable BlockHint blockedPendingRequests) throws Exception;
+    abstract void openNewConnection(@Nullable BlockHint blockedPendingRequests, @NonNull Thread requestingThread) throws Exception;
+
+    abstract boolean containsThread(@NonNull Thread thread);
 
     static boolean incrementWithLimit(AtomicInteger variable, int limit) {
         while (true) {
@@ -250,11 +310,72 @@ abstract class PoolResizer {
     }
 
     final void forEachConnection(Consumer<ResizerConnection> c) {
-        for (ResizerConnection http1Connection : http1Connections) {
-            c.accept(http1Connection);
+        http1Connections.forEach(c);
+        http2Connections.forEach(c);
+    }
+
+    /**
+     * This is a concurrent list implementation that is similar to
+     * {@link java.util.concurrent.CopyOnWriteArrayList}, but with some extra optimization for
+     * {@link #doSomeWork()}.
+     */
+    private static final class ConnectionList {
+        private static final ResizerConnection[] EMPTY = new ResizerConnection[0];
+
+        private final Lock lock = new ReentrantLock();
+
+        /**
+         * Copy of {@link #safeItems} <i>only</i> for use in {@link #doSomeWork()}, without lock.
+         * {@link #doSomeWork()} may shuffle and reorder this array in-place as needed.
+         */
+        private volatile ResizerConnection[] unsafeItems = EMPTY;
+        /**
+         * Items for concurrent access, guarded by {@link #lock}.
+         */
+        private ResizerConnection[] safeItems = EMPTY;
+
+        void forEach(Consumer<ResizerConnection> c) {
+            ResizerConnection[] items;
+            lock.lock();
+            try {
+                items = safeItems;
+            } finally {
+                lock.unlock();
+            }
+            for (ResizerConnection item : items) {
+                c.accept(item);
+            }
         }
-        for (ResizerConnection http2Connection : http2Connections) {
-            c.accept(http2Connection);
+
+        void add(ResizerConnection connection) {
+            lock.lock();
+            try {
+                ResizerConnection[] prev = safeItems;
+                ResizerConnection[] next = Arrays.copyOf(prev, prev.length + 1);
+                next[prev.length] = connection;
+                this.safeItems = next;
+                this.unsafeItems = next.clone();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        void remove(ResizerConnection connection) {
+            lock.lock();
+            try {
+                ResizerConnection[] prev = safeItems;
+                int index = Arrays.asList(prev).indexOf(connection);
+                if (index == -1) {
+                    return;
+                }
+                ResizerConnection[] next = Arrays.copyOf(prev, prev.length - 1);
+                System.arraycopy(prev, index + 1, next, index, prev.length - index - 1);
+
+                this.safeItems = next;
+                this.unsafeItems = next.clone();
+            } finally {
+                lock.unlock();
+            }
         }
     }
 
@@ -276,6 +397,8 @@ abstract class PoolResizer {
     }
 
     abstract static class ResizerConnection {
+        abstract boolean inEventLoop(Thread thread);
+
         /**
          * Attempt to dispatch a stream on this connection.
          *
@@ -287,6 +410,7 @@ abstract class PoolResizer {
     }
 
     static final class PendingRequest extends AtomicBoolean {
+        final Thread requestingThread = Thread.currentThread();
         final @Nullable BlockHint blockHint;
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
 

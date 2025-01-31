@@ -121,6 +121,11 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             public Stream<Object> stream() {
                 return defaultBeanContext.streamOfType(resolutionContext.copy(), argument, finalQualifier);
             }
+
+            @Override
+            public String toString() {
+                return "Provider(" + argument + ")";
+            }
         };
     }
 
@@ -128,4 +133,5 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
     protected boolean isAllowEmptyProviders(BeanContext context) {
         return true;
     }
+
 }

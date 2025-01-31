@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.filter.FilterArgumentBinderPredicate;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 
@@ -49,12 +49,12 @@ final class RouteMatchArgumentBinder implements TypedRequestArgumentBinder<Route
 
     @Override
     public BindingResult<RouteMatch<?>> bind(ArgumentConversionContext<RouteMatch<?>> context, HttpRequest<?> source) {
-        Optional<RouteMatch<?>> match = source.getAttribute(HttpAttributes.ROUTE_MATCH).map(r -> (RouteMatch<?>) r);
+        Optional<RouteMatch<?>> match = RouteAttributes.getRouteMatch(source);
         return () -> match;
     }
 
     @Override
     public boolean test(Argument<?> argument, MutablePropagatedContext mutablePropagatedContext, HttpRequest<?> request, @Nullable HttpResponse<?> response, @Nullable Throwable failure) {
-        return argument.isNullable() || request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent();
+        return argument.isNullable() || RouteAttributes.getRouteMatch(request).isPresent();
     }
 }

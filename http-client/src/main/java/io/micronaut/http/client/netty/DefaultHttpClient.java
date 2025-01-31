@@ -38,7 +38,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.functional.ThrowingFunction;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -50,6 +50,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
@@ -59,6 +60,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -97,7 +99,6 @@ import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.NettyBodyAdapter;
 import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
-import io.micronaut.http.netty.body.NettyCharSequenceBodyWriter;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.body.NettyWritableBodyWriter;
@@ -196,8 +197,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -886,11 +889,15 @@ public class DefaultHttpClient implements
     private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        // if a connection is available immediately, we can use its executor for the timeout
+        // instead of a random executor for the whole group
+        AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
         ExecutionFlow<HttpResponse<O>> mono = resolveRequestURI(request).flatMap(uri -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
             //noinspection unchecked
             return sendRequestWithRedirects(
                 propagatedContext,
+                scheduler,
                 blockHint,
                 mutableRequest,
                 (req, resp) -> InternalByteBody.bufferFlow(resp.byteBody())
@@ -908,7 +915,7 @@ public class DefaultHttpClient implements
         }
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
-                mono = mono.timeout(requestTimeout, connectionManager.getGroup(), null)
+                mono = mono.timeout(requestTimeout, scheduler.get(), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
                             return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
@@ -1508,11 +1515,23 @@ public class DefaultHttpClient implements
         return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
     }
 
+    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
+        PropagatedContext propagatedContext,
+        @Nullable BlockHint blockHint,
+        MutableHttpRequest<?> request,
+        BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
+    ) {
+        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockHint, request, readResponse);
+    }
+
     /**
      * This is the high-level request method. It sits above {@link #sendRawRequest} and handles
      * things like filters, error handling, response parsing, request writing.
      *
      * @param propagatedContext The context propagated from the original client call
+     * @param preferredScheduler A reference holding the preferred scheduler for timeouts. This is
+     *                           replaced by the connection event loop ASAP so that callers can take
+     *                           advantage of locality
      * @param blockHint         The optional block hint
      * @param request           The request to send. Must have resolved absolute URI (see {@link #resolveURI})
      * @param readResponse      Function that reads the response from the raw
@@ -1523,12 +1542,13 @@ public class DefaultHttpClient implements
      */
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
         PropagatedContext propagatedContext,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
         @Nullable BlockHint blockHint,
         MutableHttpRequest<?> request,
         BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
-        if (informationalServiceId != null && request.getAttribute(HttpAttributes.SERVICE_ID).isEmpty()) {
-            request.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
+        if (informationalServiceId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
+            ClientAttributes.setServiceId(request, informationalServiceId);
         }
 
         List<GenericHttpFilter> filters =
@@ -1543,6 +1563,7 @@ public class DefaultHttpClient implements
                     try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                         return sendRequestWithRedirectsNoFilter(
                             propagatedContext,
+                            preferredScheduler,
                             blockHint,
                             MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
                             readResponse
@@ -1558,6 +1579,7 @@ public class DefaultHttpClient implements
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirectsNoFilter(
         PropagatedContext propagatedContext,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
         @Nullable BlockHint blockHint,
         MutableHttpRequest<?> request,
         BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
@@ -1576,6 +1598,8 @@ public class DefaultHttpClient implements
         // first: connect
         return connectionManager.connect(requestKey, blockHint)
             .flatMap(poolHandle -> {
+                preferredScheduler.set(poolHandle.channel.eventLoop());
+
                 // build the raw request
                 request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
 
@@ -1989,7 +2013,7 @@ public class DefaultHttpClient implements
         );
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
-        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyCharSequenceBodyWriter());
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new CharSequenceBodyWriter(StandardCharsets.UTF_8));
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
         return registry;
     }

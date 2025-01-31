@@ -22,6 +22,7 @@ dependencies {
     testImplementation(projects.micronautRuntime)
     testImplementation(libs.logback.classic)
     testImplementation(libs.jazzer.junit)
+    testImplementation(libs.jazzer.api)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")

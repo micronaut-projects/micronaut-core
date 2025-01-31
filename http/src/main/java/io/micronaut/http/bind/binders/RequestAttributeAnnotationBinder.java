@@ -30,7 +30,6 @@ import io.micronaut.http.annotation.RequestAttribute;
  *
  * @param <T> A type
  * @author Ahmed Lafta
- * @see io.micronaut.http.HttpAttributes
  */
 public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<T>
     implements AnnotatedRequestArgumentBinder<RequestAttribute, T>, PostponedRequestArgumentBinder<T> {

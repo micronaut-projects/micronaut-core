@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -20,6 +19,7 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.MethodBasedRouteMatch
+import io.micronaut.web.router.RouteAttributes
 import io.micronaut.web.router.RouteMatch
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -291,7 +291,7 @@ class FilterErrorSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.then(chain.proceed(request), { resp ->
-                routeMatch.set(resp.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch).get())
+                routeMatch.set(RouteAttributes.getRouteMatch(resp).get())
             })
         }
 

@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.HttpAttributes
+import io.micronaut.http.BasicHttpAttributes
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -18,9 +18,9 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.RouteAttributes
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
-import org.spockframework.util.Assert
 import spock.lang.Specification
 
 class OptionsRequestAttributesSpec extends Specification {
@@ -97,9 +97,9 @@ class OptionsRequestAttributesSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            containsRouteMatch = request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString())
-            containsRouteInfo = request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString())
-            containsUriTemplate = request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString())
+            containsRouteMatch = RouteAttributes.getRouteMatch(request).isPresent()
+            containsRouteInfo = RouteAttributes.getRouteInfo(request).isPresent()
+            containsUriTemplate = BasicHttpAttributes.getUriTemplate(request).isPresent()
             return chain.proceed(request)
         }
     }

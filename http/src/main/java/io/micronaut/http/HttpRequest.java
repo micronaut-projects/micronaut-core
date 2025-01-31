@@ -126,6 +126,20 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Set the user principal.
+     *
+     * @param principal The principal
+     * @since 4.8.0
+     */
+    default void setUserPrincipal(@Nullable Principal principal) {
+        if (principal != null) {
+            setAttribute(HttpAttributes.PRINCIPAL, principal);
+        } else {
+            removeAttribute(HttpAttributes.PRINCIPAL, Principal.class);
+        }
+    }
+
+    /**
      * @return Get the raw, percent-encoded path without any parameters
      */
     default @NonNull String getPath() {

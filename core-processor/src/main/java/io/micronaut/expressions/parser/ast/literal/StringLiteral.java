@@ -21,9 +21,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
-import org.objectweb.asm.Type;
-
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Expression AST node for string literal.
@@ -46,8 +45,8 @@ public final class StringLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        ctx.methodVisitor().push(value);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ExpressionDef.constant(value);
     }
 
     @Override
@@ -56,7 +55,7 @@ public final class StringLiteral extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return STRING;
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.STRING;
     }
 }

@@ -24,11 +24,10 @@ import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -38,12 +37,8 @@ import java.util.Map;
 @Internal
 public class SubscriptOperator extends ExpressionNode {
 
-    private static final Method LIST_GET_METHOD = Method.getMethod(
-        ReflectionUtils.getRequiredMethod(List.class, "get", int.class)
-    );
-    private static final Method MAP_GET_METHOD = Method.getMethod(
-        ReflectionUtils.getRequiredMethod(Map.class, "get", Object.class)
-    );
+    private static final Method LIST_GET_METHOD = ReflectionUtils.getRequiredMethod(List.class, "get", int.class);
+    private static final Method MAP_GET_METHOD = ReflectionUtils.getRequiredMethod(Map.class, "get", Object.class);
 
     private final ExpressionNode callee;
     private final ExpressionNode index;
@@ -56,37 +51,25 @@ public class SubscriptOperator extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        callee.compile(ctx);
-        GeneratorAdapter methodVisitor = ctx.methodVisitor();
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        ExpressionDef calleeExp = callee.compile(ctx);
         ClassElement indexType = index.resolveClassElement(ctx);
-        index.compile(ctx);
+        ExpressionDef indexExp = index.compile(ctx);
 
+        TypeDef resultType = resolveType(ctx);
         if (isMap) {
             if (!indexType.isAssignable(String.class)) {
                 throw new ExpressionCompilationException("Invalid subscript operator. Map key must be a string.");
-            } else {
-                methodVisitor.invokeInterface(
-                    Type.getType(Map.class),
-                    MAP_GET_METHOD
-                );
             }
-        } else {
-            if (!indexType.equals(PrimitiveElement.INT)) {
-                throw new ExpressionCompilationException("Invalid subscript operator. Index must be an integer.");
-            }
-            if (isArray) {
-                methodVisitor.arrayLoad(resolveType(ctx));
-            } else {
-                methodVisitor.invokeInterface(
-                    Type.getType(List.class),
-                    LIST_GET_METHOD
-                );
-            }
+            return calleeExp.invoke(MAP_GET_METHOD, indexExp).cast(resultType);
         }
-        if (!isArray) {
-            methodVisitor.checkCast(resolveType(ctx));
+        if (!indexType.equals(PrimitiveElement.INT)) {
+            throw new ExpressionCompilationException("Invalid subscript operator. Index must be an integer.");
         }
+        if (isArray) {
+            return calleeExp.arrayElement(indexExp);
+        }
+        return calleeExp.invoke(LIST_GET_METHOD, indexExp).cast(resultType);
     }
 
     @Override
@@ -113,8 +96,7 @@ public class SubscriptOperator extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        ClassElement valueElement = resolveClassElement(ctx);
-        return JavaModelUtils.getTypeReference(valueElement);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.erasure(resolveClassElement(ctx));
     }
 }

@@ -44,52 +44,25 @@ If you don't use the https://micronaut-projects.github.io/micronaut-gradle-plugi
 
 [source, kotlin]
 ----
-plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.9.20"
-    id("com.google.devtools.ksp") version "1.9.20-1.0.13"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
-    application
-}
-version = "0.1"
-group = "dockerisms"
-repositories {
-    mavenCentral()
-
-    maven {
-        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    }
-}
-val micronautVersion by properties
-dependencies {
-    runtimeOnly("ch.qos.logback:logback-classic")
-    runtimeOnly("org.yaml:snakeyaml")
-    implementation("io.micronaut:micronaut-jackson-databind")
-
-
-    implementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
-    implementation("io.micronaut:micronaut-http-server-netty")
-
-    ksp(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
-    ksp("io.micronaut:micronaut-inject-kotlin")
-    kspTest(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
-    kspTest("io.micronaut:micronaut-inject-kotlin")
-
-    testImplementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
-    testImplementation("io.micronaut:micronaut-http-client")
-    testImplementation("io.micronaut.test:micronaut-test-junit5")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-}
-
-application {
-    mainClass.set("dockerisms.Application")
-}
-
-tasks {
-    withType<Test> {
-        useJUnitPlatform()
-    }
-}
+ksp(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+ksp("io.micronaut:micronaut-inject-kotlin")
+kspTest(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+kspTest("io.micronaut:micronaut-inject-kotlin")
 ----
 
 Unfortunately, KSP doesn't see the changes in the classes made by other compiler plugins, which breaks integration with the `allopen` plugin.
-To make the integration work, we have introduced an experimental system property `kotlin.allopen.annotations` for the annotation processor. The property expects a list of annotations that are open, separated by `,`.
+To make the integration work, we have introduced an experimental KSP property `kotlin.allopen.annotations` for the annotation processor. The property expects a list of annotations that are open, separated by `|`. It's also supported to use the system property of the same name, but that might be unreliable considering build daemons can be cached.
+
+.Kotlin All-Open plugin configuration
+[source, groovy]
+----
+include::test-suite-kotlin-ksp-all-open/build.gradle.kts[tags="allopen", indent=0]
+----
+
+.KSP configuration - repeat all the annotations that are included in Kotlin All-Open configuration
+[source, groovy]
+----
+include::test-suite-kotlin-ksp-all-open/build.gradle.kts[tags="ksp", indent=0]
+----
+
+NOTE: Kotlin All-Open plugin supports only class level annotations - it's not possible to open a class just by a method annotation

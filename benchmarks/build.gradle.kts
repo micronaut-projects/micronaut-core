@@ -11,7 +11,6 @@ val typeCheckTestSourceSet = sourceSets.create("typeCheckTest") {
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
     jmhAnnotationProcessor(projects.micronautInjectJava)
-    jmhAnnotationProcessor(libs.bundles.asm)
     jmhAnnotationProcessor(libs.jmh.generator.annprocess)
 
     annotationProcessor(platform(libs.test.boms.micronaut.validation))
