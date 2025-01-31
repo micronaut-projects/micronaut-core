@@ -22,7 +22,10 @@ dependencies {
     testImplementation project(":core-reactive")
     testImplementation project(":inject-java-test")
     testImplementation libs.logback.classic
-
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation(libs.junit.jupiter.api)
 }
 
 spotless {
