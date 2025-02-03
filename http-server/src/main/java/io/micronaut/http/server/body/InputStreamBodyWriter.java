@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.server.body;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -52,15 +53,30 @@ import java.util.concurrent.ExecutorService;
 public final class InputStreamBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<InputStream> {
     private final ExecutorService executorService;
 
-    InputStreamBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
+    InputStreamBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
         super(configuration);
         this.executorService = executorService;
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<InputStream> outgoingResponse, Argument<InputStream> type, MediaType mediaType, InputStream object) throws CodecException {
-        outgoingResponse.getHeaders().setIfMissing(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(object, OptionalLong.empty(), executorService, NettyByteBufferFactory.DEFAULT));
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         MutableHttpResponse<InputStream> outgoingResponse,
+                                         Argument<InputStream> type,
+                                         MediaType mediaType,
+                                         InputStream object) throws CodecException {
+        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(object, OptionalLong.empty(), executorService, bodyFactory));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<InputStream> type,
+                                        @NonNull MediaType mediaType,
+                                        InputStream object) {
+        return InputStreamByteBody.create(object, OptionalLong.empty(), executorService, bodyFactory);
     }
 
     @Override

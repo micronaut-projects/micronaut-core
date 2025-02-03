@@ -305,8 +305,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beanContextConfiguration = contextConfiguration;
-        this.traceMode = beanContextConfiguration.getTraceMode();
-        this.tracePatterns = beanContextConfiguration.getTraceClasses();
+        BeanResolutionTraceConfiguration traceConfiguration = beanContextConfiguration
+            .getTraceConfiguration();
+        this.traceMode = traceConfiguration.mode();
+        this.tracePatterns = traceConfiguration.classPatterns();
     }
 
     /**
@@ -482,6 +484,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             terminating.set(false);
             running.set(false);
             configured.set(false);
+            if (traceMode != BeanResolutionTraceMode.NONE) {
+                traceMode.getTracer().ifPresent(tracer -> {
+                    tracer.traceContextShutdown(this);
+                });
+            }
         }
         return this;
     }
@@ -1663,6 +1670,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return refs;
         }
         return Collections.emptyList();
+    }
+
+    @Override
+    public BeanContext registerBeanConfiguration(BeanConfiguration configuration) {
+        Objects.requireNonNull(configuration, "Configuration cannot be null");
+        this.beanConfigurations.put(configuration.getName(), configuration);
+        return this;
     }
 
     @Override

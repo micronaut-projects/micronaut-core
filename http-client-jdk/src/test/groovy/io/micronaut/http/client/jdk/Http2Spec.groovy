@@ -21,6 +21,7 @@ import spock.lang.Specification
 @Property(name = "micronaut.server.http-version", value = "HTTP_2_0")
 @Property(name = "micronaut.server.ssl.build-self-signed", value = "true")
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "0")
 @Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = "true")
 @Property(name = "micronaut.server.max-request-size", value = "16384")
 class Http2Spec extends Specification {

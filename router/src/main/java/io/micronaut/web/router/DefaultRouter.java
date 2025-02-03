@@ -21,7 +21,6 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -594,9 +593,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
-        var routeMatch = (RouteMatch) request.getAttribute(HttpAttributes.ROUTE_MATCH)
-            .filter(o -> o instanceof RouteMatch)
-            .orElse(null);
+        var routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
         HttpMethod method = request.getMethod();
         String path = request.getPath();
         for (FilterRoute filterRoute : preconditionFilterRoutes) {

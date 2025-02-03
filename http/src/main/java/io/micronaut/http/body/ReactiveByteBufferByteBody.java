@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.jdk;
+package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -21,9 +21,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
-import io.micronaut.http.body.CloseableAvailableByteBody;
-import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
@@ -37,29 +34,24 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.OptionalLong;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Streaming {@link io.micronaut.http.body.ByteBody} implementation for the JDK http client.
+ * Streaming {@link io.micronaut.http.body.ByteBody} implementation based on NIO {@link ByteBuffer}s.
  *
  * @since 4.8.0
  * @author Jonas Konrad
  */
 @Internal
-final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByteBody {
+public final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByteBody {
     private final SharedBuffer sharedBuffer;
     private BufferConsumer.Upstream upstream;
 
-    ReactiveByteBufferByteBody(SharedBuffer sharedBuffer) {
+    public ReactiveByteBufferByteBody(SharedBuffer sharedBuffer) {
         this(sharedBuffer, sharedBuffer.getRootUpstream());
     }
 
@@ -68,7 +60,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
         this.upstream = upstream;
     }
 
-    private BufferConsumer.Upstream primary(ByteBufferConsumer primary) {
+    BufferConsumer.Upstream primary(ByteBufferConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
@@ -242,7 +234,7 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
      * Buffering is done using a {@link ByteArrayOutputStream}. Concurrency control is done through
      * a non-reentrant lock based on {@link AtomicReference}.
      */
-    static final class SharedBuffer extends BaseSharedBuffer<ByteBufferConsumer, ByteBuffer> implements ByteBufferConsumer {
+    public static final class SharedBuffer extends BaseSharedBuffer<ByteBufferConsumer, ByteBuffer> implements ByteBufferConsumer {
         // fields for concurrency control, see #submit
         private final AtomicReference<WorkState> workState = new AtomicReference<>(WorkState.CLEAN);
         private final ConcurrentLinkedQueue<Runnable> workQueue = new ConcurrentLinkedQueue<>();
@@ -304,11 +296,11 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
             }
         }
 
-        public void reserve() {
+        void reserve() {
             submit(this::reserve0);
         }
 
-        public void subscribe(@Nullable ByteBufferConsumer consumer, Upstream upstream) {
+        void subscribe(@Nullable ByteBufferConsumer consumer, Upstream upstream) {
             submit(() -> subscribe0(consumer, upstream));
         }
 
@@ -407,106 +399,5 @@ final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByt
         CLEAN,
         WORKING_THEN_CLEAN,
         WORKING_THEN_DIRTY
-    }
-
-    /**
-     * {@link HttpResponse.BodySubscriber} implementation that pushes data into a
-     * {@link SharedBuffer}.
-     */
-    static final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableByteBody>, BufferConsumer.Upstream {
-        private final SharedBuffer sharedBuffer;
-        private final CloseableByteBody root;
-        private final AtomicLong demand = new AtomicLong(0);
-        private Flow.Subscription subscription;
-        private boolean cancelled;
-        private volatile boolean disregardBackpressure;
-
-        ByteBodySubscriber(BodySizeLimits limits) {
-            sharedBuffer = new SharedBuffer(limits, this);
-            root = new ReactiveByteBufferByteBody(sharedBuffer);
-        }
-
-        @Override
-        public CompletionStage<CloseableByteBody> getBody() {
-            return CompletableFuture.completedFuture(root);
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            boolean initialDemand;
-            boolean cancelled;
-            synchronized (this) {
-                this.subscription = subscription;
-                cancelled = this.cancelled;
-                initialDemand = demand.get() > 0;
-            }
-            if (cancelled) {
-                subscription.cancel();
-            } else if (initialDemand) {
-                subscription.request(disregardBackpressure ? Long.MAX_VALUE : 1);
-            }
-        }
-
-        @Override
-        public void onNext(List<ByteBuffer> item) {
-            for (ByteBuffer buffer : item) {
-                int n = buffer.remaining();
-                demand.addAndGet(-n);
-                sharedBuffer.add(buffer);
-            }
-            if (demand.get() > 0) {
-                subscription.request(1);
-            }
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            sharedBuffer.error(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            sharedBuffer.complete();
-        }
-
-        @Override
-        public void start() {
-            Flow.Subscription initialDemand;
-            synchronized (this) {
-                initialDemand = subscription;
-                demand.set(1);
-            }
-            if (initialDemand != null) {
-                initialDemand.request(1);
-            }
-        }
-
-        @Override
-        public void onBytesConsumed(long bytesConsumed) {
-            long prev = demand.getAndAdd(bytesConsumed);
-            if (prev <= 0 && prev + bytesConsumed > 0) {
-                subscription.request(1);
-            }
-        }
-
-        @Override
-        public void allowDiscard() {
-            Flow.Subscription subscription;
-            synchronized (this) {
-                cancelled = true;
-                subscription = this.subscription;
-            }
-            if (subscription != null) {
-                subscription.cancel();
-            }
-        }
-
-        @Override
-        public void disregardBackpressure() {
-            disregardBackpressure = true;
-            if (subscription != null) {
-                subscription.request(Long.MAX_VALUE);
-            }
-        }
     }
 }

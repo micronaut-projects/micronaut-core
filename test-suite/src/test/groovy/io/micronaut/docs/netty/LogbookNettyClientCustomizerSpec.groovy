@@ -55,6 +55,7 @@ class LogbookNettyClientCustomizerSpec extends Specification {
                 'micronaut.server.http-version'       : '2.0',
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port':            0,
                 'micronaut.http.client.http-version'  : '2.0',
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'spec.name'                           : 'LogbookNettyClientCustomizerSpec'
@@ -88,6 +89,7 @@ class LogbookNettyClientCustomizerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port':            0,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'spec.name'                           : 'LogbookNettyClientCustomizerSpec'
         ])

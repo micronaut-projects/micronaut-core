@@ -25,7 +25,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -39,13 +38,14 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.MicronautHttpData;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.converters.NettyConverters;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -149,7 +149,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
         MessageBodyReader<T> reader = null;
-        final RouteInfo<?> routeInfo = nhr.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+        final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(nhr).orElse(null);
         if (routeInfo != null) {
             reader = (MessageBodyReader<T>) routeInfo.getMessageBodyReader();
         }

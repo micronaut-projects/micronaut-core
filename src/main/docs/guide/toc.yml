@@ -114,7 +114,22 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-  jsonBinding: JSON Binding
+  jsonBinding:
+    title: JSON Binding
+    serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
+    serializationUsingJacksonDatabind: Serialization using Jackson Databind
+    jsonMapper: JsonMapper
+    bindingUsingReactiveFrameworks: Binding using Reactive Frameworks
+    bindingUsingCompletableFuture: Binding Using CompletableFuture
+    bindingUsingPOJOs: Binding using POJOs
+    jacksonConfiguration:
+      title: Jackson Configuration
+      jacksonConfigurationFeatures: Features
+      jacksonConfigurationFurtherCustomisingJsonFactory: Further customising `JsonFactory`
+      jacksonConfigurationSupportForJsonView: Support for `@JsonView`
+      jacksonConfigurationBeans: Beans
+      jacksonConfigurationServiceLoader: Service Loader
+      jacksonConfigurationNumberPrecision: Number Precision
   plainTextResponses: Plain Text Responses
   datavalidation:
     title: Data Validation

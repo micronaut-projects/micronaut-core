@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.server.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.types.files.SystemFile;
@@ -49,10 +52,25 @@ public final class FileBodyWriter implements ResponseBodyWriter<File> {
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, MediaType mediaType, File object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         MutableHttpResponse<File> outgoingResponse,
+                                         Argument<File> type,
+                                         MediaType mediaType,
+                                         File object) throws CodecException {
         SystemFile systemFile = new SystemFile(object);
         MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
-        return systemFileBodyWriter.write(request, newResponse, systemFile);
+        return systemFileBodyWriter.write(bodyFactory, request, newResponse, systemFile);
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<File> type,
+                                        @NonNull MediaType mediaType,
+                                        File object) {
+        return systemFileBodyWriter.writePiece(bodyFactory, new SystemFile(object));
     }
 
     @Override

@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -43,6 +42,7 @@ import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -180,7 +180,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
 
         if (shouldProceedNormally) {
-            UriRouteMatch<Object, Object> routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class)
+            UriRouteMatch<Object, Object> routeMatch = RouteAttributes.getRouteMatch(actualResponse)
+                .map(rm -> (UriRouteMatch<Object, Object>) rm)
                 .orElseThrow(() -> new IllegalStateException("Route match is required!"));
             //Adding new handler to the existing pipeline to handle WebSocket Messages
             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
@@ -306,10 +307,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             MutableHttpResponse<?> proceed = HttpResponse.ok();
 
             if (route != null) {
-                request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
-                request.setAttribute(HttpAttributes.ROUTE_INFO, route);
-                proceed.setAttribute(HttpAttributes.ROUTE_MATCH, route);
-                proceed.setAttribute(HttpAttributes.ROUTE_INFO, route);
+                RouteAttributes.setRouteMatch(request, route);
+                RouteAttributes.setRouteInfo(request, route.getRouteInfo());
+                RouteAttributes.setRouteMatch(proceed, route);
+                RouteAttributes.setRouteInfo(proceed, route.getRouteInfo());
             }
 
             ExecutionFlow<HttpResponse<?>> response;

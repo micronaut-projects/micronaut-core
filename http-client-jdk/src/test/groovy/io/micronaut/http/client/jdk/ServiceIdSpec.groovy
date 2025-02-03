@@ -2,7 +2,7 @@ package io.micronaut.http.client.jdk
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpAttributes
+import io.micronaut.http.BasicHttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpVersion
@@ -80,7 +80,7 @@ class ServiceIdSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            serviceId = request.getAttribute(HttpAttributes.SERVICE_ID).orElse(null)
+            serviceId = BasicHttpAttributes.getServiceId(request).orElse(null)
             return chain.proceed(request)
         }
     }

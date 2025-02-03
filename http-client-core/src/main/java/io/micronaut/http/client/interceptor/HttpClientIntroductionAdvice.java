@@ -43,7 +43,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -56,6 +56,7 @@ import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
@@ -435,9 +436,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         }
 
-        request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
+        ClientAttributes.setInvocationContext(request, context);
         // Set the URI template used to make the request for tracing purposes
-        request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(annotationMetadata, uriTemplate.toString()));
+        BasicHttpAttributes.setUriTemplate(request, resolveTemplate(annotationMetadata, uriTemplate.toString()));
 
         return RequestBinderResult.withRequest(request);
     }

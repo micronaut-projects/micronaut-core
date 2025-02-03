@@ -32,7 +32,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     /**
      * The head of the linked list of steps in this flow.
      */
-    private final Head head = new Head();
+    private Head head = new Head();
     /**
      * The tail of the linked list of steps in this flow.
      */
@@ -67,10 +67,14 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      * @param executionFlow The execution flow
      */
     private void complete0(@NonNull ExecutionFlow<Object> executionFlow) {
+        if (head == null) {
+            throw new IllegalStateException("Delayed flow has been completed");
+        }
         Step immediateStep = head.atomicSetOutput(executionFlow);
         if (immediateStep != null) {
             work(immediateStep, executionFlow);
         }
+        head = null;
     }
 
     @Override

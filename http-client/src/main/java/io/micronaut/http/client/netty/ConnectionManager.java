@@ -46,6 +46,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.DecoderException;
@@ -109,6 +110,7 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.slf4j.Logger;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -363,12 +365,10 @@ public class ConnectionManager {
 
     private void initBootstrap() {
         this.bootstrap = new Bootstrap()
-            .group(group)
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
         if (httpVersion.isHttp3()) {
             this.udpBootstrap = new Bootstrap()
-                .group(group)
                 .channelFactory(udpChannelFactory);
         }
 
@@ -450,11 +450,12 @@ public class ConnectionManager {
      * Use the bootstrap to connect to the given host. Also does some proxy setup. This method is
      * not final: The test suite overrides it to return embedded channels instead.
      *
-     * @param requestKey The host to connect to
+     * @param requestKey         The host to connect to
      * @param channelInitializer The initializer to use
+     * @param requestingThread   A hint which thread may use this connection (not 100% reliable)
      * @return Future that terminates when the TCP connection is established.
      */
-    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer) {
+    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull Thread requestingThread) {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
         Bootstrap localBootstrap = bootstrap.clone();
@@ -465,7 +466,28 @@ public class ConnectionManager {
         localBootstrap.handler(channelInitializer)
             .remoteAddress(host, port);
         channelInitializer.bootstrappedCustomizer = clientCustomizer.specializeForBootstrap(localBootstrap);
+        assignGroup(localBootstrap, requestingThread);
         return localBootstrap.connect();
+    }
+
+    private void assignGroup(Bootstrap bootstrap, Thread requestingThread) {
+        HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality locality = configuration.getConnectionPoolConfiguration().getConnectionLocality();
+        if (locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
+            bootstrap.group(group);
+            return;
+        }
+        EventLoop loop = (EventLoop) findEventLoop(requestingThread);
+        if (loop == null) {
+            if (locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
+                throw new IllegalStateException("Attempted to open a HTTP connection from thread " +
+                    requestingThread + " which is not part of event loop group " + group +
+                    ", but configured the pool in locality mode ENFORCED_ALWAYS, which disallows " +
+                    "requesting from outside this group");
+            }
+            bootstrap.group(group);
+        } else {
+            bootstrap.group(loop);
+        }
     }
 
     /**
@@ -574,7 +596,7 @@ public class ConnectionManager {
                 // failed
                 ch.close();
             }
-        });
+        }, Thread.currentThread());
         withPropagation(connectFuture, future -> {
             if (!future.isSuccess()) {
                 initial.tryEmitError(future.cause());
@@ -842,6 +864,27 @@ public class ConnectionManager {
 
     private <E extends HttpClientException> E decorate(E exc) {
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
+    @Nullable
+    private EventExecutor findEventLoop(Thread thread) {
+        if (thread == Thread.currentThread()) {
+            // shortcut to avoid the loop
+            EventExecutor executor = ThreadExecutorMap.currentExecutor();
+            if (executor != null) {
+                if (executor == group || executor.parent() == group) {
+                    return executor;
+                } else {
+                    return null;
+                }
+            }
+        }
+        for (EventExecutor executor : group) {
+            if (executor.inEventLoop(thread)) {
+                return executor;
+            }
+        }
+        return null;
     }
 
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
@@ -1205,9 +1248,9 @@ public class ConnectionManager {
         }
 
         @Override
-        void openNewConnection(@Nullable BlockHint blockHint) throws Exception {
+        void openNewConnection(@Nullable BlockHint blockHint, @NonNull Thread requestingThread) throws Exception {
             // open a new connection
-            ChannelFuture channelFuture = openConnectionFuture();
+            ChannelFuture channelFuture = openConnectionFuture(requestingThread);
             if (blockHint != null && blockHint.blocks(channelFuture.channel().eventLoop())) {
                 channelFuture.channel().close();
                 onNewConnectionFailure(BlockHint.createException());
@@ -1220,7 +1263,12 @@ public class ConnectionManager {
             });
         }
 
-        private ChannelFuture openConnectionFuture() {
+        @Override
+        boolean containsThread(@NonNull Thread thread) {
+            return findEventLoop(thread) != null;
+        }
+
+        private ChannelFuture openConnectionFuture(@NonNull Thread requestingThread) {
             CustomizerAwareInitializer initializer;
             if (requestKey.isSecure()) {
                 if (httpVersion.isHttp3()) {
@@ -1228,6 +1276,7 @@ public class ConnectionManager {
                     Bootstrap localBootstrap = udpBootstrap.clone()
                         .handler(channelInitializer)
                         .localAddress(0);
+                    assignGroup(localBootstrap, requestingThread);
                     channelInitializer.bootstrappedCustomizer = clientCustomizer.specializeForBootstrap(localBootstrap);
                     return localBootstrap.bind();
                 }
@@ -1260,7 +1309,7 @@ public class ConnectionManager {
                     case H2C -> new Http2UpgradeInitializer(this);
                 };
             }
-            return doConnect(requestKey, initializer);
+            return doConnect(requestKey, initializer, requestingThread);
         }
 
         public void shutdown() {
@@ -1379,6 +1428,11 @@ public class ConnectionManager {
                         windDownConnection();
                     }
                 }
+            }
+
+            @Override
+            boolean inEventLoop(Thread thread) {
+                return channel.eventLoop().inEventLoop(thread);
             }
 
             @Override

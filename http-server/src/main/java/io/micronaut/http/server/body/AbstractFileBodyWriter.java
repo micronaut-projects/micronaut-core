@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.server.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -24,15 +24,16 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.netty.handler.codec.http.HttpHeaderNames;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Abstract implementation for types that write files.
@@ -40,16 +41,20 @@ import java.util.Arrays;
 @Experimental
 @Internal
 abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, StreamFileBodyWriter, SystemFileBodyWriter {
-    private static final String[] ENTITY_HEADERS = {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
-    protected final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
+    private static final Set<String> ENTITY_HEADERS = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    protected final HttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 
-    AbstractFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
+    static {
+        ENTITY_HEADERS.addAll(List.of(HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED));
+    }
+
+    AbstractFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
     }
 
     private static void copyNonEntityHeaders(MutableHttpResponse<?> from, MutableHttpResponse to) {
         from.getHeaders().forEachValue((header, value) -> {
-            if (Arrays.binarySearch(ENTITY_HEADERS, header) < 0) {
+            if (!ENTITY_HEADERS.contains(header)) {
                 to.getHeaders().add(header, value);
             }
         });
@@ -71,9 +76,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
             }
         }
 
-        if (!response.getHeaders().contains(HttpHeaderNames.CONTENT_TYPE)) {
-            response.header(HttpHeaderNames.CONTENT_TYPE, systemFile.getMediaType().toString());
-        }
+        response.getHeaders().contentTypeIfMissing(systemFile.getMediaType());
         setDateAndCacheHeaders(response, lastModified);
         systemFile.process(nettyResponse);
         return false;
@@ -87,7 +90,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
         LocalDateTime now = LocalDateTime.now();
-        if (!headers.contains(HttpHeaderNames.DATE)) {
+        if (!headers.contains(HttpHeaders.DATE)) {
             headers.date(now);
         }
 
@@ -98,7 +101,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         }
 
         if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
-            NettyHttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
+            HttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
             StringBuilder header = new StringBuilder(cacheConfig.getPublic() ? "public" : "private")
                 .append(", max-age=")
                 .append(configuration.getCacheSeconds());
@@ -119,10 +122,10 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         headers.date(now);
     }
 
-    protected ByteBodyHttpResponse<?> notModified(MutableHttpResponse<?> originalResponse) {
+    protected ByteBodyHttpResponse<?> notModified(ByteBodyFactory bodyFactory, MutableHttpResponse<?> originalResponse) {
         MutableHttpResponse<Void> response = HttpResponse.notModified();
         AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
-        return ByteBodyHttpResponseWrapper.wrap(response, AvailableNettyByteBody.empty());
+        return ByteBodyHttpResponseWrapper.wrap(response, bodyFactory.createEmpty());
     }
 }

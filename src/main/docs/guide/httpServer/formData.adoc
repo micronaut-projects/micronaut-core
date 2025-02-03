@@ -2,14 +2,14 @@ To make data binding model customizations consistent between form data and JSON,
 
 The advantage of this approach is that the same Jackson annotations used for customizing JSON binding can be used for form submissions.
 
-In practice this means that to bind regular form data, the only change required to the previous JSON binding code is updating the api:http.MediaType[] consumed:
+In practice this means that to bind regular form data, the only change required to the <<bindingUsingPOJOs, previous JSON binding code>> is updating the api:http.MediaType[] consumed:
 
-snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding Form Data to POJOs"]
+snippet::io.micronaut.docs.server.form.PersonController[tags="class,formbinding,endclass", title="Binding Form Data to POJOs"]
 
-TIP: To avoid denial of service attacks, collection types and arrays created during binding are limited by the setting `jackson.arraySizeThreshold` in your configuration file (e.g `application.yml`)
+TIP: To avoid denial-of-service attacks, collection types and arrays created during binding are limited by the setting `jackson.arraySizeThreshold` in your configuration file (e.g `application.yml`)
 
 Alternatively, instead of using a POJO you can bind form data directly to method parameters (which works with JSON too!):
 
-snippet::io.micronaut.docs.server.json.PersonController[tags="class,args,endclass", indent=0, title="Binding Form Data to Parameters"]
+snippet::io.micronaut.docs.server.form.PersonController[tags="class,formsaveWithArgs,endclass", title="Binding Form Data to Parameters"]
 
-As you can see from the example above, this approach lets you use features such as support for link:{jdkapi}/java.base/java/util/Optional.html[Optional] types and restrict the parameters to be bound. When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound.
+As you can see from the example above, this approach lets you use features such as support for `@Nullable` or link:{jdkapi}/java.base/java/util/Optional.html[Optional] types and restrict the parameters to be bound. When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound.

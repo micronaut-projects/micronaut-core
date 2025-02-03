@@ -18,21 +18,16 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.AbstractBodyAdapter;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
-import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
-
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongUnaryOperator;
 
 /**
  * Adapter from generic streaming {@link ByteBody} to {@link StreamingNettyByteBody}.
@@ -41,21 +36,12 @@ import java.util.function.LongUnaryOperator;
  * @since 4.6.0
  */
 @Internal
-public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscriber<ByteBuf> {
+public final class NettyBodyAdapter extends AbstractBodyAdapter<ByteBuf, StreamingNettyByteBody.SharedBuffer> {
     private final EventLoopFlow eventLoopFlow;
-    private final Publisher<ByteBuf> source;
-    @Nullable
-    private final Runnable onDiscard;
-
-    private volatile boolean cancelled;
-    private volatile Subscription subscription;
-    private StreamingNettyByteBody.SharedBuffer sharedBuffer;
-    private final AtomicLong demand = new AtomicLong(1);
 
     private NettyBodyAdapter(EventLoop eventLoop, Publisher<ByteBuf> source, @Nullable Runnable onDiscard) {
+        super(source, onDiscard);
         this.eventLoopFlow = new EventLoopFlow(eventLoop);
-        this.source = source;
-        this.onDiscard = onDiscard;
     }
 
     /**
@@ -93,55 +79,6 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
     }
 
     @Override
-    public void start() {
-        source.subscribe(this);
-    }
-
-    @Override
-    public void onBytesConsumed(long bytesConsumed) {
-        if (bytesConsumed < 0) {
-            throw new IllegalArgumentException("Negative bytes consumed");
-        }
-
-        // clamping add
-        LongUnaryOperator add = l -> l + bytesConsumed < l ? Long.MAX_VALUE : l + bytesConsumed;
-        long oldDemand = this.demand.getAndUpdate(add);
-        long newDemand = add.applyAsLong(oldDemand);
-        if (oldDemand <= 0 && newDemand > 0) {
-            subscription.request(1);
-        }
-    }
-
-    @Override
-    public void allowDiscard() {
-        cancelled = true;
-        if (subscription != null) {
-            subscription.cancel();
-        }
-        if (onDiscard != null) {
-            onDiscard.run();
-        }
-    }
-
-    @Override
-    public void disregardBackpressure() {
-        this.demand.set(Long.MAX_VALUE);
-        if (subscription != null) {
-            subscription.request(Long.MAX_VALUE);
-        }
-    }
-
-    @Override
-    public void onSubscribe(Subscription s) {
-        this.subscription = s;
-        if (cancelled) {
-            s.cancel();
-        } else {
-            s.request(1);
-        }
-    }
-
-    @Override
     public void onNext(ByteBuf bytes) {
         if (eventLoopFlow.executeNow(() -> onNext0(bytes))) {
             onNext0(bytes);
@@ -158,15 +95,15 @@ public final class NettyBodyAdapter implements BufferConsumer.Upstream, Subscrib
 
     @Override
     public void onError(Throwable t) {
-        if (eventLoopFlow.executeNow(() -> sharedBuffer.error(t))) {
-            sharedBuffer.error(t);
+        if (eventLoopFlow.executeNow(() -> super.onError(t))) {
+            super.onError(t);
         }
     }
 
     @Override
     public void onComplete() {
-        if (eventLoopFlow.executeNow(() -> sharedBuffer.complete())) {
-            sharedBuffer.complete();
+        if (eventLoopFlow.executeNow(super::onComplete)) {
+            super.onComplete();
         }
     }
 

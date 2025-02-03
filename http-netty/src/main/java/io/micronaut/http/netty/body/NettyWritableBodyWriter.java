@@ -18,19 +18,21 @@ package io.micronaut.http.netty.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.TypedMessageBodyHandler;
@@ -40,7 +42,6 @@ import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufOutputStream;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
@@ -74,19 +75,31 @@ public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Wr
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
-        MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
-        if (mediaType != null && !outgoingHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
-            outgoingHeaders.contentType(mediaType);
-        }
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         MutableHttpResponse<Writable> outgoingResponse,
+                                         Argument<Writable> type,
+                                         MediaType mediaType,
+                                         Writable object) throws CodecException {
+        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<Writable> type,
+                                        @NonNull MediaType mediaType,
+                                        Writable object) {
         ByteBufOutputStream outputStream = new ByteBufOutputStream(ByteBufAllocator.DEFAULT.buffer());
         try {
-            object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, outgoingHeaders));
+            object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, response.getHeaders()));
             outputStream.close();
         } catch (IOException e) {
             throw new MessageBodyException("Error writing body from writable", e);
         }
-        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, new AvailableNettyByteBody(outputStream.buffer()));
+        return new AvailableNettyByteBody(outputStream.buffer());
     }
 
     @Override

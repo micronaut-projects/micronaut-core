@@ -28,8 +28,8 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
-import io.micronaut.web.router.RouteMatchUtils;
 import org.reactivestreams.Publisher;
 
 import java.util.Map;
@@ -66,7 +66,7 @@ public class EndpointsFilter implements Ordered {
     @RequestFilter
     @Nullable
     public HttpResponse<?> doFilter(HttpRequest<?> request) {
-        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
+        Optional<RouteMatch<?>> routeMatch = RouteAttributes.getRouteMatch(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
             ExecutableMethod<?, ?> method = methodBasedRouteMatch.getExecutableMethod();
             if (endpointMethods.getOrDefault(method, false)) {

@@ -426,6 +426,11 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      * @param e The error
      */
     public void error(Throwable e) {
+        if (error != null) {
+            error.addSuppressed(e);
+            return;
+        }
+
         error = e;
         discardBuffer();
         if (subscribers != null) {

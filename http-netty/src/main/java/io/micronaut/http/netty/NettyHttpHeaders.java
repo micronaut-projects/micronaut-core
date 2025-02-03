@@ -302,7 +302,14 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         }
         contentType = Optional.ofNullable(mediaType);
         return this;
+    }
 
+    @Override
+    public MutableHttpHeaders contentTypeIfMissing(MediaType mediaType) {
+        if (nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+            return this;
+        }
+        return contentType(mediaType);
     }
 
     @Override

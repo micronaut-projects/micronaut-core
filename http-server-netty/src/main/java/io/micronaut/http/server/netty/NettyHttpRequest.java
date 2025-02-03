@@ -63,6 +63,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.DefaultUriRouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -226,7 +227,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public FormRouteCompleter formRouteCompleter() {
         assert isFormOrMultipartData();
         if (formRouteCompleter == null) {
-            formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
+            formRouteCompleter = new FormRouteCompleter(RouteAttributes.getRouteMatch(this).get(), getChannelHandlerContext().channel().eventLoop());
         }
         return formRouteCompleter;
     }

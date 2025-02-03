@@ -25,12 +25,12 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.codec.CodecException;
 
-import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 
 /**
@@ -41,10 +41,10 @@ import java.io.OutputStream;
  * @author Jonas Konrad
  */
 @Internal
-public class ResponseBodyWriterWrapper<T> implements ResponseBodyWriter<T> {
+final class ResponseBodyWriterWrapper<T> implements ResponseBodyWriter<T> {
     private final MessageBodyWriter<T> wrapped;
 
-    protected ResponseBodyWriterWrapper(MessageBodyWriter<T> wrapped) {
+    ResponseBodyWriterWrapper(MessageBodyWriter<T> wrapped) {
         this.wrapped = wrapped;
     }
 
@@ -74,9 +74,16 @@ public class ResponseBodyWriterWrapper<T> implements ResponseBodyWriter<T> {
     }
 
     @Override
-    public @NonNull ByteBodyHttpResponse<?> write(@NonNull ByteBufferFactory<?, ?> bufferFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        writeTo(type, mediaType, object, httpResponse.getHeaders(), baos);
-        return ByteBodyHttpResponseWrapper.wrap(httpResponse, AvailableByteArrayBody.create(bufferFactory, baos.toByteArray()));
+    public @NonNull ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> httpResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) throws CodecException {
+        return ByteBodyHttpResponseWrapper.wrap(httpResponse, writePiece(bodyFactory, httpResponse.getHeaders(), type, mediaType, object));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) {
+        return writePiece(bodyFactory, response.toMutableResponse().getHeaders(), type, mediaType, object);
+    }
+
+    private @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, MutableHttpHeaders headers, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) {
+        return bodyFactory.buffer(s -> writeTo(type, mediaType, object, headers, s));
     }
 }

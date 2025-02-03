@@ -16,7 +16,6 @@
 package io.micronaut.http.server.tck.tests.filter;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -32,6 +31,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.TestScenario;
 import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.annotation.security.RolesAllowed;
 import org.junit.jupiter.api.Test;
@@ -95,7 +95,7 @@ public class HttpServerFilterTest {
 
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
             if (routeMatch instanceof MethodBasedRouteMatch match) {
                 MethodBasedRouteMatch<?, ?> methodRoute = match;
                 if (methodRoute.hasAnnotation(RolesAllowed.class)) {

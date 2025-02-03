@@ -28,6 +28,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 
+import io.micronaut.inject.BeanConfiguration;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,6 +52,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private final List<Object> singletons = new ArrayList<>();
     private final List<RuntimeBeanDefinition<?>> beanDefinitions = new ArrayList<>();
+    private final Collection<BeanConfiguration> beanConfigurations = new HashSet<>();
     private final List<String> environments = new ArrayList<>();
     private final List<String> defaultEnvironments = new ArrayList<>();
     private final List<String> packages = new ArrayList<>();
@@ -73,8 +75,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
-    private Set<String> traceClasses = BeanResolutionTraceMode.getDefaultTraceClasses();
-    private BeanResolutionTraceMode traceMode = BeanResolutionTraceMode.getDefaultMode(traceClasses);
+    private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
 
     /**
      * Default constructor.
@@ -93,24 +94,16 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder beanResolutionTrace(
-        BeanResolutionTraceMode traceMode,
-        String... classPatterns) {
-        this.traceMode = traceMode == null ? BeanResolutionTraceMode.NONE : traceMode;
-        if (ArrayUtils.isNotEmpty(classPatterns)) {
-            this.traceClasses = Set.of(classPatterns);
+    public ApplicationContextBuilder beanResolutionTrace(BeanResolutionTraceConfiguration configuration) {
+        if (configuration != null) {
+            this.traceConfiguration = configuration;
         }
         return this;
     }
 
     @Override
-    public BeanResolutionTraceMode getTraceMode() {
-        return this.traceMode;
-    }
-
-    @Override
-    public Set<String> getTraceClasses() {
-        return traceClasses;
+    public BeanResolutionTraceConfiguration getTraceConfiguration() {
+        return this.traceConfiguration;
     }
 
     private ClassLoader resolveClassLoader() {
@@ -192,6 +185,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
         if (definitions != null) {
             beanDefinitions.addAll(Arrays.asList(definitions));
+        }
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanConfigurations(@NonNull BeanConfiguration... configurations) {
+        if (configurations != null) {
+            beanConfigurations.addAll(Arrays.asList(configurations));
         }
         return this;
     }
@@ -392,6 +393,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!beanDefinitions.isEmpty()) {
             for (RuntimeBeanDefinition<?> beanDefinition : beanDefinitions) {
                 applicationContext.registerBeanDefinition(beanDefinition);
+            }
+        }
+
+        if (!beanConfigurations.isEmpty()) {
+            for (BeanConfiguration beanConfiguration : beanConfigurations) {
+                applicationContext.registerBeanConfiguration(beanConfiguration);
             }
         }
 

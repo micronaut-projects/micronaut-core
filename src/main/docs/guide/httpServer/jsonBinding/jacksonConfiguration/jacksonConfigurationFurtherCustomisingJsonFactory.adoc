@@ -1,0 +1,2 @@
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, there may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
+This can be achieved by providing your own `JsonFactory` bean, or by providing a `BeanCreatedEventListener<JsonFactory>` which configures the default bean on startup.

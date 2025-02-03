@@ -2,15 +2,15 @@
 awaitility = "4.2.2"
 bcpkix = "1.70"
 blaze = "1.6.14"
-brotli4j = "1.16.0"
-bytebuddy = "1.15.11"
+brotli4j = "1.18.0"
+bytebuddy = "1.16.1"
 caffeine = "2.9.3"
 classgraph = "4.8.179"
 compile-testing = "0.21.0"
 
 geb = "7.0"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.5"
+graal-svm = "23.1.6"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -30,7 +30,7 @@ jsr305 = "3.0.2"
 jakarta-el = "5.0.1"
 jakarta-el-impl = "5.0.0-M1"
 japicmp-gradle-plugin="0.4.5"
-jazzer = "0.22.1"
+jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.11.4"
 junit-platform="1.11.4"
@@ -44,7 +44,7 @@ micronaut-groovy = "4.5.0"
 micronaut-session = "4.5.0"
 micronaut-sql = "5.3.0"
 micronaut-test = "4.6.2"
-micronaut-validation = "4.8.0"
+micronaut-validation = "4.8.1"
 micronaut-rxjava2 = "2.6.0"
 micronaut-rxjava3 = "3.6.0"
 micronaut-reactor = "3.5.0"
@@ -54,13 +54,13 @@ neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
 okio = "3.9.1"
 slf4j = "2.0.16"
-smallrye = "6.4.1"
+smallrye = "6.7.3"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
 testcontainers = "1.20.4"
 tomlj="1.1.1"
-vertx = "4.5.11"
+vertx = "4.5.12"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
 micronaut-sourcegen = "1.6.1"
@@ -69,7 +69,7 @@ micronaut-sourcegen = "1.6.1"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.24"
+managed-groovy = "4.0.25"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.17.2"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
@@ -230,6 +230,7 @@ junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engi
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
+jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 

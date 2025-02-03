@@ -13,23 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.body;
+package io.micronaut.http.server.body;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
@@ -52,20 +54,35 @@ import java.util.concurrent.ExecutorService;
 public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<StreamedFile> {
     private final ExecutorService ioExecutor;
 
-    StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
+    StreamFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
         super(configuration);
         this.ioExecutor = ioExecutor;
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(ByteBufferFactory<?, ?> bufferFactory, HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         MutableHttpResponse<StreamedFile> outgoingResponse,
+                                         Argument<StreamedFile> type,
+                                         MediaType mediaType,
+                                         StreamedFile object) throws CodecException {
         if (handleIfModifiedAndHeaders(request, outgoingResponse, object, outgoingResponse)) {
-            return notModified(outgoingResponse);
+            return notModified(bodyFactory, outgoingResponse);
         } else {
-            long length = object.getLength();
-            InputStream inputStream = object.getInputStream();
-            return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, NettyByteBufferFactory.DEFAULT));
+            return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
         }
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<StreamedFile> type,
+                                        @NonNull MediaType mediaType,
+                                        StreamedFile object) {
+        long length = object.getLength();
+        InputStream inputStream = object.getInputStream();
+        return InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, bodyFactory);
     }
 
     @Override

@@ -18,9 +18,9 @@ package io.micronaut.http.server.cors;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.web.router.RouteAttributes;
 
 import java.util.Arrays;
 import java.util.List;
@@ -53,8 +53,8 @@ public final class CrossOriginUtil {
      */
     @NonNull
     public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(@NonNull HttpRequest<?> request) {
-        return request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)
-            .flatMap(CrossOriginUtil::getCorsOriginConfiguration);
+        return RouteAttributes.getRouteMatch(request)
+            .flatMap(rm -> getCorsOriginConfiguration((AnnotationMetadata) rm));
     }
 
     /**
