@@ -18,12 +18,10 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.computeNumericOperationTargetType;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
 
 /**
  * Abstract expression AST node for binary math operations
@@ -33,36 +31,26 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class MathOperator extends BinaryOperator permits DivOperator,
-                                                                         ModOperator,
-                                                                         MulOperator,
-                                                                         SubOperator {
-    public MathOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
+public final class MathOperator extends BinaryOperator {
+
+    private final ExpressionDef.MathBinaryOperation.OpType type;
+
+    public MathOperator(ExpressionNode leftOperand, ExpressionNode rightOperand, ExpressionDef.MathBinaryOperation.OpType type) {
         super(leftOperand, rightOperand);
+        this.type = type;
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        Type targetType = resolveType(ctx);
-
-        Type leftType = leftOperand.resolveType(ctx);
-        leftOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(leftType, mv);
-        pushPrimitiveCastIfNecessary(leftType, targetType, mv);
-
-        Type rightType = rightOperand.resolveType(ctx);
-        rightOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(rightType, mv);
-        pushPrimitiveCastIfNecessary(rightType, targetType, mv);
-
-        mv.visitInsn(getMathOperationOpcode(ctx));
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        TypeDef targetType = resolveType(ctx);
+        return leftOperand.compile(ctx)
+            .cast(targetType)
+            .math(type, rightOperand.compile(ctx).cast(targetType))
+            .cast(targetType);
     }
 
     @Override
-    protected Type resolveOperationType(Type leftOperandType, Type rightOperandType) {
+    protected TypeDef resolveOperationType(TypeDef leftOperandType, TypeDef rightOperandType) {
         return computeNumericOperationTargetType(leftOperandType, rightOperandType);
     }
-
-    protected abstract int getMathOperationOpcode(ExpressionCompilationContext ctx);
 }

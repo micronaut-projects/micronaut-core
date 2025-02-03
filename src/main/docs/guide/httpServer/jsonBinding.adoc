@@ -1,7 +1,3 @@
-:jackson-annotations: https://fasterxml.github.io/jackson-annotations/javadoc/2.9/
-:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
-:jackson-core: https://fasterxml.github.io/jackson-core/javadoc/2.9/
-
 The most common data interchange format nowadays is JSON.
 
 By default, the api:http.annotation.Controller[] annotation specifies that the controllers in Micronaut framework consume and produce JSON by default.

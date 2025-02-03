@@ -1,6 +1,11 @@
 package io.micronaut.http.reactive.execution
 
+import io.micronaut.core.execution.DelayedExecutionFlow
+import io.micronaut.core.execution.ExecutionFlow
+import io.micronaut.core.execution.ImperativeExecutionFlow
+import io.micronaut.core.propagation.PropagatedContext
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Hooks
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
@@ -96,5 +101,52 @@ class ReactorExecutionFlowImplSpec extends Specification {
                 Mono.just("foo").delaySubscription(Duration.ofSeconds(1)),
                 Mono.just("foo").subscribeOn(Schedulers.immediate()),
         ]
+    }
+
+    def 'defuse immediate'() {
+        when:
+        Hooks.resetOnOperatorDebug()
+        def flow = ReactorExecutionFlowImpl.defuse(ReactorExecutionFlowImpl.toMono(ExecutionFlow.just("foo")), PropagatedContext.empty())
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue() == "foo"
+    }
+
+    def 'defuse immediate with map'() {
+        when:
+        Hooks.resetOnOperatorDebug()
+        def flow = ReactorExecutionFlowImpl.defuse(ReactorExecutionFlowImpl.toMono(ExecutionFlow.just("foo")).map { it + "bar" }, PropagatedContext.empty())
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue() == "foobar"
+    }
+
+    def 'defuse delayed with map'() {
+        when:
+        Hooks.resetOnOperatorDebug()
+        DelayedExecutionFlow del = DelayedExecutionFlow.create()
+        def flow = ReactorExecutionFlowImpl.defuse(ReactorExecutionFlowImpl.toMono(del).map { it + "bar" }, PropagatedContext.empty())
+        def result
+        flow.onComplete((o, e) -> {
+            result = o
+        })
+        then:
+        result == null
+        when:
+        del.complete("foo")
+        then:
+        result == "foobar"
+    }
+
+    def 'defuse delayed with map, but delayed completes before defuse'() {
+        when:
+        Hooks.resetOnOperatorDebug()
+        DelayedExecutionFlow del = DelayedExecutionFlow.create()
+        def mono = ReactorExecutionFlowImpl.toMono(del).map { it + "bar" }
+        del.complete("foo")
+        def flow = ReactorExecutionFlowImpl.defuse(mono, PropagatedContext.empty())
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue() == "foobar"
     }
 }

@@ -41,6 +41,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
@@ -182,7 +183,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
         this.nettyEmbeddedServices = nettyEmbeddedServices;
         this.coroutineHelper = coroutineHelper;
-        request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        RouteAttributes.setRouteMatch(request, routeMatch);
 
         Flux.from(callOpenMethod(ctx)).subscribe(v -> { }, t -> {
             forwardErrorToUser(ctx, e -> {

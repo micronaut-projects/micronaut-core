@@ -95,7 +95,7 @@ class ConnectionManagerSpec extends Specification {
             int i = 0
 
             @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer) {
+            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer, Thread requestingThread) {
                 try {
                     channelInitializer.bootstrappedCustomizer = clientCustomizer
                     def connection = connections[i++]

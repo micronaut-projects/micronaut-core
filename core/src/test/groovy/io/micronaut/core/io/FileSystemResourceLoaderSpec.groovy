@@ -16,7 +16,6 @@
 package io.micronaut.core.io
 
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader
-import io.micronaut.core.io.file.FileSystemResourceLoader
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -32,15 +31,15 @@ class FileSystemResourceLoaderSpec extends Specification {
         new File(loader.normalize(base), loader.normalize(resource)).exists() == presentOnDisk
 
         where:
-        base                      | resource                   | presentViaResolver   | presentOnDisk
-        "."                       | "src"                      | false                | true
-        "."                       | "file:src/main"            | false                | true
-        "src"                     | "main"                     | false                | true
-        "file:src"                | "main"                     | false                | true
-        "file:src"                | "file:main"                | false                | true
-        "file:src"                | "file:/main"               | false                | true
-        "src/test/resources"      | "foo/bar.txt"              | true                 | true
-        "file:src/test/resources" | "../resources/foo/bar.txt" | true                 | true
-        "file:src/test/resources" | "../../../build.gradle"    | false                | true
+        base                      | resource                    | presentViaResolver | presentOnDisk
+        "."                       | "src"                       | false              | true
+        "."                       | "file:src/main"             | false              | true
+        "src"                     | "main"                      | false              | true
+        "file:src"                | "main"                      | false              | true
+        "file:src"                | "file:main"                 | false              | true
+        "file:src"                | "file:/main"                | false              | true
+        "src/test/resources"      | "foo/bar.txt"               | true               | true
+        "file:src/test/resources" | "../resources/foo/bar.txt"  | true               | true
+        "file:src/test/resources" | "../../../build.gradle.kts" | false              | true
     }
 }

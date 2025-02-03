@@ -20,19 +20,28 @@ import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.CircularDependencyException;
+import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import io.micronaut.core.type.TypeInformation;
+import io.micronaut.core.type.TypeInformation.TypeFormat;
+import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.*;
 
+import io.micronaut.inject.proxy.InterceptedBean;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -48,6 +57,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     protected final DefaultBeanContext context;
     protected final BeanDefinition<?> rootDefinition;
     protected final Path path;
+    private final @NonNull BeanResolutionTraceMode traceMode;
+    private final boolean traceEnabled;
     private Map<CharSequence, Object> attributes;
     private Qualifier<?> qualifier;
     private List<BeanRegistration<?>> dependentBeans;
@@ -64,6 +75,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
+        this.traceMode = context.traceMode;
+        this.traceEnabled = rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns);
     }
 
     @Override
@@ -83,16 +96,173 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return old;
     }
 
+    @Override
+    public void valueResolved(Argument<?> argument, Qualifier<?> qualifier, String property, Object value) {
+        if (traceEnabled) {
+            traceMode.getTracer().ifPresent(tracer ->
+                tracer.traceValueResolved(
+                    this,
+                    (Argument<Object>) argument,
+                    property,
+                    value
+                )
+            );
+        }
+    }
+
+    private boolean isTraceEnabled(@NonNull String typeName, @NonNull Set<String> tracePatterns) {
+        return traceMode != BeanResolutionTraceMode.NONE &&
+            (tracePatterns.isEmpty() || tracePatterns.stream().anyMatch(typeName::matches));
+    }
+
+    @Override
+    public Object resolvePropertyValue(Argument<?> argument, String stringValue, String cliProperty, boolean isPlaceholder) {
+        ApplicationContext applicationContext = (ApplicationContext) context;
+
+        Argument<?> argumentType = argument;
+        Class<?> wrapperType = null;
+        Class<?> type = argument.getType();
+        if (type == Optional.class) {
+            wrapperType = Optional.class;
+            argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        } else if (type == OptionalInt.class) {
+            wrapperType = OptionalInt.class;
+            argumentType = Argument.INT;
+        } else if (type == OptionalLong.class) {
+            wrapperType = OptionalLong.class;
+            argumentType = Argument.LONG;
+        } else if (type == OptionalDouble.class) {
+            wrapperType = OptionalDouble.class;
+            argumentType = Argument.DOUBLE;
+        }
+
+        ArgumentConversionContext<?> conversionContext = wrapperType != null ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
+
+        Optional<?> value;
+        if (isPlaceholder) {
+            value = applicationContext.resolvePlaceholders(stringValue).flatMap(v -> applicationContext.getConversionService().convert(v, conversionContext));
+        } else {
+            stringValue = substituteWildCards(stringValue);
+            value = applicationContext.getProperty(stringValue, conversionContext);
+            if (value.isEmpty() && cliProperty != null) {
+                value = applicationContext.getProperty(cliProperty, conversionContext);
+            }
+        }
+
+        if (traceEnabled) {
+            String propertyName = stringValue;
+            Object propertyValue = value.orElse(null);
+            traceMode.getTracer().ifPresent(tracer ->
+                tracer.traceValueResolved(
+                    this,
+                    (Argument<? super Object>) argument,
+                    propertyName,
+                    propertyValue
+                ));
+        }
+
+        if (argument.isOptional()) {
+            if (value.isEmpty()) {
+                return value;
+            } else {
+                Object convertedOptional = value.get();
+                if (convertedOptional instanceof Optional) {
+                    return convertedOptional;
+                } else {
+                    return value;
+                }
+            }
+        } else {
+            if (wrapperType != null) {
+                final Object v = value.orElse(null);
+                if (OptionalInt.class == wrapperType) {
+                    return v instanceof Integer i ? OptionalInt.of(i) : OptionalInt.empty();
+                } else if (OptionalLong.class == wrapperType) {
+                    return v instanceof Long l ? OptionalLong.of(l) : OptionalLong.empty();
+                } else if (OptionalDouble.class == wrapperType) {
+                    return v instanceof Double d ? OptionalDouble.of(d) : OptionalDouble.empty();
+                }
+            }
+            if (value.isPresent()) {
+                return value.get();
+            } else {
+                if (argument.isDeclaredNullable()) {
+                    return null;
+                }
+                String finalStringValue = stringValue;
+                return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
+                    .orElseThrow(() -> DependencyInjectionException.missingProperty(this, conversionContext, finalStringValue));
+            }
+        }
+    }
+
+    private String substituteWildCards(String valString) {
+        ConfigurationPath configurationPath = getConfigurationPath();
+        if (configurationPath.isNotEmpty()) {
+            return configurationPath.resolveValue(valString);
+        }
+        return valString;
+    }
+
     @NonNull
     @Override
     public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return context.getBean(this, beanType, qualifier);
+        T bean = context.getBean(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceMode.getTracer().ifPresent(tracer -> {
+                tracer.traceBeanResolved(
+                    this,
+                    beanType,
+                    qualifier,
+                    bean
+                );
+                String disabledBeanMessage = context.resolveDisabledBeanMessage(
+                    this,
+                    beanType,
+                    qualifier
+                );
+                if (disabledBeanMessage != null) {
+                    tracer.traceBeanDisabled(
+                        AbstractBeanResolutionContext.this,
+                        beanType,
+                        qualifier,
+                        disabledBeanMessage
+                    );
+                }
+            });
+        }
+        return bean;
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return context.getBeansOfType(this, beanType, qualifier);
+        Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceBeanCollection(beanType, qualifier, beans);
+        }
+        return beans;
+    }
+
+    private <T> void traceBeanCollection(Argument<T> beanType, Qualifier<T> qualifier, Collection<T> beans) {
+        traceMode.getTracer().ifPresent(tracer -> {
+            for (T bean : beans) {
+                tracer.traceBeanResolved(this, beanType, qualifier, bean);
+            }
+            String disabledBeanMessage = context.resolveDisabledBeanMessage(
+                this,
+                beanType,
+                qualifier
+            );
+            if (disabledBeanMessage != null) {
+                tracer.traceBeanDisabled(
+                    AbstractBeanResolutionContext.this,
+                    beanType,
+                    qualifier,
+                    disabledBeanMessage
+                );
+            }
+        });
     }
 
     @NonNull
@@ -103,19 +273,55 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
-        return context.mapOfType(this, beanType, qualifier);
+        Map<String, V> beanMap = context.mapOfType(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceBeanCollection(beanType, qualifier, beanMap.values());
+        }
+        return beanMap;
     }
 
     @NonNull
     @Override
     public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return context.findBean(this, beanType, qualifier);
+        Optional<T> resolved = context.findBean(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceMode.getTracer().ifPresent(tracer -> {
+                tracer.traceBeanResolved(
+                    this,
+                    beanType,
+                    qualifier,
+                    resolved.orElse(null)
+                );
+                String disabledBeanMessage = context.resolveDisabledBeanMessage(
+                    this,
+                    beanType,
+                    qualifier
+                );
+                if (disabledBeanMessage != null) {
+                    tracer.traceBeanDisabled(
+                        AbstractBeanResolutionContext.this,
+                        beanType,
+                        qualifier,
+                        disabledBeanMessage
+                    );
+                }
+            });
+        }
+        return resolved;
     }
 
     @NonNull
     @Override
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return context.getBeanRegistrations(this, beanType, qualifier);
+        Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier);
+        if (traceEnabled) {
+            traceBeanCollection(
+                beanType,
+                qualifier,
+                registrations.stream().map(BeanRegistration::getBean).collect(Collectors.toList())
+            );
+        }
+        return registrations;
     }
 
     /**
@@ -146,8 +352,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void destroyInjectScopedBeans() {
         final CustomScope<?> injectScope = context.getCustomScopeRegistry()
-                .findScope(InjectScope.class.getName())
-                .orElse(null);
+            .findScope(InjectScope.class.getName())
+            .orElse(null);
         if (injectScope instanceof LifeCycle<?> cycle) {
             cycle.stop();
         }
@@ -301,28 +507,46 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     class DefaultPath extends LinkedList<Segment<?, ?>> implements Path {
 
-        public static final String RIGHT_ARROW = " --> ";
+        public static final String RIGHT_ARROW = "\\---> ";
+        public static final String RIGHT_ARROW_EMOJI = " ↪️  ";
         private static final String CIRCULAR_ERROR_MSG = "Circular dependency detected";
 
         DefaultPath() {
         }
 
         @Override
-        public String toString() {
+        public String toConsoleString(boolean ansiSupported) {
             Iterator<Segment<?, ?>> i = descendingIterator();
-            StringBuilder pathString = new StringBuilder();
+            String ls = CachedEnvironment.getProperty("line.separator");
+            StringBuilder pathString = new StringBuilder().append(ls);
+
+            String spaces = "";
             while (i.hasNext()) {
                 pathString.append(i.next().toString());
                 if (i.hasNext()) {
-                    pathString.append(RIGHT_ARROW);
+                    pathString
+                        .append(ls)
+                        .append(spaces)
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
+                    spaces += "      ";
                 }
             }
             return pathString.toString();
         }
 
-        @SuppressWarnings("MagicNumber")
+        @Override
+        public String toString() {
+            return toConsoleString(false);
+        }
+
         @Override
         public String toCircularString() {
+            return toConsoleCircularString(false);
+        }
+
+        @SuppressWarnings("MagicNumber")
+        @Override
+        public String toConsoleCircularString(boolean ansiSupported) {
             Iterator<Segment<?, ?>> i = descendingIterator();
             StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
@@ -342,10 +566,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             while (i.hasNext() && index < size() - 1) {
                 String segmentString = i.next().toString();
                 if (index == cycleIndex) {
-                    pathString.append(ls).append(spaces).append("^").append("  \\---> ");
+                    pathString.append(ls).append(spaces).append("^").append("  ")
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
                     spaces = spaces + "|  ";
                 } else if (index != 0) {
-                    pathString.append(ls).append(spaces).append("\\---> ");
+                    pathString
+                        .append(ls)
+                        .append(spaces)
+                        .append(ansiSupported ? RIGHT_ARROW_EMOJI : RIGHT_ARROW);
                 }
                 pathString.append(segmentString);
                 spaces = spaces + "      ";
@@ -377,37 +605,65 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
-            if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
-                ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments);
-                detectCircularDependency(declaringType, argument, constructorSegment);
-            } else {
-                Segment<?, ?> previous = peek();
-                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
-                if (contains(methodSegment)) {
-                    push(methodSegment);
-                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
+            try {
+                if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
+                    ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments);
+                    detectCircularDependency(declaringType, argument, constructorSegment);
                 } else {
-                    push(methodSegment);
+                    Segment<?, ?> previous = peek();
+                    MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
+                    if (contains(methodSegment)) {
+                        push(methodSegment);
+                        throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
+                    } else {
+                        push(methodSegment);
+                    }
                 }
+            } finally {
+                traceResolution();
             }
             return this;
         }
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
+            if (traceEnabled) {
+                traceMode.getTracer().ifPresent(tracer -> {
+                    tracer.traceBeanCreation(
+                        AbstractBeanResolutionContext.this,
+                        declaringType,
+                        beanType
+                    );
+                });
+            }
             return pushConstructorResolve(declaringType, beanType);
+        }
+
+        private void traceResolution() {
+            if (traceEnabled) {
+                getPath().currentSegment().ifPresent(segment -> traceMode.getTracer().ifPresent(tracer -> {
+                    tracer.traceInjectBean(
+                        AbstractBeanResolutionContext.this,
+                        segment
+                    );
+                }));
+            }
         }
 
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
-            Segment<?, ?> previous = peek();
-            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodInjectionPoint.getName(), argument,
+            try {
+                Segment<?, ?> previous = peek();
+                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodInjectionPoint.getName(), argument,
                     methodInjectionPoint.getArguments(), previous instanceof MethodSegment ms ? ms : null);
-            if (contains(methodSegment)) {
-                push(methodSegment);
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
-            } else {
-                push(methodSegment);
+                if (contains(methodSegment)) {
+                    push(methodSegment);
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
+                } else {
+                    push(methodSegment);
+                }
+            } finally {
+                traceResolution();
             }
 
             return this;
@@ -415,13 +671,41 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
-            Segment<?, ?> previous = peek();
-            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
-            if (contains(methodSegment)) {
-                push(methodSegment);
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
-            } else {
-                push(methodSegment);
+            try {
+                Segment<?, ?> previous = peek();
+                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
+                if (contains(methodSegment)) {
+                    push(methodSegment);
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
+                } else {
+                    push(methodSegment);
+                }
+            } finally {
+                traceResolution();
+            }
+
+            return this;
+        }
+
+        @Override
+        public Path pushEventListenerResolve(BeanDefinition<?> declaringType, Argument<?> eventType) {
+            try {
+                EventListenerSegment<?, ?> segment = new EventListenerSegment<>(
+                    declaringType,
+                    eventType
+                );
+                if (contains(segment)) {
+                    push(segment);
+                    throw new CircularDependencyException(
+                        AbstractBeanResolutionContext.this,
+                        eventType,
+                        CIRCULAR_ERROR_MSG
+                    );
+                } else {
+                    push(segment);
+                }
+            } finally {
+                traceResolution();
             }
 
             return this;
@@ -429,36 +713,48 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
-            FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldInjectionPoint.asArgument());
-            if (contains(fieldSegment)) {
-                push(fieldSegment);
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
-            } else {
-                push(fieldSegment);
+            try {
+                FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldInjectionPoint.asArgument());
+                if (contains(fieldSegment)) {
+                    push(fieldSegment);
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
+                } else {
+                    push(fieldSegment);
+                }
+            } finally {
+                traceResolution();
             }
             return this;
         }
 
         @Override
         public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument) {
-            FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldAsArgument);
-            if (contains(fieldSegment)) {
-                push(fieldSegment);
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
-            } else {
-                push(fieldSegment);
+            try {
+                FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldAsArgument);
+                if (contains(fieldSegment)) {
+                    push(fieldSegment);
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
+                } else {
+                    push(fieldSegment);
+                }
+            } finally {
+                traceResolution();
             }
             return this;
         }
 
         @Override
         public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
-            AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, getCurrentQualifier(), annotationMemberBeanAsArgument);
-            if (contains(annotationSegment)) {
-                push(annotationSegment);
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), CIRCULAR_ERROR_MSG);
-            } else {
-                push(annotationSegment);
+            try {
+                AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, getCurrentQualifier(), annotationMemberBeanAsArgument);
+                if (contains(annotationSegment)) {
+                    push(annotationSegment);
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), CIRCULAR_ERROR_MSG);
+                } else {
+                    push(annotationSegment);
+                }
+            } finally {
+                traceResolution();
             }
             return this;
         }
@@ -509,6 +805,29 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             super.push(segment);
             AbstractBeanResolutionContext.this.onNewSegment(segment);
         }
+
+        @Override
+        public void close() {
+            if (traceEnabled) {
+                traceMode.getTracer().ifPresent(tracer -> {
+                    if (isEmpty()) {
+                        tracer.traceBeanCreated(
+                            AbstractBeanResolutionContext.this,
+                            rootDefinition
+                        );
+                    } else {
+                        Segment<?, ?> segment = peek();
+                        if (segment != null) {
+                            tracer.traceInjectComplete(
+                                AbstractBeanResolutionContext.this,
+                                segment
+                            );
+                        }
+                    }
+                });
+            }
+            Path.super.close();
+        }
     }
 
     /**
@@ -536,15 +855,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     public static class ConstructorSegment extends AbstractSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object> {
 
+        private static final String ANN_ADAPTER = "io.micronaut.aop.Adapter";
         private final String methodName;
         private final Argument<Object>[] arguments;
 
         /**
          * @param declaringBeanDefinition The declaring class
-         * @param qualifier      The qualifier
-         * @param methodName     The methodName
-         * @param argument       The argument
-         * @param arguments      The arguments
+         * @param qualifier               The qualifier
+         * @param methodName              The methodName
+         * @param argument                The argument
+         * @param arguments               The arguments
          */
         ConstructorSegment(BeanDefinition<Object> declaringBeanDefinition, Qualifier<Object> qualifier, String methodName, Argument<Object> argument, Argument<Object>[] arguments) {
             super(declaringBeanDefinition, qualifier, declaringBeanDefinition.getBeanType().getName(), argument);
@@ -554,15 +874,40 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
+            return toConsoleString(false);
+        }
+
+        @NonNull
+        public String toConsoleString(boolean ansiSupported) {
             StringBuilder baseString;
-            if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
-                baseString = new StringBuilder("new ");
-                baseString.append(getDeclaringType().getBeanType().getSimpleName());
+            BeanDefinition<Object> declaringType = getDeclaringType();
+            TypeInformation<Object> typeInformation = declaringType.getTypeInformation();
+            if (declaringType.hasDeclaredStereotype(ANN_ADAPTER)) {
+                ExecutableMethod<Object, ?> method = declaringType.getExecutableMethods().iterator().next();
+                // Not great, but to produce accurate debug output we have to reach into AOP internals
+                Class<?> beanType = method.classValue(ANN_ADAPTER, "adaptedBean").orElse(declaringType.getBeanType());
+                String beanMethod = method.stringValue(ANN_ADAPTER, "adaptedMethod").orElse("unknown");
+                baseString = new StringBuilder(TypeFormat.getBeanTypeString(
+                    ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED,
+                    beanType,
+                    declaringType.asArgument().getTypeVariables(),
+                    declaringType.getAnnotationMetadata()
+                )).append(MEMBER_SEPARATOR);
+                baseString.append(beanMethod);
+            } else if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
+                baseString = new StringBuilder(
+                    ansiSupported ? AnsiColour.magentaBold("new ") : "new "
+                );
+                baseString.append(typeInformation.getBeanTypeString(
+                    ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED
+                ));
             } else {
-                baseString = new StringBuilder(getDeclaringType().getBeanType().getSimpleName()).append('.');
+                baseString = new StringBuilder(typeInformation.getBeanTypeString(
+                    ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED
+                )).append(MEMBER_SEPARATOR);
                 baseString.append(methodName);
             }
-            outputArguments(baseString, arguments);
+            outputArguments(baseString, arguments, ansiSupported);
             return baseString.toString();
         }
 
@@ -603,8 +948,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public MethodArgumentSegment(BeanDefinition<Object> declaringType,
                                      Qualifier<Object> qualifier,
                                      String methodName,
-                                     Argument<Object>  argument,
-                                     Argument<Object> [] arguments,
+                                     Argument<Object> argument,
+                                     Argument<Object>[] arguments,
                                      MethodSegment<Object, Object> outer) {
             super(declaringType, qualifier, methodName, argument, arguments);
             this.outer = outer;
@@ -620,16 +965,77 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
+            return toConsoleString(false);
+        }
+
+        @Override
+        public String toConsoleString(boolean ansiSupported) {
             BeanDefinition<?> declaringBean = getDeclaringBean();
             if (declaringBean.hasAnnotation(Factory.class)) {
-                ConstructorInjectionPoint<?> constructor = declaringBean.getConstructor();
-                var baseString = new StringBuilder(constructor.getDeclaringBeanType().getSimpleName()).append('.');
-                baseString.append(getName());
-                outputArguments(baseString, getArguments());
+                String beanDescription = declaringBean.getBeanDescription(
+                    ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED,
+                    false
+                );
+
+                var baseString = new StringBuilder(beanDescription);
+                String methodName = getName();
+                if (!CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
+                    String memberSeparator = ansiSupported ? AnsiColour.CYAN_BOLD + MEMBER_SEPARATOR + AnsiColour.RESET : MEMBER_SEPARATOR;
+                    baseString.append(memberSeparator);
+                    baseString.append(methodName);
+                }
+
+                outputArguments(baseString, getArguments(), ansiSupported);
                 return baseString.toString();
             } else {
-                return super.toString();
+                return super.toConsoleString(ansiSupported);
             }
+        }
+    }
+
+    /**
+     * Represents a segment that is an event listener.
+     *
+     * @param <B> The bean type
+     * @param <T> The event type
+     */
+    public static class EventListenerSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
+        /**
+         * @param declaringClass The declaring class
+         * @param eventType      The argument
+         */
+        EventListenerSegment(
+            BeanDefinition<B> declaringClass,
+            Argument<T> eventType) {
+            super(declaringClass, null, eventType.getName(), eventType);
+        }
+
+        @Override
+        public String toConsoleString(boolean ansiSupported) {
+            if (ansiSupported) {
+                String event = getArgument().getTypeString(TypeFormat.ANSI_SIMPLE);
+                return event + " ➡️  " +
+                    getDeclaringBean().getBeanDescription(TypeFormat.ANSI_SHORTENED);
+            } else {
+                String event = getArgument().getTypeString(TypeFormat.SIMPLE);
+                return event + " -> " +
+                    getDeclaringBean().getBeanDescription(TypeFormat.SHORTENED);
+            }
+        }
+
+        @Override
+        public InjectionPoint<B> getInjectionPoint() {
+            return this;
+        }
+
+        @Override
+        public Argument<?>[] getArguments() {
+            return new Argument[]{getArgument()};
+        }
+
+        @Override
+        public BeanDefinition<B> getDeclaringBean() {
+            return getDeclaringType();
         }
     }
 
@@ -641,11 +1047,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         private final Argument<Object>[] arguments;
 
         /**
-         * @param declaringType      The declaring type
-         * @param qualifier          The qualifier
-         * @param methodName         The method name
-         * @param argument           The argument
-         * @param arguments          The arguments
+         * @param declaringType The declaring type
+         * @param qualifier     The qualifier
+         * @param methodName    The method name
+         * @param argument      The argument
+         * @param arguments     The arguments
          */
         MethodSegment(BeanDefinition<B> declaringType, Qualifier<B> qualifier, String methodName, Argument<T> argument, Argument<Object>[] arguments) {
             super(declaringType, qualifier, methodName, argument);
@@ -654,9 +1060,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
-            StringBuilder baseString = new StringBuilder(getDeclaringType().getBeanType().getSimpleName()).append('.');
+            return toConsoleString(false);
+        }
+
+        @Override
+        public String toConsoleString(boolean ansiSupported) {
+            StringBuilder baseString = new StringBuilder(
+                getDeclaringType().getTypeInformation().getBeanTypeString(
+                    ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED
+                )
+            );
+            String memberSeparator = ansiSupported ? AnsiColour.CYAN_BOLD + MEMBER_SEPARATOR + AnsiColour.RESET : MEMBER_SEPARATOR;
+            baseString.append(memberSeparator);
             baseString.append(getName());
-            outputArguments(baseString, arguments);
+            outputArguments(baseString, arguments, ansiSupported);
             return baseString.toString();
         }
 
@@ -692,9 +1109,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public static final class FieldSegment<B, T> extends AbstractSegment<B, T> implements InjectionPoint<B>, ArgumentCoercible<T>, ArgumentInjectionPoint<B, T> {
 
         /**
-         * @param declaringClass     The declaring class
-         * @param qualifier          The qualifier
-         * @param argument           The argument
+         * @param declaringClass The declaring class
+         * @param qualifier      The qualifier
+         * @param argument       The argument
          */
         FieldSegment(BeanDefinition<B> declaringClass, Qualifier<B> qualifier, Argument<T> argument) {
             super(declaringClass, qualifier, argument.getName(), argument);
@@ -702,7 +1119,21 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
-            return getDeclaringType().getBeanType().getSimpleName() + "." + getName();
+            return toConsoleString(false);
+        }
+
+        @Override
+        public String toConsoleString(boolean ansiSupported) {
+            String beanDescription = getDeclaringType().getBeanDescription(
+                ansiSupported ? TypeFormat.ANSI_SHORTENED : TypeFormat.SHORTENED,
+                false
+            );
+            StringBuilder baseString = new StringBuilder(beanDescription);
+            String memberSeparator = ansiSupported ? AnsiColour.CYAN_BOLD + MEMBER_SEPARATOR + AnsiColour.RESET : MEMBER_SEPARATOR;
+            baseString.append(memberSeparator);
+            baseString.append(getName());
+
+            return baseString.toString();
         }
 
         @Override
@@ -782,6 +1213,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * Abstract class for a Segment.
      */
     protected abstract static class AbstractSegment<B, T> implements Segment<B, T>, Named {
+
+        /**
+         * The separator between a type and its member when printing to user.
+         */
+        protected static final String MEMBER_SEPARATOR = "#";
+
         private final BeanDefinition<B> declaringComponent;
         @Nullable
         private final Qualifier<B> qualifier;
@@ -799,6 +1236,32 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             this.qualifier = qualifier;
             this.name = name;
             this.argument = argument;
+        }
+
+        /**
+         * A common method for retrieving a name for type. The default behavior is to use the shortened type name.
+         *
+         * @param type The type
+         * @return The name to be shown to user
+         */
+        protected String getTypeName(Class<?> type) {
+            if (InterceptedBean.class.isAssignableFrom(type)) {
+                Class<?>[] interfaces = type.getInterfaces();
+                Set<String> interfaceNames = Arrays.stream(interfaces)
+                    .map(Class::getName)
+                    .collect(Collectors.toSet());
+                if (type.isInterface() && interfaceNames.contains("io.micronaut.aop.Introduced")) {
+                    return NameUtils.getShortenedName(
+                        interfaces[0].getTypeName()
+                    );
+                } else {
+                    return NameUtils.getShortenedName(
+                        type.getSuperclass().getTypeName()
+                    );
+                }
+            } else {
+                return NameUtils.getShortenedName(type.getTypeName());
+            }
         }
 
         @Override
@@ -841,26 +1304,46 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         /**
-         * @param baseString The base string
-         * @param arguments  The arguments
+         * @param baseString    The base string
+         * @param arguments     The arguments
+         * @param ansiSupported Whether ANSI colour is supported
          */
-        void outputArguments(StringBuilder baseString, Argument[] arguments) {
-            baseString.append('(');
+        void outputArguments(StringBuilder baseString, Argument[] arguments, boolean ansiSupported) {
+            baseString.append(ansiSupported ? AnsiColour.brightCyan("(") : "(");
             for (int i = 0; i < arguments.length; i++) {
                 Argument<?> argument = arguments[i];
                 boolean isInjectedArgument = argument.equals(getArgument());
                 if (isInjectedArgument) {
+                    if (ansiSupported) {
+                        baseString.append(AnsiColour.BLUE_UNDERLINED);
+                    }
                     baseString.append('[');
                 }
-                baseString.append(argument);
+                String beanTypeString = argument.getBeanTypeString(
+                    ansiSupported && !isInjectedArgument ? TypeFormat.ANSI_SIMPLE : TypeFormat.SIMPLE
+                );
+                baseString.append(beanTypeString)
+                    .append(' ')
+                    .append(ansiSupported && !isInjectedArgument ? AnsiColour.brightBlue(argument.getName()) : argument.getName());
                 if (isInjectedArgument) {
                     baseString.append(']');
+                    if (ansiSupported) {
+                        baseString.append(AnsiColour.RESET);
+                    }
                 }
+
                 if (i != arguments.length - 1) {
-                    baseString.append(',');
+                    Argument<?> next = arguments[i + 1];
+                    if (getDeclaringType().getBeanType().isSynthetic() &&
+                        next.getName().startsWith("$")) {
+                        // skip synthetic arguments
+                        break;
+                    }
+                    baseString.append(", ");
                 }
             }
-            baseString.append(')');
+            baseString.append(ansiSupported ? AnsiColour.brightCyan(")") : ")");
+
         }
     }
 }

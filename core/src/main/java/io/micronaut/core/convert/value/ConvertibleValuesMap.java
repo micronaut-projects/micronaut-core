@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -127,5 +128,10 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V>, Conversion
     @Override
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public void forEach(BiConsumer<String, V> action) {
+        map.forEach((k, v) -> action.accept(k.toString(), v));
     }
 }

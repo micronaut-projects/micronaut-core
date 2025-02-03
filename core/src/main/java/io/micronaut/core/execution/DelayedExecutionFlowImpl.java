@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -31,11 +32,13 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     /**
      * The head of the linked list of steps in this flow.
      */
-    private final Head head = new Head();
+    private Head head = new Head();
     /**
      * The tail of the linked list of steps in this flow.
      */
     private Step tail = head;
+    private Runnable onCancel;
+    private volatile boolean cancelled;
 
     /**
      * Perform the given step with the given item. Continue on until there is either no more steps,
@@ -53,16 +56,25 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         } while (step != null);
     }
 
+    @Override
+    public void completeFrom(@NonNull ExecutionFlow<T> flow) {
+        flow.onComplete(this::complete);
+    }
+
     /**
      * Complete with initial execution flow.
      *
      * @param executionFlow The execution flow
      */
     private void complete0(@NonNull ExecutionFlow<Object> executionFlow) {
+        if (head == null) {
+            throw new IllegalStateException("Delayed flow has been completed");
+        }
         Step immediateStep = head.atomicSetOutput(executionFlow);
         if (immediateStep != null) {
             work(immediateStep, executionFlow);
         }
+        head = null;
     }
 
     @Override
@@ -85,6 +97,11 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     @SuppressWarnings("unchecked")
     private <R> ExecutionFlow<R> next(Step next) {
         Step oldTail = tail;
+        if (oldTail instanceof DelayedExecutionFlowImpl.Cancel<?>) {
+            // because the Cancel step can only cancel flows upstream of it, we can't allow adding
+            // further downstream steps.
+            throw new IllegalStateException("Cannot add more ExecutionFlow steps after cancellation");
+        }
         tail = next;
         ExecutionFlow output = oldTail.atomicSetNext(next);
         if (output != null) {
@@ -123,6 +140,11 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         next(new OnComplete<>(fn));
     }
 
+    @Override
+    public void completeTo(CompletableFuture<T> completableFuture) {
+        next(new OnCompleteToFuture<>(completableFuture));
+    }
+
     @SuppressWarnings("unchecked")
     @Nullable
     @Override
@@ -135,7 +157,38 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         }
     }
 
-    private abstract static class Step<I, O> {
+    @Override
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    @Override
+    public void cancel() {
+        if (cancelled) {
+            return;
+        }
+        next(new Cancel());
+        cancelled = true;
+        Runnable hook = this.onCancel;
+        if (hook != null) {
+            hook.run();
+        }
+    }
+
+    @Override
+    public void onCancel(Runnable hook) {
+        Runnable prev = this.onCancel;
+        if (prev != null) {
+            this.onCancel = () -> {
+                prev.run();
+                hook.run();
+            };
+        } else {
+            this.onCancel = hook;
+        }
+    }
+
+    private abstract static sealed class Step<I, O> {
         /**
          * The next step to take, or {@code null} if there is no next step yet.
          */
@@ -332,6 +385,34 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
                 LOG.error("Failed to execute onComplete", e);
             }
             return executionFlow;
+        }
+    }
+
+    private static final class OnCompleteToFuture<E> extends Step<E, E> {
+        private final CompletableFuture<E> future;
+
+        public OnCompleteToFuture(CompletableFuture<E> future) {
+            this.future = future;
+        }
+
+        @Override
+        ExecutionFlow<E> apply(ExecutionFlow<E> executionFlow) {
+            try {
+                executionFlow.completeTo(future);
+            } catch (Exception e) {
+                LOG.error("Failed to execute onComplete", e);
+            }
+            return executionFlow;
+        }
+    }
+
+    private static final class Cancel<E> extends Step<E, E> {
+        private static final ExecutionFlow ERR = ExecutionFlow.error(new AssertionError("Should never be hit, no further steps are allowed after cancel"));
+
+        @Override
+        ExecutionFlow<E> apply(ExecutionFlow<E> input) {
+            input.cancel();
+            return ERR;
         }
     }
 }

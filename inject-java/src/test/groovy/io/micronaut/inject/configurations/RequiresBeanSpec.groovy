@@ -16,13 +16,16 @@
 package io.micronaut.inject.configurations
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.configurations.requiresbean.RequiresBean
 import io.micronaut.inject.configurations.requiresconditionfalse.GitHubActionsBean
 import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
 import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
 import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
+import org.atinject.jakartatck.auto.accessories.Cupholder
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.environment.Jvm
@@ -67,6 +70,40 @@ class RequiresBeanSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void "test that a bean configuration cannot disable internal package"() {
+        when:
+        ApplicationContext
+                .builder()
+                .beanConfigurations(BeanConfiguration.of(
+                        "io.micronaut.inject.configurations.requiresconditiontrue",
+                        {false}
+                ))
+                .start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message == 'Custom bean configurations cannot be added for internal Micronaut packages: io.micronaut.inject.configurations.requiresconditiontrue'
+    }
+
+    void "test runtime bean configuration condition returning #condition"() {
+        given:
+        def context = ApplicationContext
+                .builder()
+                .beanConfigurations(BeanConfiguration.of(
+                        "org.atinject.jakartatck.auto",
+                        {condition}
+                ))
+                .start()
+
+        expect:
+        context.containsBean(Cupholder) == present
+
+        where:
+        condition | present
+        false     | false
+        true      | true
     }
 
     void "test requires property when not present"() {

@@ -18,6 +18,7 @@ package io.micronaut.jackson.core.env;
 import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.MapPropertySource;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
@@ -35,7 +36,9 @@ import java.util.Set;
  *
  * @author Fabian Nonnenmacher
  * @since 2.0
+ * @deprecated CloudFoundry support should be added manually
  */
+@Deprecated(forRemoval = true)
 @Internal
 public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonPropertySourceLoader {
 
@@ -87,7 +90,7 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
     }
 
     @Override
-    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order) {
-        return super.createPropertySource("cloudfoundry-vcap-application", map, order);
+    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order, PropertySource.Origin origin) {
+        return super.createPropertySource("cloudfoundry-vcap-application", map, order, PropertySource.Origin.of("env.VCAP_APPLICATION"));
     }
 }

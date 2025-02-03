@@ -30,18 +30,18 @@ class PropertyCircularDependencyFailureSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        context.getBean(B)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         CircularDependencyException e = thrown()
         e.message == '''\
-Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B
+Failed to inject value for parameter [propA] of method [setPropA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$MyClassB
 
 Message: Circular dependency detected
 Path Taken:
-new B()
-      \\---> B.setA([A a])
-            ^  \\---> A.setB([B b])
+new @j.i.Singleton i.m.i.f.P$MyClassB()
+      \\---> @j.i.Singleton i.m.i.f.P$MyClassB#setPropA([MyClassA propA])
+            ^  \\---> @j.i.Singleton i.m.i.f.P$MyClassA#setPropB([MyClassB propB])
             |        |
             +--------+'''
 
@@ -50,12 +50,12 @@ new B()
     }
 
     @Singleton
-    static class A {
-        @Inject B b
+    static class MyClassA {
+        @Inject MyClassB propB
     }
 
     @Singleton
-    static class B {
-        @Inject A a
+    static class MyClassB {
+        @Inject MyClassA propA
     }
 }

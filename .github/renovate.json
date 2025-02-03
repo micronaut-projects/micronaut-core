@@ -1,24 +1,32 @@
 {
   "extends": [
-    "config:base"
+    "config:recommended"
   ],
-  "addLabels": ["type: dependency-upgrade"],
+  "addLabels": [
+    "type: dependency-upgrade"
+  ],
   "schedule": [
-    "after 10pm every day"
+    "after 10pm"
   ],
   "prHourlyLimit": 1,
   "prConcurrentLimit": 20,
   "timezone": "Europe/Prague",
   "packageRules": [
     {
-      "matchPackagePatterns": ["actions.*"],
       "dependencyDashboardApproval": true,
-      "matchUpdateTypes": ["patch"],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "matchCurrentVersion": "!/^0/",
-      "automerge": true
+      "automerge": true,
+      "matchPackageNames": [
+        "/actions.*/"
+      ]
     },
     {
-      "matchUpdateTypes": ["patch"],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
     }

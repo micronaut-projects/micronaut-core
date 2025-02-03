@@ -33,6 +33,17 @@ import java.util.Set;
 public interface BeanContextConfiguration {
 
     /**
+     * The debug mode for bean resolution.
+     *
+     * @since 4.8.0
+     * @see BeanResolutionTraceMode
+     * @return The bean resolution debug mode.
+     */
+    default @NonNull BeanResolutionTraceConfiguration getTraceConfiguration() {
+        return new BeanResolutionTraceConfiguration();
+    }
+
+    /**
      * @return If a {@link io.micronaut.context.exceptions.NoSuchBeanException} should be thrown on a missing {@link io.micronaut.context.BeanProvider} or {@link jakarta.inject.Provider}
      * @since 3.0.0
      */

@@ -13,7 +13,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.20"
     id("com.google.devtools.ksp") version "1.9.20-1.0.13"
     id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
-    id("io.micronaut.application") version "4.0.0"
+    id("io.micronaut.application") version "4.4.4" // get latest version from https://plugins.gradle.org/plugin/io.micronaut.application
 }
 version = "0.1"
 group = "example.micronaut"
@@ -56,13 +56,13 @@ To make the integration work, we have introduced an experimental KSP property `k
 .Kotlin All-Open plugin configuration
 [source, groovy]
 ----
-include::test-suite-kotlin-ksp-all-open/build.gradle[tags="allopen", indent=0]
+include::test-suite-kotlin-ksp-all-open/build.gradle.kts[tags="allopen", indent=0]
 ----
 
 .KSP configuration - repeat all the annotations that are included in Kotlin All-Open configuration
 [source, groovy]
 ----
-include::test-suite-kotlin-ksp-all-open/build.gradle[tags="ksp", indent=0]
+include::test-suite-kotlin-ksp-all-open/build.gradle.kts[tags="ksp", indent=0]
 ----
 
 NOTE: Kotlin All-Open plugin supports only class level annotations - it's not possible to open a class just by a method annotation

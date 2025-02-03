@@ -46,31 +46,42 @@ public final class ReactivePropagation {
      * @return propagation aware publisher
      */
     public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, Publisher<T> actual) {
-        if (actual instanceof CorePublisher) {
-            return new CorePublisher<>() {
-                @Override
-                public void subscribe(@NonNull CoreSubscriber<? super T> subscriber) {
-                    CorePublisher<T> actualCorePublisher = (CorePublisher<T>) actual;
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actualCorePublisher.subscribe(propagate(propagatedContext, subscriber));
-                    }
-                }
-
-                @Override
-                public void subscribe(Subscriber<? super T> subscriber) {
-                    if (subscriber instanceof CoreSubscriber<? super T> coreSubscriber) {
-                        subscribe(coreSubscriber);
-                        return;
-                    }
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actual.subscribe(propagate(propagatedContext, subscriber));
-                    }
-                }
-            };
+        if (actual instanceof CorePublisher<T> corePublisher) {
+            return propagate(propagatedContext, corePublisher);
         }
         return subscriber -> {
             try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                 actual.subscribe(propagate(propagatedContext, subscriber));
+            }
+        };
+    }
+    /**
+     * Creates propagation context aware {@link Publisher}.
+     *
+     * @param propagatedContext The context
+     * @param actual The publisher
+     * @param <T> The publisher element type
+     * @return propagation aware publisher
+     * @since 4.8
+     */
+    public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, CorePublisher<T> actual) {
+        return new CorePublisher<>() {
+            @Override
+            public void subscribe(@NonNull CoreSubscriber<? super T> subscriber) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    actual.subscribe(propagate(propagatedContext, subscriber));
+                }
+            }
+
+            @Override
+            public void subscribe(Subscriber<? super T> subscriber) {
+                if (subscriber instanceof CoreSubscriber<? super T> coreSubscriber) {
+                    subscribe(coreSubscriber);
+                    return;
+                }
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    actual.subscribe(propagate(propagatedContext, subscriber));
+                }
             }
         };
     }
@@ -89,10 +100,13 @@ public final class ReactivePropagation {
             @NonNull
             @Override
             public Context currentContext() {
+                Context ctx;
                 if (actual instanceof CoreSubscriber<T> actualSubscriber) {
-                    return actualSubscriber.currentContext();
+                    ctx = actualSubscriber.currentContext();
+                } else {
+                    ctx = Context.empty();
                 }
-                return CoreSubscriber.super.currentContext();
+                return ReactorPropagation.addPropagatedContext(ctx, propagatedContext);
             }
 
             @Override

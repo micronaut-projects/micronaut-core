@@ -12,7 +12,7 @@ class NettyBodyAdapterSpec extends Specification {
         def flux = Flux.just(Unpooled.EMPTY_BUFFER, Unpooled.wrappedBuffer(new byte[] {1, 2, 3}))
         def adapter = NettyBodyAdapter.adapt(flux, new EmbeddedChannel().eventLoop())
         def received = Unpooled.buffer()
-        def upstream = adapter.primary(new BufferConsumer() {
+        def upstream = adapter.primary(new ByteBufConsumer() {
             @Override
             void add(ByteBuf buf) {
                 received.writeBytes(buf)

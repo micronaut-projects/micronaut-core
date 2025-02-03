@@ -20,7 +20,6 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -38,6 +37,7 @@ import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -245,7 +245,7 @@ public class FilterErrorTest {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.then(chain.proceed(request),
-                httpResponse -> routeMatch.set(httpResponse.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).get()));
+                httpResponse -> routeMatch.set(RouteAttributes.getRouteMatch(httpResponse).get()));
         }
 
         @Override

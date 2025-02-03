@@ -36,6 +36,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
@@ -392,6 +393,20 @@ public class RequestFilterTest {
     }
 
     @Test
+    public void requestFilterRouteInfo() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/route-info"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("java.lang.String")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
     public void requestFilterRouteMatchNullable() throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -549,6 +564,11 @@ public class RequestFilterTest {
             request.setAttribute("route-match-response", routeMatch.getRouteInfo().getReturnType().getType().getName());
         }
 
+        @RequestFilter("/request-filter/route-info")
+        public void requestFilterRouteMatch(MutableHttpRequest<?> request, RouteInfo<?> routeInfo) {
+            request.setAttribute("route-info-response", routeInfo.getReturnType().getType().getName());
+        }
+
         @RequestFilter("/request-filter/route-match-nullable")
         public HttpResponse<?> requestFilterRouteMatchNullable(MutableHttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
             return HttpResponse.ok("route-match-nullable");
@@ -646,6 +666,11 @@ public class RequestFilterTest {
         @Get("/request-filter/route-match")
         public String requestFilterRouteMatch(HttpRequest<?> request) {
             return request.getAttribute("route-match-response", String.class).orElse("none");
+        }
+
+        @Get("/request-filter/route-info")
+        public String requestFilterRouteInfo(HttpRequest<?> request) {
+            return request.getAttribute("route-info-response", String.class).orElse("none");
         }
     }
 }

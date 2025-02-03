@@ -21,10 +21,13 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.BeanConfiguration;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * An interface for building an application context.
@@ -35,6 +38,39 @@ import java.util.Map;
  * @see ApplicationContext#builder()
  */
 public interface ApplicationContextBuilder {
+
+    /**
+     * Sets the trace mode for bean resolution.
+     * @param traceMode The debug mode
+     * @param classPatterns The patterns
+     * @since 4.8.0
+     * @see BeanResolutionTraceMode
+     * @return This builder
+     */
+    default @NonNull ApplicationContextBuilder beanResolutionTrace(
+        @NonNull BeanResolutionTraceMode traceMode,
+        String... classPatterns) {
+        Objects.requireNonNull(traceMode, "Trace mode cannot be null");
+        return beanResolutionTrace(
+            new BeanResolutionTraceConfiguration(
+                traceMode,
+                Set.of(classPatterns),
+                null
+            )
+        );
+    }
+
+    /**
+     * Sets the trace mode for bean resolution.
+     * @param configuration The trace configuration
+     * @since 4.8.0
+     * @see BeanResolutionTraceMode
+     * @return This builder
+     */
+    default @NonNull ApplicationContextBuilder beanResolutionTrace(
+        @NonNull BeanResolutionTraceConfiguration configuration) {
+        return this;
+    }
 
     /**
      * Whether to eager initialize {@link io.micronaut.context.annotation.ConfigurationProperties} beans.
@@ -107,6 +143,16 @@ public interface ApplicationContextBuilder {
      * @since 4.5.0
      */
     default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+        return this;
+    }
+
+    /**
+     * Register additional bean configurations.
+     * @param configurations The configurations.
+     * @return This builder
+     * @since 4.8.0
+     */
+    default @NonNull ApplicationContextBuilder beanConfigurations(@NonNull BeanConfiguration... configurations) {
         return this;
     }
 

@@ -22,9 +22,8 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
-
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Expression AST node for boolean literal.
@@ -41,8 +40,8 @@ public final class BoolLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        ctx.methodVisitor().push(value);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ExpressionDef.constant(value);
     }
 
     @Override
@@ -51,7 +50,7 @@ public final class BoolLiteral extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        return BOOLEAN;
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.Primitive.BOOLEAN;
     }
 }

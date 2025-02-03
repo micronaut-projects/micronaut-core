@@ -176,7 +176,13 @@ public class ConfigurationMetadataBuilder {
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = declaringType.getName();
         metadata.name = name;
-        metadata.path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
+        metadata.path = propertyType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
+            .orElseGet(() -> NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true));
+        if (propertyType.hasStereotype(ConfigurationReader.class)) {
+            metadata.path = ConfigurationUtils.getRequiredTypePath(propertyType);
+        } else {
+            metadata.path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
+        }
         metadata.type = propertyType.getType().getName();
         metadata.description = description;
         metadata.defaultValue = defaultValue;
@@ -192,7 +198,7 @@ public class ConfigurationMetadataBuilder {
      */
     @SuppressWarnings("MagicNumber")
     static String quote(String string) {
-        if (string == null || string.length() == 0) {
+        if (string == null || string.isEmpty()) {
             return "\"\"";
         }
 

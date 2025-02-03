@@ -303,7 +303,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     } catch (ElementPostponedToNextRoundException ignore) {
                         // Ignore, next round will redo
                     } catch (IOException e) {
-                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                        throw new ClassGenerationException("I/O error occurred during class: '" + className + "' generation: " + e.getMessage(), e);
+                    } catch (Throwable e) {
+                        throw new RuntimeException("Failed to generate class: '" + className + "': " + e.getMessage(), e);
                     }
                 });
 
@@ -390,7 +392,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);
-                writers.put(builderWriter.getBeanType().getClassName(), builderWriter);
+                writers.put(builderWriter.getBeanType().getName(), builderWriter);
             } else {
                 context.fail("No build method found in builder: " + builderType.getName(), classToBuild);
             }
@@ -464,7 +466,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         }
 
-        writers.put(writer.getBeanType().getClassName(), writer);
+        writers.put(writer.getBeanType().getName(), writer);
 
         addExecutableMethods(ce, writer, beanProperties);
     }

@@ -3,7 +3,7 @@ package io.micronaut.http.server.netty.filters
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Order
-import io.micronaut.http.HttpAttributes
+import io.micronaut.http.BasicHttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
@@ -18,6 +18,7 @@ import io.micronaut.http.server.annotation.PreMatching
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
+import io.micronaut.web.router.RouteAttributes
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
@@ -60,13 +61,13 @@ class ServerPreFilterSpec extends Specification {
         @PreMatching
         @RequestFilter
         void preMatchingRequest(HttpRequest<?> request) {
-            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent()) {
+            if (RouteAttributes.getRouteInfo(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent()) {
+            if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isPresent()) {
+            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
             events.add("prematching " + request.uri)
@@ -161,13 +162,13 @@ class ServerPreFilterSpec extends Specification {
         }
 
         private static void validateRoutes(HttpRequest<?> request) {
-            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent()) {
+            if (RouteAttributes.getRouteInfo(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent()) {
+            if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isPresent()) {
+            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
         }
@@ -202,13 +203,13 @@ class ServerPreFilterSpec extends Specification {
         @PreMatching
         @RequestFilter
         void preMatchingRequest(HttpRequest<?> request) {
-            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent()) {
+            if (RouteAttributes.getRouteInfo(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent()) {
+            if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isPresent()) {
+            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
             events.add("prematching " + request.uri)
@@ -335,25 +336,25 @@ class ServerPreFilterSpec extends Specification {
         @PreMatching
         @RequestFilter
         void preMatchingRequest(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
-            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isPresent()) {
+            if (RouteAttributes.getRouteInfo(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isPresent()) {
+            if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isPresent()) {
+            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
             events.add("prematching " + request.uri)
             def response = continuation.proceed()
             events.add("after prematching " + request.uri)
-            if (request.getAttribute(HttpAttributes.ROUTE_INFO).isEmpty()) {
+            if (RouteAttributes.getRouteInfo(request).isEmpty()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.ROUTE_MATCH).isEmpty()) {
+            if (RouteAttributes.getRouteMatch(request).isEmpty()) {
                 throw new IllegalStateException()
             }
-            if (request.getAttribute(HttpAttributes.URI_TEMPLATE).isEmpty()) {
+            if (BasicHttpAttributes.getUriTemplate(request).isEmpty()) {
                 throw new IllegalStateException()
             }
         }

@@ -20,7 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 
@@ -36,43 +37,39 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class RelationalOperator extends ExpressionNode permits GtOperator,
-                                                                               GteOperator,
-                                                                               LtOperator,
-                                                                               LteOperator {
-    protected final ExpressionNode leftOperand;
-    protected final ExpressionNode rightOperand;
+public final class RelationalOperator extends ExpressionNode {
+    private final ExpressionNode leftOperand;
+    private final ExpressionNode rightOperand;
+    private final ExpressionDef.ComparisonOperation.OpType type;
 
     private ExpressionNode comparisonOperation;
 
-    public RelationalOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
+    public RelationalOperator(ExpressionNode leftOperand,
+                              ExpressionNode rightOperand,
+                              ExpressionDef.ComparisonOperation.OpType type) {
         this.leftOperand = leftOperand;
         this.rightOperand = rightOperand;
+        this.type = type;
     }
 
-    protected abstract Integer intComparisonOpcode();
-
-    protected abstract Integer nonIntComparisonOpcode();
-
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        TypeDef leftType = leftOperand.resolveType(ctx);
+        TypeDef rightType = rightOperand.resolveType(ctx);
 
         if (isNumeric(leftType) && isNumeric(rightType)) {
             comparisonOperation = new NumericComparisonOperation(
-                leftOperand, rightOperand,
-                intComparisonOpcode(), nonIntComparisonOpcode());
+                    leftOperand, rightOperand, type);
         } else {
             comparisonOperation = new ComparablesComparisonOperation(
-                leftOperand, rightOperand, nonIntComparisonOpcode());
+                    leftOperand, rightOperand, type);
         }
 
         return comparisonOperation.resolveType(ctx);
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
-        comparisonOperation.compile(ctx);
+    public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return comparisonOperation.compile(ctx);
     }
 }

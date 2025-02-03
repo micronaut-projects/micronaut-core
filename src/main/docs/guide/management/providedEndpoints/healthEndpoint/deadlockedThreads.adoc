@@ -1,0 +1,51 @@
+The deadlocked threads health indicator uses the link:{jdkapi}/java.management/java/lang/management/ThreadMXBean.html[ThreadMXBean] to check for deadlocked threads and is part of the `/health` and `/health/liveness` endpoints.
+
+Its only configuration option is to enable or disable the indicator by the `endpoints.health.deadlocked-thread.enabled` key. It is enabled by default.
+
+WARNING: https://github.com/oracle/graal/issues/6101[`ThreadMXBean` is not supported in GraalVM Native Image]
+
+The health status is set to api:health.HealthStatus#DOWN[DOWN] if any deadlocked threads are found and their link:{jdkapi}/java.management/java/lang/management/ThreadInfo.html[ThreadInfo] including a formatted stacktrace are given in the details. See below for an example.
+
+[source,json]
+----
+{
+    "name": "example-app",
+    "status": "DOWN",
+    "details": {
+        "deadlockedThreads": {
+            "name": "example-app",
+            "status": "DOWN",
+            "details": [
+                {
+                    "threadId": "60",
+                    "threadName": "Thread-0",
+                    "threadState": "BLOCKED",
+                    "daemon": "false",
+                    "priority": "5",
+                    "suspended": "false",
+                    "inNative": "false",
+                    "lockName": "java.lang.Object@7d10b1ca",
+                    "lockOwnerName": "Thread-1",
+                    "lockOwnerId": "61",
+                    "lockedSynchronizers": [],
+                    "stackTrace": "app//com.example.Deadlock.lambda$new$0(Deadlock.java:27)\n-  blocked on java.lang.Object@7d10b1ca\n-  locked java.lang.Object@4505ea74\napp//com.example.Deadlock$$Lambda/0x000001906948b360.run(Unknown Source)\njava.base@21/java.lang.Thread.runWith(Thread.java:1596)\njava.base@21/java.lang.Thread.run(Thread.java:1583)\n"
+                },
+                {
+                    "threadId": "61",
+                    "threadName": "Thread-1",
+                    "threadState": "BLOCKED",
+                    "daemon": "false",
+                    "priority": "5",
+                    "suspended": "false",
+                    "inNative": "false",
+                    "lockName": "java.lang.Object@4505ea74",
+                    "lockOwnerName": "Thread-0",
+                    "lockOwnerId": "60",
+                    "lockedSynchronizers": [],
+                    "stackTrace": "app//com.example.Deadlock.lambda$new$1(Deadlock.java:43)\n-  blocked on java.lang.Object@4505ea74\n-  locked java.lang.Object@7d10b1ca\napp//com.example.Deadlock$$Lambda/0x000001906948b580.run(Unknown Source)\njava.base@21/java.lang.Thread.runWith(Thread.java:1596)\njava.base@21/java.lang.Thread.run(Thread.java:1583)\n"
+                }
+            ]
+        }
+    }
+}
+----

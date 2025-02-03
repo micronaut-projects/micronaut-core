@@ -102,6 +102,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      * @param httpHostResolver  HTTP Host resolver
+     * @param router  Router
      */
     @Inject
     public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,

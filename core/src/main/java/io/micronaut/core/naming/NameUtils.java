@@ -16,7 +16,9 @@
 package io.micronaut.core.naming;
 
 import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
@@ -35,13 +37,11 @@ public class NameUtils {
     private static final int IS_LENGTH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
-    private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
     private static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
-    private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
      * Checks whether the given name is a valid service identifier.
@@ -49,8 +49,17 @@ public class NameUtils {
      * @param name The name
      * @return True if it is
      */
-    public static boolean isHyphenatedLowerCase(String name) {
-        return StringUtils.isNotEmpty(name) && SERVICE_ID_REGEX.matcher(name).matches() && Character.isLetter(name.charAt(0));
+    public static boolean isHyphenatedLowerCase(@Nullable String name) {
+        if (name == null || name.isEmpty() || !Character.isLetter(name.charAt(0))) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLowerCase(c) && (c < '0' || c > '9') && c != '-') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -60,7 +69,7 @@ public class NameUtils {
      * @param suffixes The suffix to remove
      * @return The decapitalized name
      */
-    public static String decapitalizeWithoutSuffix(String name, String... suffixes) {
+    public static @NonNull String decapitalizeWithoutSuffix(@NonNull String name, String... suffixes) {
         String decapitalized = decapitalize(name);
         return trimSuffix(decapitalized, suffixes);
     }
@@ -72,7 +81,7 @@ public class NameUtils {
      * @param suffixes The suffixes
      * @return The trimmed string
      */
-    public static String trimSuffix(String string, String... suffixes) {
+    public static @NonNull String trimSuffix(@NonNull String string, String... suffixes) {
         if (suffixes != null) {
             for (String suffix : suffixes) {
                 if (string.endsWith(suffix)) {
@@ -89,7 +98,7 @@ public class NameUtils {
      * @param name The property name
      * @return The class name
      */
-    public static String capitalize(String name) {
+    public static @NonNull String capitalize(@NonNull String name) {
         final String rest = name.substring(1);
 
         // Funky rule so that names like 'pNAME' will still work.
@@ -106,7 +115,7 @@ public class NameUtils {
      * @param name The name
      * @return The hyphenated string
      */
-    public static String hyphenate(String name) {
+    public static @NonNull String hyphenate(@NonNull String name) {
         return hyphenate(name, true);
     }
 
@@ -117,12 +126,12 @@ public class NameUtils {
      * @param lowerCase Whether the result should be converted to lower case
      * @return The hyphenated string
      */
-    public static String hyphenate(String name, boolean lowerCase) {
+    public static @NonNull String hyphenate(@NonNull String name, boolean lowerCase) {
+        String kebabReplaced = name.replace('_', '-').replace(' ', '-');
         if (isHyphenatedLowerCase(name)) {
-            return KEBAB_REPLACEMENTS.matcher(name).replaceAll("-");
+            return kebabReplaced;
         } else {
-            char separatorChar = '-';
-            return separateCamelCase(KEBAB_REPLACEMENTS.matcher(name).replaceAll("-"), lowerCase, separatorChar);
+            return separateCamelCase(kebabReplaced, lowerCase, '-');
         }
     }
 
@@ -132,7 +141,7 @@ public class NameUtils {
      * @param name The hyphenated string
      * @return The camel case form
      */
-    public static String dehyphenate(String name) {
+    public static @NonNull String dehyphenate(@NonNull String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
             if (!token.isEmpty() && Character.isLetter(token.charAt(0))) {
@@ -151,7 +160,7 @@ public class NameUtils {
      * @param className The class name
      * @return The package name
      */
-    public static String getPackageName(String className) {
+    public static @NonNull String getPackageName(@NonNull String className) {
         Matcher matcher = DOT_UPPER.matcher(className);
         if (matcher.find()) {
             int position = matcher.start();
@@ -166,7 +175,7 @@ public class NameUtils {
      * @param camelCase The camel case name
      * @return The underscore separated version
      */
-    public static String underscoreSeparate(String camelCase) {
+    public static @NonNull String underscoreSeparate(@NonNull String camelCase) {
         return underscoreSeparate(camelCase, false);
     }
 
@@ -177,7 +186,7 @@ public class NameUtils {
      * @param lowercase true to lowercase the result
      * @return The underscore separated version
      */
-    public static String underscoreSeparate(String camelCase, boolean lowercase) {
+    public static @NonNull String underscoreSeparate(@NonNull String camelCase, boolean lowercase) {
         return separateCamelCase(camelCase.replace('-', '_'), lowercase, '_');
     }
 
@@ -187,7 +196,7 @@ public class NameUtils {
      * @param camelCase The camel case name
      * @return The underscore separated version
      */
-    public static String environmentName(String camelCase) {
+    public static @NonNull String environmentName(@NonNull String camelCase) {
         return separateCamelCase(camelCase.replace('-', '_').replace('.', '_'), false, '_')
             .toUpperCase(Locale.ENGLISH);
     }
@@ -198,7 +207,7 @@ public class NameUtils {
      * @param className The class name
      * @return The simple name of the class
      */
-    public static String getSimpleName(String className) {
+    public static @NonNull String getSimpleName(@NonNull String className) {
         Matcher matcher = DOT_UPPER.matcher(className);
         if (matcher.find()) {
             int position = matcher.start();
@@ -208,12 +217,47 @@ public class NameUtils {
     }
 
     /**
+     * Returns the shortened fully-qualified name for a class represented as a string.
+     * Shortened name would have package names and owner objects reduced to a single letter.
+     * For example, {@code com.example.Owner$Inner} would become {@code c.e.O$Inner}.
+     * IDEs would still be able to recognize these types, but they would take less space
+     * visually.
+     *
+     * @since 4.8.x
+     * @param typeName The fully-qualified type name
+     * @return The shortened type name
+     */
+    @Experimental
+    public static @NonNull String getShortenedName(@NonNull String typeName) {
+        int nameStart = typeName.lastIndexOf('$');
+        if (nameStart < 0) {
+            nameStart = typeName.lastIndexOf('.');
+        }
+        if (nameStart < 0) {
+            nameStart = 0;
+        }
+        StringBuilder shortened = new StringBuilder();
+        boolean segmentStart = true;
+        for (int i = 0; i < nameStart; i++) {
+            char c = typeName.charAt(i);
+            if (segmentStart) {
+                shortened.append(c);
+                segmentStart = false;
+            } else if (c == '.' || c == '$') {
+                shortened.append(c);
+                segmentStart = true;
+            }
+        }
+        return shortened.append(typeName.substring(nameStart)).toString();
+    }
+
+    /**
      * Is the given method name a valid setter name.
      *
      * @param methodName The method name
      * @return True if it is a valid setter name
      */
-    public static boolean isSetterName(String methodName) {
+    public static boolean isSetterName(@NonNull String methodName) {
         return isWriterName(methodName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
     }
 
@@ -264,7 +308,7 @@ public class NameUtils {
      * @param setterName The setter
      * @return The property name
      */
-    public static String getPropertyNameForSetter(String setterName) {
+    public static @NonNull String getPropertyNameForSetter(@NonNull String setterName) {
         return getPropertyNameForSetter(setterName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
     }
 
@@ -344,7 +388,7 @@ public class NameUtils {
      * @param methodName The method name
      * @return True if it is a valid getter name
      */
-    public static boolean isGetterName(String methodName) {
+    public static boolean isGetterName(@NonNull String methodName) {
         return isReaderName(methodName, AccessorsStyle.DEFAULT_READ_PREFIX);
     }
 
@@ -403,7 +447,7 @@ public class NameUtils {
      * @param getterName The getter
      * @return The property name
      */
-    public static String getPropertyNameForGetter(String getterName) {
+    public static @NonNull String getPropertyNameForGetter(@NonNull String getterName) {
         return getPropertyNameForGetter(getterName, AccessorsStyle.DEFAULT_READ_PREFIX);
     }
 
@@ -507,8 +551,8 @@ public class NameUtils {
         return nameFor(isBoolean ? PREFIX_IS : PREFIX_GET, propertyName);
     }
 
-    private static String nameFor(String prefix, @NonNull String propertyName) {
-        if (prefix.isEmpty()) {
+    private static @NonNull String nameFor(@Nullable String prefix, @NonNull String propertyName) {
+        if (StringUtils.isEmpty(prefix)) {
             return propertyName;
         }
 
@@ -534,7 +578,7 @@ public class NameUtils {
      * @param name The String to decapitalize
      * @return The decapitalized version of the String
      */
-    public static String decapitalize(String name) {
+    public static @Nullable String decapitalize(@Nullable String name) {
         if (name == null) {
             return null;
         }
@@ -565,12 +609,13 @@ public class NameUtils {
         return name;
     }
 
-    private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
-        StringBuilder newName = new StringBuilder();
+    static @NonNull String separateCamelCase(@NonNull String name, boolean lowerCase, char separatorChar) {
+        StringBuilder newName = new StringBuilder(name.length() + 4);
         if (!lowerCase) {
             boolean first = true;
             char last = '0';
-            for (char c : name.toCharArray()) {
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
                 if (first) {
                     if (c != separatorChar) {
                         // special case where first char == separatorChar, don't double it
@@ -599,12 +644,11 @@ public class NameUtils {
                 last = c;
             }
         } else {
-            char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
             char secondLast = separatorChar;
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
                     if (c != separatorChar) {
@@ -643,7 +687,7 @@ public class NameUtils {
      * @param filename The name of the file
      * @return The file extension
      */
-    public static String extension(String filename) {
+    public static @NonNull String extension(@NonNull String filename) {
         int extensionPos = filename.lastIndexOf('.');
         int lastUnixPos = filename.lastIndexOf('/');
         int lastWindowsPos = filename.lastIndexOf('\\');
@@ -662,7 +706,7 @@ public class NameUtils {
      * @param str The string
      * @return The new string in camel case
      */
-    public static String camelCase(String str) {
+    public static @NonNull String camelCase(@NonNull String str) {
         return camelCase(str, true);
     }
 
@@ -673,7 +717,7 @@ public class NameUtils {
      * @param lowerCaseFirstLetter Whether the first letter is in upper case or lower case
      * @return The new string in camel case
      */
-    public static String camelCase(String str, boolean lowerCaseFirstLetter) {
+    public static @NonNull String camelCase(@NonNull String str, boolean lowerCaseFirstLetter) {
         StringBuilder sb = new StringBuilder(str.length());
         for (String s : str.split("[\\s_-]")) {
             String capitalize = capitalize(s);
@@ -693,7 +737,7 @@ public class NameUtils {
      * @param path The path of the file
      * @return The file name without extension
      */
-    public static String filename(String path) {
+    public static @NonNull String filename(@NonNull String path) {
         int extensionPos = path.lastIndexOf('.');
         int lastUnixPos = path.lastIndexOf('/');
         int lastWindowsPos = path.lastIndexOf('\\');
@@ -712,7 +756,7 @@ public class NameUtils {
      * @param str The string to check
      * @return Whether is valid kebab-case or not
      */
-    public static boolean isValidHyphenatedPropertyName(String str) {
+    public static boolean isValidHyphenatedPropertyName(@NonNull String str) {
         return KEBAB_CASE_SEQUENCE.matcher(str).matches();
     }
 
@@ -722,7 +766,7 @@ public class NameUtils {
      * @param str The string to check
      * @return Whether is valid environment-style property name or not
      */
-    public static boolean isEnvironmentName(String str) {
+    public static boolean isEnvironmentName(@NonNull String str) {
         return ENVIRONMENT_VAR_SEQUENCE.matcher(str).matches();
     }
 

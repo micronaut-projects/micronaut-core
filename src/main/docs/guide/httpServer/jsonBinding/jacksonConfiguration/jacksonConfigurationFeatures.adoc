@@ -1,3 +1,6 @@
+:jackson-core: https://fasterxml.github.io/jackson-core/javadoc/2.9/
+:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
+
 If you use <<jsonBinding, `micronaut-jackson-databind`>>, all Jackson's features can be configured with their name as the key and a boolean to indicate enabled or disabled.
 
 |======

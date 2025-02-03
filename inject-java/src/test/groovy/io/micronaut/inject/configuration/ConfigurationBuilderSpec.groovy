@@ -215,4 +215,248 @@ interface Foo {
         ctx.close()
     }
 
+    void "test @Inject with nested configurationProperties"() {
+        given:
+        ApplicationContext ctx = buildContext("test.NestedConfig", '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import jakarta.inject.Inject;
+
+@ConfigurationProperties("product-aggregator")
+class NestedConfig {
+
+    @Inject
+    LevelOne levelOnez = new LevelOne();
+
+    public LevelOne getLevelOnez() {
+        return levelOnez;
+    }
+
+    public void setLevelOnez(LevelOne levelOnez) {
+        this.levelOnez = levelOnez;
+    }
+
+    @ConfigurationProperties("level-one")
+    static class LevelOne {
+
+        String levelOneValue;
+
+        @Inject
+        LevelTwo levelTwo = new LevelTwo();
+
+        public String getLevelOneValue() {
+            return levelOneValue;
+        }
+
+        public void setLevelOneValue(String levelOneValue) {
+            this.levelOneValue = levelOneValue;
+        }
+
+        public LevelTwo getLevelTwo() {
+            return levelTwo;
+        }
+
+        public void setLevelTwo(LevelTwo levelTwo) {
+            this.levelTwo = levelTwo;
+        }
+
+        @ConfigurationProperties("level-two")
+        static class LevelTwo {
+
+            private String levelTwoValue;
+
+            public String getLevelTwoValue() {
+                return levelTwoValue;
+            }
+
+            public void setLevelTwoValue(String levelTwoValue) {
+                this.levelTwoValue = levelTwoValue;
+            }
+        }
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of([
+                'product-aggregator.level-one.level-one-value': 'ONE',
+                'product-aggregator.level-one.level-two.level-two-value': 'TWO',
+        ]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("test.NestedConfig")
+        def testPropBean = ctx.getBean(testProps)
+        def definition = ctx.getBeanDefinition(testProps)
+
+        then:
+        noExceptionThrown()
+
+        definition.properties.injectedFields.size() == 1
+        definition.properties.injectedFields[0].name == "levelOnez"
+
+        testPropBean.getLevelOnez().getLevelOneValue() == "ONE"
+        testPropBean.getLevelOnez().getLevelTwo()
+        testPropBean.getLevelOnez().getLevelTwo().getLevelTwoValue() == "TWO"
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test @Inject with nested configurationProperties - method injection"() {
+        given:
+        ApplicationContext ctx = buildContext("test.NestedConfig", '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Nullable;import jakarta.inject.Inject;
+
+@ConfigurationProperties("product-aggregator")
+class NestedConfig {
+
+    private LevelOne levelOnez = new LevelOne();
+
+    public LevelOne getLevelOnez() {
+        return levelOnez;
+    }
+
+    public void setLevelOnez(LevelOne levelOnez) {
+        this.levelOnez = levelOnez;
+    }
+
+    @ConfigurationProperties("level-one")
+    static class LevelOne {
+
+        String levelOneValue;
+
+        @Inject
+        LevelTwo levelTwo = new LevelTwo();
+
+        public String getLevelOneValue() {
+            return levelOneValue;
+        }
+
+        public void setLevelOneValue(String levelOneValue) {
+            this.levelOneValue = levelOneValue;
+        }
+
+        public LevelTwo getLevelTwo() {
+            return levelTwo;
+        }
+
+        public void setLevelTwo(LevelTwo levelTwo) {
+            this.levelTwo = levelTwo;
+        }
+
+        @ConfigurationProperties("level-two")
+        static class LevelTwo {
+
+            private String levelTwoValue;
+
+            public String getLevelTwoValue() {
+                return levelTwoValue;
+            }
+
+            public void setLevelTwoValue(String levelTwoValue) {
+                this.levelTwoValue = levelTwoValue;
+            }
+        }
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of([
+                'product-aggregator.level-one.level-one-value': 'ONE',
+                'product-aggregator.level-one.level-two.level-two-value': 'TWO',
+        ]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("test.NestedConfig")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+
+        testPropBean.getLevelOnez().getLevelOneValue() == "ONE"
+        testPropBean.getLevelOnez().getLevelTwo()
+        testPropBean.getLevelOnez().getLevelTwo().getLevelTwoValue() == "TWO"
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test @Inject with nested configurationProperties - field only"() {
+        given:
+        ApplicationContext ctx = buildContext("test.NestedConfig", '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import jakarta.inject.Inject;
+
+@ConfigurationProperties("product-aggregator")
+class NestedConfig {
+
+    @Inject
+    LevelOne levelOnez = new LevelOne();
+
+    @ConfigurationProperties("level-one")
+    static class LevelOne {
+
+        String levelOneValue;
+
+        @Inject
+        LevelTwo levelTwo = new LevelTwo();
+
+        public String getLevelOneValue() {
+            return levelOneValue;
+        }
+
+        public void setLevelOneValue(String levelOneValue) {
+            this.levelOneValue = levelOneValue;
+        }
+
+        public LevelTwo getLevelTwo() {
+            return levelTwo;
+        }
+
+        public void setLevelTwo(LevelTwo levelTwo) {
+            this.levelTwo = levelTwo;
+        }
+
+        @ConfigurationProperties("level-two")
+        static class LevelTwo {
+
+            private String levelTwoValue;
+
+            public String getLevelTwoValue() {
+                return levelTwoValue;
+            }
+
+            public void setLevelTwoValue(String levelTwoValue) {
+                this.levelTwoValue = levelTwoValue;
+            }
+        }
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of([
+                'product-aggregator.level-one.level-one-value': 'ONE',
+                'product-aggregator.level-one.level-two.level-two-value': 'TWO',
+        ]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("test.NestedConfig")
+        def testPropBean = ctx.getBean(testProps)
+        def definition = ctx.getBeanDefinition(testProps)
+
+        then:
+        noExceptionThrown()
+
+        definition.properties.injectedFields.size() == 1
+        definition.properties.injectedFields[0].name == "levelOnez"
+
+        testPropBean.levelOnez.getLevelOneValue() == "ONE"
+        testPropBean.levelOnez.getLevelTwo()
+        testPropBean.levelOnez.getLevelTwo().getLevelTwoValue() == "TWO"
+
+        cleanup:
+        ctx.close()
+    }
 }

@@ -27,6 +27,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
@@ -219,23 +220,20 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
     @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        ByteArrayOutputStream stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, null, toWrite, true)
-                .writeTo(stream)
+        byte[] bytecode = AnnotationMetadataWriter.write(className, toWrite)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    byte[] bytes = stream.toByteArray()
+                    byte[] bytes = bytecode
                     return super.defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
             }
         }
 
-        AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
-        return metadata
+        return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
     }
 
     /**

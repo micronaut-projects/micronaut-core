@@ -82,6 +82,19 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Registers a bean configuration. This allows disabling a set of beans based on a condition.
+     *
+     * @param configuration The configuration
+     * @return The registry
+     * @since 4.8.0
+     */
+    @NonNull
+    @Experimental
+    default BeanDefinitionRegistry registerBeanConfiguration(BeanConfiguration configuration) {
+        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support runtime registration of bean configurations");
+    }
+
+    /**
      * Registers a new reference at runtime. Not that registering beans can impact
      * the object graph therefore should this should be done as soon as possible prior to
      * the creation of other beans preferably with a high priority {@link io.micronaut.context.annotation.Context} scope bean.

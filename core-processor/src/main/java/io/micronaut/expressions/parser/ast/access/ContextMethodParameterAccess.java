@@ -17,19 +17,16 @@ package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
-
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
-import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Expression AST node used for context method parameter access.
@@ -40,9 +37,8 @@ import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
 @Internal
 final class ContextMethodParameterAccess extends ExpressionNode {
 
-    private static final Method GET_ARGUMENT_METHOD =
-        new Method("getArgument", Type.getType(Object.class),
-            new Type[]{TypeDescriptors.INT});
+    private static final java.lang.reflect.Method GET_ARGUMENT_METHOD =
+        ReflectionUtils.getRequiredMethod(ExpressionEvaluationContext.class, "getArgument", int.class);
 
     private final ParameterElement parameterElement;
 
@@ -53,19 +49,10 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-        mv.loadArg(0);
-        mv.push(parameterIndex);
-        // invoke getArgument method
-        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_ARGUMENT_METHOD);
-        if (nodeType != null) {
-            if (TypeDescriptors.isPrimitive(nodeType)) {
-                mv.unbox(nodeType);
-            } else {
-                mv.checkCast(nodeType);
-            }
-        }
+    protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
+        return ctx.expressionEvaluationContextVar().
+            invoke(GET_ARGUMENT_METHOD, ExpressionDef.constant(parameterIndex))
+            .cast(TypeDef.erasure(parameterElement.getType()));
     }
 
     @Override
@@ -92,8 +79,8 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
         doResolveClassElement(ctx);
-        return getTypeReference(parameterElement.getType());
+        return TypeDef.erasure(parameterElement.getType());
     }
 }

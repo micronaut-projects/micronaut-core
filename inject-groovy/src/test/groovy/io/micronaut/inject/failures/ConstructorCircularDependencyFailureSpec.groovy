@@ -31,7 +31,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        MyClassB b =  context.getBean(MyClassB)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
@@ -40,10 +40,10 @@ Failed to inject value for field [propA] of class: io.micronaut.inject.failures.
 
 Message: Circular dependency detected
 Path Taken:
-new MyClassB()
-      \\---> MyClassB.propA
-            ^  \\---> new MyClassA([MyClassC propC])
-            |        \\---> new MyClassC([MyClassB propB])
+new @j.i.Singleton i.m.i.f.C$MyClassB()
+      \\---> @j.i.Singleton i.m.i.f.C$MyClassB#propA
+            ^  \\---> new @j.i.Singleton i.m.i.f.C$MyClassA([MyClassC propC])
+            |        \\---> new i.m.i.f.C$MyClassC([MyClassB propB])
             |              |
             +--------------+'''
 
@@ -65,11 +65,11 @@ Failed to inject value for field [propA] of class: io.micronaut.inject.failures.
 
 Message: Circular dependency detected
 Path Taken:
-new MyClassD(MyClassB propB)
-      \\---> new MyClassD([MyClassB propB])
-            \\---> MyClassB.propA
-                  ^  \\---> new MyClassA([MyClassC propC])
-                  |        \\---> new MyClassC([MyClassB propB])
+new @j.i.Singleton i.m.i.f.C$MyClassD(MyClassB propB)
+      \\---> new @j.i.Singleton i.m.i.f.C$MyClassD([MyClassB propB])
+            \\---> @j.i.Singleton i.m.i.f.C$MyClassB#propA
+                  ^  \\---> new @j.i.Singleton i.m.i.f.C$MyClassA([MyClassC propC])
+                  |        \\---> new i.m.i.f.C$MyClassC([MyClassB propB])
                   |              |
                   +--------------+'''
     }

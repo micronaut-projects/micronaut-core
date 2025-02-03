@@ -18,11 +18,13 @@ package io.micronaut.http.bind.binders;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -59,6 +61,16 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
                 unmatchedArgumentBinders.stream(),
                 internalPostUnmatchedArgumentBinders.stream()
             )
+        );
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        Function<RequestArgumentBinder<Object>, RequestArgumentBinder<Object>> createSpecific = b -> b.createSpecific((Argument<Object>) argument);
+        return new DefaultUnmatchedRequestArgumentBinder<>(
+            internalPreUnmatchedArgumentBinders.stream().map(createSpecific).toList(),
+            unmatchedArgumentBinders.stream().map(createSpecific).toList(),
+            internalPostUnmatchedArgumentBinders.stream().map(createSpecific).toList()
         );
     }
 

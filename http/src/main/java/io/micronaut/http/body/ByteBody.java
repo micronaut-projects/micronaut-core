@@ -138,7 +138,24 @@ public interface ByteBody {
      *
      * @return A future that completes when all bytes are available
      */
+    @NonNull
     CompletableFuture<? extends CloseableAvailableByteBody> buffer();
+
+    /**
+     * Create a new {@link CloseableByteBody} with the same content but an independent lifecycle,
+     * claiming this body in the process.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     * <p>The purpose of this method is to <i>move</i> the data to a different component in an
+     * application, making clear that the receiving component claims ownership of the body. If the
+     * sending component then closes the original {@link ByteBody} for example, it will have no
+     * impact on the new {@link CloseableByteBody} that the receiver is working with.
+     *
+     * @return A new {@link CloseableByteBody} with the same content.
+     * @since 4.8.0
+     */
+    @NonNull
+    CloseableByteBody move();
 
     /**
      * This enum controls how backpressure should be handled if one of the two bodies

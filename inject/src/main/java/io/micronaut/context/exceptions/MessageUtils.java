@@ -60,7 +60,7 @@ class MessageUtils {
         }
         if (hasPath) {
             String pathString = path.toString();
-            builder.append("Path Taken: ").append(pathString);
+            builder.append("Path Taken:").append(pathString);
         }
         return builder.toString();
     }
@@ -176,7 +176,7 @@ class MessageUtils {
     private static void appendPath(boolean circular, StringBuilder builder, String ls, BeanResolutionContext.Path path) {
         builder.append("Path Taken:");
         if (circular) {
-            builder.append(ls).append(path.toCircularString());
+            builder.append(ls).append(path.toConsoleCircularString(false));
         } else {
             builder.append(" ").append(path);
         }

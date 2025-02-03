@@ -1,0 +1,37 @@
+The netty client uses a _connection pool_ to share HTTP connections between requests for greater efficiency. The pools
+are scoped by service (the service ID you can configure in the `@Client` annotation), and by authority (host and port),
+so if you configure e.g. the maximum number of connections, what is meant is the number of connections _per host_.
+
+You can configure the pool through the `micronaut.http.client.pool.\*` properties or, for specific services, via
+`micronaut.http.services.*.pool.*`. I'll only mention the simple property name from here on.
+
+HTTP/1.1 and HTTP/2.0 connections are handled and configured separately, because the latter can handle many concurrent
+requests on the same connection. For the purposes of pooling, HTTP/3 connections are treated as HTTP/2.0 connections.
+
+When a request is initiated, it is added to a _pending request queue_. The maximum size of this queue is configured
+with `max-pending-acquires`, the default is no limit. If the limit is exceeded, the request is rejected. You can also
+configure an `acquire-timeout` (no timeout by default).
+
+Once a request is in the pending request queue, it is dispatched to an existing connection. If all connections are
+busy but there are still pending requests, a decision is made on whether to create new connections:
+
+* The maximum number of pending connections (i.e. connections that are still being established) may not exceed
+`max-pending-connections` (default: 4).
+* For HTTP/1.1, the maximum number of connections may not exceed `max-concurrent-http1-connections` (no limit by
+default).
+* For HTTP/2.0, the maximum number of connections may not exceed `max-concurrent-http2-connections` (default: 1).
+* There will be at most as many pending connections as there are pending requests.
+
+The HTTP version is determined by any existing connections in the pool. If the pool is empty, both limits apply, so by
+default only one connection is opened at first. For HTTP/2.0, there is also a
+`max-concurrent-requests-per-http2-connection` setting that controls how many requests may run on the same HTTP/2.0
+connection simultaneously.
+
+Note that a pending connection is not actually associated to a request until it is fully established. A pending request
+may time out, but the connection that was created for it will still enter the pool and may be used by another request.
+
+Once a connection is in the pool, there are multiple ways it may terminate and exit the pool. During a request, the
+connection may see a read timeout configured by `read-timeout`. When the connection is idle (no request), a similar
+read timeout can be configured by `connection-pool-idle-timeout`. A fixed maximum connection lifetime may be configured
+using `connect-ttl`, after which the connection will wind down (no new request will be sent and the connection will
+terminate after all requests are done). Certain HTTP errors may also lead to a connection shutdown for safety.

@@ -2,6 +2,7 @@ package io.micronaut.inject.field
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.BeanResolutionTraceMode
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.exceptions.BeanContextException
@@ -15,7 +16,9 @@ class FieldInjectionSpec extends Specification {
 
     void "test bean injection via private field"() {
         given:
-        BeanContext context = ApplicationContext.run()
+        BeanContext context = ApplicationContext.builder()
+            .beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT)
+            .start()
 
         when:"A bean is obtained that has a setter with @Inject"
         C c =  context.getBean(C)

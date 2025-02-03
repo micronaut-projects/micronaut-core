@@ -1,6 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory
+
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
@@ -8,6 +8,7 @@ import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.netty.body.AvailableNettyByteBody
 import io.micronaut.http.netty.body.NettyBodyAdapter
 import io.micronaut.http.netty.body.NettyByteBody
+import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
@@ -351,7 +352,7 @@ class Http2ServerHandlerSpec extends Specification {
                         read++
                         return 1
                     }
-                }, OptionalLong.empty(), service, NettyByteBufferFactory.DEFAULT))
+                }, OptionalLong.empty(), service, new NettyByteBodyFactory(ctx.channel())))
             }
 
             @Override
