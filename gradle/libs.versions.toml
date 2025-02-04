@@ -63,7 +63,7 @@ tomlj="1.1.1"
 vertx = "4.5.12"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "1.6.1"
+micronaut-sourcegen = "1.6.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
