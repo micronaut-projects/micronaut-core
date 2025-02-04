@@ -23,6 +23,10 @@ dependencies {
     testImplementation(projects.micronautCoreReactive)
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(libs.logback.classic)
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation(libs.junit.jupiter.api)
 
 }
 
