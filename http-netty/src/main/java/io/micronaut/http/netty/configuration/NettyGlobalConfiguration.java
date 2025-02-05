@@ -29,9 +29,15 @@ import io.netty.util.ResourceLeakDetector;
 @ConfigurationProperties("netty")
 @BootstrapContextCompatible
 public class NettyGlobalConfiguration {
+
     private static final boolean DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING = true;
+    private static final boolean DEFAULT_THREAD_FACTORY_DAEMON = false;
+    private static final int DEFAULT_THREAD_FACTORY_PRIORITY = Thread.NORM_PRIORITY;
+
     private ResourceLeakDetector.Level resourceLeakDetectorLevel;
     private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
+    private boolean defaultThreadFactoryDaemon = DEFAULT_THREAD_FACTORY_DAEMON;
+    private int defaultThreadFactoryPriority = DEFAULT_THREAD_FACTORY_PRIORITY;
 
     /**
      * Sets the resource leak detection level.
@@ -53,7 +59,7 @@ public class NettyGlobalConfiguration {
     }
 
     /**
-     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}.
      * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
      * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
      *
@@ -64,7 +70,7 @@ public class NettyGlobalConfiguration {
     }
 
     /**
-     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING}.
      * If {@code true}, netty event loop threads will implement project reactor {@link reactor.core.scheduler.NonBlocking} by default.
      * Because of that, any Project Reactor's blocking operations throw an exception on those threads.
      *
@@ -73,5 +79,46 @@ public class NettyGlobalConfiguration {
      */
     public void setDefaultThreadFactoryReactorNonBlocking(boolean defaultThreadFactoryReactorNonBlocking) {
         this.defaultThreadFactoryReactorNonBlocking = defaultThreadFactoryReactorNonBlocking;
+    }
+
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_DAEMON}.
+     *
+     * @return defaultThreadFactoryDaemon are created threads will be a daemon or not
+     */
+    public boolean isDefaultThreadFactoryDaemon() {
+        return defaultThreadFactoryDaemon;
+    }
+
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_DAEMON}.
+     *
+     * @param defaultThreadFactoryDaemon are created threads will be a daemon or not
+     */
+    public void setDefaultThreadFactoryDaemon(boolean defaultThreadFactoryDaemon) {
+        this.defaultThreadFactoryDaemon = defaultThreadFactoryDaemon;
+    }
+
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_DAEMON}.
+     *
+     * @return defaultThreadFactoryPriority created threads priority
+     */
+    public int getDefaultThreadFactoryPriority() {
+        return defaultThreadFactoryPriority;
+    }
+
+    /**
+     * Default value: {@value #DEFAULT_THREAD_FACTORY_DAEMON}.
+     * Minimum value: {@value Thread.MIN_PRIORITY}, maximum value: {@value Thread.MAX_PRIORITY}
+     *
+     * @param defaultThreadFactoryPriority created threads priority
+     */
+    public void setDefaultThreadFactoryPriority(int defaultThreadFactoryPriority) {
+        if (defaultThreadFactoryPriority < Thread.MIN_PRIORITY || defaultThreadFactoryPriority > Thread.MAX_PRIORITY) {
+            throw new IllegalArgumentException("defaultThreadFactoryPriority: " + defaultThreadFactoryPriority + " (expected: Thread.MIN_PRIORITY <= defaultThreadFactoryPriority <= Thread.MAX_PRIORITY)");
+        }
+
+        this.defaultThreadFactoryPriority = defaultThreadFactoryPriority;
     }
 }

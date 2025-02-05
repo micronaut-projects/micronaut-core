@@ -21,7 +21,9 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
-import org.objectweb.asm.Type;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.TypeDef;
 
 /**
  * Abstract evaluated expression AST node.
@@ -32,7 +34,7 @@ import org.objectweb.asm.Type;
 @Internal
 public abstract class ExpressionNode {
 
-    protected Type nodeType;
+    protected TypeDef nodeType;
     protected ClassElement classElement;
 
     /**
@@ -40,18 +42,20 @@ public abstract class ExpressionNode {
      * Node compilation includes type resolution and bytecode generation.
      *
      * @param ctx expression compilation context
+     * @return The expression definition
      */
-    public final void compile(@NonNull ExpressionCompilationContext ctx) {
+    public final ExpressionDef compile(@NonNull ExpressionCompilationContext ctx) {
         resolveType(ctx);
-        generateBytecode(ctx);
+        return generateExpression(ctx);
     }
 
     /**
      * Generates bytecode for this AST node.
      *
      * @param ctx expression compilation context
+     * @return The expression definition
      */
-    protected abstract void generateBytecode(@NonNull ExpressionCompilationContext ctx);
+    protected abstract ExpressionDef generateExpression(@NonNull ExpressionCompilationContext ctx);
 
     /**
      * On resolution stage type information is collected and node validity is checked. Once type
@@ -62,7 +66,7 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
-    public final Type resolveType(@NonNull ExpressionVisitorContext ctx) {
+    public final TypeDef resolveType(@NonNull ExpressionVisitorContext ctx) {
         if (nodeType == null) {
             nodeType = doResolveType(ctx);
         }
@@ -78,7 +82,7 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
-    public final Type resolveType(@NonNull ExpressionCompilationContext ctx) {
+    public final TypeDef resolveType(@NonNull ExpressionCompilationContext ctx) {
         return resolveType(ctx.evaluationVisitorContext());
     }
 
@@ -117,12 +121,17 @@ public abstract class ExpressionNode {
      * @return The resolved type
      */
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        Type type = doResolveType(ctx);
-        try {
-            return PrimitiveElement.valueOf(type.getClassName());
-        } catch (IllegalArgumentException e) {
-            return ClassElement.of(type.getClassName());
+        TypeDef type = doResolveType(ctx);
+        if (type instanceof TypeDef.Primitive primitive) {
+            return PrimitiveElement.valueOf(primitive.name());
         }
+        if (type instanceof ClassTypeDef.ClassElementType classElementType) {
+            return classElementType.classElement();
+        }
+        if (type instanceof ClassTypeDef classTypeDef) {
+            return ctx.visitorContext().getClassElement(classTypeDef.getName()).orElseThrow();
+        }
+        throw new IllegalArgumentException("Unsupported type: " + type);
     }
 
     /**
@@ -142,5 +151,7 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
-    protected abstract Type doResolveType(@NonNull ExpressionVisitorContext ctx);
+    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+        return TypeDef.erasure(doResolveClassElement(ctx));
+    }
 }

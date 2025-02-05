@@ -14,42 +14,32 @@ import org.junit.jupiter.api.Test;
 import java.util.Locale;
 import java.util.Optional;
 
+import static io.micronaut.core.order.Ordered.HIGHEST_PRECEDENCE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Property(name = "spec.name", value = "CompositeMessageSourceTest")
 @MicronautTest(startApplication = false)
 class CompositeMessageSourceTest {
+    private static final Locale SPANISH = new Locale("es", "ES");
 
     @Test
     void messageSourcesAreSorted(MessageSource messageSource) {
         String code = "jakarta.validation.constraints.Positive.message";
-        assertEquals("Must be positive", messageSource.getMessage(code, Locale.ENGLISH).get());
+        Optional<String> messageOptional = messageSource.getMessage(code, Locale.ENGLISH);
+        assertTrue(messageOptional.isPresent());
+        assertEquals("Must be positive", messageOptional.get());
+        messageOptional = messageSource.getMessage(code, SPANISH);
+        assertTrue(messageOptional.isPresent());
+        assertEquals("Debe ser positivo", messageOptional.get());
     }
 
     @Requires(property = "spec.name", value = "CompositeMessageSourceTest")
     @Factory
     static class MessageSourceFactory {
-
         @Singleton
         MessageSource createMessageSource() {
-            return new MessageSource() {
-                private final MessageSource delegate = new ResourceBundleMessageSource("i18n.messages");
-
-                @Override
-                public @NonNull Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
-                    return delegate.getRawMessage(code, context);
-                }
-
-                @Override
-                public @NonNull String interpolate(@NonNull String template, @NonNull MessageContext context) {
-                    return delegate.interpolate(template, context);
-                }
-
-                @Override
-                public int getOrder() {
-                    return HIGHEST_PRECEDENCE;
-                }
-            };
+            return new ResourceBundleMessageSource("i18n.messages", HIGHEST_PRECEDENCE);
         }
     }
 

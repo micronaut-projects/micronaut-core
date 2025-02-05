@@ -10,12 +10,12 @@ import groovy.transform.CompileStatic
 class RemovedPackages implements ViolationTransformer {
     private final List<String> excludedPackagesPrefixes
     private final List<String> excludedPackages
-    
-    public RemovedPackages(Map<String, List<String>> params) {
-        this.excludedPackagesPrefixes = params.prefixes as List<String>
-        this.excludedPackages = params.exact as List<String>
+
+    public RemovedPackages(Map<String, String> params) {
+        this.excludedPackagesPrefixes = params.prefixes.split(',') as List<String>
+        this.excludedPackages = params.exact.split(',') as List<String>
     }
-    
+
     Optional<Violation> transform(String type, Violation v) {
         String pkg = type.substring(0, type.lastIndexOf('.'))
 
@@ -27,4 +27,3 @@ class RemovedPackages implements ViolationTransformer {
         return Optional.of(v)
     }
 }
-

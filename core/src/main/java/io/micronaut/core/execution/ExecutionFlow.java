@@ -19,9 +19,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -84,16 +89,7 @@ public interface ExecutionFlow<T> {
     @NonNull
     static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
-        executor.execute(() -> supplier.get().onComplete((t, throwable) -> {
-            if (throwable != null) {
-                if (throwable instanceof CompletionException completionException) {
-                    throwable = completionException.getCause();
-                }
-                completableFuture.completeExceptionally(throwable);
-            } else {
-                completableFuture.complete(t);
-            }
-        }));
+        executor.execute(() -> supplier.get().onComplete(completableFuture::complete));
         return completableFuture;
     }
 
@@ -147,11 +143,73 @@ public interface ExecutionFlow<T> {
     ExecutionFlow<T> putInContext(@NonNull String key, @NonNull Object value);
 
     /**
+     * Store a contextual value if it is absent.
+     *
+     * @param key   The key
+     * @param value The value
+     * @return a new flow
+     * @since 4.8.0
+     */
+    @NonNull
+    default ExecutionFlow<T> putInContextIfAbsent(@NonNull String key, @NonNull Object value) {
+        return this;
+    }
+
+    /**
      * Invokes a provided function when the flow is resolved, or immediately if it is already done.
      *
      * @param fn The function
      */
     void onComplete(@NonNull BiConsumer<? super T, Throwable> fn);
+
+    /**
+     * Completes the flow to the completable future.
+     *
+     * @param completableFuture The completable future
+     * @since 4.8
+     */
+    void completeTo(@NonNull CompletableFuture<T> completableFuture);
+
+    /**
+     * Create a new {@link ExecutionFlow} that either returns the same result or, if the timeout
+     * expires before the result is received, a {@link java.util.concurrent.TimeoutException}.
+     *
+     * @param timeout   The timeout
+     * @param scheduler Scheduler to schedule the timeout task
+     * @param onDiscard An optional consumer to be called on the value of this flow if the flow
+     *                  completes after the timeout has expired and thus the value is discarded
+     * @return A new flow that will produce either the same value or a {@link java.util.concurrent.TimeoutException}
+     */
+    @NonNull
+    default ExecutionFlow<T> timeout(@NonNull Duration timeout, @NonNull ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
+        DelayedExecutionFlow<T> delayed = DelayedExecutionFlow.create();
+        AtomicBoolean completed = new AtomicBoolean(false);
+        // schedule the timeout
+        ScheduledFuture<?> future = scheduler.schedule(() -> {
+            if (completed.compareAndSet(false, true)) {
+                cancel();
+                delayed.completeExceptionally(new TimeoutException());
+            }
+        }, timeout.toNanos(), TimeUnit.NANOSECONDS);
+        // forward any result
+        onComplete((t, throwable) -> {
+            if (completed.compareAndSet(false, true)) {
+                future.cancel(false);
+                if (throwable != null) {
+                    delayed.completeExceptionally(throwable);
+                } else {
+                    delayed.complete(t);
+                }
+            } else {
+                if (onDiscard != null) {
+                    onDiscard.accept(t, throwable);
+                }
+            }
+        });
+        // forward cancel from downstream
+        delayed.onCancel(this::cancel);
+        return delayed;
+    }
 
     /**
      * Create an {@link ImperativeExecutionFlow} from this execution flow, if possible. The flow
@@ -203,18 +261,22 @@ public interface ExecutionFlow<T> {
     @NonNull
     default CompletableFuture<T> toCompletableFuture() {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        onComplete((value, throwable) -> {
-            if (throwable != null) {
-                if (throwable instanceof CompletionException completionException) {
-                    throwable = completionException.getCause();
-                }
-                completableFuture.completeExceptionally(throwable);
-            } else {
-                completableFuture.complete(value);
-            }
-        });
+        completeTo(completableFuture);
         return completableFuture;
     }
 
+    /**
+     * Send an optional hint to the upstream producer that the result of this flow is no longer
+     * needed and can be discarded. This is an optional operation, and has no effect if the flow
+     * has already completed. After a cancellation, a flow might never complete.
+     * <p>If this flow contains a resource that needs to be cleaned up (e.g. an
+     * {@link java.io.InputStream}), the caller should still add a
+     * {@link #onComplete completion listener} for cleanup, in case the upstream producer does not
+     * support cancellation or has already submitted the result.
+     *
+     * @since 4.8.0
+     */
+    default void cancel() {
+    }
 }
 

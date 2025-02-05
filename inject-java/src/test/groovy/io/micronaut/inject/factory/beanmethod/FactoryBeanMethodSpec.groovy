@@ -4,10 +4,12 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
 import jakarta.inject.Singleton
 
 class FactoryBeanMethodSpec extends AbstractTypeElementSpec {
+
 
     void "test a factory bean with static method or field"() {
         given:
@@ -48,7 +50,7 @@ class Bar2 {
 ''')
 
         when:
-        def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar1'))
+        BeanDefinition<?> bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar1'))
                 .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
 
                 .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
@@ -57,6 +59,7 @@ class Bar2 {
         def bar2 = getBean(context, 'test.Bar2')
 
         then:
+        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype t.Bar1 t.TestFactory.bar()'
         bar1 != null
         bar2 != null
         bar1BeanDefinition.getScope().get() == Prototype.class

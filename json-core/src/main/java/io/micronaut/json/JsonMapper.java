@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -352,12 +353,14 @@ public interface JsonMapper {
      * @since 4.0.0
      */
     static @NonNull JsonMapper createDefault() {
+        AtomicReference<IllegalStateException> ex = new AtomicReference<>();
         return ServiceLoader.load(JsonMapperSupplier.class).stream()
             .flatMap(p -> {
                 try {
                     JsonMapperSupplier supplier = p.get();
                     return Stream.ofNullable(supplier);
                 } catch (Exception e) {
+                    addException(ex, e);
                     return Stream.empty();
                 }
             })
@@ -366,10 +369,28 @@ public interface JsonMapper {
                 try {
                     return Stream.of(jsonMapperSupplier.get());
                 } catch (Exception e) {
+                    addException(ex, e);
                     return Stream.empty();
                 }
             })
             .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"));
+            .orElseThrow(() -> {
+                if (ex.get() != null) {
+                    return ex.get();
+                } else {
+                    return new IllegalStateException("No default JsonMapper implementation found");
+                }
+            });
+    }
+
+    private static void addException(AtomicReference<IllegalStateException> ref, Exception toAdd) {
+        ref.updateAndGet(existing -> {
+            if (existing == null) {
+                return new IllegalStateException("Failed to initialize default JsonMapper", toAdd);
+            } else {
+                existing.addSuppressed(toAdd);
+                return existing;
+            }
+        });
     }
 }

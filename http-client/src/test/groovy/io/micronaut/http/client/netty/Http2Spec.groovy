@@ -4,7 +4,12 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
@@ -17,6 +22,7 @@ import spock.lang.Specification
 @Property(name = "micronaut.server.http-version", value = "HTTP_2_0")
 @Property(name = "micronaut.server.ssl.build-self-signed", value = "true")
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "0")
 @Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = "true")
 @Property(name = "micronaut.server.max-request-size", value = "16384")
 class Http2Spec extends Specification {

@@ -15,85 +15,86 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.Method;
-import org.objectweb.asm.commons.TableSwitchGenerator;
+import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.StatementDef;
+import io.micronaut.sourcegen.model.TypeDef;
+import io.micronaut.sourcegen.model.VariableDef;
 
+import javax.lang.model.element.Modifier;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.IntStream;
 
 /**
  * Switch based dispatch writer.
  *
  * @author Denis Stepanov
- * @since 3.1
+ * @since 4.7
  */
 @Internal
-public final class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
+public final class DispatchWriter implements ClassOutputWriter {
 
-    private static final Method DISPATCH_METHOD = new Method("dispatch", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object[].class)));
+    private static final Method GET_ACCESSIBLE_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractExecutableMethodsDefinition.class,
+        "getAccessibleTargetMethodByIndex",
+        int.class
+    );
 
-    private static final Method DISPATCH_ONE_METHOD = new Method("dispatchOne", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object.class)));
+    private static final MethodDef UNKNOWN_DISPATCH_AT_INDEX = MethodDef.builder("unknownDispatchAtIndexException")
+        .addParameter("index", int.class)
+        .returns(RuntimeException.class)
+        .build();
 
-    private static final Method GET_TARGET_METHOD = new Method("getTargetMethodByIndex", getMethodDescriptor(java.lang.reflect.Method.class, Collections.singletonList(int.class)));
+    private static final Method GET_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractExecutableMethodsDefinition.class,
+        "getTargetMethodByIndex",
+        int.class
+    );
 
-    private static final Method GET_ACCESSIBLE_TARGET_METHOD = new Method("getAccessibleTargetMethodByIndex", getMethodDescriptor(java.lang.reflect.Method.class, Collections.singletonList(int.class)));
-
-    private static final Method UNKNOWN_DISPATCH_AT_INDEX = new Method("unknownDispatchAtIndexException", getMethodDescriptor(RuntimeException.class, Collections.singletonList(int.class)));
+    private static final Method DISPATCH_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractExecutableMethodsDefinition.class,
+        "dispatch",
+        int.class,
+        Object.class,
+        Object[].class
+    );
 
     private static final String FIELD_INTERCEPTABLE = "$interceptable";
 
-    private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
+    private static final ClassTypeDef TYPE_REFLECTION_UTILS = ClassTypeDef.of(ReflectionUtils.class);
 
-    private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class));
+    private static final Method METHOD_GET_REQUIRED_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class);
 
-    private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
+    private static final Method METHOD_INVOKE_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class);
 
-    private static final org.objectweb.asm.commons.Method METHOD_GET_FIELD_VALUE = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class));
+    private static final Method METHOD_GET_FIELD_VALUE =
+        ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class);
 
-    private static final org.objectweb.asm.commons.Method METHOD_SET_FIELD_VALUE = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "setField", Class.class, String.class, Object.class, Object.class));
+    private static final Method METHOD_SET_FIELD_VALUE = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "setField", Class.class, String.class, Object.class, Object.class);
 
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
-    private final Type thisType;
-
-    private final Type dispatchSuperType;
 
     private boolean hasInterceptedMethod;
-
-    public DispatchWriter(Type thisType) {
-        this(thisType, ExecutableMethodsDefinitionWriter.SUPER_TYPE);
-    }
-
-    public DispatchWriter(Type thisType, Type dispatchSuperType) {
-        super();
-        this.thisType = thisType;
-        this.dispatchSuperType = dispatchSuperType;
-    }
 
     /**
      * Adds new set field dispatch target.
@@ -135,7 +136,23 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * @return the target index
      */
     public int addMethod(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        return addDispatchTarget(new MethodDispatchTarget(dispatchSuperType, declaringType, methodElement, useOneDispatch, !useOneDispatch));
+        DispatchTarget dispatchTarget = findDispatchTarget(declaringType, methodElement, useOneDispatch);
+        return addDispatchTarget(dispatchTarget);
+    }
+
+    private DispatchTarget findDispatchTarget(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
+        boolean isKotlinDefault = argumentTypes.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+        ClassElement declaringClassType = (ClassElement) declaringType;
+        if (methodElement.isReflectionRequired()) {
+            if (isKotlinDefault) {
+                throw new ProcessingException(methodElement, "Kotlin default methods are not supported for reflection invocation");
+            }
+            return new MethodReflectionDispatchTarget(declaringType, methodElement, dispatchTargets.size(), useOneDispatch);
+        } else if (isKotlinDefault) {
+            return new KotlinMethodWithDefaultsDispatchTarget(declaringClassType, methodElement, useOneDispatch);
+        }
+        return new MethodDispatchTarget(declaringClassType, methodElement, useOneDispatch);
     }
 
     /**
@@ -153,12 +170,11 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                                     String interceptedProxyBridgeMethodName) {
         hasInterceptedMethod = true;
         return addDispatchTarget(new InterceptableMethodDispatchTarget(
-                dispatchSuperType,
-                declaringType,
-                methodElement,
-                interceptedProxyClassName,
-                interceptedProxyBridgeMethodName,
-                thisType)
+            findDispatchTarget(declaringType, methodElement, false),
+            declaringType,
+            methodElement,
+            interceptedProxyClassName,
+            interceptedProxyBridgeMethodName)
         );
     }
 
@@ -173,156 +189,148 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         return dispatchTargets.size() - 1;
     }
 
-    /**
-     * Build dispatch method if needed.
-     *
-     * @param classWriter The classwriter
-     */
-    public void buildDispatchMethod(ClassWriter classWriter) {
-        int[] cases = dispatchTargets.stream()
-                .filter(DispatchTarget::supportsDispatchMulti)
-                .mapToInt(dispatchTargets::indexOf)
-                .toArray();
-        if (cases.length == 0) {
-            return;
+    @Nullable
+    public MethodDef buildDispatchMethod() {
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(DispatchTarget::supportsDispatchMulti);
+        if (dispatchers.isEmpty()) {
+            return null;
         }
-        GeneratorAdapter dispatchMethod = new GeneratorAdapter(classWriter.visitMethod(
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                DISPATCH_METHOD.getName(),
-                DISPATCH_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                DISPATCH_METHOD.getName(),
-                DISPATCH_METHOD.getDescriptor()
-        );
-        dispatchMethod.loadArg(0);
-        dispatchMethod.tableSwitch(cases, new TableSwitchGenerator() {
-            @Override
-            public void generateCase(int key, Label end) {
-                DispatchTarget method = dispatchTargets.get(key);
-                method.writeDispatchMulti(dispatchMethod, key);
-                dispatchMethod.returnValue();
-            }
 
-            @Override
-            public void generateDefault() {
-                dispatchMethod.loadThis();
-                dispatchMethod.loadArg(0);
-                dispatchMethod.invokeVirtual(thisType, UNKNOWN_DISPATCH_AT_INDEX);
-                dispatchMethod.throwException();
-            }
-        }, true);
-        dispatchMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
-        dispatchMethod.visitEnd();
-    }
+        return MethodDef.override(DISPATCH_METHOD)
+            .build((aThis, methodParameters) -> {
 
-    /**
-     * Build dispatch one method if needed.
-     *
-     * @param classWriter The classwriter
-     */
-    public void buildDispatchOneMethod(ClassWriter classWriter) {
-        int[] cases = dispatchTargets.stream()
-                .filter(DispatchTarget::supportsDispatchOne)
-                .mapToInt(dispatchTargets::indexOf)
-                .toArray();
-        if (cases.length == 0) {
-            return;
-        }
-        GeneratorAdapter dispatchMethod = new GeneratorAdapter(classWriter.visitMethod(
-                ACC_PROTECTED | ACC_FINAL,
-                DISPATCH_ONE_METHOD.getName(),
-                DISPATCH_ONE_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PROTECTED | ACC_FINAL,
-                DISPATCH_ONE_METHOD.getName(),
-                DISPATCH_ONE_METHOD.getDescriptor()
-        );
-        dispatchMethod.loadArg(0);
-        Map<String, DispatchTargetState> stateMap = new HashMap<>();
-        dispatchMethod.tableSwitch(cases, new TableSwitchGenerator() {
-            @Override
-            public void generateCase(int key, Label end) {
-                DispatchTarget method = dispatchTargets.get(key);
-                if (method.writeDispatchOne(dispatchMethod, key, stateMap)) {
-                    dispatchMethod.returnValue();
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+                VariableDef.MethodParameter argsArray = methodParameters.get(2);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    StatementDef statementDef = dispatchTarget.dispatch(caseIndex, methodIndex, target, argsArray);
+                    switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
                 }
-            }
 
-            @Override
-            public void generateDefault() {
-                dispatchMethod.loadThis();
-                dispatchMethod.loadArg(0);
-                dispatchMethod.invokeVirtual(thisType, UNKNOWN_DISPATCH_AT_INDEX);
-                dispatchMethod.throwException();
-            }
-        }, true);
-        for (DispatchTargetState state : stateMap.values()) {
-            state.complete(dispatchMethod);
-        }
-        dispatchMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
-        dispatchMethod.visitEnd();
-    }
-
-    /**
-     * Build get target method by index method if needed.
-     *
-     * @param classWriter The classwriter
-     */
-    public void buildGetTargetMethodByIndex(ClassWriter classWriter) {
-        GeneratorAdapter getTargetMethodByIndex = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PROTECTED | Opcodes.ACC_FINAL,
-                GET_TARGET_METHOD.getName(),
-                GET_TARGET_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                GET_TARGET_METHOD.getName(),
-                GET_TARGET_METHOD.getDescriptor()
-        );
-        getTargetMethodByIndex.loadArg(0);
-        int[] cases = dispatchTargets.stream()
-                .filter(MethodDispatchTarget.class::isInstance)
-                .mapToInt(dispatchTargets::indexOf)
-                .toArray();
-        getTargetMethodByIndex.tableSwitch(cases, new TableSwitchGenerator() {
-            @Override
-            public void generateCase(int key, Label end) {
-                MethodDispatchTarget method = (MethodDispatchTarget) dispatchTargets.get(key);
-                TypedElement declaringType = method.declaringType;
-                Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
-                MethodElement methodElement = method.methodElement;
-                pushTypeUtilsGetRequiredMethod(getTargetMethodByIndex, declaringTypeObject, methodElement);
-                getTargetMethodByIndex.returnValue();
-            }
-
-            @Override
-            public void generateDefault() {
-                getTargetMethodByIndex.loadThis();
-                getTargetMethodByIndex.loadArg(0);
-                getTargetMethodByIndex.invokeVirtual(thisType, UNKNOWN_DISPATCH_AT_INDEX);
-                getTargetMethodByIndex.throwException();
-            }
-        }, true);
-        getTargetMethodByIndex.visitMaxs(DEFAULT_MAX_STACK, 1);
-        getTargetMethodByIndex.visitEnd();
-    }
-
-    public static void pushTypeUtilsGetRequiredMethod(GeneratorAdapter builder, Type declaringTypeObject, MethodElement methodElement) {
-        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-
-        builder.push(declaringTypeObject);
-        builder.push(methodElement.getName());
-        if (!argumentTypes.isEmpty()) {
-            pushNewArray(builder, Class.class, argumentTypes, parameterElement -> {
-                builder.push(JavaModelUtils.getTypeReference(parameterElement));
+                return StatementDef.multi(
+                    methodParameters.get(0).asStatementSwitch(
+                        TypeDef.OBJECT,
+                        switchCases,
+                        aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
+                    ),
+                    ExpressionDef.nullValue().returning()
+                );
             });
-        } else {
-            builder.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
+    }
+
+    private List<Map.Entry<DispatchTarget, Integer>> getDispatchers(Predicate<DispatchTarget> predicate) {
+        List<Map.Entry<DispatchTarget, Integer>> result = new ArrayList<>();
+        int index = 0;
+        for (DispatchTarget dispatchTarget : dispatchTargets) {
+            if (predicate.test(dispatchTarget)) {
+                result.add(Map.entry(dispatchTarget, index));
+            }
+            index++;
         }
-        builder.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
+        return result;
+    }
+
+    @Nullable
+    public MethodDef buildDispatchOneMethod() {
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(DispatchTarget::supportsDispatchOne);
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.builder("dispatchOne")
+            .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+            .addParameters(int.class, Object.class, Object.class)
+            .returns(TypeDef.OBJECT)
+            .build((aThis, methodParameters) -> {
+
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+                VariableDef.MethodParameter value = methodParameters.get(2);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    StatementDef statementDef = dispatchTarget.dispatchOne(caseIndex, methodIndex, target, value);
+                    switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
+                }
+
+                return StatementDef.multi(
+                    methodParameters.get(0).asStatementSwitch(
+                        TypeDef.OBJECT,
+                        switchCases,
+                        aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
+                    ),
+                    ExpressionDef.nullValue().returning()
+                );
+            });
+    }
+
+    @Nullable
+    public MethodDef buildGetTargetMethodByIndex() {
+        // Should we include methods that don't require reflection???
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> dispatchTarget.getMethodElement() != null);
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.override(GET_TARGET_METHOD)
+            .build((aThis, methodParameters) -> {
+
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+
+                for (Map.Entry<DispatchTarget, Integer> dispatcher : dispatchers) {
+                    int caseIndex = dispatcher.getValue();
+                    DispatchTarget dispatchTarget = dispatcher.getKey();
+                    MethodElement methodElement = dispatchTarget.getMethodElement();
+
+                    StatementDef statement = TYPE_REFLECTION_UTILS.invokeStatic(METHOD_GET_REQUIRED_METHOD,
+
+                        ExpressionDef.constant(ClassTypeDef.of(methodElement.getDeclaringType())),
+                        ExpressionDef.constant(methodElement.getName()),
+                        TypeDef.CLASS.array().instantiate(
+                            Arrays.stream(methodElement.getSuspendParameters())
+                                .map(p -> ExpressionDef.constant(TypeDef.erasure(p.getType())))
+                                .toList()
+                        )
+                    ).returning();
+                    switchCases.put(ExpressionDef.constant(caseIndex), statement);
+                }
+
+                return StatementDef.multi(
+                    methodParameters.get(0).asStatementSwitch(
+                        TypeDef.OBJECT,
+                        switchCases,
+                        aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
+                    ),
+                    ExpressionDef.nullValue().returning()
+                );
+            });
+    }
+
+    public static ExpressionDef getTypeUtilsGetRequiredMethod(ClassTypeDef declaringType, MethodElement methodElement) {
+        List<ExpressionDef> values = new ArrayList<>();
+        values.add(ExpressionDef.constant(declaringType));
+        values.add(ExpressionDef.constant(methodElement.getName()));
+        if (methodElement.getSuspendParameters().length > 0) {
+            values.add(TypeDef.CLASS.array().instantiate(
+                Arrays.stream(methodElement.getSuspendParameters())
+                    .map(parameterElement -> ExpressionDef.constant(TypeDef.erasure(parameterElement.getType())))
+                    .toList()
+            ));
+        } else {
+            values.add(
+                TYPE_REFLECTION_UTILS.getStaticField("EMPTY_CLASS_ARRAY", TypeDef.of(Class[].class))
+            );
+        }
+        return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_GET_REQUIRED_METHOD, values);
     }
 
     @Override
@@ -353,72 +361,130 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         /**
          * @return true if writer supports dispatch one.
          */
-        default boolean supportsDispatchOne() {
-            return false;
-        }
-
-        /**
-         * Generate {@code dispatchOne} with shared state.
-         *
-         * @param writer The method writer
-         * @param methodIndex The method index
-         * @param stateMap State map shared for this {@code dispatchOne} method, may be written to
-         * @return {@code true} iff the return value is on the top of the stack, {@code false} iff
-         * we branched instead
-         */
-        default boolean writeDispatchOne(GeneratorAdapter writer, int methodIndex, Map<String, DispatchTargetState> stateMap) {
-            writeDispatchOne(writer, methodIndex);
-            return true;
-        }
-
-        /**
-         * Generate dispatch one.
-         * @param methodIndex The method index
-         *
-         * @param writer The writer
-         */
-        default void writeDispatchOne(GeneratorAdapter writer, int methodIndex) {
-            throw new IllegalStateException("Not supported");
-        }
+        boolean supportsDispatchOne();
 
         /**
          * @return true if writer supports dispatch multi.
          */
-        default boolean supportsDispatchMulti() {
-            return false;
+        boolean supportsDispatchMulti();
+
+        default StatementDef dispatch(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef valuesArray) {
+            return dispatch(target, valuesArray);
         }
 
-        /**
-         * Generate dispatch multi.
-         *
-         * @param writer The writer
-         * @param methodIndex The method index
-         */
-        default void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
+        default StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
             throw new IllegalStateException("Not supported");
         }
+
+        StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray);
+
+        MethodElement getMethodElement();
+
+        TypedElement getDeclaringType();
 
     }
 
     /**
-     * State carried between different {@link DispatchTarget}s. This allows for code size reduction
-     * by sharing bytecode in the same method.
+     * Dispatch target implementation writer.
      */
     @Internal
-    public interface DispatchTargetState {
+    public abstract static class AbstractDispatchTarget implements DispatchTarget {
+
         /**
-         * Complete writing this state.
+         * Implement dispatch.
          *
-         * @param writer The method writer
+         * @param target      The target
+         * @param valuesArray The values array
+         * @return The dispatch statement
          */
-        void complete(GeneratorAdapter writer);
+        @Override
+        public StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray) {
+            ExpressionDef expression = dispatchMultiExpression(target, valuesArray);
+            return expressionReturning(expression);
+        }
+
+        /**
+         * Implement dispatch one.
+         *
+         * @param caseValue      The case value
+         * @param caseExpression The case expression
+         * @param target         The target
+         * @param value          The value
+         * @return The dispatch statement
+         */
+        @Override
+        public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            ExpressionDef expression = dispatchOneExpression(target, value);
+            return expressionReturning(expression);
+        }
+
+        private StatementDef expressionReturning(ExpressionDef expression) {
+            MethodElement methodElement = getMethodElement();
+            if (methodElement != null && methodElement.getReturnType().isVoid() && !methodElement.isSuspend()) {
+                return StatementDef.multi(
+                    (StatementDef) expression,
+                    ExpressionDef.nullValue().returning()
+                );
+            }
+            return expression.returning();
+        }
+
+        /**
+         * Implements multi dispatch.
+         *
+         * @param target      The target
+         * @param valuesArray The values
+         * @return THe expression
+         */
+        protected ExpressionDef dispatchMultiExpression(ExpressionDef target, ExpressionDef valuesArray) {
+            MethodElement methodElement = getMethodElement();
+            if (methodElement == null) {
+                return dispatchMultiExpression(target, List.of(valuesArray.arrayElement(0)));
+            }
+            return dispatchMultiExpression(target,
+                IntStream.range(0, methodElement.getSuspendParameters().length).mapToObj(valuesArray::arrayElement).toList()
+            );
+        }
+
+        /**
+         * Implements multi dispatch.
+         *
+         * @param target The target
+         * @param values The values
+         * @return The dispatch expression
+         */
+        protected ExpressionDef dispatchMultiExpression(ExpressionDef target, List<? extends ExpressionDef> values) {
+            return dispatchOneExpression(target, values.get(0));
+        }
+
+        /**
+         * Implements one dispatch.
+         *
+         * @param target The target
+         * @param value  The value
+         * @return The dispatch expression
+         */
+        protected ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
+            return dispatchExpression(target);
+        }
+
+        /**
+         * Implements dispatch.
+         *
+         * @param target The target
+         * @return The dispatch expression
+         */
+        protected ExpressionDef dispatchExpression(ExpressionDef target) {
+            throw new IllegalStateException("Not supported");
+        }
+
     }
 
     /**
      * Field get dispatch target.
      */
     @Internal
-    public static final class FieldGetDispatchTarget implements DispatchTarget {
+    public static final class FieldGetDispatchTarget extends AbstractDispatchTarget {
         @NonNull
         final FieldElement beanField;
 
@@ -437,31 +503,30 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer, int fieldIndex) {
-            final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
-            final Type beanType = JavaModelUtils.getTypeReference(beanField.getOwningType());
+        public MethodElement getMethodElement() {
+            return null;
+        }
+
+        @Override
+        public TypedElement getDeclaringType() {
+            return null;
+        }
+
+        @Override
+        public ExpressionDef dispatchExpression(ExpressionDef bean) {
+            final TypeDef propertyType = TypeDef.of(beanField.getType());
+            final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
 
             if (beanField.isReflectionRequired()) {
-                writer.push(beanType); // Bean class
-                writer.push(beanField.getName()); // Field name
-                writer.loadArg(1); // Bean instance
-                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_FIELD_VALUE);
-                if (beanField.isPrimitive()) {
-                    pushCastToType(writer, propertyType);
-                }
+                return TYPE_REFLECTION_UTILS.invokeStatic(
+                    METHOD_GET_FIELD_VALUE,
+                    ExpressionDef.constant(targetType), // Target class
+                    ExpressionDef.constant(beanField.getName()), // Field name,
+                    bean // Target instance
+                ).cast(propertyType);
             } else {
-                // load this
-                writer.loadArg(1);
-                pushCastToType(writer, beanType);
-
-                // get field value
-                writer.getField(
-                    JavaModelUtils.getTypeReference(beanField.getOwningType()),
-                    beanField.getName(),
-                    propertyType);
+                return bean.cast(targetType).field(beanField).cast(propertyType);
             }
-
-            pushBoxPrimitiveIfNecessary(propertyType, writer);
         }
 
         @NonNull
@@ -474,7 +539,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * Field set dispatch target.
      */
     @Internal
-    public static final class FieldSetDispatchTarget implements DispatchTarget {
+    public static final class FieldSetDispatchTarget extends AbstractDispatchTarget {
         @NonNull
         final FieldElement beanField;
 
@@ -493,34 +558,32 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer, int fieldIndex) {
-            final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
-            final Type beanType = JavaModelUtils.getTypeReference(beanField.getOwningType());
+        public MethodElement getMethodElement() {
+            return null;
+        }
 
+        @Override
+        public TypedElement getDeclaringType() {
+            return null;
+        }
+
+        @Override
+        public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            final TypeDef propertyType = TypeDef.of(beanField.getType());
+            final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
             if (beanField.isReflectionRequired()) {
-                writer.push(beanType); // Bean class
-                writer.push(beanField.getName()); // Field name
-                writer.loadArg(1); // Bean instance
-                writer.loadArg(2); // Field value
-                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_SET_FIELD_VALUE);
+                return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
+                    ExpressionDef.constant(targetType), // Target class
+                    ExpressionDef.constant(beanField.getName()), // Field name
+                    target, // Target instance
+                    value // Field value
+                ).after(ExpressionDef.nullValue().returning());
             } else {
-                // load this
-                writer.loadArg(1);
-                pushCastToType(writer, beanType);
-
-                // load value
-                writer.loadArg(2);
-                pushCastToType(writer, propertyType);
-
-                // get field value
-                writer.putField(
-                    beanType,
-                    beanField.getName(),
-                    propertyType);
-
+                return target.cast(targetType)
+                    .field(beanField)
+                    .put(value.cast(propertyType))
+                    .after(ExpressionDef.nullValue().returning());
             }
-            // push null return type
-            writer.push((String) null);
         }
 
         @NonNull
@@ -533,147 +596,169 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * Method invocation dispatch target.
      */
     @Internal
-    @SuppressWarnings("FinalClass")
-    public static class MethodDispatchTarget implements DispatchTarget {
-        final Type dispatchSuperType;
-        final TypedElement declaringType;
+    public static final class MethodDispatchTarget extends AbstractDispatchTarget {
+        final ClassElement declaringType;
         final MethodElement methodElement;
-        final boolean oneDispatch;
-        final boolean multiDispatch;
+        private final boolean useOneDispatch;
 
-        private MethodDispatchTarget(Type dispatchSuperType,
-                                     TypedElement declaringType,
+        private MethodDispatchTarget(ClassElement targetType,
                                      MethodElement methodElement,
-                                     boolean oneDispatch,
-                                     boolean multiDispatch) {
-            this.dispatchSuperType = dispatchSuperType;
-            this.declaringType = declaringType;
+                                     boolean useOneDispatch) {
+            this.declaringType = targetType;
             this.methodElement = methodElement;
-            this.oneDispatch = oneDispatch;
-            this.multiDispatch = multiDispatch;
+            this.useOneDispatch = useOneDispatch;
         }
 
+        @Override
+        public boolean supportsDispatchOne() {
+            return useOneDispatch;
+        }
+
+        @Override
+        public boolean supportsDispatchMulti() {
+            return !useOneDispatch;
+        }
+
+        @Override
+        public ClassElement getDeclaringType() {
+            return declaringType;
+        }
+
+        @Override
         public MethodElement getMethodElement() {
             return methodElement;
         }
 
         @Override
+        public ExpressionDef dispatchMultiExpression(ExpressionDef target, List<? extends ExpressionDef> values) {
+            ClassTypeDef targetType = ClassTypeDef.of(declaringType);
+            if (methodElement.isStatic()) {
+                return targetType.invokeStatic(methodElement, values);
+            }
+            return target.cast(targetType).invoke(methodElement, values);
+        }
+
+        @Override
+        public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
+            ClassTypeDef targetType = ClassTypeDef.of(declaringType);
+            if (methodElement.isStatic()) {
+                return targetType.invokeStatic(methodElement, TypeDef.OBJECT.array().instantiate(value));
+            }
+            if (methodElement.getSuspendParameters().length > 0) {
+                return target.cast(targetType).invoke(methodElement, value);
+            }
+            return target.cast(targetType).invoke(methodElement);
+        }
+    }
+
+    /**
+     * Method invocation dispatch target.
+     */
+    @Internal
+    public static final class KotlinMethodWithDefaultsDispatchTarget extends AbstractDispatchTarget {
+        final ClassElement declaringType;
+        final MethodElement methodElement;
+        private final boolean useOneDispatch;
+
+        private KotlinMethodWithDefaultsDispatchTarget(ClassElement targetType,
+                                                       MethodElement methodElement,
+                                                       boolean useOneDispatch) {
+            this.declaringType = targetType;
+            this.methodElement = methodElement;
+            this.useOneDispatch = useOneDispatch;
+        }
+
+        @Override
         public boolean supportsDispatchOne() {
-            return oneDispatch;
+            return useOneDispatch;
         }
 
         @Override
         public boolean supportsDispatchMulti() {
-            return multiDispatch;
+            return !useOneDispatch;
         }
 
         @Override
-        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
-            writeDispatch(writer, methodIndex, true);
+        public ClassElement getDeclaringType() {
+            return declaringType;
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer, int methodIndex) {
-            writeDispatch(writer, methodIndex, false);
+        public MethodElement getMethodElement() {
+            return methodElement;
         }
 
-        private void writeDispatch(GeneratorAdapter writer, int methodIndex, boolean isMulti) {
-            String methodName = methodElement.getName();
+        @Override
+        public ExpressionDef dispatchMultiExpression(ExpressionDef target, List<? extends ExpressionDef> values) {
+            return MethodGenUtils.invokeKotlinDefaultMethod(declaringType, methodElement, target, values);
+        }
 
-            List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-            Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
-            boolean isKotlinDefault = argumentTypes.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+        @Override
+        public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
+            return MethodGenUtils.invokeKotlinDefaultMethod(declaringType, methodElement, target, List.of(value));
+        }
+    }
 
-            final boolean reflectionRequired = methodElement.isReflectionRequired();
-            ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-            boolean isInterface = declaringType.getType().isInterface();
-            Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
-            boolean hasArgs = !argumentTypes.isEmpty();
+    /**
+     * Method invocation dispatch target.
+     */
+    @Internal
+    public static final class MethodReflectionDispatchTarget extends AbstractDispatchTarget {
+        private final TypedElement declaringType;
+        private final MethodElement methodElement;
+        private final int methodIndex;
+        private final boolean useOneDispatch;
 
-            // load this
-            boolean isStaticMethodInvocation = methodElement.isStatic() || isKotlinDefault;
+        private MethodReflectionDispatchTarget(TypedElement declaringType,
+                                               MethodElement methodElement,
+                                               int methodIndex,
+                                               boolean useOneDispatch) {
+            this.declaringType = declaringType;
+            this.methodElement = methodElement;
+            this.methodIndex = methodIndex;
+            this.useOneDispatch = useOneDispatch;
+        }
 
-            if (!isStaticMethodInvocation) {
-                writer.loadArg(1);
-            }
+        @Override
+        public boolean supportsDispatchOne() {
+            return useOneDispatch;
+        }
 
-            if (reflectionRequired) {
-                if (isStaticMethodInvocation) {
-                    writer.push((String) null);
-                }
-                writer.loadThis();
-                writer.push(methodIndex);
-                writer.invokeVirtual(dispatchSuperType, GET_ACCESSIBLE_TARGET_METHOD);
-                if (hasArgs) {
-                    if (isMulti) {
-                        writer.loadArg(2);
-                    } else {
-                        writer.push(1);
-                        writer.newArray(Type.getType(Object.class)); // new Object[1]
-                        writer.dup(); // one ref to store and one to return
-                        writer.push(0);
-                        writer.loadArg(2);
-                        writer.visitInsn(AASTORE); // objects[0] = argumentAtIndex2
-                    }
-                } else {
-                    writer.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
-                }
-                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
-            } else {
-                if (!isStaticMethodInvocation) {
-                    pushCastToType(writer, declaringTypeObject);
-                }
-                int[] defaultsMasksLocal = null;
-                if (hasArgs) {
-                    if (isKotlinDefault) {
-                        writer.loadArg(1); // First parameter is the current instance
-                        pushCastToType(writer, declaringTypeObject);
-                        defaultsMasksLocal = WriterUtils.computeKotlinDefaultsMask(writer, (paramIndex, parameterElement) -> {
-                            writer.loadArg(2);
-                            writer.push(paramIndex);
-                            writer.visitInsn(AALOAD);
-                        }, null, argumentTypes);
-                    }
-                    if (isMulti) {
-                        int argCount = argumentTypes.size();
-                        Iterator<ParameterElement> argIterator = argumentTypes.iterator();
-                        for (int i = 0; i < argCount; i++) {
-                            writer.loadArg(2);
-                            writer.push(i);
-                            writer.visitInsn(AALOAD);
-                            // cast the argument value to the correct type
-                            pushCastToType(writer, argIterator.next());
-                        }
-                    } else {
-                        writer.loadArg(2);
-                        // cast the argument value to the correct type
-                        pushCastToType(writer, argumentTypes.iterator().next());
-                    }
-                }
-                Method method = new Method(methodName, getMethodDescriptor(returnType, argumentTypes));
-                if (isKotlinDefault) {
-                    method = WriterUtils.asDefaultKotlinMethod(method, declaringTypeObject, defaultsMasksLocal.length);
-                    for (int defaultsMaskLocal : defaultsMasksLocal) {
-                        writer.loadLocal(defaultsMaskLocal, Type.INT_TYPE); // Bit mask of defaults
-                    }
-                    writer.push((String) null); // Last parameter is just a marker and is always null
-                    writer.invokeStatic(declaringTypeObject, method);
-                } else {
-                    if (isStaticMethodInvocation) {
-                        writer.invokeStatic(declaringTypeObject, method);
-                    } else {
-                        writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                            declaringTypeObject.getInternalName(), method.getName(),
-                            method.getDescriptor(), isInterface);
-                    }
-                }
-            }
+        @Override
+        public boolean supportsDispatchMulti() {
+            return !useOneDispatch;
+        }
 
-            if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                writer.push((String) null);
-            } else if (!reflectionRequired) {
-                pushBoxPrimitiveIfNecessary(returnType, writer);
-            }
+        @Override
+        public TypedElement getDeclaringType() {
+            return declaringType;
+        }
+
+        @Override
+        public MethodElement getMethodElement() {
+            return methodElement;
+        }
+
+        @Override
+        public ExpressionDef dispatchMultiExpression(ExpressionDef target, ExpressionDef valuesArray) {
+            return TYPE_REFLECTION_UTILS.invokeStatic(
+                METHOD_INVOKE_METHOD,
+
+                methodElement.isStatic() ? ExpressionDef.nullValue() : target,
+                new VariableDef.This().invoke(GET_ACCESSIBLE_TARGET_METHOD, ExpressionDef.constant(methodIndex)),
+                valuesArray
+            );
+        }
+
+        @Override
+        public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
+            return TYPE_REFLECTION_UTILS.invokeStatic(
+                METHOD_INVOKE_METHOD,
+
+                methodElement.isStatic() ? ExpressionDef.nullValue() : target,
+                new VariableDef.This().invoke(GET_ACCESSIBLE_TARGET_METHOD, ExpressionDef.constant(methodIndex)),
+                methodElement.getSuspendParameters().length > 0 ? TypeDef.OBJECT.array().instantiate(value) : TypeDef.OBJECT.array().instantiate()
+            );
         }
 
     }
@@ -682,82 +767,74 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * Interceptable method invocation dispatch target.
      */
     @Internal
-    public static final class InterceptableMethodDispatchTarget extends MethodDispatchTarget {
-        final String interceptedProxyClassName;
-        final String interceptedProxyBridgeMethodName;
-        final Type thisType;
+    public static final class InterceptableMethodDispatchTarget extends AbstractDispatchTarget {
+        private final TypedElement declaringType;
+        private final DispatchTarget dispatchTarget;
+        private final String interceptedProxyClassName;
+        private final String interceptedProxyBridgeMethodName;
+        private final MethodElement methodElement;
 
-        private InterceptableMethodDispatchTarget(Type dispatchSuperType,
+        private InterceptableMethodDispatchTarget(DispatchTarget dispatchTarget,
                                                   TypedElement declaringType,
                                                   MethodElement methodElement,
                                                   String interceptedProxyClassName,
-                                                  String interceptedProxyBridgeMethodName,
-                                                  Type thisType) {
-            super(dispatchSuperType, declaringType, methodElement, false, true);
+                                                  String interceptedProxyBridgeMethodName) {
+            this.declaringType = declaringType;
+            this.methodElement = methodElement;
+            this.dispatchTarget = dispatchTarget;
             this.interceptedProxyClassName = interceptedProxyClassName;
             this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
-            this.thisType = thisType;
         }
 
         @Override
-        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
-            List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-            ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-            Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
+        public boolean supportsDispatchOne() {
+            return false;
+        }
 
-            // load this
-            writer.loadArg(1);
-            // duplicate target
-            writer.dup();
+        @Override
+        public boolean supportsDispatchMulti() {
+            return true;
+        }
 
-            String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
-            Label invokeTargetBlock = new Label();
+        @Override
+        public TypedElement getDeclaringType() {
+            return declaringType;
+        }
 
-            Type interceptedProxyType = getObjectType(interceptedProxyClassName);
+        @Override
+        public MethodElement getMethodElement() {
+            return methodElement;
+        }
 
-            // load this.$interceptable field value
-            writer.loadThis();
-            writer.getField(thisType, FIELD_INTERCEPTABLE, Type.getType(boolean.class));
-            // check if it equals true
-            writer.push(true);
-            writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
+        @Override
+        public StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray) {
+            VariableDef.Field interceptableField = new VariableDef.This()
+                .field(FIELD_INTERCEPTABLE, TypeDef.of(boolean.class));
 
-            // target instanceOf intercepted proxy
-            writer.loadArg(1);
-            writer.instanceOf(interceptedProxyType);
-            // check if instanceOf
-            writer.push(true);
-            writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
+            ClassTypeDef proxyType = ClassTypeDef.of(interceptedProxyClassName);
 
-            pushCastToType(writer, interceptedProxyType);
+            return interceptableField.isTrue().and(target.instanceOf(proxyType))
+                .doIfElse(
+                    invokeProxyBridge(proxyType, target, valuesArray),
+                    dispatchTarget.dispatch(target, valuesArray)
+                );
+        }
 
-            // load arguments
-            Iterator<ParameterElement> iterator = argumentTypes.iterator();
-            for (int i = 0; i < argumentTypes.size(); i++) {
-                writer.loadArg(2);
-                writer.push(i);
-                writer.visitInsn(AALOAD);
-
-                pushCastToType(writer, iterator.next());
+        private StatementDef invokeProxyBridge(ClassTypeDef proxyType, ExpressionDef target, ExpressionDef valuesArray) {
+            boolean suspend = methodElement.isSuspend();
+            ExpressionDef.InvokeInstanceMethod invoke = target.cast(proxyType).invoke(
+                interceptedProxyBridgeMethodName,
+                Arrays.stream(methodElement.getSuspendParameters()).map(p -> TypeDef.of(p.getType())).toList(),
+                suspend ? TypeDef.OBJECT : TypeDef.of(methodElement.getReturnType()),
+                IntStream.range(0, methodElement.getSuspendParameters().length).mapToObj(valuesArray::arrayElement).toList()
+            );
+            if (dispatchTarget.getMethodElement().getReturnType().isVoid() && !suspend) {
+                return StatementDef.multi(
+                    invoke,
+                    ExpressionDef.nullValue().returning()
+                );
             }
-
-            writer.visitMethodInsn(INVOKEVIRTUAL,
-                    interceptedProxyType.getInternalName(), interceptedProxyBridgeMethodName,
-                    methodDescriptor, false);
-
-            if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                writer.visitInsn(ACONST_NULL);
-            } else {
-                pushBoxPrimitiveIfNecessary(returnType, writer);
-            }
-            writer.returnValue();
-
-            writer.visitLabel(invokeTargetBlock);
-
-            // remove parent
-            writer.pop();
-
-            super.writeDispatchMulti(writer, methodIndex);
+            return invoke.returning();
         }
     }
 

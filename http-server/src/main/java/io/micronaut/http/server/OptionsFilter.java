@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -30,7 +29,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.server.cors.CorsUtil;
-import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.UriRouteMatch;
 
 import java.util.ArrayList;
@@ -79,7 +78,7 @@ public final class OptionsFilter implements Ordered {
     }
 
     private boolean hasOptionsRouteMatch(HttpRequest<?> request) {
-        return request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).map(routeMatch -> {
+        return RouteAttributes.getRouteMatch(request).map(routeMatch -> {
             if (routeMatch instanceof UriRouteMatch<?, ?> uriRouteMatch) {
                 return uriRouteMatch.getHttpMethod() == HttpMethod.OPTIONS;
             }

@@ -26,9 +26,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.KeyDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.cfg.DeserializerFactoryConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -141,8 +139,7 @@ public class ObjectMapperFactory {
     @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
-
-        ObjectMapper objectMapper = new ObjectMapper(jsonFactory, null, new DefaultDeserializationContext.Impl(new ResilientBeanDeserializerFactory(new DeserializerFactoryConfig())));
+        ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
         final boolean hasConfiguration = jacksonConfiguration != null;
         if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {

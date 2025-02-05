@@ -40,45 +40,6 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
-    void "test primitive classes in metadata"() {
-        given:
-        def annotationMetadata = buildTypeAnnotationMetadata("""
-package inneranntest;
-
-import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.*;
-import io.micronaut.inject.annotation.Outer;
-
-@io.micronaut.inject.annotation.MyAnnotationX(
-clazz1 = void.class,
-clazz2 = int.class,
-clazz3 = long.class,
-clazz4 = byte.class,
-clazz5 = boolean.class,
-clazz6 = char.class,
-clazz7 = float.class,
-clazz8 = double.class,
-clazz9 = short.class
-)
-class Test {
-
-}
-""")
-
-        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
-
-        expect:
-        annotationMetadata.classValue(MyAnnotationX, "clazz1").get() == void
-        annotationMetadata.classValue(MyAnnotationX, "clazz2").get() == int
-        annotationMetadata.classValue(MyAnnotationX, "clazz3").get() == long
-        annotationMetadata.classValue(MyAnnotationX, "clazz4").get() == byte
-        annotationMetadata.classValue(MyAnnotationX, "clazz5").get() == boolean
-        annotationMetadata.classValue(MyAnnotationX, "clazz6").get() == char
-        annotationMetadata.classValue(MyAnnotationX, "clazz7").get() == float
-        annotationMetadata.classValue(MyAnnotationX, "clazz8").get() == double
-        annotationMetadata.classValue(MyAnnotationX, "clazz9").get() == short
-    }
-
     void "test inner annotations in metadata"() {
         given:
         def annotationMetadata = buildTypeAnnotationMetadata("""

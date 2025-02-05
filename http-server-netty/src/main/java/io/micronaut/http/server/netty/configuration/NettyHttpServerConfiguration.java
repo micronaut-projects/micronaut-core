@@ -1196,7 +1196,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @author James Kleeh
      * @author graemerocher
      * @since 3.1.0
+     * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration}
      */
+    @Deprecated(since = "4.8.0", forRemoval = true)
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {
 
@@ -1225,14 +1227,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Inject
         public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
                                             @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
-            if (cacheSeconds != null) {
-                this.cacheSeconds = cacheSeconds;
-                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-seconds` instead.");
-            }
-            if (isPublic != null) {
-                this.cacheControl.setPublic(isPublic);
-                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-control.public` instead.");
-            }
         }
 
         /**
@@ -1268,7 +1262,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
         /**
          * Configuration for the Cache-Control header.
+         *
+         * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration}
          */
+        @Deprecated(since = "4.8.0", forRemoval = true)
         @ConfigurationProperties("cache-control")
         public static class CacheControlConfiguration {
 

@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.netty.body.BodySizeLimits;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
@@ -35,6 +35,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
@@ -581,6 +582,13 @@ final class HttpPipelineBuilder implements Closeable {
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     cp.fireChannelRead(ReferenceCountUtil.retain(msg));
+                }
+            });
+            pipeline.addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                    // makeRequestHandler is pretty cheap so this is fine
+                    makeRequestHandler(Optional.empty(), false).handleUnboundError(cause);
                 }
             });
             connectionCustomizer.onInitialPipelineBuilt();

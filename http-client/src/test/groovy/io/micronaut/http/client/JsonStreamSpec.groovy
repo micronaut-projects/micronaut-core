@@ -72,10 +72,6 @@ class JsonStreamSpec  extends Specification {
         jsonObjects.size() == 2
         jsonObjects[0].title == 'The Stand'
         jsonObjects[1].title == 'The Shining'
-
-        cleanup:
-        client.stop()
-
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1864')
@@ -92,10 +88,6 @@ class JsonStreamSpec  extends Specification {
 
         then:
         jsonObjects.size() == 4
-
-        cleanup:
-        client.stop()
-
     }
 
     void "test read JSON stream demand all POJO"() {

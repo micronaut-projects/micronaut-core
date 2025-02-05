@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Controller("/search")
@@ -30,7 +31,7 @@ public class SearchController {
     }
 
     @Introspected
-    record Input(List<String> haystack, String needle) {
+    record Input(ArrayList<String> haystack, String needle) {
     }
 
     @Introspected

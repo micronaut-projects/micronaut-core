@@ -26,11 +26,13 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -108,6 +110,25 @@ abstract class AbstractJdkHttpClient {
     protected final CookieDecoder cookieDecoder;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+
+    protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
+        this.loadBalancer = prototype.loadBalancer;
+        this.httpVersion = prototype.httpVersion;
+        this.configuration = prototype.configuration;
+        this.contextPath = prototype.contextPath;
+        this.client = prototype.client;
+        this.cookieManager = prototype.cookieManager;
+        this.requestBinderRegistry = prototype.requestBinderRegistry;
+        this.clientId = prototype.clientId;
+        this.conversionService = prototype.conversionService;
+        this.sslBuilder = prototype.sslBuilder;
+        this.log = prototype.log;
+        this.filterResolver = prototype.filterResolver;
+        this.clientFilterEntries = prototype.clientFilterEntries;
+        this.cookieDecoder = prototype.cookieDecoder;
+        this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
+        this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
+    }
 
     /**
      * @param log                        the logger to use
@@ -411,6 +432,10 @@ abstract class AbstractJdkHttpClient {
         @NonNull io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
+        if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
+            ClientAttributes.setServiceId(request, clientId);
+        }
+
         return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
             .map(httpRequest -> {
                 if (log.isDebugEnabled()) {

@@ -16,6 +16,7 @@
 package io.micronaut.context.i18n;
 
 import io.micronaut.context.AbstractMessageSource;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
@@ -35,12 +36,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceBundleMessageSource.class);
+    private static final int DEFAULT_ORDER = 0;
     private final String baseName;
     private final Map<MessageKey, Optional<String>> messageCache =
                 buildMessageCache();
     private final Map<MessageKey, Optional<ResourceBundle>> bundleCache =
             buildBundleCache();
     private final @Nullable ResourceBundle defaultBundle;
+    private final int order;
 
     /**
      * Default constructor.
@@ -53,9 +56,29 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
     /**
      * Default constructor.
      * @param baseName The base name of the message bundle
+     * @param order used for the implementation of the {@link Ordered#getOrder()} method
+     */
+    public ResourceBundleMessageSource(@NonNull String baseName, int order) {
+        this(baseName, null, order);
+    }
+
+    /**
+     * Default constructor.
+     * @param baseName The base name of the message bundle
      * @param defaultLocale The default locale to use if no message is found for the given locale
      */
     public ResourceBundleMessageSource(@NonNull String baseName, @Nullable Locale defaultLocale) {
+        this(baseName, defaultLocale, DEFAULT_ORDER);
+    }
+
+    /**
+     * Default constructor.
+     * @param baseName The base name of the message bundle
+     * @param defaultLocale The default locale to use if no message is found for the given locale
+     * @param order used for the implementation of the {@link Ordered#getOrder()} method
+     */
+    public ResourceBundleMessageSource(@NonNull String baseName, @Nullable Locale defaultLocale, int order) {
+        this.order = order;
         ArgumentUtils.requireNonNull("baseName", baseName);
         this.baseName = baseName;
         ResourceBundle defaultBundle;
@@ -72,6 +95,11 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             defaultBundle = null;
         }
         this.defaultBundle = defaultBundle;
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
     }
 
     @NonNull

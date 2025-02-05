@@ -11,6 +11,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SuiteDisplayName("HTTP Server TCK for Javanet client")
 @ExcludeClassNamePatterns({
     "io.micronaut.http.server.tck.tests.FilterProxyTest", // There's no proxy client for the JDK client
+    "io.micronaut.http.server.tck.tests.forms.FormsJacksonAnnotationsTest" // it seems application/x-www-form-urlencoded is not yet supported by the JDK client
 })
 @ExcludeTags("multipart") // Multipart not supported by HttpClient
 public class JdkHttpServerTestSuite {

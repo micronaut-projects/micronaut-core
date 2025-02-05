@@ -53,4 +53,8 @@ final class DefaultFieldConstructorInjectionPoint<T> extends DefaultFieldInjecti
         return Argument.ZERO_ARGUMENTS;
     }
 
+    @Override
+    public Class<T> getDeclaringBeanType() {
+        return (Class<T>) declaringType;
+    }
 }

@@ -2,6 +2,8 @@ To make data binding model customizations consistent between form data and JSON,
 
 The advantage of this approach is that the same Jackson annotations used for customizing JSON binding can be used for form submissions.
 
+IMPORTANT: Form URL encoded content type and Jackson annotations are not supported by the <<httpClient, Micronaut HTTP Client>>.
+
 In practice this means that to bind regular form data, the only change required to the <<bindingUsingPOJOs, previous JSON binding code>> is updating the api:http.MediaType[] consumed:
 
 snippet::io.micronaut.docs.server.form.PersonController[tags="class,formbinding,endclass", title="Binding Form Data to POJOs"]

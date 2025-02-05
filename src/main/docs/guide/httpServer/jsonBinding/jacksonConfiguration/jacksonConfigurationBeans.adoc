@@ -1,3 +1,5 @@
+:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
+
 If you use <<jsonBinding, `micronaut-jackson-databind`>>, in addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]

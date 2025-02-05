@@ -18,10 +18,10 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
@@ -40,20 +40,42 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
     /**
      * Writes an object as a {@link ByteBodyHttpResponse}.
      *
-     * @param bufferFactory The buffer factory
-     * @param request       The request
-     * @param httpResponse  The response
-     * @param type          The response body type
-     * @param mediaType     The media type
-     * @param object        The object to write
+     * @param bodyFactory  The buffer factory
+     * @param request      The request
+     * @param httpResponse The response
+     * @param type         The response body type
+     * @param mediaType    The media type
+     * @param object       The object to write
      * @return A {@link ByteBodyHttpResponse} with the response bytes
      * @throws CodecException If an error occurs encoding
      */
     @NonNull
     ByteBodyHttpResponse<?> write(
-        @NonNull ByteBufferFactory<?, ?> bufferFactory,
+        @NonNull ByteBodyFactory bodyFactory,
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> httpResponse,
+        @NonNull Argument<T> type,
+        @NonNull MediaType mediaType,
+        T object) throws CodecException;
+
+    /**
+     * Write a <i>piece</i> of a larger response, e.g. when writing a Publisher or a part of a
+     * multipart response. In this case, response headers cannot be modified.
+     *
+     * @param bodyFactory The buffer factory
+     * @param request     The request
+     * @param response    The response this piece is part of
+     * @param type        The type of this piece
+     * @param mediaType   The media type of this piece
+     * @param object      The piece to write
+     * @return The response bytes
+     * @throws CodecException If an error occurs encoding
+     */
+    @NonNull
+    CloseableByteBody writePiece(
+        @NonNull ByteBodyFactory bodyFactory,
+        @NonNull HttpRequest<?> request,
+        @NonNull HttpResponse<?> response,
         @NonNull Argument<T> type,
         @NonNull MediaType mediaType,
         T object) throws CodecException;

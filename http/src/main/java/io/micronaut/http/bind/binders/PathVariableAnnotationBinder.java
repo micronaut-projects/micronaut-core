@@ -22,14 +22,13 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.Collections;
-import java.util.Optional;
 
 /**
  * Used for binding a parameter exclusively from a path variable.
@@ -48,6 +47,14 @@ public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> i
         super(conversionService);
     }
 
+    /**
+     * @param conversionService The conversion service
+     * @param argument The argument
+     */
+    public PathVariableAnnotationBinder(ConversionService conversionService, Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
     @Override
     public Class<PathVariable> getAnnotationType() {
         return PathVariable.class;
@@ -58,25 +65,18 @@ public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> i
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
 
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(PathVariable.class).orElse(argument.getName());
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // e.g. ?pojo*
-        final Optional<UriMatchInfo> matchInfo = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class);
-        boolean bindAll = matchInfo
-            .flatMap(umi -> umi.getVariables()
-                .stream()
-                .filter(v -> v.getName().equals(parameterName))
-                .findFirst()
-                .map(UriMatchVariable::isExploded)).orElse(false);
+        final UriMatchInfo matchInfo = BasicHttpAttributes.getRouteMatchInfo(source).orElseThrow();
+        boolean bindAll = getBindAll(matchInfo, resolvedParameterName(argument));
 
-        final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues(), conversionService);
+        final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.getVariableValues(), conversionService);
         if (bindAll) {
             Object value;
             // Only maps and POJOs will "bindAll", lists work like normal
             if (Iterable.class.isAssignableFrom(argument.getType())) {
-                value = doResolve(context, variableValues, parameterName);
+                value = doResolve(context, variableValues);
                 if (value == null) {
                     value = Collections.emptyList();
                 }
@@ -85,7 +85,22 @@ public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> i
             }
             return doConvert(value, context);
         }
-        return doBind(context, variableValues, parameterName, BindingResult.unsatisfied());
+        return doBind(context, variableValues, BindingResult.unsatisfied());
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        return annotationMetadata.stringValue(PathVariable.class).orElse(argument.getName());
+    }
+
+    private Boolean getBindAll(UriMatchInfo matchInfo, String parameterName) {
+        for (UriMatchVariable v : matchInfo.getVariables()) {
+            if (v.getName().equals(parameterName)) {
+                return v.isExploded();
+            }
+        }
+        return false;
     }
 
 }

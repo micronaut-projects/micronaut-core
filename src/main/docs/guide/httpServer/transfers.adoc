@@ -38,6 +38,19 @@ The server supports returning `304` (Not Modified) responses if the files being 
 
 TIP: To use a custom data source to send data through an input stream, construct a link:{jdkapi}/java.base/java/io/PipedInputStream.html[PipedInputStream] and link:{jdkapi}/java.base/java/io/PipedOutputStream.html[PipedOutputStream] to write data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
 
+== Sending Reactive Streams as File Downloads
+Micronaut also supports returning *reactive streams* (e.g., `Flux`, `Flowable`,
+or any `Publisher`) without buffering the entire response in memory. If you want to
+force the client browser to download the streamed data (for example, CSV lines),
+you can set the `Content-Disposition: attachment` header.
+
+snippet::io.micronaut.docs.server.transfer.DownloadController[tags="class,endclass", indent=0, title="Sending Reactive Stream"]
+
+NOTE: Wrapping your stream in `HttpResponse<Flux<String>>` does not cause
+the entire CSV to be loaded into memory. Micronaut will still *stream*
+the data as it is produced. Returning `HttpResponse<T>` simply allows you
+to set any headers or custom status codes.
+
 == Cache Configuration
 
 By default, file responses include caching headers. The following options determine how the `Cache-Control` header is built.

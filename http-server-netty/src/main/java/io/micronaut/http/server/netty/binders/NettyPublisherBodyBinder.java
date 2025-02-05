@@ -97,7 +97,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                     }
                     return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 });
-            Publisher<Object> future = ReactiveExecutionFlow.toPublisher(() -> flow);
+            Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
             return () -> Optional.of(future);
         }
         return BindingResult.empty();

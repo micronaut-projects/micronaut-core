@@ -28,7 +28,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.objectweb.asm.Type;
 
 import java.io.File;
 import java.io.IOException;
@@ -159,14 +158,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     String getBeanTypeName();
 
     /**
-     * The provided type of the bean. Usually this is the same as {@link #getBeanTypeName()}, except in the case of
-     * factory beans which produce a different type.
-     *
-     * @return The provided type
-     */
-    Type getProvidedType();
-
-    /**
      * Make the bean definition as validated by jakarta.validation.
      *
      * @param validated Whether the bean definition is validated
@@ -183,7 +174,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * @return The intercepted type
      */
-    Optional<Type> getInterceptedType();
+    Optional<String> getInterceptedType();
 
     /**
      * @return Return whether the bean definition is validated.
@@ -207,7 +198,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param compilationDir The compilation directory
      * @throws IOException If an I/O error occurs
      */
-    void writeTo(File compilationDir) throws IOException;
+    default void writeTo(File compilationDir) throws IOException {
+        accept(new DirectoryClassWriterOutputVisitor(compilationDir));
+    }
 
     /**
      * Write the class to output via a visitor that manages output destination.

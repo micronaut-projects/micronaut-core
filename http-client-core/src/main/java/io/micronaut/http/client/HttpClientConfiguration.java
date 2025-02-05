@@ -924,6 +924,9 @@ public abstract class HttpClientConfiguration {
 
         private boolean enabled = DEFAULT_ENABLED;
 
+        @NonNull
+        private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
+
         /**
          * Whether connection pooling is enabled.
          * [available in the Netty HTTP client]
@@ -1061,6 +1064,61 @@ public abstract class HttpClientConfiguration {
          */
         public void setMaxConcurrentHttp2Connections(int maxConcurrentHttp2Connections) {
             this.maxConcurrentHttp2Connections = maxConcurrentHttp2Connections;
+        }
+
+        /**
+         * Optimize locality of client connections depending on which event loop makes a request.
+         * [available in the Netty HTTP client]
+         *
+         * @return The locality configuration
+         * @since 4.8.0
+         */
+        public @NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
+            return connectionLocality;
+        }
+
+        /**
+         * Optimize locality of client connections depending on which event loop makes a request.
+         * [available in the Netty HTTP client]
+         *
+         * @param connectionLocality The locality configuration
+         * @since 4.8.0
+         */
+        public void setConnectionLocality(@NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
+            this.connectionLocality = connectionLocality;
+        }
+
+        /**
+         * Options for {@link #connectionLocality}.
+         *
+         * @since 4.8.0
+         */
+        public enum ConnectionLocality {
+            /**
+             * Do not consider locality when selecting a connection.
+             */
+            IGNORE,
+            /**
+             * If a request is made from an event loop, and a connection is already in the pool
+             * from that same event loop, prefer using that connection. When a new connection needs
+             * to be created, also prefer the current event loop.
+             */
+            PREFERRED,
+            /**
+             * If a request is made from an event loop, and a connection is already in the pool
+             * from that same event loop, use that connection. Otherwise, force creating a new
+             * connection on the same event loop. Please ensure that settings such as
+             * {@link #maxPendingConnections} are also high enough to create new connections.
+             */
+            ENFORCED_IF_SAME_GROUP,
+            /**
+             * Same as {@link #ENFORCED_IF_SAME_GROUP}, but if a request is made from outside the
+             * event loop group of the client, fail <i>a</i> request. Note that there is no
+             * guarantee that the offending request is the only request seeing a failure, so the
+             * exception should only be used as a warning that you are using the client in a way
+             * that you did not intend.
+             */
+            ENFORCED_ALWAYS,
         }
     }
 

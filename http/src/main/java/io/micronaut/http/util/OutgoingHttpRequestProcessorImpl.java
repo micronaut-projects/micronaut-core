@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.util;
 
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import jakarta.inject.Singleton;
 
@@ -38,7 +38,7 @@ public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProc
      */
     @Override
     public boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, HttpRequest<?> request) {
-        Optional<String> serviceId = request.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
+        Optional<String> serviceId = BasicHttpAttributes.getServiceId(request);
         String uri = request.getUri().toString();
         return shouldProcessRequest(matcher, serviceId.orElse(null), uri);
     }
