@@ -143,6 +143,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -596,7 +597,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
     @Override
     public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
-        if (method instanceof UnsafeExecutable<?,?>) {
+        if (method instanceof UnsafeExecutable<?, ?>) {
             return new BeanContextUnsafeExecutionHandle(method, beanDefinition, (UnsafeExecutable<Object, Object>) method);
         }
         return new BeanContextExecutionHandle(method, beanDefinition);
@@ -1569,10 +1570,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
             List<BeanDefinition<Object>> bdCandidates = new ArrayList<>(20);
             for (BeanDefinitionProducer producer : beanDefinitionsClasses) {
-                if (!producer.isReferenceEnabled(this)) {
+                BeanDefinitionReference<Object> reference = producer.getReferenceIfEnabled(this);
+                if (reference == null) {
                     continue;
                 }
-                BeanDefinitionReference<Object> reference = producer.getReference();
                 if (!filteringQualifier.doesQualify(Object.class, reference)) {
                     continue;
                 }
@@ -1588,8 +1589,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             candidates = bdCandidates;
         } else {
             Stream<BeanDefinitionReference<Object>> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream()
-                .filter(p -> p.isReferenceEnabled(this))
-                .map(BeanDefinitionProducer::getReference));
+                .map(p -> p.getReferenceIfEnabled(this))
+                .filter(Objects::nonNull));
             Stream<BeanDefinition<Object>> candidateStream = qualifier.reduce(Object.class,
                 reduced
                     .map(ref -> ref.load(this))
@@ -1615,8 +1616,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (!beanDefinitionsClasses.isEmpty()) {
             return beanDefinitionsClasses
                     .stream()
-                    .filter(p -> p.isDefinitionEnabled(this))
-                    .map(p -> p.getDefinition(this))
+                    .map(p -> p.getDefinitionIfEnabled(this))
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
 
@@ -1637,8 +1638,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     public Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
         if (!beanDefinitionsClasses.isEmpty()) {
             final List refs = beanDefinitionsClasses.stream()
-                    .filter(p -> p.isReferenceEnabled(this))
-                    .map(BeanDefinitionProducer::getReference)
+                    .map(p -> p.getReferenceIfEnabled(this))
+                    .filter(Objects::nonNull)
                     .toList();
 
             return refs;
@@ -1681,11 +1682,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         Class<B> beanType = definition.getBeanType();
         for (Class<?> indexedType : indexedTypes) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
-                resolveTypeIndex(indexedType).forEach(p -> p.disable(definition));
+                resolveTypeIndex(indexedType).forEach(p -> p.disableIfMatch(definition));
                 break;
             }
         }
-        beanDefinitionsClasses.forEach(p -> p.disable(definition));
+        beanDefinitionsClasses.forEach(p -> p.disableIfMatch(definition));
         purgeCacheForBeanType(definition.getBeanType());
     }
 
@@ -1984,7 +1985,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 try {
                     loadEagerBeans(contextScopeBean, eagerInit);
                 } catch (Throwable e) {
-                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + contextScopeBean.getReference().getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                    BeanDefinitionReference<?> ref = contextScopeBean.getReferenceBestEffort();
+                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + (ref == null ? "<ref discarded>" : ref.getName()) + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                 }
             }
             filterReplacedBeans(null, eagerInit);
@@ -2005,10 +2007,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (!processedBeans.isEmpty()) {
             List<BeanDefinitionMethodReference<Object, Object>> methodsToProcess = new ArrayList<>();
             for (BeanDefinitionProducer processedBeanProducer : processedBeans) {
-                if (!processedBeanProducer.isDefinitionEnabled(this)) {
+                BeanDefinition<Object> definition = processedBeanProducer.getDefinitionIfEnabled(this);
+                if (definition == null) {
                     continue;
                 }
-                BeanDefinition<Object> definition = processedBeanProducer.getDefinition(this);
                 for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
                     if (method.hasStereotype(Executable.class)) {
                         methodsToProcess.add(BeanDefinitionMethodReference.of(definition, (ExecutableMethod<Object, Object>) method));
@@ -2078,7 +2080,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (CollectionUtils.isNotEmpty(parallelBeans)) {
             processParallelBeans(parallelBeans);
         }
-        ForkJoinPool.commonPool().execute(() -> beanDefinitionsClasses.forEach(p -> p.isReferenceEnabled(this)));
+        ForkJoinPool.commonPool().execute(() -> beanDefinitionsClasses.forEach(p -> p.getReferenceIfEnabled(this)));
     }
 
     /**
@@ -2154,17 +2156,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
             candidates = new HashSet<>();
             for (BeanDefinitionProducer producer : beanDefinitionProducers) {
-                if (producer.isDisabled() || !producer.isReferenceCandidateBean(beanType) || !producer.isReferenceEnabled(this, resolutionContext)) {
+                if (producer.isDisabledOptimistic() || !producer.isReferenceCandidateBean(beanType)) {
                     continue;
                 }
-                BeanDefinition<T> loadedBean = producer.getDefinition(this);
-                if (!loadedBean.isCandidateBean(beanType)) {
-                    continue;
-                }
-                if (predicate != null && !predicate.test(loadedBean)) {
-                    continue;
-                }
-                if (!producer.isDefinitionEnabled(this, resolutionContext)) {
+                BeanDefinition<T> loadedBean = producer.getDefinitionIfEnabled(this, null, false, beanType, predicate);
+                if (loadedBean == null) {
                     continue;
                 }
 
@@ -2233,16 +2229,19 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (!beanDefinitionsClasses.isEmpty()) {
             List<BeanDefinition<T>> candidates = new ArrayList<>();
             for (BeanDefinitionProducer producer : beanProducers) {
-                if (producer.isDisabled() || !producer.isReferenceEnabled(this)) {
+                if (producer.isDisabledOptimistic()) {
                     continue;
                 }
-                BeanDefinitionReference<T> reference = producer.getReference();
+                BeanDefinitionReference<T> reference = producer.getReferenceIfEnabled(this);
+                if (reference == null) {
+                    continue;
+                }
                 Class<?> candidateType = reference.getBeanType();
                 if (candidateType == null || !candidateType.isInstance(instance)) {
                     continue;
                 }
-                BeanDefinition<T> candidate = reference.load(this);
-                if (!candidate.isEnabled(this)) {
+                BeanDefinition<T> candidate = producer.getDefinitionIfEnabled(this);
+                if (candidate == null) {
                     continue;
                 }
                 candidates.add(candidate);
@@ -2463,7 +2462,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     protected void processParallelBeans(List<BeanDefinitionProducer> parallelBeans) {
         if (!parallelBeans.isEmpty()) {
             List<BeanDefinitionProducer> finalParallelBeans = parallelBeans.stream()
-                    .filter(p -> p.isReferenceEnabled(this))
+                .filter(p -> p.getReferenceIfEnabled(this) != null)
                     .toList();
             if (!finalParallelBeans.isEmpty()) {
                 new Thread(() -> {
@@ -2472,9 +2471,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                         try {
                             loadEagerBeans(producer, parallelDefinitions);
                         } catch (Throwable e) {
-                            BeanDefinitionReference<Object> beanDefinitionReference = producer.getReference();
-                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                            Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                            BeanDefinitionReference<?> beanDefinitionReference = producer.getReferenceBestEffort();
+                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference == null ? "<ref discarded>" : beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                            boolean shutdownOnError = beanDefinitionReference != null &&
+                                beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
                             }
@@ -2668,14 +2668,9 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void loadEagerBeans(BeanDefinitionProducer producer, Collection<BeanDefinition<Object>> collector) {
-        if (producer.isReferenceEnabled(this)) {
-            BeanDefinitionReference<Object> reference = producer.getReference();
-            BeanDefinition<Object> beanDefinition = reference.load(this);
-            try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
-                if (beanDefinition.isEnabled(this, resolutionContext)) {
-                    collector.add(beanDefinition);
-                }
-            }
+        BeanDefinition<Object> definition = producer.getDefinitionIfEnabled(this, null, true);
+        if (definition != null) {
+            collector.add(definition);
         }
     }
 
@@ -3349,19 +3344,19 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
             reference:
             for (BeanDefinitionProducer beanDefinitionProducer : producers) {
-                if (beanDefinitionProducer.isDisabled()) {
+                if (beanDefinitionProducer.isDisabledOptimistic()) {
                     continue;
                 }
                 BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
                 for (BeanConfiguration disableConfiguration : configurationsDisabled) {
                     if (disableConfiguration.isWithin(beanDefinitionReference)) {
-                        beanDefinitionProducer.referenceEnabled = false;
+                        beanDefinitionProducer.disable();
                         continue reference;
                     }
                 }
 
                 if (beanDefinitionReference.isProxiedBean()) {
-                    beanDefinitionProducer.referenceEnabled = false;
+                    beanDefinitionProducer.disable();
                     BeanDefinitionProducer proxyBeanProducer = new BeanDefinitionProducer(beanDefinitionReference);
                     // retain only if proxy target otherwise the target is never used
                     if (beanDefinitionReference.isProxyTarget()) {
@@ -4202,44 +4197,22 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      */
     @Internal
     static final class BeanDefinitionProducer {
+        private static final AtomicReferenceFieldUpdater<BeanDefinitionProducer, Object> DEFINITION_UPDATER =
+            AtomicReferenceFieldUpdater.newUpdater(BeanDefinitionProducer.class, Object.class, "definition");
+        private static final Object DEFINITION_DISABLED_SENTINEL = "";
 
         @Nullable
         @SuppressWarnings("java:S3077")
         private volatile BeanDefinitionReference reference;
         @Nullable
         @SuppressWarnings("java:S3077")
-        private volatile BeanDefinition definition;
-        @Nullable
-        private volatile Boolean referenceEnabled;
-        @Nullable
-        private volatile Boolean definitionEnabled;
+        private volatile Object definition;
 
         BeanDefinitionProducer(@NonNull BeanDefinitionReference reference) {
             this.reference = reference;
         }
 
-        boolean isReferenceEnabled(DefaultBeanContext context) {
-            return isReferenceEnabled(context, null);
-        }
-
-        boolean isReferenceEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
-            BeanDefinitionReference<?> ref = reference;
-            // The reference needs to be assigned to a new variable as it can change between checks
-            if (ref == null) {
-                return false;
-            }
-            if (referenceEnabled == null) {
-                if (isReferenceEnabled(ref, context, resolutionContext)) {
-                    referenceEnabled = true;
-                } else {
-                    referenceEnabled = false;
-                    reference = null;
-                }
-            }
-            return referenceEnabled;
-        }
-
-        private boolean isReferenceEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
+        private static boolean isReferenceEnabled(BeanDefinitionReference<?> ref, DefaultBeanContext context, BeanResolutionContext resolutionContext) {
             if (ref == null) {
                 return false;
             }
@@ -4249,44 +4222,9 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return ref.isEnabled(context);
         }
 
-        boolean isDisabled() {
-            if (reference == null) {
-                return true;
-            }
-            Boolean refEnabled = referenceEnabled;
-            // The reference needs to be assigned to a new variable as it can change between checks
-            if (refEnabled != null && !refEnabled) {
-                return true;
-            }
-            Boolean defEnabled = definitionEnabled;
-            // The reference needs to be assigned to a new variable as it can change between checks
-            return defEnabled != null && !defEnabled;
-        }
-
-        boolean isDefinitionEnabled(DefaultBeanContext defaultBeanContext) {
-            return isDefinitionEnabled(defaultBeanContext, null);
-        }
-
-        private boolean isDefinitionEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
-            if (definitionEnabled == null) {
-                if (isReferenceEnabled(context, resolutionContext)) {
-                    BeanDefinition <?> def = getDefinition(context);
-                    if (isDefinitionEnabled(context, resolutionContext, def)) {
-                        definition = def;
-                        definitionEnabled = true;
-                    } else {
-                        definitionEnabled = false;
-                    }
-                } else {
-                    definitionEnabled = false;
-                }
-            }
-            return definitionEnabled;
-        }
-
-        private boolean isDefinitionEnabled(@NonNull DefaultBeanContext context,
-                                            @NonNull BeanResolutionContext resolutionContext,
-                                            @Nullable BeanDefinition<?> def) {
+        private static boolean isDefinitionEnabled(@NonNull DefaultBeanContext context,
+                                                   @NonNull BeanResolutionContext resolutionContext,
+                                                   @Nullable BeanDefinition<?> def) {
             if (def == null) {
                 return false;
             }
@@ -4296,32 +4234,109 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return def.isEnabled(context, resolutionContext);
         }
 
-        @NonNull
-        <T> BeanDefinitionReference<T> getReference() {
-            // The reference needs to be assigned to a new variable as it can change between checks
-            Boolean refEnabled = referenceEnabled;
-            if (reference == null || refEnabled == null || !refEnabled) {
-                throw new IllegalStateException("The reference is not enabled");
+        /**
+         * Returns {@code true} if we know for sure that the definition is disabled
+         * ({@link #getDefinitionIfEnabled} is {@code null}). Note that even if this returns
+         * {@code false}, {@link #getDefinitionIfEnabled} may still return {@code null} in some
+         * cases.
+         *
+         * @return {@code true} if we know for sure that this definition is disabled
+         */
+        boolean isDisabledOptimistic() {
+            return reference == null || definition == DEFINITION_DISABLED_SENTINEL;
+        }
+
+        @Nullable
+        <T> BeanDefinitionReference<T> getReferenceIfEnabled(DefaultBeanContext context) {
+            return getReferenceIfEnabled(context, null);
+        }
+
+        @Nullable
+        <T> BeanDefinitionReference<T> getReferenceIfEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+            BeanDefinitionReference ref = reference;
+            if (ref == null) {
+                return null;
             }
+            if (isReferenceEnabled(ref, context, resolutionContext)) {
+                return ref;
+            } else {
+                this.reference = null;
+                return null;
+            }
+        }
+
+        /**
+         * Get the reference if it hasn't been discarded yet. It might still be disabled, though.
+         * This is used for logging.
+         *
+         * @return The reference, if it's still available
+         */
+        @Nullable
+        BeanDefinitionReference<?> getReferenceBestEffort() {
             return reference;
         }
 
-        @NonNull
-        private <T> BeanDefinition<T> getDefinition(BeanContext beanContext) {
-            // The reference needs to be assigned to a new variable as it can change between checks
-            Boolean defEnabled = definitionEnabled;
-            if (defEnabled != null && !defEnabled) {
-                throw new IllegalStateException("The definition is not enabled");
+        @Nullable
+        <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context) {
+            return getDefinitionIfEnabled(context, null, false);
+        }
+
+        @Nullable
+        <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext, boolean newContext) {
+            return getDefinitionIfEnabled(context, resolutionContext, newContext, null, null);
+        }
+
+        /**
+         * Get the bean definition for this producer, if it's enabled.
+         *
+         * @param context           The context
+         * @param resolutionContext The resolution context (optional)
+         * @param newContext        If {@code true}, a new resolution context is created for checking {@link BeanDefinition#isEnabled}
+         * @param beanType          The bean type this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
+         * @param predicate         The predicate this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
+         * @return The definition or {@code null} if it's disabled (or {@code beanType} or {@code predicate} did not match)
+         */
+        @Nullable
+        <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context,
+                                                     @Nullable BeanResolutionContext resolutionContext,
+                                                     boolean newContext,
+                                                     @Nullable Argument<T> beanType,
+                                                     @Nullable Predicate<BeanDefinition<T>> predicate) {
+            Object defObject = this.definition;
+            if (defObject != DEFINITION_DISABLED_SENTINEL && defObject != null) {
+                return (BeanDefinition<T>) defObject;
             }
-            try {
-                BeanDefinition def = definition;
-                if (def == null) {
-                    def = getReference().load(beanContext);
-                    definition = def;
+            BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
+            if (ref == null) {
+                // shortcut for future calls
+                this.definition = DEFINITION_DISABLED_SENTINEL;
+                return null;
+            }
+            BeanDefinition def = ref.load(context);
+            if (beanType != null && !def.isCandidateBean(beanType)) {
+                return null;
+            }
+            if (predicate != null && !predicate.test(def)) {
+                return null;
+            }
+            boolean definitionEnabled;
+            if (newContext) {
+                try (BeanResolutionContext ctx = context.newResolutionContext(def, resolutionContext)) {
+                    definitionEnabled = isDefinitionEnabled(context, ctx, def);
                 }
-                return def;
-            } catch (Throwable e) {
-                throw new BeanInstantiationException(MSG_BEAN_DEFINITION + reference.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+            } else {
+                definitionEnabled = isDefinitionEnabled(context, resolutionContext, def);
+            }
+            if (definitionEnabled) {
+                if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
+                    return def;
+                } else {
+                    defObject = this.definition;
+                    return defObject != DEFINITION_DISABLED_SENTINEL && defObject != null ? (BeanDefinition<T>) defObject : null;
+                }
+            } else {
+                this.definition = DEFINITION_DISABLED_SENTINEL;
+                return null;
             }
         }
 
@@ -4331,12 +4346,15 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return ref != null && ref.isCandidateBean(beanType);
         }
 
-        void disable(BeanDefinitionReference<?> reference) {
-            // The reference needs to be assigned to a new variable as it can change between checks
-            BeanDefinitionReference ref = this.reference;
-            if (ref != null && ref.equals(reference)) {
-                this.reference = null;
+        void disableIfMatch(BeanDefinitionReference<?> toDisable) {
+            if (Objects.equals(toDisable, this.reference)) {
+                disable();
             }
+        }
+
+        void disable() {
+            this.reference = null;
+            this.definition = DEFINITION_DISABLED_SENTINEL;
         }
     }
 
