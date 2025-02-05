@@ -2462,7 +2462,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     protected void processParallelBeans(List<BeanDefinitionProducer> parallelBeans) {
         if (!parallelBeans.isEmpty()) {
             List<BeanDefinitionProducer> finalParallelBeans = parallelBeans.stream()
-                .filter(p -> p.getReferenceIfEnabled(this) != null)
+                    .filter(p -> p.getReferenceIfEnabled(this) != null)
                     .toList();
             if (!finalParallelBeans.isEmpty()) {
                 new Thread(() -> {
@@ -4233,7 +4233,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
 
         private static boolean isDefinitionEnabled(@NonNull DefaultBeanContext context,
-                                                   @NonNull BeanResolutionContext resolutionContext,
+                                                   @Nullable BeanResolutionContext resolutionContext,
                                                    @Nullable BeanDefinition<?> def) {
             if (def == null) {
                 return false;
