@@ -4201,9 +4201,19 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             AtomicReferenceFieldUpdater.newUpdater(BeanDefinitionProducer.class, Object.class, "definition");
         private static final Object DEFINITION_DISABLED_SENTINEL = "";
 
+        /**
+         * Initially the reference, may be set to {@code null} by {@link #disable()} or if
+         * {@link #getReferenceIfEnabled} determines the ref is disabled.
+         */
         @Nullable
         @SuppressWarnings("java:S3077")
         private volatile BeanDefinitionReference reference;
+        /**
+         * Initially {@code null}. If the {@link #reference} is enabled, and the definition from it
+         * is also enabled, this is set to the {@link BeanDefinition}. If the definition is
+         * disabled (either through conditions or explicitly by {@link #disable()}), this is set to
+         * {@link #DEFINITION_DISABLED_SENTINEL}.
+         */
         @Nullable
         @SuppressWarnings("java:S3077")
         private volatile Object definition;
