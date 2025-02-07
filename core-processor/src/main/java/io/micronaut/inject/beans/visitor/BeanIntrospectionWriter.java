@@ -517,7 +517,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             // 2: push enum name
             ExpressionDef.constant(enumConstantElement.getName()),
             // 3: annotation metadata
-            enumConstantElement.getAnnotationMetadata() == null ? (
+            enumConstantElement.getAnnotationMetadata() == null || enumConstantElement.getAnnotationMetadata().isEmpty() ? (
                 ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class))
             ) : getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadClassValueExpressionFn)
         );

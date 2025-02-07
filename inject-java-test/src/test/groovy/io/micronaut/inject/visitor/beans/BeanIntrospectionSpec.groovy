@@ -4146,7 +4146,8 @@ public enum Test {
     @JsonProperty("Y")
     B(1),
     @JsonProperty("Z")
-    C(2);
+    C(2),
+    D(3);
     private final int number;
     Test(int number) {
         this.number = number;
@@ -4181,6 +4182,7 @@ public enum Test {
         enumIntrospection.constants[0].stringValue(JsonProperty).get() == "X"
         enumIntrospection.constants[1].stringValue(JsonProperty).get() == "Y"
         enumIntrospection.constants[2].stringValue(JsonProperty).get() == "Z"
+        enumIntrospection.constants[3].stringValue(JsonProperty).isEmpty()
     }
 
     void "test enum bean properties with custom getter"() {
