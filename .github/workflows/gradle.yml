@@ -61,7 +61,7 @@ jobs:
       - name: "🚔 Sonatype Scan"
         id: sonatypescan
         run: |
-          ./gradlew ossIndexAudit --no-parallel
+          ./gradlew ossIndexAudit --info --no-parallel
 
       - name: "🛠 Build with Gradle"
         id: gradle
