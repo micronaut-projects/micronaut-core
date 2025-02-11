@@ -30,6 +30,8 @@ jobs:
       PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OSS_INDEX_USERNAME: ${{ secrets.OSS_INDEX_USERNAME }}
+      OSS_INDEX_PASSWORD: ${{ secrets.OSS_INDEX_PASSWORD }}
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: "🗑 Free disk space"
