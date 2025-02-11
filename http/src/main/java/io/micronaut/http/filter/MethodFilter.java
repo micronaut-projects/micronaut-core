@@ -43,6 +43,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
+import reactor.core.scheduler.NonBlocking;
 
 import java.util.List;
 import java.util.Objects;
@@ -763,10 +764,13 @@ record MethodFilter<T>(FilterOrder order,
 
         @Override
         public HttpResponse<?> proceed() {
+            if (Thread.currentThread() instanceof NonBlocking) {
+                throw new IllegalStateException("Cannot use blocking continuation on non-blocking thread. Please mark the filter to run on another thread with @ExecuteOn, or use a reactive continuation.");
+            }
+
             boolean interrupted = false;
             while (true) {
                 try {
-                    // todo: detect event loop thread
                     filterContext = downstream.apply(filterContext).toCompletableFuture().get();
                     if (interrupted) {
                         Thread.currentThread().interrupt();

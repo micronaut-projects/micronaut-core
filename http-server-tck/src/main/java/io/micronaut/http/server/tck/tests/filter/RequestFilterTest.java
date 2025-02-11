@@ -445,6 +445,7 @@ public class RequestFilterTest {
         }
 
         @RequestFilter("/request-filter/binding")
+        @ExecuteOn(TaskExecutors.BLOCKING)
         public void requestFilterBinding(
             @Header String contentType,
             @Body byte[] bytes,
