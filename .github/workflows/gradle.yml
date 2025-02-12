@@ -38,14 +38,14 @@ jobs:
          df -h
 
       - name: "📥 Checkout repository"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/gradle-build-action@v3.5.0
 
       - name: "❓ Optional setup step"
         run: |
@@ -58,7 +58,7 @@ jobs:
 
       - name: "📊 Publish Test Report"
         if: always()
-        uses: mikepenz/action-junit-report@v3
+        uses: mikepenz/action-junit-report@v5
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
