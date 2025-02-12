@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Streaming {@link io.micronaut.http.body.ByteBody} implementation based on NIO {@link ByteBuffer}s.
@@ -236,7 +237,7 @@ public final class ReactiveByteBufferByteBody implements CloseableByteBody, Inte
      */
     public static final class SharedBuffer extends BaseSharedBuffer<ByteBufferConsumer, ByteBuffer> implements ByteBufferConsumer {
         // fields for concurrency control, see #submit
-        private final AtomicReference<WorkState> workState = new AtomicReference<>(WorkState.CLEAN);
+        private final ReentrantLock lock = new ReentrantLock();
         private final ConcurrentLinkedQueue<Runnable> workQueue = new ConcurrentLinkedQueue<>();
 
         private SnapshotByteArrayOutputStream buffer;
@@ -256,7 +257,7 @@ public final class ReactiveByteBufferByteBody implements CloseableByteBody, Inte
          *     <li>Tasks submitted on one thread will not be reordered (local order). This is
          *     similar to {@code EventLoopFlow} semantics.</li>
          *     <li>Reentrant calls (calls to {@code submit} from inside a submitted task) will
-         *     delay the second task until the first task is complete.</li>
+         *     run the task immediately (required by servlet).</li>
          *     <li>There is no executor to run tasks. This ensures good locality when submissions
          *     have low contention (i.e. tasks are usually run immediately on the submitting
          *     thread).</li>
@@ -265,34 +266,20 @@ public final class ReactiveByteBufferByteBody implements CloseableByteBody, Inte
          * @param task The task to run
          */
         private void submit(Runnable task) {
-            /*
-             * This implementation is fairly simple: A work queue that contains all the tasks, and
-             * an atomic field to control concurrency.
-             */
-
             workQueue.add(task);
-            if (workState.getAndUpdate(ws -> ws == WorkState.CLEAN ? WorkState.WORKING_THEN_CLEAN : WorkState.WORKING_THEN_DIRTY) != WorkState.CLEAN) {
-                // another thread is working and will pick up our task
-                return;
-            }
 
-            // it's our turn
-            while (true) {
-                while (true) {
-                    task = workQueue.poll();
-                    if (task == null) {
-                        break;
-                    }
-                    task.run();
-                }
-
-                if (workState.compareAndSet(WorkState.WORKING_THEN_CLEAN, WorkState.CLEAN)) {
-                    // done!
+            while (!workQueue.isEmpty()) {
+                if (!lock.tryLock()) {
                     break;
                 }
-
-                // some other thread added a task in the meantime, run it.
-                workState.set(WorkState.WORKING_THEN_CLEAN);
+                try {
+                    Runnable todo = workQueue.poll();
+                    if (todo != null) {
+                        todo.run();
+                    }
+                } finally {
+                    lock.unlock();
+                }
             }
         }
 
