@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.LocaleResolver;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -177,7 +178,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
 
         List<String> messages = new ArrayList<>();
         for (io.micronaut.http.server.exceptions.response.Error e : errorContext.getErrors()) {
-            if (!e.getMessage().equalsIgnoreCase(httpStatusReason)) {
+            if (StringUtils.isNotEmpty(e.getMessage()) && !e.getMessage().equalsIgnoreCase(httpStatusReason)) {
                 messages.add(htmlSanitizer.sanitize(e.getMessage()));
             }
         }
