@@ -950,6 +950,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         public Environment stop() {
             if (bootstrapEnvironment != null) {
                 bootstrapEnvironment.stop();
+                bootstrapEnvironment = null;
             }
             return super.stop();
         }

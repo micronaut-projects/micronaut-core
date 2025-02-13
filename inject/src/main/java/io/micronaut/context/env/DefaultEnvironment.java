@@ -53,6 +53,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -868,6 +869,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private void diffMap(Map<String, Object> map, Map<String, Object> newMap, Map<String, Object> changes) {
+        Map<String, Object> remainingMap = new LinkedHashMap<>(map);
         for (Map.Entry<String, Object> entry : newMap.entrySet()) {
             String key = entry.getKey();
             Object newValue = entry.getValue();
@@ -884,8 +886,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
                     changes.put(key, oldValue);
                 }
+                remainingMap.remove(key);
             }
         }
+        remainingMap.forEach((key, value) -> {
+            changes.put(key, value);
+        });
     }
 
     private static boolean hasChanged(Object newValue, Object oldValue) {
