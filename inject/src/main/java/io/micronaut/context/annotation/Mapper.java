@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.annotation;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
@@ -36,7 +35,6 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.TYPE })
-@Experimental
 @Executable(processOnStartup = true)
 public @interface Mapper {
 
