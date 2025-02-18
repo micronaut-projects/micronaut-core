@@ -1369,7 +1369,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             if (StringUtils.isNotEmpty(factoryMethod)) {
                 return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> {
                     List<StatementDef> statements =
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, builderVar);
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar);
 
                     String propertyName = NameUtils.getPropertyNameForGetter(configBuilderMethodInjectPoint.methodName);
                     String setterName = NameUtils.setterNameFor(propertyName);
@@ -1383,7 +1383,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 return injectMethodSignature.instanceVar
                     .invoke(configBuilderMethodInjectPoint.methodName, builderType)
                     .newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, builderVar)
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar)
                     ));
             }
         }
@@ -1393,7 +1393,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             ClassTypeDef builderType = ClassTypeDef.of(configBuilderFieldInjectPoint.type);
             if (StringUtils.isNotEmpty(factoryMethod)) {
                 return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> {
-                    List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, builderVar);
+                    List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar);
 
                     statements.add(injectMethodSignature.instanceVar
                         .field(configBuilderFieldInjectPoint.field, builderType)
@@ -1405,14 +1405,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 return injectMethodSignature.instanceVar
                     .field(configBuilderFieldInjectPoint.field, builderType)
                     .newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, builderVar)
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar)
                     ));
             }
         }
         throw new IllegalStateException();
     }
 
-    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature, List<ConfigBuilderPointInjectCommand> points, VariableDef builderVar) {
+    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature, List<ConfigBuilderPointInjectCommand> points, VariableDef.Local builderVar) {
         List<StatementDef> statements = new ArrayList<>();
         for (ConfigBuilderPointInjectCommand builderPoint : points) {
             statements.add(
@@ -1423,7 +1423,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     private StatementDef getConfigBuilderPointStatement(InjectMethodSignature injectMethodSignature,
-                                                        VariableDef builderVar,
+                                                        VariableDef.Local builderVar,
                                                         ConfigBuilderPointInjectCommand builderPoint) {
         if (builderPoint instanceof ConfigBuilderMethodInjectCommand configBuilderMethodInjectPoint) {
             return visitConfigBuilderMethodInternal(
@@ -2912,16 +2912,17 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         Map<String, ClassElement> generics,
         boolean isDurationWithTimeUnit,
         String propertyPath,
-        VariableDef builderVar) {
+        VariableDef.Local builderVar) {
 
         boolean zeroArgs = paramType == null;
 
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
+        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace('.', '_').replace('-', '_'));
         return getGetValueForPathCall(injectMethodSignature, paramType, propertyName, propertyPath, zeroArgs, generics)
-            .newLocal("optional" + NameUtils.capitalize(propertyPath.replace('.', '_')), optionalVar -> {
+            .newLocal(localName, optionalVar -> {
                 return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)
                     .ifTrue(
-                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal("value", valueVar -> {
+                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal(localName + "_value", valueVar -> {
                             if (zeroArgs) {
                                 return valueVar.cast(boolean.class).ifTrue(
                                     StatementDef.doTry(
@@ -3050,7 +3051,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         if (!isRequired) {
-            return valueExpression.newLocal("value", valueVar ->
+            return valueExpression.newLocal(fieldElement.getName() + "Value", valueVar ->
                 valueVar.ifNonNull(
                     putField(fieldElement, requiresReflection, injectMethodSignature, valueVar, fieldIndex)
                 ));
