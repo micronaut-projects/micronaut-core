@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -166,6 +167,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
         ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
             .getEventPublisher(HttpRequestTerminatedEvent.class);
+        ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher = nettyEmbeddedServices
+            .getEventPublisher(HttpRequestReceivedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
             nettyEmbeddedServices.getExecutorSelector()
                 .select(TaskExecutors.BLOCKING).orElse(null)
@@ -175,6 +178,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             nettyEmbeddedServices,
             ioExecutor,
             httpRequestTerminatedEventPublisher,
+            httpRequestReceivedEventPublisher,
             applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);

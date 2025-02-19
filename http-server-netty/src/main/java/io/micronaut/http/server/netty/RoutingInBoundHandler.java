@@ -47,6 +47,7 @@ import io.micronaut.http.body.ResponseBodyWriterWrapper;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.EventLoopFlow;
@@ -124,6 +125,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     ExecutorService ioExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
+    final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
     /**
@@ -133,24 +135,26 @@ public final class RoutingInBoundHandler implements RequestHandler {
     boolean supportLoggingHandler = false;
 
     /**
-     * @param serverConfiguration          The Netty HTTP server configuration
-     * @param embeddedServerContext        The embedded server context
-     * @param ioExecutor                   The IO executor
-     * @param terminateEventPublisher      The terminate event publisher
-     * @param conversionService            The conversion service
+     * @param serverConfiguration               The Netty HTTP server configuration
+     * @param embeddedServerContext             The embedded server context
+     * @param ioExecutor                        The IO executor
+     * @param terminateEventPublisher           The terminate event publisher
+     * @param receivedPublisher                 The received publisher
+     * @param conversionService                 The conversion service
      */
     RoutingInBoundHandler(
         NettyHttpServerConfiguration serverConfiguration,
         NettyEmbeddedServices embeddedServerContext,
         Supplier<ExecutorService> ioExecutor,
         ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher,
-        ConversionService conversionService) {
+        ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher, ConversionService conversionService) {
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
         this.messageBodyHandlerRegistry = embeddedServerContext.getMessageBodyHandlerRegistry();
         this.ioExecutorSupplier = ioExecutor;
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
         this.terminateEventPublisher = terminateEventPublisher;
+        this.receivedPublisher = receivedPublisher;
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
@@ -205,6 +209,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        if (receivedPublisher != ApplicationEventPublisher.NO_OP) {
+            receivedPublisher.publishEvent(new HttpRequestReceivedEvent(mnRequest));
+        }
         if (serverConfiguration.isValidateUrl()) {
             try {
                 mnRequest.getUri();
