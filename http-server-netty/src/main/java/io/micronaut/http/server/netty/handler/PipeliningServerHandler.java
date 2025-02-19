@@ -30,7 +30,6 @@ import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.runtime.server.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -76,11 +75,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.Optional;
-import java.util.Queue;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a

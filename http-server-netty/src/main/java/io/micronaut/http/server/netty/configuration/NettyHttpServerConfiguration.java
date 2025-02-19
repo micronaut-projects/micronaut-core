@@ -1455,24 +1455,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private boolean serverSocket = true;
 
         /**
-         * Create a TCP listener configuration.
-         *
-         * @param host The host to bind to
-         * @param port The port to bind to
-         * @param ssl Whether to enable SSL
-         * @return The configuration with the given settings
-         */
-        @Internal
-        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
-            NettyListenerConfiguration configuration = new NettyListenerConfiguration(host + ":" + port);
-            configuration.setFamily(Family.TCP);
-            configuration.setHost(host);
-            configuration.setPort(port);
-            configuration.setSsl(ssl);
-            return configuration;
-        }
-
-        /**
          * Constructor.
          *
          * @param name The name of this listener
@@ -1490,6 +1472,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Deprecated
         public NettyListenerConfiguration() {
             this("unknown");
+        }
+
+        /**
+         * Create a TCP listener configuration.
+         *
+         * @param host The host to bind to
+         * @param port The port to bind to
+         * @param ssl Whether to enable SSL
+         * @return The configuration with the given settings
+         */
+        @Internal
+        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
+            NettyListenerConfiguration configuration = new NettyListenerConfiguration(host + ":" + port);
+            configuration.setFamily(Family.TCP);
+            configuration.setHost(host);
+            configuration.setPort(port);
+            configuration.setSsl(ssl);
+            return configuration;
         }
 
         /**
