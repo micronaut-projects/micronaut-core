@@ -20,11 +20,13 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.simple.cookies.SimpleCookies;
 
 import java.util.Optional;
@@ -53,14 +55,23 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
         this.cookies.put(cookie.getName(), cookie);
+        updateCookies();
         return this;
+    }
+
+    private void updateCookies() {
+        headers.remove(HttpHeaders.SET_COOKIE);
+        for (Cookie cookie : cookies.getAll()) {
+            ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> headers.add(HttpHeaders.SET_COOKIE, c));
+        }
     }
 
     @Override
     public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
         for (Cookie cookie: cookies) {
-            cookie(cookie);
+            this.cookies.put(cookie.getName(), cookie);
         }
+        updateCookies();
         return this;
     }
 

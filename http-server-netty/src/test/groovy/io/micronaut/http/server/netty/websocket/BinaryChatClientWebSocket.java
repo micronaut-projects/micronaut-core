@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.websocket;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
@@ -32,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 
+@Requires(property = "spec.name", value = "BinaryWebSocketSpec")
 @ClientWebSocket("/binary/chat/{topic}/{username}")
 public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 

@@ -17,7 +17,7 @@ class ServiceHttpClientHealthIndicatorSpec extends Specification {
     ServiceHttpClientConfiguration.ServiceConnectionPoolConfiguration connectionPoolConfiguration = null
     ServiceHttpClientConfiguration.ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration = null
     ServiceHttpClientConfiguration.ServiceSslClientConfiguration sslConfiguration = null
-    ServiceHttpClientConfiguration serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", connectionPoolConfiguration, webSocketCompressionConfiguration, sslConfiguration, Mock(HttpClientConfiguration))
+    ServiceHttpClientConfiguration serviceHttpConfiguration = new ServiceHttpClientConfiguration("some-http-service", connectionPoolConfiguration, webSocketCompressionConfiguration, null, sslConfiguration, Mock(HttpClientConfiguration))
 
     def "Health Indicator is set to true and is healthy"() {
         given:

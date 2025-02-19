@@ -52,7 +52,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 /**
@@ -576,7 +575,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         // one reference is kept by the MicronautHttpData.chunks list, and is released on MicronautHttpData.deallocate.
         // The other reference is created by the user on pollChunk, and released when she calls claim()
 
-        private final Lock lock = new ReentrantLock();
+        private final Lock lock = new NonReentrantLock();
         private final long offset;
         @Nullable
         private ByteBuf buf; // always has refCnt = 1
@@ -595,11 +594,11 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
                 buf = mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, Math.toIntExact(length));
             } else {
                 CompositeByteBuf composite = Unpooled.compositeBuffer(lastSegmentIndex - firstSegmentIndex + 1);
-                composite.addComponent(mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, MMAP_SEGMENT_SIZE - offsetInSegment));
+                composite.addComponent(true, mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, MMAP_SEGMENT_SIZE - offsetInSegment));
                 for (int i = firstSegmentIndex + 1; i < lastSegmentIndex; i++) {
-                    composite.addComponent(mmapSegment(i).retain());
+                    composite.addComponent(true, mmapSegment(i).retain());
                 }
-                composite.addComponent(mmapSegment(lastSegmentIndex).retainedSlice(0, Math.toIntExact((offset + length) % MMAP_SEGMENT_SIZE)));
+                composite.addComponent(true, mmapSegment(lastSegmentIndex).retainedSlice(0, Math.toIntExact((offset + length - 1) % MMAP_SEGMENT_SIZE + 1)));
                 buf = composite;
             }
             if (oldBuf != null) {

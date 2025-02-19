@@ -19,10 +19,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
+import io.micronaut.core.util.StringUtils
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
+import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.health.aggregator.DefaultHealthAggregator
@@ -103,7 +106,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are not available with all disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': false])
+        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': StringUtils.FALSE])
 
         expect:
         !context.containsBean(HealthEndpoint)
@@ -117,8 +120,8 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are available with all disabled and health enabled"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': false, 'endpoints.health.enabled': true])
-
+        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': StringUtils.FALSE,
+                                                             'endpoints.health.enabled': StringUtils.TRUE])
         context.start()
 
         expect:
@@ -136,17 +139,17 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'micronaut.application.name': 'foo',
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:h2:mem:twoDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health", Map).blockFirst()
+        HttpResponse<Map> response = client.exchange("/health", Map)
         Map result = response.body()
-
 
         then:
         response.code() == HttpStatus.OK.code
@@ -169,22 +172,43 @@ class HealthEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test health endpoint returns 401 for sensitive true and details-visible anonymous"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': StringUtils.TRUE,
+                'endpoints.health.details-visible': DetailsVisibility.ANONYMOUS])
+        URL server = embeddedServer.getURL()
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
+
+        when:
+        client.exchange("/health", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+        HttpStatus.UNAUTHORIZED == ex.status
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     void "test health endpoint with a high diskspace threshold"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health", HealthResult)
-                                .onErrorResume(throwable -> {
-                                    def rsp = ((HttpClientResponseException) throwable).response
-                                    rsp.getBody(HealthResult)
-                                    return Flux.just(rsp)
-        }).blockFirst()
+        client.exchange("/health", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+        HttpResponse<HealthResult> response = ex.response
         HealthResult result = response.getBody(HealthResult).get()
 
         then:
@@ -202,15 +226,15 @@ class HealthEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'endpoints.health.status.http-mapping.DOWN': 200,
                 'endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health", HealthResult)
-                                .blockFirst()
+        HttpResponse<HealthResult> response = client.exchange("/health", HealthResult)
         HealthResult result = response.body()
 
         then:
@@ -228,19 +252,21 @@ class HealthEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:mysql://localhost:59654/foo'
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
+        when:
+        client.exchange("/health", Map)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
 
         when:
-        def response = rxClient.exchange("/health", Map).onErrorResume(throwable -> {
-                def rsp = ((HttpClientResponseException) throwable).response
-                rsp.getBody(Map)
-                return Flux.just(rsp)
-        }).blockFirst()
+        HttpResponse<Map> response = ex.response
         Map result = response.getBody(Map).get()
 
         then:
@@ -254,21 +280,21 @@ class HealthEndpointSpec extends Specification {
 
         cleanup:
         embeddedServer?.close()
-
     }
 
     void "test /health/liveness endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
         embeddedServer.applicationContext.createBean(TestLivenessHealthIndicator.class)
 
         when:
-        def response = rxClient.exchange("/health/liveness", Map).blockFirst()
+        HttpResponse<Map> response = client.exchange("/health/liveness", Map)
         Map result = response.body()
 
         then:
@@ -286,14 +312,15 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.application.name': 'foo',
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
         embeddedServer.applicationContext.createBean(TestReadinessHealthIndicator.class)
 
         when:
-        def response = rxClient.exchange("/health/readiness", Map).blockFirst()
+        HttpResponse<Map> response = client.exchange("/health/readiness", Map)
         Map result = response.body()
 
         then:
@@ -311,14 +338,15 @@ class HealthEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
         embeddedServer.applicationContext.createBean(TestReadinessHealthIndicator.class)
 
         when:
-        def response = rxClient.exchange("/health/readiness", Map).blockFirst()
+        HttpResponse<Map> response = client.exchange("/health/readiness", Map)
         Map result = response.body()
 
         then:
@@ -337,18 +365,20 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'indicator.name': 'TestLivenessDown',
-                'endpoints.health.sensitive': false
+                'endpoints.health.sensitive': StringUtils.FALSE
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health/liveness", HealthResult)
-                .onErrorResume(throwable -> {
-                        def rsp = ((HttpClientResponseException) throwable).response
-                        rsp.getBody(HealthResult)
-                        return Flux.just(rsp)
-                }).blockFirst()
+        client.exchange("/health/liveness", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+
+        when:
+        HttpResponse<HealthResult> response = ex.response
         HealthResult result = response.getBody(HealthResult).get()
 
         then:
@@ -364,18 +394,20 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'indicator.name': 'TestReadinessDown',
-                'endpoints.health.sensitive': false
+                'endpoints.health.sensitive': StringUtils.FALSE
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health/readiness", HealthResult)
-                .onErrorResume(throwable -> {
-                        def rsp = ((HttpClientResponseException) throwable).response
-                        rsp.getBody(HealthResult)
-                        return Flux.just(rsp)
-                }).blockFirst()
+        client.exchange("/health/readiness", HealthResult)
+
+        then:
+        HttpClientResponseException ex = thrown(HttpClientResponseException)
+
+        when:
+        HttpResponse<HealthResult> response = ex.response
         HealthResult result = response.getBody(HealthResult).get()
 
         then:
@@ -391,15 +423,15 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'indicator.name': 'TestReadinessDown',
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'endpoints.health.status.http-mapping.DOWN': 200
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health/readiness", HealthResult)
-                .blockFirst()
+        HttpResponse<HealthResult> response = client.exchange("/health/readiness", HealthResult)
         HealthResult result = response.body()
 
         then:
@@ -415,15 +447,15 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'indicator.name': 'TestLivenessDown',
-                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive': StringUtils.FALSE,
                 'endpoints.health.status.http-mapping.DOWN': 200
         ])
         URL server = embeddedServer.getURL()
-        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, server)
+        BlockingHttpClient client = httpClient.toBlocking()
 
         when:
-        def response = rxClient.exchange("/health/liveness", HealthResult)
-                .blockFirst()
+        HttpResponse<HealthResult> response = client.exchange("/health/liveness", HealthResult)
         HealthResult result = response.body()
 
         then:

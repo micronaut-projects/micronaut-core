@@ -45,6 +45,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
+
 /**
  * An AST transformation that produces metadata for use by the injection container
  *
@@ -77,14 +78,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode classNode = classes[0]
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
-                GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
-                GroovyPackageElement groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
+                def visitorContext = new GroovyVisitorContext(source, unit)
+                def groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
                 if (groovyPackageElement.hasStereotype(Configuration)) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                    def writer = new BeanConfigurationWriter(
                             classNode.packageName,
                             groovyPackageElement,
-                            groovyPackageElement.getAnnotationMetadata(),
-                            visitorContext
+                            groovyPackageElement.getAnnotationMetadata()
                     )
                     try {
                         writer.accept(outputVisitor)
@@ -97,7 +97,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit)
+        def groovyVisitorContext = new GroovyVisitorContext(source, unit)
         def elementAnnotationMetadataFactory = groovyVisitorContext
                 .getElementAnnotationMetadataFactory()
                 .readOnly()

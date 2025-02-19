@@ -33,6 +33,11 @@ import java.util.Optional;
 public interface Cookie extends Comparable<Cookie>, Serializable {
 
     /**
+     * Constant for undefined MaxAge attribute value.
+     */
+    long UNDEFINED_MAX_AGE = Long.MIN_VALUE;
+
+    /**
      * @see <a href="https://tools.ietf.org/html/rfc6265#section-4.1.1">The Secure Attribute</a>.
      */
     String ATTRIBUTE_SECURE = "Secure";
@@ -66,7 +71,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2">The Max-Age Attribute</a>
      */
     String ATTRIBUTE_MAX_AGE = "Max-Age";
-    
+
     /**
      * @return The name of the cookie
      */
@@ -110,6 +115,10 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     boolean isSecure();
 
     /**
+     * Gets the maximum age of the cookie in seconds. If the max age has not been explicitly set,
+     * then the value returned will be {@link #UNDEFINED_MAX_AGE}, indicating that the Max-Age
+     * Attribute should not be written.
+     *
      * @return The maximum age of the cookie in seconds
      */
     long getMaxAge();
@@ -136,7 +145,8 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     }
 
     /**
-     * Sets the max age of the cookie in seconds.
+     * Sets the max age of the cookie in seconds. When not explicitly set, the max age will default
+     * to {@link #UNDEFINED_MAX_AGE} and cause the Max-Age Attribute not to be encoded.
      *
      * @param maxAge The max age
      * @return This cookie

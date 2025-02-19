@@ -1,6 +1,7 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.HttpRequest
@@ -56,6 +57,7 @@ import io.netty.handler.codec.http2.Http2FrameStream
 import io.netty.handler.codec.http2.Http2FrameStreamEvent
 import io.netty.handler.codec.http2.Http2Headers
 import io.netty.handler.codec.http2.Http2HeadersFrame
+import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
@@ -93,8 +95,9 @@ class ConnectionManagerSpec extends Specification {
             int i = 0
 
             @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
+            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer, Thread requestingThread) {
                 try {
+                    channelInitializer.bootstrappedCustomizer = clientCustomizer
                     def connection = connections[i++]
                     connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
                         def loop
@@ -127,6 +130,7 @@ class ConnectionManagerSpec extends Specification {
     def 'simple http2 get'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -148,6 +152,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http2 streaming get'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -184,7 +189,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 get with compression'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -215,6 +220,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http2 get with compression'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -250,6 +256,7 @@ class ConnectionManagerSpec extends Specification {
     def 'simple http1 tls get'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -267,6 +274,7 @@ class ConnectionManagerSpec extends Specification {
     def 'simple h2c get'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.plaintext-mode': 'h2c',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -284,7 +292,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 streaming get'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -302,6 +310,7 @@ class ConnectionManagerSpec extends Specification {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -369,7 +378,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 reuse'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -392,7 +401,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 not reused after refresh'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn1 = new EmbeddedTestConnectionHttp1()
@@ -414,7 +423,7 @@ class ConnectionManagerSpec extends Specification {
 
     def 'http1 plain text customization'() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
         def tracker = ctx.getBean(CustomizerTracker)
 
@@ -444,7 +453,6 @@ class ConnectionManagerSpec extends Specification {
 
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.channel == conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -463,6 +471,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.http.client.plaintext-mode': 'h2c',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
         def tracker = ctx.getBean(CustomizerTracker)
@@ -502,7 +511,6 @@ class ConnectionManagerSpec extends Specification {
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req1Channel.channel !== conn.clientChannel
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
@@ -523,6 +531,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http1 exchange read timeout'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.read-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -563,6 +572,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.http.client.read-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -605,6 +615,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http1 read timeout during dispatch'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.read-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -641,6 +652,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http1 ttl'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.connect-ttl': '100s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -668,6 +680,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.http.client.connect-ttl': '100s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -697,6 +710,7 @@ class ConnectionManagerSpec extends Specification {
     def 'http1 pool timeout'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.connection-pool-idle-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -726,6 +740,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.http.client.connect-ttl': '100s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -772,7 +787,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'cancel pool acquisition'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -820,6 +835,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.max-pending-acquires': 5,
                 'micronaut.http.client.pool.max-pending-connections': 1,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -871,6 +887,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.max-pending-connections': 1,
                 'micronaut.http.client.pool.max-concurrent-http1-connections': 2,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -900,7 +917,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'multipart request'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -934,7 +951,7 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'publisher request'() {
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
@@ -968,6 +985,7 @@ class ConnectionManagerSpec extends Specification {
     def 'connection pool disabled http1'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.enabled': false,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -994,6 +1012,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.enabled': false,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -1020,7 +1039,8 @@ class ConnectionManagerSpec extends Specification {
 
     def 'http2 goaway'() {
         def ctx = ApplicationContext.run([
-                'micronaut.http.client.ssl.insecure-trust-all-certificates'  : true
+                'micronaut.http.client.ssl.insecure-trust-all-certificates'  : true,
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -1053,7 +1073,8 @@ class ConnectionManagerSpec extends Specification {
     def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-                'micronaut.http.client.read-timeout': '5s'
+                'micronaut.http.client.read-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -1102,6 +1123,7 @@ class ConnectionManagerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.http.client.read-timeout': '1s',
+                'spec.name': ConnectionManagerSpec.simpleName,
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
@@ -1141,6 +1163,86 @@ class ConnectionManagerSpec extends Specification {
 
         where:
         http2 << [false, true]
+    }
+
+    def 'automated ping, writes only'(String prop, boolean ping) {
+        given:
+        def props = [
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ]
+        props.put(prop, '1s')
+        def ctx = ApplicationContext.run(props)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+
+        conn.clientChannel.unfreezeTime()
+        for (int i = 0; i < 8; i++) {
+            conn.testExchangeRequest(client)
+            TimeUnit.MILLISECONDS.sleep(250)
+        }
+        conn.advance()
+
+        def msgs = conn.serverChannel.inboundMessages().toList()
+
+        expect:
+        msgs.size() >= (ping ? 9 : 8)
+        msgs.any { it instanceof Http2PingFrame } == ping
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        prop                                              | ping
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | false
+        'micronaut.http.client.http2.ping-interval-idle'  | false
+    }
+
+    def 'automated ping, no traffic'(String prop, boolean ping) {
+        given:
+        def props = [
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ]
+        props.put(prop, '1s')
+        def ctx = ApplicationContext.run(props)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        // do one request
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+
+        conn.clientChannel.unfreezeTime()
+        TimeUnit.SECONDS.sleep(2)
+        conn.advance()
+
+        expect:
+        conn.serverChannel.readInbound() instanceof Http2PingFrame == ping
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        prop                                              | ping
+        'micronaut.http.client.http2.ping-interval-read'  | true
+        'micronaut.http.client.http2.ping-interval-write' | true
+        'micronaut.http.client.http2.ping-interval-idle'  | true
     }
 
     void assertPoolConnections(DefaultHttpClient client, int count) {
@@ -1403,6 +1505,7 @@ class ConnectionManagerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "ConnectionManagerSpec")
     @Singleton
     static class CustomizerTracker implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
         final Queue<Snapshot> initialPipelineBuilt = new ArrayDeque<>()

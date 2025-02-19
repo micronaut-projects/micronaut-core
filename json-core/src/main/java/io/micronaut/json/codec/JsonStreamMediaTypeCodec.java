@@ -37,10 +37,12 @@ import java.util.List;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced with message body writers / readers API
  */
 @Experimental
 @Singleton
 @BootstrapContextCompatible
+@Deprecated(forRemoval = true, since = "4.7")
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json-stream";
@@ -48,9 +50,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     private final List<MediaType> streamAdditionalTypes;
 
     /**
-     * @param jsonMapper                To read/write JSON
+     * @param jsonMapper To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     public JsonStreamMediaTypeCodec(JsonMapper jsonMapper,
                                     ApplicationConfiguration applicationConfiguration,
@@ -64,9 +66,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     }
 
     /**
-     * @param jsonCodec                To read/write JSON
+     * @param jsonCodec To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
+     * @param codecConfiguration The configuration for the codec
      */
     @Inject
     public JsonStreamMediaTypeCodec(BeanProvider<JsonMapper> jsonCodec,
@@ -82,7 +84,7 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     @Override
     public Collection<MediaType> getMediaTypes() {
-        List<MediaType> mediaTypes = new ArrayList<>();
+        var mediaTypes = new ArrayList<MediaType>();
         mediaTypes.add(MediaType.APPLICATION_JSON_STREAM_TYPE);
         mediaTypes.addAll(streamAdditionalTypes);
         return mediaTypes;

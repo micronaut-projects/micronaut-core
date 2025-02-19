@@ -18,8 +18,15 @@ package io.micronaut.core.order;
 /**
  * Interface for objects that are ordered.
  *
+ * <p>Provides a programmatic alternative to {@link io.micronaut.core.annotation.Order}.</p>
+ *
+ * <p>Note that this interface only applies to injected collection types since the beans have
+ * to be instantiated to resolve the order therefore unlike {@link io.micronaut.core.annotation.Order}
+ * it cannot be used for the purposes of prioritizing bean selection.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
+ * @see io.micronaut.core.annotation.Order
  */
 public interface Ordered {
     /**

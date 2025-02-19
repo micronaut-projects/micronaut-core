@@ -15,9 +15,13 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * An injection point as a point in a class definition where dependency injection is required.
@@ -32,5 +36,26 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
      * @return The bean that declares this injection point
      */
     @NonNull BeanDefinition<T> getDeclaringBean();
+
+    /**
+     * @return The qualifier of the bean that declares this injection point
+     * @since 4.5.0
+     */
+    @Nullable
+    default Qualifier<T> getDeclaringBeanQualifier() {
+        return getDeclaringBean().getDeclaredQualifier();
+    }
+
+    /**
+     * Check whether injection is required for the given metadata.
+     * @param annotationMetadata The annotation metadata.
+     * @return True if injection is required.
+     * @since 4.5.0
+     */
+    static boolean isInjectionRequired(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata != null && annotationMetadata
+            .booleanValue(AnnotationUtil.INJECT, AnnotationUtil.MEMBER_REQUIRED)
+            .orElse(true);
+    }
 
 }

@@ -17,34 +17,24 @@ package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.io.IOUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -67,49 +57,8 @@ final class ServiceScanner<S> {
         this.transformer = transformer;
     }
 
-    private static URI normalizeFilePath(String path, URI uri) {
-        Path p = Paths.get(uri);
-        if (p.endsWith(path)) {
-            Path subpath = Paths.get(path);
-            for (int i = 0; i < subpath.getNameCount(); i++) {
-                p = p.getParent();
-            }
-            uri = p.toUri();
-        }
-        return uri;
-    }
-
-    /**
-     * Note: referenced by {@code io.micronaut.core.graal.ServiceLoaderInitialization}.
-     */
-    @SuppressWarnings("java:S3398")
-    private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
-        final StaticServiceDefinitions ssd = findStaticServiceDefinitions();
-        if (ssd != null) {
-            return ssd.serviceTypeMap.getOrDefault(
-                path,
-                Collections.emptySet()
-            );
-        } else {
-            Set<String> typeNames = new HashSet<>();
-            // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
-            @SuppressWarnings({"Convert2Lambda", "java:S1604"}) Consumer<Path> consumer = new Consumer<>() {
-
-                @Override
-                public void accept(Path currentPath) {
-                    if (Files.isRegularFile(currentPath)) {
-                        final String typeName = currentPath.getFileName().toString();
-                        typeNames.add(typeName);
-                    }
-                }
-            };
-            IOUtils.eachFile(uri, path, consumer);
-            return typeNames;
-        }
-    }
-
     @Nullable
-    private static StaticServiceDefinitions findStaticServiceDefinitions() {
+    static StaticServiceDefinitions findStaticServiceDefinitions() {
         if (hasImageSingletons()) {
             return ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
         } else {
@@ -138,7 +87,7 @@ final class ServiceScanner<S> {
                     if (line == null) {
                         break;
                     }
-                    if (line.length() == 0 || line.charAt(0) == '#') {
+                    if (line.isEmpty() || line.charAt(0) == '#') {
                         continue;
                     }
                     if (!lineCondition.test(line)) {
@@ -157,47 +106,8 @@ final class ServiceScanner<S> {
         return typeNames;
     }
 
-    private boolean isWebSphereClassLoader() {
-        return classLoader.getClass().getName().startsWith("com.ibm.ws.classloader");
-    }
-
-    private String buildResourceSearchPath() {
-        String path = "META-INF/micronaut/" + serviceName;
-
-        if (isWebSphereClassLoader()) {
-            // Special case WebSphere classloader
-            // https://github.com/micronaut-projects/micronaut-core/issues/9905
-            return path + "/";
-        }
-
-        return path;
-    }
-
     private Enumeration<URL> findStandardServiceConfigs() throws IOException {
         return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
-    }
-
-    private void findMicronautMetaServiceConfigs(BiConsumer<URI, String> consumer) throws IOException, URISyntaxException {
-        String path = buildResourceSearchPath();
-        final Enumeration<URL> micronautResources = classLoader.getResources(path);
-        Set<URI> uniqueURIs = new LinkedHashSet<>();
-        while (micronautResources.hasMoreElements()) {
-            URL url = micronautResources.nextElement();
-            final URI uri = url.toURI();
-            uniqueURIs.add(uri);
-        }
-
-        for (URI uri : uniqueURIs) {
-            String scheme = uri.getScheme();
-            if ("file".equals(scheme)) {
-                uri = normalizeFilePath(path, uri);
-            }
-            // on GraalVM there are spurious extra resources that end with # and then a number
-            // we ignore this extra ones
-            if (!("resource".equals(scheme) && uri.toString().contains("#"))) {
-                consumer.accept(uri, path);
-            }
-        }
     }
 
     /**
@@ -218,12 +128,13 @@ final class ServiceScanner<S> {
                     tasks.add(task);
                     task.fork();
                 }
-                findMicronautMetaServiceConfigs((uri, path) -> {
-                    final MicronautMetaServicesLoader task = new MicronautMetaServicesLoader(uri, path);
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                for (String serviceEntry : serviceEntries) {
+                    final ServiceInstanceLoader task = new ServiceInstanceLoader(serviceEntry);
                     tasks.add(task);
                     task.fork();
-                });
-            } catch (IOException | URISyntaxException e) {
+                }
+            } catch (IOException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
             }
         }
@@ -239,7 +150,7 @@ final class ServiceScanner<S> {
 
         @Override
         public void collect(Collection<S> values, boolean allowFork) {
-            if (allowFork) {
+            if (allowFork && ForkJoinPool.getCommonPoolParallelism() > 1) {
                 ForkJoinPool.commonPool().invoke(this);
                 for (RecursiveActionValuesCollector<S> task : tasks) {
                     task.join();
@@ -257,47 +168,16 @@ final class ServiceScanner<S> {
                             }
                         }
                     }
-                    findMicronautMetaServiceConfigs((uri, path) -> {
-                        for (String typeName : computeMicronautServiceTypeNames(uri, path)) {
-                            S val = transformer.apply(typeName);
-                            if (val != null) {
-                                values.add(val);
-                            }
+                    Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                    for (String serviceEntry : serviceEntries) {
+                        S val = transformer.apply(serviceEntry);
+                        if (val != null) {
+                            values.add(val);
                         }
-                    });
-                } catch (IOException | URISyntaxException e) {
+                    }
+                } catch (IOException e) {
                     throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
                 }
-            }
-        }
-    }
-
-    private final class MicronautMetaServicesLoader extends RecursiveActionValuesCollector<S> {
-        private final URI uri;
-        private final List<ServiceInstanceLoader> tasks = new ArrayList<>();
-        private final String path;
-
-        private MicronautMetaServicesLoader(URI uri, String path) {
-            this.uri = uri;
-            this.path = path;
-        }
-
-        @Override
-        public void collect(Collection<S> values) {
-            for (ServiceInstanceLoader task : tasks) {
-                task.join();
-                task.collect(values);
-            }
-        }
-
-        @Override
-        @SuppressWarnings("java:S2095")
-        protected void compute() {
-            Set<String> typeNames = computeMicronautServiceTypeNames(uri, path);
-            for (String typeName : typeNames) {
-                ServiceInstanceLoader task = new ServiceInstanceLoader(typeName);
-                tasks.add(task);
-                task.fork();
             }
         }
     }

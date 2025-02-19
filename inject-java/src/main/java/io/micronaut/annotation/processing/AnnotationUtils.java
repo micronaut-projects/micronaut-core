@@ -29,6 +29,7 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.Set;
 
 /**
  * Utility methods for annotations.
@@ -54,24 +55,24 @@ public class AnnotationUtils {
     /**
      * Default constructor.
      *
-     * @param processingEnv     The processing env
-     * @param elementUtils      The elements
-     * @param messager          The messager
-     * @param types             The types
-     * @param modelUtils        The model utils
-     * @param genericUtils      The generic utils
-     * @param filer             The filer
+     * @param processingEnv The processing env
+     * @param elementUtils The elements
+     * @param messager The messager
+     * @param types The types
+     * @param modelUtils The model utils
+     * @param genericUtils The generic utils
+     * @param filer The filer
      * @param visitorAttributes The visitor attributes
      */
     protected AnnotationUtils(
-            ProcessingEnvironment processingEnv,
-            Elements elementUtils,
-            Messager messager,
-            Types types,
-            ModelUtils modelUtils,
-            GenericUtils genericUtils,
-            Filer filer,
-            MutableConvertibleValues<Object> visitorAttributes) {
+        ProcessingEnvironment processingEnv,
+        Elements elementUtils,
+        Messager messager,
+        Types types,
+        ModelUtils modelUtils,
+        GenericUtils genericUtils,
+        Filer filer,
+        MutableConvertibleValues<Object> visitorAttributes) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
@@ -85,27 +86,28 @@ public class AnnotationUtils {
     /**
      * Default constructor.
      *
-     * @param processingEnv     The processing env
-     * @param elementUtils      The elements
-     * @param messager          The messager
-     * @param types             The types
-     * @param modelUtils        The model utils
-     * @param genericUtils      The generic utils
-     * @param filer             The filer
+     * @param processingEnv The processing env
+     * @param elementUtils The elements
+     * @param messager The messager
+     * @param types The types
+     * @param modelUtils The model utils
+     * @param genericUtils The generic utils
+     * @param filer The filer
      */
     public AnnotationUtils(
-            ProcessingEnvironment processingEnv,
-            Elements elementUtils,
-            Messager messager,
-            Types types,
-            ModelUtils modelUtils,
-            GenericUtils genericUtils,
-            Filer filer) {
+        ProcessingEnvironment processingEnv,
+        Elements elementUtils,
+        Messager messager,
+        Types types,
+        ModelUtils modelUtils,
+        GenericUtils genericUtils,
+        Filer filer) {
         this(processingEnv, elementUtils, messager, types, modelUtils, genericUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
      * The {@link AnnotatedElementValidator} instance. Can be null.
+     *
      * @return The validator instance
      */
     public @Nullable AnnotatedElementValidator getElementValidator() {
@@ -121,10 +123,10 @@ public class AnnotationUtils {
     @Deprecated(forRemoval = true, since = "4.3.0")
     public JavaAnnotationMetadataBuilder newAnnotationBuilder() {
         return new JavaAnnotationMetadataBuilder(
-                elementUtils,
-                messager,
-                this,
-                modelUtils
+            elementUtils,
+            messager,
+            this,
+            modelUtils
         );
     }
 
@@ -135,14 +137,15 @@ public class AnnotationUtils {
      */
     public JavaVisitorContext newVisitorContext() {
         return new JavaVisitorContext(
-                processingEnv,
-                messager,
-                elementUtils,
-                types,
-                modelUtils,
-                filer,
-                visitorAttributes,
-                TypeElementVisitor.VisitorKind.ISOLATING
+            processingEnv,
+            messager,
+            elementUtils,
+            types,
+            modelUtils,
+            filer,
+            visitorAttributes,
+            TypeElementVisitor.VisitorKind.ISOLATING,
+            Set.of()
         );
     }
 

@@ -15,7 +15,11 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * A BeanConfiguration is a grouping of several {@link BeanDefinition} instances.
@@ -48,7 +52,9 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * @param beanDefinitionReference The bean definition class
      * @return True if it is
      */
-    boolean isWithin(BeanDefinitionReference beanDefinitionReference);
+    default boolean isWithin(BeanDefinitionReference beanDefinitionReference) {
+        return isWithin(beanDefinitionReference.getBeanType());
+    }
 
     /**
      * Check whether the specified class is within this bean configuration.
@@ -56,7 +62,12 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * @param className The class name
      * @return True if it is
      */
-    boolean isWithin(String className);
+    default boolean isWithin(String className) {
+        String packageName = getName();
+        final int i = className.lastIndexOf('.');
+        String pkgName = i > -1 ? className.substring(0, i) : className;
+        return pkgName.equals(packageName) || pkgName.startsWith(packageName + '.');
+    }
 
     /**
      * Check whether the specified class is within this bean configuration.
@@ -66,5 +77,38 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      */
     default boolean isWithin(Class cls) {
         return isWithin(cls.getName());
+    }
+
+    /**
+     * Programmatically create a bean configuration for the given package.
+      * @param thePackage The package
+     * @param condition The condition
+     * @return The bean configuration
+     * @since 4.8.0
+     */
+    static @NonNull BeanConfiguration of(@NonNull Package thePackage, @NonNull Predicate<BeanContext> condition) {
+        return of(thePackage.getName(), condition);
+    }
+
+    /**
+     * Programmatically create a bean configuration for the given package.
+     * @param thePackage The package
+     * @param condition The condition
+     * @return The bean configuration
+     * @since 4.8.0
+     */
+    static @NonNull BeanConfiguration of(@NonNull String thePackage, @NonNull Predicate<BeanContext> condition) {
+        return new ConditionalBeanConfiguration(thePackage, condition);
+    }
+
+    /**
+     * Programmatically disable beans within a package.
+     *
+     * @param thePackage The package name
+     * @return The bean configuration
+     * @since 4.8.0
+     */
+    static @NonNull BeanConfiguration disabled(@NonNull String thePackage) {
+        return new ConditionalBeanConfiguration(thePackage, (beanContext -> false));
     }
 }

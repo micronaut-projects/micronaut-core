@@ -46,7 +46,7 @@ class MaxResponseSizeSpec extends Specification {
 
         then:
         def e = thrown(ContentLengthExceededException)
-        e.message == "Client '/': The received length exceeds the maximum allowed content length [1024]"
+        e.message == "Client '/': The received length [7000] exceeds the maximum allowed content length [1024]"
     }
 
     @Requires(property = "spec.name", value = 'MaxResponseSizeSpec' )

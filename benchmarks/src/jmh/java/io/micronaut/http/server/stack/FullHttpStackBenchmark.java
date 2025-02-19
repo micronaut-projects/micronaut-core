@@ -4,8 +4,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -37,6 +35,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class FullHttpStackBenchmark {
+    /**
+     * If {@code true}, verify that the test is running on a netty {@link FastThreadLocalThread}.
+     * This is relevant for performance testing, but doesn't matter for type pollution tests. Don't
+     * turn this off for perf testing!
+     */
+    public static boolean checkFtlThread = true;
+
     @Benchmark
     public void test(Holder holder) {
         ByteBuf response = holder.exchange();
@@ -85,7 +90,7 @@ public class FullHttpStackBenchmark {
 
         @Setup
         public void setUp() {
-            if (!(Thread.currentThread() instanceof FastThreadLocalThread)) {
+            if (checkFtlThread && !(Thread.currentThread() instanceof FastThreadLocalThread)) {
                 throw new IllegalStateException("Should run on a netty FTL thread");
             }
 
@@ -111,14 +116,7 @@ public class FullHttpStackBenchmark {
             clientChannel.writeOutbound(request);
             clientChannel.flushOutbound();
 
-            requestBytes = PooledByteBufAllocator.DEFAULT.buffer();
-            while (true) {
-                ByteBuf part = clientChannel.readOutbound();
-                if (part == null) {
-                    break;
-                }
-                requestBytes.writeBytes(part);
-            }
+            requestBytes = NettyUtil.readAllOutboundContiguous(clientChannel);
 
             // sanity check: run req/resp once and see that the response is correct
             responseBytes = exchange();
@@ -128,7 +126,7 @@ public class FullHttpStackBenchmark {
             //System.out.println(response.content().toString(StandardCharsets.UTF_8));
             Assertions.assertEquals(HttpResponseStatus.OK, response.status());
             Assertions.assertEquals("application/json", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
-            Assertions.assertEquals("keep-alive", response.headers().get(HttpHeaderNames.CONNECTION));
+            Assertions.assertNull(response.headers().get(HttpHeaderNames.CONNECTION));
             String expectedResponseBody = "{\"listIndex\":4,\"stringIndex\":0}";
             Assertions.assertEquals(expectedResponseBody, response.content().toString(StandardCharsets.UTF_8));
             Assertions.assertEquals(expectedResponseBody.length(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
@@ -138,15 +136,7 @@ public class FullHttpStackBenchmark {
         private ByteBuf exchange() {
             channel.writeInbound(requestBytes.retainedDuplicate());
             channel.runPendingTasks();
-            CompositeByteBuf response = PooledByteBufAllocator.DEFAULT.compositeBuffer();
-            while (true) {
-                ByteBuf part = channel.readOutbound();
-                if (part == null) {
-                    break;
-                }
-                response.addComponent(true, part);
-            }
-            return response;
+            return NettyUtil.readAllOutboundComposite(channel);
         }
 
         @TearDown

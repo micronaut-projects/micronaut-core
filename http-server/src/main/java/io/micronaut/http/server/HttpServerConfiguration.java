@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -29,6 +30,8 @@ import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.Charset;
@@ -75,6 +78,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10L; // 10MB
 
     /**
+     * The default max buffer size.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_MAX_REQUEST_BUFFER_SIZE = 1024 * 1024 * 10L; // 10MB
+
+    /**
      * The default read idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
@@ -116,16 +125,25 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
 
-
     /**
      * The default value whether to dispatch OPTIONS Requests.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DISPATCH_OPTIONS_REQUESTS = false;
+
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_SEMICOLON_IS_NORMAL_CHAR = false;
+
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_PARAMS = 1024;
+
+    private static final Logger LOG = LoggerFactory.getLogger(HttpServerConfiguration.class);
+
     private Integer port;
     private String host;
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
+    private long maxRequestBufferSize = DEFAULT_MAX_REQUEST_BUFFER_SIZE;
     private Duration readIdleTimeout = null;
     private Duration writeIdleTimeout = null;
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
@@ -148,6 +166,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
+    private boolean notFoundOnMissingBody = true;
+    private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
      * Default constructor.
@@ -259,6 +280,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public long getMaxRequestSize() {
         return maxRequestSize;
+    }
+
+    /**
+     * @return The maximum number of bytes from the request that may be buffered if the application requests buffering
+     */
+    public long getMaxRequestBufferSize() {
+        return maxRequestBufferSize;
     }
 
     /**
@@ -414,6 +442,22 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
+     * Sets the maximum number of request bytes that will be buffered. Fully streamed requests can
+     * still exceed this value. Default value ({@value #DEFAULT_MAX_REQUEST_BUFFER_SIZE} =&gt; // 10MB).
+     * Currently limited to {@code 2^31}, if you need longer request bodies, stream them.<br>
+     * Note that there is always some internal buffering, so a very low value ({@code < ~64K}) will
+     * essentially act like a request size limit.
+     *
+     * @param maxRequestBufferSize The maximum number of bytes from the request that may be buffered if the application requests buffering
+     */
+    public void setMaxRequestBufferSize(@ReadableBytes long maxRequestBufferSize) {
+        if (maxRequestBufferSize > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("max-request-buffer-size must be < " + Integer.MAX_VALUE);
+        }
+        this.maxRequestBufferSize = maxRequestBufferSize;
+    }
+
+    /**
      * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READ_IDLE_TIME_MINUTES} minutes).
      *
      * @param readIdleTimeout The read idle time
@@ -551,6 +595,61 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     public boolean isValidateUrl() {
         return validateUrl;
     }
+
+    /**
+     * @return True if not-found should be returned on missing body. False to return an empty body.
+     * @since 4.6
+     */
+    public boolean isNotFoundOnMissingBody() {
+        return notFoundOnMissingBody;
+    }
+
+    /**
+     * @param notFoundOnMissingBody True if no found should be returned on missing body. False to return an empty body.
+     * @since 4.6
+     */
+    public void setNotFoundOnMissingBody(boolean notFoundOnMissingBody) {
+        this.notFoundOnMissingBody = notFoundOnMissingBody;
+    }
+
+    /**
+     * Returns whether the semicolon is considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @return {@code true} if the semicolon is a normal character, {@code false} otherwise.
+     * @since 4.8
+     */
+    public boolean isSemicolonIsNormalChar() {
+        return semicolonIsNormalChar;
+    }
+
+    /**
+     * Sets whether the semicolon should be considered a normal character in the query.
+     * A "normal" semicolon is one that is not used as a parameter separator.
+     *
+     * @param semicolonIsNormalChar {@code true} if the semicolon should be a normal character, {@code false} otherwise.
+     * @since 4.8
+     */
+    public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * @return the maximum parameter count.
+     * @since 4.8
+     */
+    public int getMaxParams() {
+        return maxParams;
+    }
+
+    /**
+     * @param maxParams the maximum parameter count.
+     * @since 4.8
+     */
+    public void setMaxParams(int maxParams) {
+        this.maxParams = maxParams;
+    }
+
 
     /**
      * Configuration for multipart handling.
@@ -997,6 +1096,118 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         public void setHeader(boolean header) {
             this.header = header;
+        }
+    }
+
+    /**
+     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     *
+     * @author James Kleeh
+     * @author graemerocher
+     * @since 3.1.0
+     */
+    @ConfigurationProperties("responses.file")
+    public static class FileTypeHandlerConfiguration {
+
+        /**
+         * The default cache seconds.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_CACHESECONDS = 60;
+
+        private int cacheSeconds = DEFAULT_CACHESECONDS;
+        private CacheControlConfiguration cacheControl = new CacheControlConfiguration();
+
+        /**
+         * Default constructor.
+         */
+        public FileTypeHandlerConfiguration() {
+        }
+
+        @Inject
+        FileTypeHandlerConfiguration(
+            @Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSecondsOld,
+            @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublicOld,
+            @Nullable @Property(name = "micronaut.server.netty.responses.file.cache-seconds") Integer cacheSeconds,
+            @Nullable @Property(name = "micronaut.server.netty.responses.file.cache-control.public") Boolean isPublic
+
+        ) {
+
+            if (cacheSecondsOld != null) {
+                this.cacheSeconds = cacheSecondsOld;
+                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-seconds` instead.");
+            }
+            if (isPublicOld != null) {
+                this.cacheControl.setPublic(isPublicOld);
+                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-control.public` instead.");
+            }
+            if (cacheSeconds != null) {
+                this.cacheSeconds = cacheSeconds;
+                LOG.warn("The configuration `micronaut.server.netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-seconds` instead.");
+            }
+            if (isPublic != null) {
+                this.cacheControl.setPublic(isPublic);
+                LOG.warn("The configuration `micronaut.server.netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.responses.file.cache-control.public` instead.");
+            }
+        }
+
+        /**
+         * @return the cache seconds
+         */
+        public int getCacheSeconds() {
+            return cacheSeconds;
+        }
+
+        /**
+         * Cache Seconds. Default value ({@value #DEFAULT_CACHESECONDS}).
+         * @param cacheSeconds cache seconds
+         */
+        public void setCacheSeconds(int cacheSeconds) {
+            this.cacheSeconds = cacheSeconds;
+        }
+
+        /**
+         * @return The cache control configuration
+         */
+        public CacheControlConfiguration getCacheControl() {
+            return cacheControl;
+        }
+
+        /**
+         * Sets the cache control configuration.
+         *
+         * @param cacheControl The cache control configuration
+         */
+        public void setCacheControl(CacheControlConfiguration cacheControl) {
+            this.cacheControl = cacheControl;
+        }
+
+        /**
+         * Configuration for the Cache-Control header.
+         */
+        @ConfigurationProperties("cache-control")
+        public static class CacheControlConfiguration {
+
+            private static final boolean DEFAULT_PUBLIC_CACHE = false;
+
+            private boolean publicCache = DEFAULT_PUBLIC_CACHE;
+
+            /**
+             * Sets whether the cache control is public. Default value ({@value #DEFAULT_PUBLIC_CACHE})
+             *
+             * @param publicCache Public cache value
+             */
+            public void setPublic(boolean publicCache) {
+                this.publicCache = publicCache;
+            }
+
+            /**
+             * @return True if the cache control should be public
+             */
+            @NonNull
+            public boolean getPublic() {
+                return publicCache;
+            }
         }
     }
 }

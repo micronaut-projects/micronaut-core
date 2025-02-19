@@ -74,9 +74,9 @@ public class HealthEndpoint {
     private boolean serviceReadyIndicatorEnabled = true;
 
     /**
-     * @param healthAggregator            The {@link HealthAggregator}
-     * @param healthIndicators            The {@link HealthIndicator}
-     * @param livenessHealthIndicators    The {@link HealthIndicator} qualified by {@link Liveness}
+     * @param healthAggregator The {@link HealthAggregator}
+     * @param healthIndicators The {@link HealthIndicator}
+     * @param livenessHealthIndicators The {@link HealthIndicator} qualified by {@link Liveness}
      */
     public HealthEndpoint(HealthAggregator<HealthResult> healthAggregator,
                           HealthIndicator[] healthIndicators,
@@ -91,8 +91,8 @@ public class HealthEndpoint {
                                                                    HealthIndicator[] livenessHealthIndicators) {
         List<HealthIndicator> liveness = Arrays.asList(livenessHealthIndicators);
         return Arrays.stream(allHealthIndicators).
-                filter(healthIndicator -> !liveness.contains(healthIndicator)).
-                toArray(HealthIndicator[]::new);
+            filter(healthIndicator -> !liveness.contains(healthIndicator)).
+            toArray(HealthIndicator[]::new);
     }
 
     /**
@@ -107,7 +107,7 @@ public class HealthEndpoint {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
         return Mono.from(
-                healthAggregator.aggregate(healthIndicators, detail)
+            healthAggregator.aggregate(healthIndicators, detail)
         );
     }
 
@@ -122,25 +122,19 @@ public class HealthEndpoint {
     @SingleResult
     public Publisher<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
-        HealthIndicator[] indicators;
-
-        switch (selector) {
-            case LIVENESS:
-                indicators = livenessHealthIndicators;
-                break;
-            case READINESS:
-            default:
-                indicators = readinessHealthIndicators;
-                break;
-        }
+        HealthIndicator[] indicators = switch (selector) {
+            case LIVENESS -> livenessHealthIndicators;
+            default -> readinessHealthIndicators;
+        };
 
         return Mono.from(
-                healthAggregator.aggregate(indicators, detail)
+            healthAggregator.aggregate(indicators, detail)
         );
     }
 
     /**
      * Whether the {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Defaults to {@code true}.
+     *
      * @return True if it is enabled.
      */
     public boolean isServiceReadyIndicatorEnabled() {
@@ -149,6 +143,7 @@ public class HealthEndpoint {
 
     /**
      * Set whether the {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Defaults to {@code true}.
+     *
      * @param serviceReadyIndicatorEnabled True if the service ready indicator should be enabled.
      */
     public void setServiceReadyIndicatorEnabled(boolean serviceReadyIndicatorEnabled) {
@@ -164,6 +159,7 @@ public class HealthEndpoint {
 
     /**
      * Sets the visibility policy for health information.
+     *
      * @param detailsVisible The {@link DetailsVisibility}
      */
     public void setDetailsVisible(DetailsVisibility detailsVisible) {
@@ -249,8 +245,8 @@ public class HealthEndpoint {
             if (httpMapping != null) {
                 for (Map.Entry<String, HttpStatus> entry : httpMapping.entrySet()) {
                     this.httpMapping.put(
-                            entry.getKey().toUpperCase(Locale.ENGLISH),
-                            entry.getValue()
+                        entry.getKey().toUpperCase(Locale.ENGLISH),
+                        entry.getValue()
                     );
                 }
             }

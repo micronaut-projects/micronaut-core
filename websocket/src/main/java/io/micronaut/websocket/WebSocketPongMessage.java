@@ -24,8 +24,8 @@ import java.util.Objects;
  * Special message class that can be accepted by a {@link io.micronaut.websocket.annotation.OnMessage @OnMessage}
  * method to listen to WebSocket pongs.
  *
- * @since 3.1
  * @author Jonas Konrad
+ * @since 3.1
  */
 public final class WebSocketPongMessage {
     private final ByteBuffer<?> content;

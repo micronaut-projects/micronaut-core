@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
@@ -41,7 +42,8 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-class DefaultFilterRoute implements FilterRoute {
+@Internal
+final class DefaultFilterRoute implements FilterRoute {
 
     private final List<String> patterns = new ArrayList<>(1);
     private final Supplier<GenericHttpFilter> filterSupplier;
@@ -50,11 +52,22 @@ class DefaultFilterRoute implements FilterRoute {
     private FilterPatternStyle patternStyle;
     private volatile GenericHttpFilter filter;
     private AnnotationMetadata annotationMetadata;
+    private final boolean isPreMatching;
+    private String matchingAnnotation;
 
-    DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+    DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
         this.filterSupplier = filter;
         this.annotationMetadataResolver = annotationMetadataResolver;
+        this.isPreMatching = isPreMatching;
+    }
+
+    DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadata annotationMetadata, boolean isPreMatching) {
+        Objects.requireNonNull(filter, "HttpFilter argument is required");
+        this.filterSupplier = filter;
+        this.annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
+        this.annotationMetadata = annotationMetadata;
+        this.isPreMatching = isPreMatching;
     }
 
     /**
@@ -63,9 +76,35 @@ class DefaultFilterRoute implements FilterRoute {
      * @param annotationMetadataResolver The annotation metadata resolver
      */
     DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
-        this(filter, annotationMetadataResolver);
+        this(pattern, filter, annotationMetadataResolver, false);
+    }
+
+    /**
+     * @param pattern A pattern
+     * @param filter A {@link Supplier} for an HTTP filter
+     * @param annotationMetadataResolver The annotation metadata resolver
+     * @param isPreMatching Is pre-matching filter
+     * @since 4.6
+     */
+    DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
+        this(filter, annotationMetadataResolver, isPreMatching);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
+    }
+
+    /**
+     * @param pattern A pattern
+     * @param filter A {@link Supplier} for an HTTP filter
+     * @param annotationMetadata The annotation metadata
+     * @param isPreMatching Is pre-matching filter
+     * @since 4.6
+     */
+    DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter, AnnotationMetadata annotationMetadata, boolean isPreMatching) {
+        this(filter, AnnotationMetadataResolver.DEFAULT, isPreMatching);
+        Objects.requireNonNull(pattern, "Pattern argument is required");
+        this.patterns.add(pattern);
+        this.annotationMetadata = annotationMetadata;
+        this.matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
     }
 
     /**
@@ -74,6 +113,19 @@ class DefaultFilterRoute implements FilterRoute {
      */
     DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter) {
        this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
+    }
+
+    @Override
+    public boolean isPreMatching() {
+        return isPreMatching;
+    }
+
+    @Override
+    public String findMatchingAnnotation() {
+        if (matchingAnnotation == null) {
+            matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
+        }
+        return matchingAnnotation;
     }
 
     @NonNull
@@ -93,6 +145,7 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
+    @NonNull
     public GenericHttpFilter getFilter() {
         GenericHttpFilter filter = this.filter;
         if (filter == null) {

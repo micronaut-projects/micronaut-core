@@ -21,13 +21,12 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -46,99 +45,92 @@ import java.util.Optional;
  */
 @Internal
 @Experimental
-public class HttpResponseAdapter<O> implements HttpResponse<O> {
+public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpResponseAdapter.class);
 
-    private final java.net.http.HttpResponse<byte[]> httpResponse;
     @NonNull
     private final Argument<O> bodyType;
-    private final ConversionService conversionService;
-    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     public HttpResponseAdapter(java.net.http.HttpResponse<byte[]> httpResponse,
-                               @NonNull Argument<O> bodyType,
+                               @Nullable Argument<O> bodyType,
                                ConversionService conversionService,
-                               MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        this.httpResponse = httpResponse;
+                               MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(httpResponse, conversionService);
         this.bodyType = bodyType;
-        this.conversionService = conversionService;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-    }
-
-    @Override
-    public HttpStatus getStatus() {
-        return HttpStatus.valueOf(httpResponse.statusCode());
-    }
-
-    @Override
-    public int code() {
-        return httpResponse.statusCode();
-    }
-
-    @Override
-    public String reason() {
-        return getStatus().getReason();
-    }
-
-    @Override
-    public HttpHeaders getHeaders() {
-        return new HttpHeadersAdapter(httpResponse.headers(), conversionService);
-    }
-
-    @Override
-    public MutableConvertibleValues<Object> getAttributes() {
-        return attributes;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
     }
 
     @Override
     public Optional<O> getBody() {
-        return convertBytes(getContentType().orElse(null), httpResponse.body(), bodyType);
+        return getBody(bodyType);
     }
 
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        return convertBytes(getContentType().orElse(null), httpResponse.body(), type);
+        final boolean isOptional = type.getType() == Optional.class;
+        final Argument<Object> theArgument = (Argument<Object>) (isOptional ? type.getFirstTypeVariable().orElse(type) : type);
+        Optional<?> optional = convertBytes(getContentType().orElse(null), httpResponse.body(), theArgument);
+        if (isOptional) {
+            // If the requested type is an Optional, then we need to wrap the result again
+            return Optional.of((T) optional);
+        }
+        return (Optional<T>) optional;
     }
 
-    private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
-        final boolean isOptional = type.getType() == Optional.class;
-        final Argument finalArgument = isOptional ? type.getFirstTypeVariable().orElse(type) : type;
-
-        if (mediaTypeCodecRegistry != null && contentType != null) {
-            if (CharSequence.class.isAssignableFrom(finalArgument.getType())) {
+    private <T> Optional<T> convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
+        if (bytes.length == 0) {
+            return Optional.empty();
+        }
+        if (type.getType().equals(byte[].class)) {
+            return Optional.of((T) bytes);
+        }
+        if (contentType != null) {
+            if (CharSequence.class.isAssignableFrom(type.getType())) {
                 Charset charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
-                var converted = Optional.of(new String(bytes, charset));
-                // If the requested type is an Optional, then we need to wrap the result again
-                return isOptional ? Optional.of(converted) : converted;
-            } else if (finalArgument.getType() == byte[].class) {
-                var converted = Optional.of(bytes);
-                // If the requested type is an Optional, then we need to wrap the result again
-                return isOptional ? Optional.of(converted) : converted;
-            } else {
-                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
-                if (foundCodec.isPresent()) {
-                    try {
-                        var converted = foundCodec.map(codec -> codec.decode(finalArgument, bytes));
-                        return isOptional ? Optional.of(converted) : converted;
-                    } catch (CodecException e) {
-                        if (LOG.isDebugEnabled()) {
-                            var message = e.getMessage();
-                            LOG.debug("Error decoding body for type [{}] from '{}'. Attempting fallback.", type, contentType);
-                            LOG.debug("CodecException Message was: {}", message == null ? "null" : message.replace("\n", ""));
-                        }
-                    }
+                return Optional.of((T) new String(bytes, charset));
+            }
+        }
+        if (mediaTypeCodecRegistry != null) {
+            Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
+            if (foundCodec.isPresent()) {
+                try {
+                    return foundCodec.map(codec -> codec.decode(type, bytes));
+                } catch (CodecException e) {
+                    logCodecError(contentType, type, e);
+                }
+            }
+        }
+        if (messageBodyHandlerRegistry != null) {
+            MessageBodyReader<T> reader = messageBodyHandlerRegistry.findReader(type, contentType).orElse(null);
+            if (reader != null) {
+                try {
+                    T value = reader.read(
+                        type,
+                        contentType,
+                        getHeaders(),
+                        ByteArrayBufferFactory.INSTANCE.wrap(bytes)
+                    );
+                    return Optional.of(value);
+                } catch (CodecException e) {
+                    logCodecError(contentType, type, e);
                 }
             }
         }
         // last chance, try type conversion
-        var converted = conversionService.convert(bytes, ConversionContext.of(finalArgument));
-        if (isOptional) {
-            return Optional.of(converted);
-        } else {
-            return converted;
+       return conversionService.convert(bytes, ConversionContext.of(type));
+    }
+
+    private <T> void logCodecError(MediaType contentType, Argument<T> type, CodecException e) {
+        if (LOG.isDebugEnabled()) {
+            var message = e.getMessage();
+            LOG.debug("Error decoding body for type [{}] from '{}'. Attempting fallback.", type, contentType);
+            LOG.debug("CodecException Message was: {}", message == null ? "null" : message.replace("\n", ""));
         }
     }
 }

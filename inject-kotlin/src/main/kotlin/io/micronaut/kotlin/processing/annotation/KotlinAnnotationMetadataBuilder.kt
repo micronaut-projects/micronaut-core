@@ -56,7 +56,7 @@ import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(
     private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
-    private val resolver: Resolver,
+    var resolver: Resolver,
     private val visitorContext: KotlinVisitorContext
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
@@ -68,21 +68,6 @@ internal class KotlinAnnotationMetadataBuilder(
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
             return type.getBinaryName(resolver, visitorContext)
         }
-    }
-
-    override fun isRepeatableAnnotationContainer(annotationValue: AnnotationValue<*>?): Boolean {
-        val repeatableAnnotations = annotationValue!!.getAnnotations<Annotation>(AnnotationMetadata.VALUE_MEMBER)
-        return repeatableAnnotations.isNotEmpty() && repeatableAnnotations.all { isRepeatableAnnotation(it) }
-    }
-
-    private fun isRepeatableAnnotation(value: AnnotationValue<Annotation>): Boolean {
-        val annotationMirror = getAnnotationMirror(value.annotationName).orElse(null)
-        if (annotationMirror == null) {
-            return ClassUtils.forName(value.annotationName, null)
-                .map { it -> it.annotations.any { it.annotationClass.java == Repeatable::class.java } }
-                .orElse(false)
-        }
-        return getRepeatableContainerNameForType(annotationMirror) != null
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
@@ -401,7 +386,7 @@ internal class KotlinAnnotationMetadataBuilder(
             val arrayType = type.resolve()
             if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
                 val className = arrayType.arguments[0].type!!.resolve().declaration.getBinaryName(resolver, visitorContext);
-                val optionalClassName = ClassUtils.forName(className, javaClass.classLoader)
+                val optionalClassName = findJavaClass(className)
                 if (optionalClassName.isPresent) {
                     valueType = optionalClassName.get() as Class<Any>
                 }
@@ -533,7 +518,7 @@ internal class KotlinAnnotationMetadataBuilder(
     override fun findRepeatableContainerNameForType(annotationName: String): String? {
         val container = super.findRepeatableContainerNameForType(annotationName)
         if (container == null) {
-            return ClassUtils.forName(annotationName, null)
+            return findJavaClass(annotationName)
             .flatMap<String> {
                 for (annotation in it.annotations) {
                     if (annotation.annotationClass.java == Repeatable::class.java) {
@@ -548,6 +533,11 @@ internal class KotlinAnnotationMetadataBuilder(
         }
         return container
     }
+
+    private fun findJavaClass(className: String): Optional<Class<*>> =
+        ClassUtils.forName(className, null)
+            .or { ClassUtils.forName(className, javaClass.classLoader) }
+            .or { ClassUtils.forName(className, visitorContext::class.java.classLoader) }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
         return Optional.ofNullable(resolver.getClassDeclarationByName(annotationName))

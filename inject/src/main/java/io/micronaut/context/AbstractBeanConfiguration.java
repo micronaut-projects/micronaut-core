@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinitionReference;
+import java.util.function.Predicate;
 
 /**
  * An abstract implementation of the {@link BeanConfiguration} method. Not typically used directly from user code,

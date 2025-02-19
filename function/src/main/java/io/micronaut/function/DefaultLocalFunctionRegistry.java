@@ -55,6 +55,7 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
 
     /**
      * Constructor.
+     *
      * @param decoders decoders
      */
     public DefaultLocalFunctionRegistry(MediaTypeCodec... decoders) {
@@ -63,6 +64,7 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
 
     /**
      * Constructor.
+     *
      * @param decoders decoders
      */
     @Inject
@@ -72,6 +74,7 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
 
     /**
      * Constructor.
+     *
      * @param codecRegistry codecRegistry
      */
     public DefaultLocalFunctionRegistry(MediaTypeCodecRegistry codecRegistry) {
@@ -96,10 +99,7 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
         return Stream.of(functions, suppliers, consumers, biFunctions)
             .flatMap(map -> {
                 ExecutableMethod<?, ?> method = map.get(name);
-                if (method == null) {
-                    return Stream.empty();
-                }
-                return Stream.of(method);
+                return Stream.ofNullable(method);
             })
             .findFirst();
     }

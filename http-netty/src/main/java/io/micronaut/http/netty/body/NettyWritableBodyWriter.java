@@ -15,40 +15,39 @@
  */
 package io.micronaut.http.netty.body;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyWriter;
-import io.micronaut.http.body.RawMessageBodyHandler;
+import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.TypedMessageBodyHandler;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufOutputStream;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Collection;
 
 /**
  * Netty-specific writer implementation.
@@ -57,12 +56,17 @@ import java.util.Collection;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-@Bean(typed = RawMessageBodyHandler.class)
-public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>, RawMessageBodyHandler<Writable> {
+public final class NettyWritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable>, ResponseBodyWriter<Writable> {
+
     private final WritableBodyWriter defaultWritable;
 
     public NettyWritableBodyWriter(ApplicationConfiguration applicationConfiguration) {
         defaultWritable = new WritableBodyWriter(applicationConfiguration);
+    }
+
+    @Override
+    public Argument<Writable> getType() {
+        return Argument.of(Writable.class);
     }
 
     @Override
@@ -71,25 +75,31 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object, NettyWriteContext nettyContext) throws CodecException {
-        ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
-        MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
-        if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.contentType(mediaType);
-        }
-        try (ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf)) {
-            DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1,
-                HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
-                byteBuf,
-                ((NettyHttpHeaders) outgoingHeaders).getNettyHeaders(),
-                EmptyHttpHeaders.INSTANCE
-            );
-            object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
-            nettyContext.writeFull(fullHttpResponse);
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+                                         HttpRequest<?> request,
+                                         MutableHttpResponse<Writable> outgoingResponse,
+                                         Argument<Writable> type,
+                                         MediaType mediaType,
+                                         Writable object) throws CodecException {
+        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
+                                        @NonNull HttpRequest<?> request,
+                                        @NonNull HttpResponse<?> response,
+                                        @NonNull Argument<Writable> type,
+                                        @NonNull MediaType mediaType,
+                                        Writable object) {
+        ByteBufOutputStream outputStream = new ByteBufOutputStream(ByteBufAllocator.DEFAULT.buffer());
+        try {
+            object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, response.getHeaders()));
+            outputStream.close();
         } catch (IOException e) {
             throw new MessageBodyException("Error writing body from writable", e);
         }
+        return new AvailableNettyByteBody(outputStream.buffer());
     }
 
     @Override
@@ -107,8 +117,4 @@ public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>,
         return defaultWritable.read(type, mediaType, httpHeaders, inputStream);
     }
 
-    @Override
-    public Collection<? extends Class<?>> getTypes() {
-        return defaultWritable.getTypes();
-    }
 }

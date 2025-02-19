@@ -48,6 +48,7 @@ public abstract class DiscoveryConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled Whether discovery is enabled
      */
     public void setEnabled(boolean enabled) {

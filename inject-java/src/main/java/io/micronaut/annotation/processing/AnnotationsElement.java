@@ -32,6 +32,7 @@ import java.util.Set;
 
 /**
  * A custom Java Lang Model element that provides the annotations from the type mirror.
+ *
  * @author Denis Stepanov
  * @since 4.0.0
  */

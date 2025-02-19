@@ -50,7 +50,11 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      * @param numThreads            The number of threads
      * @param ioRatio               The IO ratio (optional)
      * @param preferNativeTransport Whether native transport is to be preferred
-     * @param executor              A named executor service to use (optional)
+     * @param executor              A named executor service to use for event loop threads
+     *                              (optional). This property is very specialized. In particular,
+     *                              it will <i>not</i> solve read timeouts or fix blocking
+     *                              operations on the event loop, in fact it may do the opposite.
+     *                              Don't use unless you really know what this does.
      * @param shutdownQuietPeriod   The shutdown quiet period
      * @param shutdownTimeout       The shutdown timeout (must be &gt;= shutdownQuietPeriod)
      */

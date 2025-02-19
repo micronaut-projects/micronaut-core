@@ -29,6 +29,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
@@ -49,7 +51,7 @@ import java.util.regex.Pattern;
 @Internal
 abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
-    private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
+    private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("[\\w-]+");
 
     private Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
@@ -58,9 +60,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     private final EndpointDefaultConfiguration endpointDefaultConfiguration;
 
     /**
-     * @param applicationContext           The application context
-     * @param uriNamingStrategy            The URI naming strategy
-     * @param conversionService            The conversion service
+     * @param applicationContext The application context
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
@@ -81,8 +83,8 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * Register a route.
      *
      * @param method The {@link ExecutableMethod}
-     * @param id     The route id
-     * @param port   The port
+     * @param id The route id
+     * @param port The port
      */
     protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
@@ -109,7 +111,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     /**
      * @param beanDefinition The bean definition to process
-     * @param method         The executable method
+     * @param method The executable method
      */
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -132,6 +134,11 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.stringValue(Endpoint.class).orElse(null);
+                    final EndpointConfiguration endpointConfiguration = beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
+                        .orElse(null);
+                    if (endpointConfiguration != null && StringUtils.isNotEmpty(endpointConfiguration.getPath())) {
+                        return Optional.of(endpointConfiguration.getPath());
+                    }
                     if (id == null || !ENDPOINT_ID_PATTERN.matcher(id).matches()) {
                         id = NameUtils.hyphenate(beanDefinition.getName());
                     }
@@ -146,7 +153,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     /**
      * @param method The {@link ExecutableMethod}
-     * @param id     The route id
+     * @param id The route id
      * @return An {@link UriTemplate}
      */
     protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
@@ -168,7 +175,10 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         if (path.charAt(0) == '/') {
             path = path.substring(1);
         }
-        return uriNamingStrategy.resolveUri(path);
+        var completePath = endpointDefaultConfiguration.getContextPath() == null
+            ? uriNamingStrategy.resolveUri(path)
+            : NameUtils.hyphenate(StringUtils.prependUri(endpointDefaultConfiguration.getContextPath(), path));
+        return completePath.charAt(0) == '/' ? completePath : "/".concat(completePath);
     }
 
     /**

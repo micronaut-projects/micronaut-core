@@ -3,6 +3,7 @@ package io.micronaut.inject.beanbuilder;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -40,7 +41,7 @@ public class TestMultipleFactoryDefiningVisitor implements TypeElementVisitor<Pr
 
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

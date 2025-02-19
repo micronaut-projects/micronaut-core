@@ -55,8 +55,7 @@ public final class JacksonFeatures implements JsonFeatures {
     }
 
     public static JacksonFeatures fromAnnotation(AnnotationValue<io.micronaut.jackson.annotation.JacksonFeatures> jacksonFeaturesAnn) {
-        JacksonFeatures jacksonFeatures = new JacksonFeatures();
-
+        var jacksonFeatures = new JacksonFeatures();
 
         SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.enumValues("enabledSerializationFeatures", SerializationFeature.class);
         if (ArrayUtils.isNotEmpty(enabledSerializationFeatures)) {
@@ -103,7 +102,7 @@ public final class JacksonFeatures implements JsonFeatures {
      * Add a serialization feature.
      *
      * @param serializationFeature serialization feature to enable/disable
-     * @param isEnabled            whether you want to turn feature on/off
+     * @param isEnabled whether you want to turn feature on/off
      * @return This object.
      */
     public JacksonFeatures addFeature(SerializationFeature serializationFeature, boolean isEnabled) {
@@ -115,7 +114,7 @@ public final class JacksonFeatures implements JsonFeatures {
      * Add a deserialization feature.
      *
      * @param deserializationFeature deserialization feature to enable/disable
-     * @param isEnabled              whether you want to turn feature on/off
+     * @param isEnabled whether you want to turn feature on/off
      * @return This object.
      */
     public JacksonFeatures addFeature(DeserializationFeature deserializationFeature, boolean isEnabled) {

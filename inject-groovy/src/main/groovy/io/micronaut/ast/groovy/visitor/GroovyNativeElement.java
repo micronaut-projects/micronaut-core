@@ -48,7 +48,7 @@ public sealed interface GroovyNativeElement {
      * The class element with an owner (Generic type etc.).
      *
      * @param annotatedNode The class node
-     * @param owner         The owner
+     * @param owner The owner
      */
     record ClassWithOwner(ClassNode annotatedNode,
                           GroovyNativeElement owner) implements GroovyNativeElement {
@@ -66,7 +66,7 @@ public sealed interface GroovyNativeElement {
      * The parameter element.
      *
      * @param annotatedNode The parameter element.
-     * @param methodNode    The method element.
+     * @param methodNode The method element.
      */
     record Parameter(org.codehaus.groovy.ast.Parameter annotatedNode,
                      MethodNode methodNode) implements GroovyNativeElement {
@@ -84,7 +84,7 @@ public sealed interface GroovyNativeElement {
      * The field element.
      *
      * @param annotatedNode The field node
-     * @param owner         The owner node
+     * @param owner The owner node
      */
     record Field(FieldNode annotatedNode,
                  GroovyNativeElement owner) implements GroovyNativeElement {
@@ -94,8 +94,8 @@ public sealed interface GroovyNativeElement {
      * The placeholder element.
      *
      * @param annotatedNode The placeholder node
-     * @param owner         The owner node
-     * @param variableName  The variable name
+     * @param owner The owner node
+     * @param variableName The variable name
      */
     record Placeholder(ClassNode annotatedNode,
                        GroovyNativeElement owner,

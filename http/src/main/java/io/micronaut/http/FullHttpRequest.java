@@ -28,6 +28,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
  * @since 1.1.0
  */
 @Internal
+@Deprecated
 public interface FullHttpRequest<B> extends HttpRequest<B> {
     /**
      * Shortcut for {@code contents() != null}.

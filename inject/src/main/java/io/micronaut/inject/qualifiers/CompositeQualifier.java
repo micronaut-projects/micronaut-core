@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -49,6 +50,14 @@ final class CompositeQualifier<T> implements Qualifier<T> {
             reduced = qualifier.reduce(beanType, reduced);
         }
         return reduced;
+    }
+
+    @Override
+    public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
+        for (Qualifier<T> qualifier : qualifiers) {
+            candidates = qualifier.filter(beanType, candidates);
+        }
+        return candidates;
     }
 
     public Qualifier<T>[] getQualifiers() {

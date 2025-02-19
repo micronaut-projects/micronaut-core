@@ -21,10 +21,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,13 +41,7 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
     public static final Argument<InputStream> TYPE = Argument.of(InputStream.class);
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
-    private final HttpServerConfiguration httpServerConfiguration;
-
-    /**
-     * @param httpServerConfiguration The server config
-     */
-    NettyInputStreamBodyBinder(HttpServerConfiguration httpServerConfiguration) {
-        this.httpServerConfiguration = httpServerConfiguration;
+    NettyInputStreamBodyBinder() {
     }
 
     @Override
@@ -60,11 +52,11 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            if (nhr.byteBody() instanceof ImmediateByteBody imm && imm.empty()) {
+            if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
             try {
-                InputStream s = nhr.byteBody().rawContent(httpServerConfiguration).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
+                InputStream s = nhr.byteBody().toInputStream();
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {

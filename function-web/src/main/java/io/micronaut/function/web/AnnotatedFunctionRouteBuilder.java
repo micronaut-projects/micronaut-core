@@ -40,7 +40,13 @@ import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Singleton;
 
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -56,8 +62,7 @@ import java.util.stream.Stream;
  */
 @Singleton
 @Replaces(DefaultLocalFunctionRegistry.class)
-public class AnnotatedFunctionRouteBuilder
-    extends DefaultRouteBuilder
+public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
     implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
 
     private final LocalFunctionRegistry localFunctionRegistry;
@@ -66,6 +71,7 @@ public class AnnotatedFunctionRouteBuilder
 
     /**
      * Constructor.
+     *
      * @param executionHandleLocator executionHandleLocator
      * @param uriNamingStrategy uriNamingStrategy
      * @param conversionService conversionService
@@ -78,12 +84,12 @@ public class AnnotatedFunctionRouteBuilder
         ConversionService conversionService,
         MediaTypeCodecRegistry codecRegistry,
         @Value("${micronaut.function.context-path:/}") String contextPath) {
+
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.localFunctionRegistry = new DefaultLocalFunctionRegistry(codecRegistry);
         this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         if (beanDefinition.hasAnnotation(FunctionBean.class)) {
@@ -96,7 +102,7 @@ public class AnnotatedFunctionRouteBuilder
                 return;
             }
 
-            List<UriRoute> routes = new ArrayList<>(2);
+            var routes = new ArrayList<UriRoute>(2);
             MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::of).toArray(MediaType[]::new);
             MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::of).toArray(MediaType[]::new);
             boolean implementsFnInterface = false;
@@ -134,7 +140,7 @@ public class AnnotatedFunctionRouteBuilder
                             }
                         }
                     } else if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0]) && consumes.length == 0) {
-                        consumes = new MediaType[]{MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
+                        consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                     }
                 }
             }
@@ -169,7 +175,7 @@ public class AnnotatedFunctionRouteBuilder
             }
 
             if (!routes.isEmpty()) {
-                for (UriRoute route: routes) {
+                for (UriRoute route : routes) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Created Route to Function: {}", route);
                     }
@@ -181,7 +187,7 @@ public class AnnotatedFunctionRouteBuilder
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 availableFunctions.put(functionName, URI.create(functionPath));
 
-                ((ExecutableMethodProcessor) localFunctionRegistry).process(beanDefinition, method);
+                ((ExecutableMethodProcessor<?>) localFunctionRegistry).process(beanDefinition, method);
             }
         }
     }

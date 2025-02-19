@@ -26,9 +26,8 @@ import spock.lang.Specification
 
 class WritableSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WritableSpec'])
     @Shared @AutoCleanup HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
-
 
     void "test render template"() {
         expect:

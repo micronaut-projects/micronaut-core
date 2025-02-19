@@ -64,16 +64,16 @@ public class HealthStatus implements Comparable<HealthStatus> {
     private final Integer severity;
 
     /**
-     * @param name        The name of the status
+     * @param name The name of the status
      * @param description The detailed information about the status
      * @param operational If it's operational
-     * @param severity    The severity, the higher the value, the more sever is situation.
+     * @param severity The severity, the higher the value, the more sever is situation.
      */
     public HealthStatus(
-            String name,
-            String description,
-            Boolean operational,
-            Integer severity) {
+        String name,
+        String description,
+        Boolean operational,
+        Integer severity) {
         if (name == null) {
             throw new IllegalArgumentException("Name cannot be null when creating a health status");
         }

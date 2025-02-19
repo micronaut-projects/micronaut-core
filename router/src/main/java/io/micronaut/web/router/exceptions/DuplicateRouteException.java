@@ -32,7 +32,7 @@ public class DuplicateRouteException extends RoutingException {
     private final List<UriRouteMatch<Object, Object>> uriRoutes;
 
     /**
-     * @param uri The URI
+     * @param uri       The URI
      * @param uriRoutes The routes
      */
     public DuplicateRouteException(String uri, List<UriRouteMatch<Object, Object>> uriRoutes) {
@@ -49,7 +49,6 @@ public class DuplicateRouteException extends RoutingException {
     }
 
     /**
-     *
      * @return The routes which caused this exception
      */
     public List<UriRouteMatch<Object, Object>> getUriRoutes() {
@@ -57,12 +56,10 @@ public class DuplicateRouteException extends RoutingException {
     }
 
     private static String buildMessage(String uri, List<UriRouteMatch<Object, Object>> uriRoutes) {
-        StringBuilder message = new StringBuilder("More than 1 route matched the incoming request. The following routes matched ");
-        message.append(uri).append(": ");
-        message.append(uriRoutes
-            .stream()
-            .map((Object::toString))
-            .collect(Collectors.joining(", ")));
-        return message.toString();
+        return "More than 1 route matched the incoming request. The following routes matched "
+                + uri + ": "
+                + uriRoutes.stream()
+                .map((Object::toString))
+                .collect(Collectors.joining(", "));
     }
 }

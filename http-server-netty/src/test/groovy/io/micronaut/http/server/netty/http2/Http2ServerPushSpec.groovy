@@ -56,7 +56,6 @@ import java.util.concurrent.CompletableFuture
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
 @Property(name = "micronaut.server.ssl.port", value = "-1")
 @Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
-@Property(name = "micronaut.server.netty.legacy-multiplex-handlers", value = "true")
 @Property(name = "spec.name", value = "Http2ServerPushSpec")
 class Http2ServerPushSpec extends Specification {
     @Inject

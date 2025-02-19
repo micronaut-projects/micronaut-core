@@ -45,7 +45,6 @@ import jakarta.inject.Inject;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -64,13 +63,14 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
 
     /**
      * Default constructor.
+     *
      * @param objectMapper The object mapper provider
      * @param conversionService The conversion service
      */
     @Inject
     protected JacksonConverterRegistrar(
-            BeanProvider<ObjectMapper> objectMapper,
-            ConversionService conversionService) {
+        BeanProvider<ObjectMapper> objectMapper,
+        ConversionService conversionService) {
         this.objectMapper = objectMapper;
         this.conversionService = conversionService;
     }
@@ -78,43 +78,43 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
-                ArrayNode.class,
-                Object[].class,
-                arrayNodeToObjectConverter()
+            ArrayNode.class,
+            Object[].class,
+            arrayNodeToObjectConverter()
         );
         conversionService.addConverter(
-                ArrayNode.class,
-                Iterable.class,
-                arrayNodeToIterableConverter()
+            ArrayNode.class,
+            Iterable.class,
+            arrayNodeToIterableConverter()
         );
         conversionService.addConverter(
-                JsonNode.class,
-                Object.class,
-                jsonNodeToObjectConverter()
+            JsonNode.class,
+            Object.class,
+            jsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                ObjectNode.class,
-                ConvertibleValues.class,
-                objectNodeToConvertibleValuesConverter()
+            ObjectNode.class,
+            ConvertibleValues.class,
+            objectNodeToConvertibleValuesConverter()
         );
         conversionService.addConverter(
-                Object.class,
-                JsonNode.class,
-                objectToJsonNodeConverter()
+            Object.class,
+            JsonNode.class,
+            objectToJsonNodeConverter()
         );
         conversionService.addConverter(
-                CharSequence.class,
-                PropertyNamingStrategy.class,
-                (charSequence, targetType, context) -> {
+            CharSequence.class,
+            PropertyNamingStrategy.class,
+            (charSequence, targetType, context) -> {
 
-                    Optional<PropertyNamingStrategy> propertyNamingStrategy = resolvePropertyNamingStrategy(charSequence);
+                Optional<PropertyNamingStrategy> propertyNamingStrategy = resolvePropertyNamingStrategy(charSequence);
 
-                    if (!propertyNamingStrategy.isPresent()) {
-                        context.reject(charSequence, new IllegalArgumentException("Unable to convert '%s' to a com.fasterxml.jackson.databind.PropertyNamingStrategy".formatted(charSequence)));
-                    }
-
-                    return propertyNamingStrategy;
+                if (propertyNamingStrategy.isEmpty()) {
+                    context.reject(charSequence, new IllegalArgumentException("Unable to convert '%s' to a com.fasterxml.jackson.databind.PropertyNamingStrategy".formatted(charSequence)));
                 }
+
+                return propertyNamingStrategy;
+            }
         );
     }
 
@@ -179,9 +179,9 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
         return (node, targetType, context) -> {
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
-            List results = new ArrayList();
+            var results = new ArrayList<>();
             node.elements().forEachRemaining(jsonNode -> {
-                Optional converted = conversionService.convert(jsonNode, elementType, context);
+                Optional<?> converted = conversionService.convert(jsonNode, elementType, context);
                 if (converted.isPresent()) {
                     results.add(converted.get());
                 }
@@ -210,22 +210,15 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
         if (charSequence != null) {
             String stringValue = NameUtils.environmentName(charSequence.toString());
             if (StringUtils.isNotEmpty(stringValue)) {
-                switch (stringValue) {
-                    case "SNAKE_CASE":
-                        return Optional.of(PropertyNamingStrategies.SNAKE_CASE);
-                    case "UPPER_CAMEL_CASE":
-                        return Optional.of(PropertyNamingStrategies.UPPER_CAMEL_CASE);
-                    case "LOWER_CASE":
-                        return Optional.of(PropertyNamingStrategies.LOWER_CASE);
-                    case "KEBAB_CASE":
-                        return Optional.of(PropertyNamingStrategies.KEBAB_CASE);
-                    case "LOWER_CAMEL_CASE":
-                        return Optional.of(PropertyNamingStrategies.LOWER_CAMEL_CASE);
-                    case "LOWER_DOT_CASE":
-                        return Optional.of(PropertyNamingStrategies.LOWER_DOT_CASE);
-                    default:
-                        return Optional.empty();
-                }
+                return switch (stringValue) {
+                    case "SNAKE_CASE" -> Optional.of(PropertyNamingStrategies.SNAKE_CASE);
+                    case "UPPER_CAMEL_CASE" -> Optional.of(PropertyNamingStrategies.UPPER_CAMEL_CASE);
+                    case "LOWER_CASE" -> Optional.of(PropertyNamingStrategies.LOWER_CASE);
+                    case "KEBAB_CASE" -> Optional.of(PropertyNamingStrategies.KEBAB_CASE);
+                    case "LOWER_CAMEL_CASE" -> Optional.of(PropertyNamingStrategies.LOWER_CAMEL_CASE);
+                    case "LOWER_DOT_CASE" -> Optional.of(PropertyNamingStrategies.LOWER_DOT_CASE);
+                    default -> Optional.empty();
+                };
             }
         }
         return Optional.empty();

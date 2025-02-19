@@ -27,6 +27,7 @@ public class WebSocketSessionOpenEvent extends WebSocketEvent {
 
     /**
      * Default constructor.
+     *
      * @param session The web socket session
      */
     public WebSocketSessionOpenEvent(WebSocketSession session) {

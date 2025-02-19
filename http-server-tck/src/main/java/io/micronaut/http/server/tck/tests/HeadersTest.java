@@ -64,6 +64,13 @@ public class HeadersTest {
                 .status(HttpStatus.OK)
                 .body("{\"status\":\"okok\"}")
                 .build()));
+        // A different use-case with using @Header(name="..")
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/foo/bar2").header("fOO",  "ok"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("{\"status\":\"okok\"}")
+                .build()));
     }
 
     /**
@@ -98,8 +105,13 @@ public class HeadersTest {
         }
 
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
-        String getFooAsJson(@Header("Foo") String foo, @Header("fOo") String foo2) {
-            return "{\"status\":\"" + foo + foo2 + "\"}";
+        String getFooAsJson(@Header("Foo") String header1, @Header("fOo") String header2) {
+            return "{\"status\":\"" + header1 + header2 + "\"}";
+        }
+
+        @Get(value = "/bar2", produces = MediaType.APPLICATION_JSON)
+        String getFooAsJson2(@Header(name = "Foo") String header1, @Header(name = "fOo") String header2) {
+            return "{\"status\":\"" + header1 + header2 + "\"}";
         }
 
         @Get(value = "/receive-multiple-headers")

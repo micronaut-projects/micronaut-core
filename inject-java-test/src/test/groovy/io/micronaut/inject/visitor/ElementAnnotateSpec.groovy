@@ -6,6 +6,7 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
@@ -153,6 +154,7 @@ class Outer {
 
     @SupportedAnnotationTypes("*")
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
+        @NonNull
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new MyAnnotatingTypeElementVisitor(), new IntrospectedTypeElementVisitor(), new AggregatingAnnotatingTypeElementVisitor()]
@@ -166,6 +168,7 @@ class Outer {
             return 100
         }
 
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING;

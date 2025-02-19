@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -121,6 +122,16 @@ public sealed interface ConfigurationPath
     int index();
 
     /**
+     * @return the current property catalog
+     *
+     * @since 4.7.0
+     */
+    @NonNull
+    default PropertyCatalog propertyCatalog() {
+        return PropertyCatalog.NORMALIZED;
+    }
+
+    /**
      * @return The qualifier.
      * @param <T> The bean type
      */
@@ -190,6 +201,7 @@ public sealed interface ConfigurationPath
     /**
      * remove last entry.
      *
+     * @return the last element from this path
      * @throws java.util.NoSuchElementException if there isn't any remaining elements.
      */
     @NonNull ConfigurationSegment removeLast();

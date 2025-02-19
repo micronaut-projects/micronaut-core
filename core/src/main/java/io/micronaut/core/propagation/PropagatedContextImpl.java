@@ -18,14 +18,10 @@ package io.micronaut.core.propagation;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
-import java.util.AbstractMap;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -103,7 +99,8 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public PropagatedContextImpl plus(PropagatedContextElement element) {
-        PropagatedContextElement[] newElements = Arrays.copyOf(elements, elements.length + 1);
+        PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length + 1];
+        System.arraycopy(elements, 0, newElements, 0, elements.length);
         newElements[newElements.length - 1] = element;
         return new PropagatedContextImpl(newElements, containsThreadElements || isThreadElement(element));
     }
@@ -187,7 +184,12 @@ final class PropagatedContextImpl implements PropagatedContext {
         } else if (prevCtx == null) {
             restore = CLEANUP;
         } else { // elements.length == 0
-            restore = () -> ThreadContext.set(prevCtx);
+            restore = new Scope() { // Keep the anonymous class to avoid lambda in hot path
+                @Override
+                public void close() {
+                    ThreadContext.set(prevCtx);
+                }
+            };
             if (elements.length == 0) {
                 ThreadContext.remove();
                 return restore;
@@ -197,36 +199,50 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextImpl ctx = this;
         ThreadContext.set(ctx);
         if (containsThreadElements) {
-            Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = ctx.updateThreadState();
-            return () -> {
-                ctx.restoreState(threadState);
-                if (prevCtx == null) {
-                    ThreadContext.remove();
-                } else {
-                    ThreadContext.set(prevCtx);
+            ThreadState[] threadState = ctx.updateThreadState();
+            return new Scope() { // Keep the anonymous class to avoid lambda in hot path
+                @Override
+                public void close() {
+                    ctx.restoreState(threadState);
+                    if (prevCtx == null) {
+                        ThreadContext.remove();
+                    } else {
+                        ThreadContext.set(prevCtx);
+                    }
                 }
             };
         }
         return restore;
     }
 
-    private Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> updateThreadState() {
-        Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = new ArrayDeque<>(elements.length);
+    private ThreadState[] updateThreadState() {
+        ThreadState[] threadState = new ThreadState[elements.length];
+        int index = 0;
         for (PropagatedContextElement element : elements) {
             if (isThreadElement(element)) {
                 ThreadPropagatedContextElement<Object> threadPropagatedContextElement = (ThreadPropagatedContextElement<Object>) element;
                 Object state = threadPropagatedContextElement.updateThreadContext();
-                threadState.push(new AbstractMap.SimpleEntry<>(threadPropagatedContextElement, state));
+                threadState[index++] = new ThreadState(threadPropagatedContextElement, state);
             }
         }
         return threadState;
     }
 
-    private void restoreState(Deque<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState) {
-        for (Map.Entry<ThreadPropagatedContextElement<Object>, Object> e : threadState) {
-            ThreadPropagatedContextElement<Object> threadPropagatedContextElement = e.getKey();
-            threadPropagatedContextElement.restoreThreadContext(e.getValue());
+    private void restoreState(ThreadState[] threadState) {
+        for (int i = threadState.length - 1; i >= 0; i--) {
+            ThreadState s = threadState[i];
+            if (s != null) {
+                s.restore();
+            }
         }
+    }
+
+    private record ThreadState(ThreadPropagatedContextElement<Object> element, Object state) {
+
+        void restore() {
+            element.restoreThreadContext(state);
+        }
+
     }
 
 }

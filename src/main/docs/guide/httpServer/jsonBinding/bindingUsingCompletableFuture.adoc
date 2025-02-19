@@ -1,0 +1,5 @@
+The same method as the previous example can also be written with the link:{jdkapi}/java.base/java/util/concurrent/CompletableFuture.html[CompletableFuture] API instead:
+
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,future,endclass", indent=0, title="Using CompletableFuture to Read the JSON"]
+
+The above example uses the `thenApply` method to achieve the same as the previous example.

@@ -47,6 +47,7 @@ class Test {
 
         expect:
         def ann = definition.synthesize(Named, "jakarta.inject.Named")
+        ann.toString() == "@jakarta.inject.Named(value=test)"
         ann.value() == 'test'
         definition.synthesizeDeclared(Named, "jakarta.inject.Named").value() == 'test'
         ann instanceof AnnotationValueProvider

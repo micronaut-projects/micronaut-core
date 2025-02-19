@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.context
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -53,7 +54,8 @@ class ServerRequestContextSpec extends Specification {
             EmbeddedServer,
             // limit number of threads to simulate thread sharing
             ['micronaut.executors.io.type': 'FIXED',
-             'micronaut.executors.io.nThreads':'2',]
+             'micronaut.executors.io.nThreads':'2',
+             'spec.name': 'ServerRequestContextSpec']
     )
 
     @Unroll
@@ -78,6 +80,7 @@ class ServerRequestContextSpec extends Specification {
         testClient.reactorContextStream() == '/test-context/reactor-context-stream'
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRequestContextSpec')
     @Client('/test-context')
     @Consumes(MediaType.TEXT_PLAIN)
     static interface TestClient {
@@ -104,6 +107,7 @@ class ServerRequestContextSpec extends Specification {
         String handlerError()
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRequestContextSpec')
     @Controller('/test-context')
     @Produces(MediaType.TEXT_PLAIN)
     static class TestContextController {
@@ -181,6 +185,7 @@ class ServerRequestContextSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRequestContextSpec')
     @Singleton
     static class TestExceptionHandler implements ExceptionHandler<TestExceptionHandlerException, HttpResponse<String>> {
         @Inject

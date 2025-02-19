@@ -32,7 +32,7 @@ public class MessageListenerException extends MessagingException {
 
     /**
      * @param message The message
-     * @param cause   The throwable
+     * @param cause The throwable
      */
     public MessageListenerException(String message, Throwable cause) {
         super(message, cause);

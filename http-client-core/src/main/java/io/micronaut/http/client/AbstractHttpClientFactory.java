@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import java.net.URI;
@@ -36,13 +37,14 @@ import java.net.URL;
 public abstract class AbstractHttpClientFactory<T extends HttpClient> implements HttpClientFactory {
 
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     protected final ConversionService conversionService;
 
-    protected AbstractHttpClientFactory(
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        ConversionService conversionService
-    ) {
+    protected AbstractHttpClientFactory(@Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                                        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                                        ConversionService conversionService) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.conversionService = conversionService;
     }
 

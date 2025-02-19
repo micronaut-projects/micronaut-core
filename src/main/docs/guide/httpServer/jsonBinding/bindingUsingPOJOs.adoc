@@ -1,0 +1,7 @@
+Note however you can just as easily write:
+
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
+
+The Micronaut framework only executes your method once the data has been read in a non-blocking manner.
+
+TIP: You can customize the output in various ways, such as using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations].

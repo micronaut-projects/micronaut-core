@@ -25,6 +25,7 @@ public class FunctionNotFoundException extends FunctionException {
 
     /**
      * Constructor.
+     *
      * @param functionName string name
      */
     public FunctionNotFoundException(String functionName) {

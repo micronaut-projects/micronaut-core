@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 
 import java.nio.charset.Charset;
@@ -59,7 +60,7 @@ public class ApplicationConfiguration {
     /**
      * @return The default charset to use.
      */
-    @SuppressWarnings("unchecked")
+    @NonNull
     public Charset getDefaultCharset() {
         return defaultCharset;
     }

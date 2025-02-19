@@ -46,7 +46,7 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
 
     public EmbeddedServerUnderTest(@NonNull Map<String, Object> properties) {
         properties.putIfAbsent("micronaut.server.port", -1);
-        properties.putIfAbsent("micronaut.ssl.port", -1);
+        properties.putIfAbsent("micronaut.server.ssl.port", -1);
         this.embeddedServer = ApplicationContext.run(EmbeddedServer.class, properties);
         this.isBlockingClient = (boolean) properties.getOrDefault(BLOCKING_CLIENT_PROPERTY, true);
     }

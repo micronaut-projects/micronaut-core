@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.java;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MediaType;
@@ -31,6 +32,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = "spec.name", value = "ParameterBindingSpec")
 @Controller("/java/parameter")
 public class ParameterController {
     @Get

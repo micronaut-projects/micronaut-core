@@ -48,6 +48,7 @@ import java.util.Map;
  */
 @Experimental
 public final class TreeGenerator extends JsonGenerator {
+
     private ObjectCodec codec;
     private int generatorFeatures;
 
@@ -118,26 +119,16 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     private static String tokenType(JsonToken token) {
-        switch (token) {
-            case END_OBJECT:
-            case END_ARRAY:
-                return "container end";
-            case FIELD_NAME:
-                return "field";
-            case VALUE_NUMBER_INT:
-                return "integer";
-            case VALUE_STRING:
-                return "string";
-            case VALUE_NUMBER_FLOAT:
-                return "float";
-            case VALUE_NULL:
-                return "null";
-            case VALUE_TRUE:
-            case VALUE_FALSE:
-                return "boolean";
-            default:
-                return "";
-        }
+        return switch (token) {
+            case END_OBJECT, END_ARRAY -> "container end";
+            case FIELD_NAME -> "field";
+            case VALUE_NUMBER_INT -> "integer";
+            case VALUE_STRING -> "string";
+            case VALUE_NUMBER_FLOAT -> "float";
+            case VALUE_NULL -> "null";
+            case VALUE_TRUE, VALUE_FALSE -> "boolean";
+            default -> "";
+        };
     }
 
     private void complete(JsonNode value) throws JsonGenerationException {
@@ -187,7 +178,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeStartObject() throws IOException {
+    public void writeStartObject() {
         structureStack.push(new ObjectBuilder());
     }
 
@@ -231,32 +222,32 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeRawUTF8String(byte[] buffer, int offset, int len) throws IOException {
+    public void writeRawUTF8String(byte[] buffer, int offset, int len) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeUTF8String(byte[] buffer, int offset, int len) throws IOException {
+    public void writeUTF8String(byte[] buffer, int offset, int len) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(String text) throws IOException {
+    public void writeRaw(String text) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(String text, int offset, int len) throws IOException {
+    public void writeRaw(String text, int offset, int len) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(char[] text, int offset, int len) throws IOException {
+    public void writeRaw(char[] text, int offset, int len) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(char c) throws IOException {
+    public void writeRaw(char c) {
         _reportUnsupportedOperation();
     }
 
@@ -276,12 +267,12 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeBinary(Base64Variant bv, byte[] data, int offset, int len) throws IOException {
+    public void writeBinary(Base64Variant bv, byte[] data, int offset, int len) {
         _reportUnsupportedOperation();
     }
 
     @Override
-    public int writeBinary(Base64Variant bv, InputStream data, int dataLength) throws IOException {
+    public int writeBinary(Base64Variant bv, InputStream data, int dataLength) {
         _reportUnsupportedOperation();
         return 0;
     }
@@ -318,7 +309,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeNumber(String encodedValue) throws IOException {
+    public void writeNumber(String encodedValue) {
         _reportUnsupportedOperation();
     }
 
@@ -370,6 +361,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     private class ArrayBuilder implements StructureBuilder {
+
         final List<JsonNode> values = new ArrayList<>();
 
         @Override
@@ -389,6 +381,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     private class ObjectBuilder implements StructureBuilder {
+
         final Map<String, JsonNode> values = new LinkedHashMap<>();
         String currentFieldName = null;
 

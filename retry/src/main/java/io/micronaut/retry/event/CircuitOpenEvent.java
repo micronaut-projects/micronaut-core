@@ -32,9 +32,9 @@ public class CircuitOpenEvent extends ApplicationEvent {
     private final Throwable throwable;
 
     /**
-     * @param source     A compile time produced invocation of a method call
+     * @param source A compile time produced invocation of a method call
      * @param retryState Encapsulate the current state of {@link io.micronaut.retry.annotation.Retryable} operation.
-     * @param throwable  The cause
+     * @param throwable The cause
      */
     public CircuitOpenEvent(
         ExecutableMethod<?, ?> source,

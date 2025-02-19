@@ -1,8 +1,7 @@
 package io.micronaut.http.server.netty
 
-
 import io.micronaut.context.annotation.Property
-import io.micronaut.core.util.StringUtils
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -17,7 +16,7 @@ import jakarta.inject.Named
 import spock.lang.Specification
 
 @MicronautTest
-@Property(name = "NettyMultiServerSpec", value = StringUtils.TRUE)
+@Property(name = "spec.name", value = "NettyMultiServerSpec")
 class NettyMultiServerSpec extends Specification {
 
     @Inject ApplicationConfiguration applicationConfiguration
@@ -46,6 +45,7 @@ class NettyMultiServerSpec extends Specification {
         secondaryClient.close()
     }
 
+    @Requires(property = "spec.name", value = "NettyMultiServerSpec")
     @Controller("/test/secondary/server")
     static class TestController {
         @Get("/")

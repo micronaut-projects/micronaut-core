@@ -29,6 +29,7 @@ import java.util.Map;
  */
 @Internal
 public class JsonObject extends JsonContainer {
+
     private final Map<String, JsonNode> values;
 
     JsonObject(Map<String, JsonNode> values) {

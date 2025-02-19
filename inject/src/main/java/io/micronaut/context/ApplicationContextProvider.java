@@ -15,6 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * An interface for classes that provide an {@link ApplicationContext}.
  *
@@ -28,5 +30,5 @@ public interface ApplicationContextProvider {
      *
      * @return The {@link ApplicationContext}
      */
-    ApplicationContext getApplicationContext();
+    @NonNull ApplicationContext getApplicationContext();
 }

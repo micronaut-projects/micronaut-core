@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 public abstract class SingleSubscriberPublisher<T> implements Publisher<T> {
+
     protected static final Subscription EMPTY_SUBSCRIPTION = new Subscription() {
         @Override
         public void request(long n) {

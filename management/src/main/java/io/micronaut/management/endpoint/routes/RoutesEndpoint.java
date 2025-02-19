@@ -53,7 +53,7 @@ public class RoutesEndpoint {
     @SingleResult
     public Object getRoutes() {
         Stream<UriRouteInfo<?, ?>> uriRoutes = router.uriRoutes()
-                .sorted(Comparator.comparing((UriRouteInfo<?, ?> r) -> r.getUriMatchTemplate().toPathString()).thenComparing(UriRouteInfo::getHttpMethodName));
+            .sorted(Comparator.comparing((UriRouteInfo<?, ?> r) -> r.getUriMatchTemplate().toPathString()).thenComparing(UriRouteInfo::getHttpMethodName));
         return routeDataCollector.getData(uriRoutes);
     }
 }

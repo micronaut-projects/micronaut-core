@@ -120,7 +120,7 @@ application/font-tdpfr				pfr
 application/gml+xml				gml
 application/gpx+xml				gpx
 application/gxf					gxf
-# application/gzip
+application/gzip					gz
 # application/h224
 # application/held+xml
 # application/http

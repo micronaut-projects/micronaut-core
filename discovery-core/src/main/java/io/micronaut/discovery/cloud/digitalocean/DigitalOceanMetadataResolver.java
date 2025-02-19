@@ -40,11 +40,26 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.*;
-import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.*;
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.populateMetadata;
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.CIDR;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.DROPLET_ID;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.GATEWAY;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.HOSTNAME;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.INTERFACES;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.IPV4;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.IPV6;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.IP_ADDRESS;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.MAC;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.NETMASK;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.PRIVATE_INTERFACES;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.PUBLIC_INTERFACES;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.REGION;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.USER_DATA;
+import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.VENDOR_DATA;
 
 /**
  * Resolves {@link ComputeInstanceMetadata} for Digital Ocean.
@@ -68,15 +83,15 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
     /**
      * @param configuration Digital Ocean Metadata configuration
-     * @param jsonFactory   Factory to use for json parsing
-     * @param mapper        Mapper to use for deserialization
+     * @param jsonFactory Factory to use for json parsing
+     * @param mapper Mapper to use for deserialization
      */
     @Inject
     @Experimental
     public DigitalOceanMetadataResolver(
-            DigitalOceanMetadataConfiguration configuration,
-            JsonFactory jsonFactory,
-            JsonMapper mapper
+        DigitalOceanMetadataConfiguration configuration,
+        JsonFactory jsonFactory,
+        JsonMapper mapper
     ) {
         this.configuration = configuration;
         this.jsonFactory = jsonFactory;
@@ -93,7 +108,6 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     }
 
     /**
-     *
      * @param objectMapper To read and write JSON
      * @param configuration Digital Ocean Metadata configuration
      */
@@ -126,7 +140,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                 JsonNode networkInterfaces = metadataJson.get(INTERFACES.getName());
                 List<NetworkInterface> privateInterfaces = processJsonInterfaces(networkInterfaces.get(PRIVATE_INTERFACES.getName()), instanceMetadata::setPrivateIpV4, instanceMetadata::setPrivateIpV6);
                 List<NetworkInterface> publicInterfaces = processJsonInterfaces(networkInterfaces.get(PUBLIC_INTERFACES.getName()), instanceMetadata::setPublicIpV4, instanceMetadata::setPublicIpV6);
-                List<NetworkInterface> allInterfaces = new ArrayList<>();
+                var allInterfaces = new ArrayList<NetworkInterface>();
                 allInterfaces.addAll(publicInterfaces);
                 allInterfaces.addAll(privateInterfaces);
                 instanceMetadata.setInterfaces(allInterfaces);
@@ -150,31 +164,31 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     }
 
     private List<NetworkInterface> processJsonInterfaces(JsonNode interfaces, Consumer<String> ipv4Setter, Consumer<String> ipv6Setter) {
-        List<NetworkInterface> networkInterfaces = new ArrayList<>();
+        var networkInterfaces = new ArrayList<NetworkInterface>();
 
         if (interfaces != null) {
-            AtomicReference<Integer> networkCounter = new AtomicReference<>(0);
+            var networkCounter = new AtomicInteger();
             interfaces.values().forEach(
-                    jsonNode -> {
-                        DigitalOceanNetworkInterface networkInterface = new DigitalOceanNetworkInterface();
-                        networkInterface.setId(networkCounter.toString());
-                        JsonNode ipv4 = jsonNode.get(IPV4.getName());
-                        if (ipv4 != null) {
-                            networkInterface.setIpv4(textValue(ipv4, IP_ADDRESS));
-                            networkInterface.setNetmask(textValue(ipv4, NETMASK));
-                            networkInterface.setGateway(textValue(ipv4, GATEWAY));
-                        }
-                        JsonNode ipv6 = jsonNode.get(IPV6.getName());
-                        if (ipv6 != null) {
-                            networkInterface.setIpv6(textValue(ipv6, IP_ADDRESS));
-                            networkInterface.setIpv6Gateway(textValue(ipv6, GATEWAY));
-                            networkInterface.setCidr(ipv6.get(CIDR.getName()).getIntValue());
-                        }
-                        networkInterface.setMac(textValue(jsonNode, MAC));
-
-                        networkCounter.getAndSet(networkCounter.get() + 1);
-                        networkInterfaces.add(networkInterface);
+                jsonNode -> {
+                    var networkInterface = new DigitalOceanNetworkInterface();
+                    networkInterface.setId(networkCounter.toString());
+                    JsonNode ipv4 = jsonNode.get(IPV4.getName());
+                    if (ipv4 != null) {
+                        networkInterface.setIpv4(textValue(ipv4, IP_ADDRESS));
+                        networkInterface.setNetmask(textValue(ipv4, NETMASK));
+                        networkInterface.setGateway(textValue(ipv4, GATEWAY));
                     }
+                    JsonNode ipv6 = jsonNode.get(IPV6.getName());
+                    if (ipv6 != null) {
+                        networkInterface.setIpv6(textValue(ipv6, IP_ADDRESS));
+                        networkInterface.setIpv6Gateway(textValue(ipv6, GATEWAY));
+                        networkInterface.setCidr(ipv6.get(CIDR.getName()).getIntValue());
+                    }
+                    networkInterface.setMac(textValue(jsonNode, MAC));
+
+                    networkCounter.getAndIncrement();
+                    networkInterfaces.add(networkInterface);
+                }
             );
 
             JsonNode firstIpv4 = interfaces.get(0).get(IPV4.getName());

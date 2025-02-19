@@ -5,6 +5,144 @@ import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec;
 
 class MethodArgumentEvaluationContextExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
+    void "test compare >"() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a > #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && result
+    }
+
+    void "test compare <"() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a < #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && !result
+    }
+
+    void "test compare <="() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a <= #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && !result
+    }
+
+    void "test compare >="() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a >= #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && result
+    }
+
+    void "test compare =="() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a == #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && !result
+    }
+
+    void "test compare !="() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Requires;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+
+                @Executable
+                @Requires(value = "#{ #a != #b }")
+                public void nn(String a, String b) {
+                }
+            }
+
+        """, ["two", "one"] as Object[])
+
+        expect:
+        result instanceof Boolean && result
+    }
+
     void "test method argument access"() {
         given:
         Object result = evaluateSingle("test.Expr", """

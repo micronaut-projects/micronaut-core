@@ -17,8 +17,11 @@ package io.micronaut.http.client.annotation;
 
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.hateoas.JsonError;
@@ -54,6 +57,28 @@ public @interface Client {
     @AliasFor(member = "value") // <2>
     String id() default "";
 // end::value[]
+
+    /**
+     * The interface definition type. When set to {@link DefinitionType.SERVER} the {@link Produces} and {@link Consumes}
+     * definition evaluated for each method of the interface will be reversed .
+     *
+     * <p>Whilst not necessarily recommended, there are scenarios like testing where it is useful to share a common interface between client and server and use the
+     * interface to create a new client declarative client. The client typically needs to produce the content type accepted by the server and consume the content type
+     * produced by the server. In this arrangement using the interface directly will not result in the correct behaviour.</p>
+     *
+     * <p>In this scenario you can set {@link DefinitionType} to {@link DefinitionType.SERVER} which will ensure the requests sent by the client use the content type declared by the {@link Consumes}
+     *  annotation of the interface and that responses use the content type declared by the {@link Produces}.</p>
+     *
+     * <p>The default behaviour is to use {@link DefinitionType.CLIENT} where the inverse of the above is true.</p>
+     *
+     * @return The interface definition type
+     * @since 4.8.0
+     * @see Consumes
+     * @see Produces
+     */
+    @Experimental
+    @NonNull
+    DefinitionType definitionType() default DefinitionType.CLIENT;
 
     /**
      * The base URI for the client. Only to be used in
@@ -109,4 +134,39 @@ public @interface Client {
         HttpVersionSelection.ALPN_HTTP_2,
         HttpVersionSelection.ALPN_HTTP_1
     };
+
+    /**
+     * The interface definition type.
+     *
+     * @since 4.8.0
+     */
+    @Experimental
+    enum DefinitionType {
+        /**
+         * Client interface definition type.
+         */
+        CLIENT,
+        /**
+         * Server (controller) interface definition type.
+         */
+        SERVER;
+
+        /**
+         * Returns true, if this definition type is {@link DefinitionType.CLIENT}.
+         *
+         * @return true, if this definition type is {@link DefinitionType.CLIENT}.
+         */
+        public boolean isClient() {
+            return this == CLIENT;
+        }
+
+        /**
+         * Returns true, if this definition type is {@link DefinitionType.SERVER}.
+         *
+         * @return true, if this definition type is {@link DefinitionType.SERVER}.
+         */
+        public boolean isServer() {
+            return this == SERVER;
+        }
+    }
 }

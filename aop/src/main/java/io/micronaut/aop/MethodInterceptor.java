@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
  *
  * @param <T> The declaring type
  * @param <R> The result of the method call
- *
  * @author Graeme Rocher
  * @since 1.0
  */

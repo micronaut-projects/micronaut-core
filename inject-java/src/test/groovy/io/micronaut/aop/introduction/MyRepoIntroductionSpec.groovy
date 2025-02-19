@@ -137,4 +137,49 @@ class MyRepoIntroductionSpec extends Specification {
             MyRepoIntroducer.EXECUTED_METHODS.clear()
     }
 
+    void "test tx interface repo methods"() {
+        when:
+            def bean = applicationContext.getBean(MyRepo3)
+            bean.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+    }
+
+    void "test tx abstract repo methods"() {
+        given:
+            def bean = applicationContext.getBean(MyRepo4)
+        when:
+            bean.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+        when:
+            bean.findById(1)
+        then:
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+    }
+
+    void "test tx default repo methods"() {
+        given:
+            def bean = applicationContext.getBean(MyRepo5)
+        when:
+            bean.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+        when:
+            bean.findById(1)
+        then:
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+    }
+
 }

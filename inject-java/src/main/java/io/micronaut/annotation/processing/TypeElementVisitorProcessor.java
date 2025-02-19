@@ -27,6 +27,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -34,6 +35,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -41,6 +43,7 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
@@ -58,6 +61,8 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
 
 /**
  * <p>The annotation processed used to execute type element visitors.</p>
@@ -80,8 +85,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     static {
 
-        final HashSet<String> warnings = new HashSet<>();
-        Set<String> names = new HashSet<>();
+        final var warnings = new HashSet<String>();
+        var names = new HashSet<String>();
         for (TypeElementVisitor<?, ?> typeElementVisitor : findCoreTypeElementVisitors(warnings)) {
             final Set<String> supportedAnnotationNames;
             try {
@@ -105,7 +110,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     private List<LoadedVisitor> loadedVisitors;
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
-    private final Set<String> pendingTypes = new LinkedHashSet<>();
 
     /**
      * The visited annotation names.
@@ -126,7 +130,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         // in particular for micronaut-openapi
         processingEnv.getOptions().entrySet().stream()
             .filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-            .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? "" : entry.getValue()));
+            .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? EMPTY_STRING : entry.getValue()));
 
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
@@ -225,7 +229,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
             Predicate<TypeElement> notGroovyObject = typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType);
 
-            Set<TypeElement> elements = new LinkedHashSet<>();
+            var elements = new LinkedHashSet<TypeElement>();
 
             for (TypeElement annotation : annotations) {
                 modelUtils.resolveTypeElements(
@@ -239,8 +243,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
 
-            pendingTypes.stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
-            pendingTypes.clear();
+            for (Object nativeType : postponedTypes.values()) {
+                AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+            }
+            postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
+            postponedTypes.clear();
 
             if (!elements.isEmpty()) {
 
@@ -264,13 +271,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                                 visitClass(loadedVisitor, javaClassElement);
                             }
                         } catch (ProcessingException e) {
-                            JavaNativeElement originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                            var originatingElement = (JavaNativeElement) e.getOriginatingElement();
                             if (originatingElement == null) {
                                 originatingElement = javaClassElement.getNativeType();
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            pendingTypes.add(javaClassElement.getName());
+                            postponedTypes.put(javaClassElement.getCanonicalName(), e.getErrorElement());
+                        } catch (ElementPostponedToNextRoundException e) {
+                            Object nativeType = e.getOriginatingElement().getNativeType();
+                            if (nativeType instanceof JavaNativeElement jne) {
+                                Element element = jne.element();
+                                postponedTypes.put(javaClassElement.getCanonicalName(), element);
+                            } else {
+                                // should never happen.
+                                throw e;
+                            }
                         }
                     }
                 }
@@ -280,7 +296,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 try {
                     loadedVisitor.getVisitor().finish(javaVisitorContext);
                 } catch (Throwable e) {
-                    StringWriter stackTraceWriter = new StringWriter();
+                    var stackTraceWriter = new StringWriter();
                     e.printStackTrace(new PrintWriter(stackTraceWriter));
 
                     error("Error finalizing type visitor [%s]: %s\n%s",

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 
 class UserInlineValueClassTest {
 
-    @Disabled("Kotline inline value classes not yet supported via Bean Introspection")
+    @Disabled("Kotlin inline value classes not yet supported via Bean Introspection")
     @Test
     fun anInlineValueClassNotYetSupportedViaBeanIntrospection() {
         val introspection: BeanIntrospection<UserInlineValueClass> = assertDoesNotThrow { BeanIntrospection.getIntrospection(UserInlineValueClass::class.java) }

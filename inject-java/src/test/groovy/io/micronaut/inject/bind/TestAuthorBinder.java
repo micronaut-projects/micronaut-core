@@ -33,24 +33,22 @@ public class TestAuthorBinder implements ArgumentBinder<Author, PropertyResolver
     @Override
     public BindingResult<Author> bind(ArgumentConversionContext<Author> context, PropertyResolver source) {
         Author author = new Author();
-        if(source.containsProperty("name")) {
+        if (source.containsProperty("name")) {
             ArgumentConversionContext<String> conversionContext = context.with(Argument.of(String.class, "name"));
             Optional<String> converted = source.getProperty("name", String.class, conversionContext);
-            if(converted.isPresent()) {
-                author.setName(converted.get());
-            }
+            converted.ifPresent(author::setName);
         }
-        if(source.containsProperty("website")) {
+        if (source.containsProperty("website")) {
             ArgumentConversionContext<Optional> conversionContext = context.with(
                     Argument.of(Optional.class, "website",
                             Argument.of(URI.class, "T")
                     )
             );
             Optional converted = source.getProperty("website", Optional.class, conversionContext);
-            if(converted.isPresent()) {
+            if (converted.isPresent()) {
                 author.setWebsite((Optional<URI>) converted.get());
             }
         }
-        return ()-> Optional.of(author);
+        return () -> Optional.of(author);
     }
 }

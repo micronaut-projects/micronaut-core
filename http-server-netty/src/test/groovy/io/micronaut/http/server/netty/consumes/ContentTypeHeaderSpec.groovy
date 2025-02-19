@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.consumes
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -27,7 +28,7 @@ import spock.lang.Specification
 
 class ContentTypeHeaderSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ContentTypeHeaderSpec'])
 
     @Shared HttpClient client = embeddedServer.applicationContext.createBean(
             HttpClient,
@@ -58,7 +59,7 @@ class ContentTypeHeaderSpec extends Specification {
         resp.body() == 'ok'
     }
 
-
+    @Requires(property = "spec.name", value = "ContentTypeHeaderSpec")
     @Controller("/test/content-type")
     static class ContentTypeController {
 

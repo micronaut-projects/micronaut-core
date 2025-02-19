@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Internal
 public final class LazyJsonNode implements ReferenceCounted {
+
     private final Lock lock = new ReentrantLock();
     @Nullable
     private ByteBuffer<?> buffer;
@@ -53,8 +54,8 @@ public final class LazyJsonNode implements ReferenceCounted {
      * Parse this JSON to the given type.
      *
      * @param mapper The mapper to use for parsing
-     * @param type   The target type
-     * @param <T>    The target type
+     * @param type The target type
+     * @param <T> The target type
      * @return The parsed value
      * @throws IOException A {@link JsonSyntaxException} or framework data binding exception
      */
@@ -82,7 +83,7 @@ public final class LazyJsonNode implements ReferenceCounted {
      *
      * @return {@code true} if this node is an object
      * @throws JsonSyntaxException If the JSON is malformed. Note that this method does not always
-     *                             do full parsing, so this exception is best-effort only
+     * do full parsing, so this exception is best-effort only
      */
     boolean isObject() throws JsonSyntaxException {
         JsonNode n = asNode;

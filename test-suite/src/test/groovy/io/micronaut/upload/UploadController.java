@@ -105,6 +105,22 @@ public class UploadController {
         }
     }
 
+    @Post(value = "/receive-completed-file-upload-huge", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    public String receiveCompletedFileUploadHuge(CompletedFileUpload data) {
+        try (InputStream is = data.getInputStream()) {
+            long n = 0;
+            byte[] arr = new byte[4096];
+            while (true) {
+                int o = is.read(arr);
+                if (o < 0) break;
+                n += o;
+            }
+            return data.getFilename() + ": " + n;
+        } catch (IOException e) {
+            return e.getMessage();
+        }
+    }
+
     @Post(value = "/receive-completed-file-upload-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveCompletedFileUploadStream(CompletedFileUpload data) {
         try {

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 // tag::imports[]
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
@@ -30,6 +31,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 
 // tag::class[]
+@Requires(property = "spec.name", value = "SimpleTextWebSocketSpec")
 @ClientWebSocket("/chat/{topic}/{username}") // <1>
 public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 

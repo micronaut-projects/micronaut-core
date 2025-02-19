@@ -22,7 +22,9 @@ package io.micronaut.http.server.netty;
  * @author Graeme Rocher
  * @see DefaultHttpContentProcessor
  * @since 1.0
+ * @deprecated Unused now
  */
+@Deprecated(forRemoval = true, since = "4.5.0")
 public interface HttpContentSubscriberFactory {
 
     /**

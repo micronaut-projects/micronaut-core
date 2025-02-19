@@ -36,5 +36,5 @@ public enum SameSite {
   /**
    * Allows third-party cookies to track users across sites. The None directive requires the Secure attribute.
    */
-  None;
+  None
 }

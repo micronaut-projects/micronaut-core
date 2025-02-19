@@ -90,6 +90,29 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
+     * Returns a collection of properties entries under the given key, but .
+     * For example, if you set {@code PropertyCatalog.RAW} then the following keys:
+     *
+     * <pre>
+     * <code>datasource.MyDs-1.url=localhost
+     * datasource.MyDs-2.url=someother</code>
+     * </pre>
+     *
+     * Calling {@code getPropertyEntries(String)} with a value of {@code datasource} will result in a collection
+     * containing {@code MyDs-1} and {@code MyDs-2} (without normalization).
+     *
+     * @param name The name to resolve
+     * @param propertyCatalog property catalog to use
+     * @return The property entries.
+     *
+     * @since 4.7.0
+     */
+    @NonNull
+    default Collection<String> getPropertyEntries(@NonNull String name, @NonNull PropertyCatalog propertyCatalog) {
+        return Collections.emptySet();
+    }
+
+    /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
      *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>

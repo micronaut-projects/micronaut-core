@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.StartupEvent
@@ -32,7 +33,6 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
-import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -43,7 +43,6 @@ import spock.lang.Stepwise
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicInteger
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -54,9 +53,8 @@ class NettyHttpServerSpec extends Specification {
 
     void "test Micronaut server running"() {
         when:
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec'])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
         then:
@@ -64,12 +62,12 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+        embeddedServer.stop()
     }
 
     void "test run Micronaut server on same port as another server"() {
         when:
-        PropertySource propertySource = PropertySource.of('micronaut.server.port':-1)
+        PropertySource propertySource = PropertySource.of('micronaut.server.port':-1, 'spec.name': 'NettyHttpServerSpec')
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
@@ -80,7 +78,7 @@ class NettyHttpServerSpec extends Specification {
 
         when: "Run another server with same port"
         sleep(1_000) // wait for port to be not available
-        ApplicationContext.run(EmbeddedServer, PropertySource.of('micronaut.server.port':embeddedServer.getPort()), Environment.TEST)
+        ApplicationContext.run(EmbeddedServer, PropertySource.of('micronaut.server.port':embeddedServer.getPort(), 'spec.name': 'NettyHttpServerSpec'), Environment.TEST)
 
         then:"An error is thrown"
         def e = thrown(ServerStartupException)
@@ -93,9 +91,8 @@ class NettyHttpServerSpec extends Specification {
 
     void "test Micronaut server running again"() {
         when:
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec'])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
         then:
@@ -103,15 +100,14 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+        embeddedServer.stop()
     }
 
     void "test Micronaut server on different port"() {
         when:
         int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec', 'micronaut.server.port':newPort.toString()])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
 
@@ -120,15 +116,14 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+        embeddedServer.stop()
     }
 
     void "test bind method argument from request parameter"() {
         when:
         int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec', 'micronaut.server.port':newPort.toString()])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         HttpResponse response = client.toBlocking().exchange('/person/another/job?id=10', String)
 
@@ -137,15 +132,14 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+        embeddedServer.stop()
     }
 
     void "test bind method argument from request parameter when parameter missing"() {
         when:"A required request parameter is missing"
         int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec', 'micronaut.server.port':newPort.toString()])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         client.toBlocking().exchange('/person/another/job', String)
 
@@ -155,15 +149,14 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+            embeddedServer.stop()
     }
 
     void "test allowed methods handling"() {
         when:"A request is sent to the server for the wrong HTTP method"
         int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec', 'micronaut.server.port':newPort.toString()])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         client.toBlocking().exchange(HttpRequest.POST('/person/job/test', '{}'), String)
 
@@ -174,7 +167,7 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+        embeddedServer.stop()
     }
 
     void "test expected connection persistence"() {
@@ -184,9 +177,8 @@ class NettyHttpServerSpec extends Specification {
         config.connectionPoolConfiguration.enabled = true
         config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
 
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'NettyHttpServerSpec'])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
 
         HttpRequest request = HttpRequest.create(HttpMethod.GET, '/person/Fred')
         HttpResponse response = client.toBlocking().exchange(request, String)
@@ -196,12 +188,13 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         client.stop()
-        applicationContext.stop()
+            embeddedServer.stop()
     }
 
     void "test run Micronaut server when enabling both http and https"() {
         when:
         PropertySource propertySource = PropertySource.of(
+                'spec.name': 'NettyHttpServerSpec',
                 'micronaut.server.port':httpPort,
                 'micronaut.server.ssl.enabled': true,
                 'micronaut.server.ssl.port': -1,
@@ -232,6 +225,7 @@ class NettyHttpServerSpec extends Specification {
         def unsecurePort = SocketUtils.findAvailableTcpPort()
         when:
         PropertySource propertySource = PropertySource.of(
+                'spec.name': 'NettyHttpServerSpec',
                 'micronaut.server.port': unsecurePort,
                 'micronaut.server.ssl.port': securePort,
                 'micronaut.server.ssl.enabled': true,
@@ -252,6 +246,7 @@ class NettyHttpServerSpec extends Specification {
     void "test non dual protocol Micronaut server only fires startup event once"() {
         when:
         PropertySource propertySource = PropertySource.of(
+                'spec.name': 'NettyHttpServerSpec',
                 'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
                 'micronaut.server.dualProtocol':false
         )
@@ -268,6 +263,7 @@ class NettyHttpServerSpec extends Specification {
     void "test dual protocol only fires startup event once"() {
         when:
         PropertySource propertySource = PropertySource.of(
+                'spec.name': 'NettyHttpServerSpec',
                 'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
                 'micronaut.server.ssl.port': SocketUtils.findAvailableTcpPort(),
                 'micronaut.server.ssl.enabled': true,
@@ -284,6 +280,7 @@ class NettyHttpServerSpec extends Specification {
         embeddedServer.applicationContext.stop()
     }
 
+    @Requires(property = "spec.name", value = "NettyHttpServerSpec")
     @Singleton
     static class EventCounter {
         AtomicInteger count = new AtomicInteger(0)
@@ -294,6 +291,7 @@ class NettyHttpServerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "NettyHttpServerSpec")
     @Controller("/person")
     static class PersonController {
 

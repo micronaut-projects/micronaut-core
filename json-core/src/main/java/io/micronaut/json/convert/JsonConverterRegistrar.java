@@ -59,9 +59,9 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
 
     @Inject
     public JsonConverterRegistrar(
-            BeanProvider<JsonMapper> objectCodec,
-            ConversionService conversionService,
-            BeanProvider<BeanPropertyBinder> beanPropertyBinder
+        BeanProvider<JsonMapper> objectCodec,
+        ConversionService conversionService,
+        BeanProvider<BeanPropertyBinder> beanPropertyBinder
     ) {
         this.objectCodecProvider = objectCodec;
         this.conversionService = conversionService;
@@ -81,34 +81,34 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
-                JsonNode.class,
-                ConvertibleValues.class,
-                objectNodeToConvertibleValuesConverter()
+            JsonNode.class,
+            ConvertibleValues.class,
+            objectNodeToConvertibleValuesConverter()
         );
         conversionService.addConverter(
-                LazyJsonNode.class,
-                ConvertibleValues.class,
-                unparsedNodeToConvertibleValuesConverter()
+            LazyJsonNode.class,
+            ConvertibleValues.class,
+            unparsedNodeToConvertibleValuesConverter()
         );
         conversionService.addConverter(
-                JsonNode.class,
-                Object.class,
-                jsonNodeToObjectConverter()
+            JsonNode.class,
+            Object.class,
+            jsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                JsonNode.class,
-                String.class,
-                jsonNodeToStringConverter()
+            JsonNode.class,
+            String.class,
+            jsonNodeToStringConverter()
         );
         conversionService.addConverter(
-                LazyJsonNode.class,
-                Object.class,
-                unparsedJsonNodeToObjectConverter()
+            LazyJsonNode.class,
+            Object.class,
+            unparsedJsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                LazyJsonNode.class,
-                String.class,
-                unparsedJsonNodeToStringConverter()
+            LazyJsonNode.class,
+            String.class,
+            unparsedJsonNodeToStringConverter()
         );
         // need to register the Object[] conversions explicitly because there is also an Object->Object[] converter
         conversionService.addConverter(
@@ -117,19 +117,19 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
             (TypeConverter) jsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                LazyJsonNode.class,
-                Object[].class,
-                (TypeConverter) unparsedJsonNodeToObjectConverter()
+            LazyJsonNode.class,
+            Object[].class,
+            (TypeConverter) unparsedJsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                Map.class,
-                Object.class,
-                mapToObjectConverter()
+            Map.class,
+            Object.class,
+            mapToObjectConverter()
         );
         conversionService.addConverter(
-                Object.class,
-                JsonNode.class,
-                objectToJsonNodeConverter()
+            Object.class,
+            JsonNode.class,
+            objectToJsonNodeConverter()
         );
     }
 
@@ -192,7 +192,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private Map<?, ?> correctKeys(Map<?, ?> map) {
-        Map<Object, Object> mapWithExtraProps = CollectionUtils.newLinkedHashMap(map.size());
+        var mapWithExtraProps = CollectionUtils.newLinkedHashMap(map.size());
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = correctKeys(entry.getValue());
@@ -202,7 +202,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private List<?> correctKeys(List<?> list) {
-        List<Object> newList = new ArrayList<>(list.size());
+        var newList = new ArrayList<>(list.size());
         for (Object o : list) {
             newList.add(correctKeys(o));
         }

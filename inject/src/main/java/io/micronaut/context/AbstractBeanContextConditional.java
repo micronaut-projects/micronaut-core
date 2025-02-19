@@ -47,20 +47,24 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
                 this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
         if (!enabled) {
-            if (ConditionLog.LOG.isDebugEnabled()) {
-                if (this instanceof BeanConfiguration) {
-                    ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
-                } else {
-                    ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
-                }
-                for (Failure failure : conditionContext.getFailures()) {
-                    ConditionLog.LOG.debug("* {}", failure.getMessage());
-                }
-            }
-            defaultBeanContext.trackDisabledComponent(conditionContext);
+            onFail(conditionContext, defaultBeanContext);
         }
 
         return enabled;
+    }
+
+    protected final void onFail(DefaultConditionContext<AbstractBeanContextConditional> conditionContext, DefaultBeanContext defaultBeanContext) {
+        if (ConditionLog.LOG.isDebugEnabled()) {
+            if (this instanceof BeanConfiguration) {
+                ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
+            } else {
+                ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
+            }
+            for (Failure failure : conditionContext.getFailures()) {
+                ConditionLog.LOG.debug("* {}", failure.getMessage());
+            }
+        }
+        defaultBeanContext.trackDisabledComponent(conditionContext);
     }
 
     @SuppressWarnings("java:S3416")

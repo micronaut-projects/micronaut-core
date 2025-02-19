@@ -244,6 +244,21 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     }
 
     /**
+     * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type, if the header is
+     * missing.
+     *
+     * @param mediaType The media type
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders contentTypeIfMissing(MediaType mediaType) {
+        if (!contains(CONTENT_TYPE)) {
+            return contentType(mediaType);
+        } else {
+            return this;
+        }
+    }
+
+    /**
      * Add a header for the given name and value.
      *
      * @param header The header name

@@ -15,9 +15,11 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.netty.channel.socket.SocketChannel;
+import io.micronaut.core.annotation.NonNull;
 import io.netty.handler.codec.http.HttpHeaders;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Set;
 
 /**
@@ -47,8 +49,13 @@ final class LocalPortElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        return Integer.toString(channel.localAddress().getPort());
+    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+        SocketAddress localAddress = metadata.localAddress().orElse(null);
+        if (localAddress instanceof InetSocketAddress addr) {
+            return Integer.toString(addr.getPort());
+        } else {
+            return ConstantElement.UNKNOWN_VALUE;
+        }
     }
 
     @Override

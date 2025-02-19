@@ -30,6 +30,7 @@ import java.util.Queue;
  * @since 1.0
  */
 public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber<T>, Emitter<T> {
+
     protected final Queue<T> upstreamBuffer = new LinkedList<>();
     protected BackPressureState upstreamState = BackPressureState.NO_SUBSCRIBER;
     protected long upstreamDemand = 0;

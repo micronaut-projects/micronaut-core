@@ -30,6 +30,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Nullability
 import com.google.devtools.ksp.symbol.Variance
 import com.google.devtools.ksp.symbol.Visibility
 import io.micronaut.aop.Around
@@ -47,7 +48,8 @@ import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
-import java.util.Optional
+import java.util.*
+import kotlin.collections.HashSet
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -133,7 +135,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     private fun shouldBeOpen(annotationMetadata: AnnotationMetadata): Boolean {
-        if (extraOpenAnnotations != null && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
+        val extraOpenAnnotations = visitorContext.extraOpenAnnotations
+        if (extraOpenAnnotations.isNotEmpty() && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
             return true
         }
         return annotationMetadata.declaredMetadata.hasDeclaredStereotype(
@@ -283,7 +286,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = type.declaration.typeParameters
-        if (type.arguments.isEmpty()) {
+        if (type.arguments.isEmpty() || type.arguments.size != typeParameters.size) {
             typeParameters.forEach {
                 typeArguments[it.name.asString()] =
                     resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
@@ -538,7 +541,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             }
             val canBePrimitive =
                 type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
-            if (allowPrimitive && canBePrimitive) {
+            if (allowPrimitive && canBePrimitive && type?.nullability != Nullability.PLATFORM) {
                 val element = primitives[qualifiedNameString]
                 if (element != null) {
                     return element
@@ -610,7 +613,6 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     companion object {
-        val extraOpenAnnotations = System.getProperty("kotlin.allopen.annotations")?.split(",")?.toTypedArray()
 
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,

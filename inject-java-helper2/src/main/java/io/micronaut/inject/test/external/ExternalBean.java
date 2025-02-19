@@ -16,7 +16,7 @@
 package io.micronaut.inject.test.external;
 
 /**
- * Test bean
+ * Test bean.
  */
 public class ExternalBean {
 

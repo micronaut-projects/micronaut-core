@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.websocket;
 
 //tag::clazz[]
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -26,6 +27,7 @@ import io.micronaut.websocket.annotation.ServerWebSocket;
 
 import java.util.function.Predicate;
 
+@Requires(property = "spec.name", value = "SimpleTextWebSocketSpec")
 @ServerWebSocket("/chat/{topic}/{username}") // <1>
 public class ChatServerWebSocket {
     private WebSocketBroadcaster broadcaster;

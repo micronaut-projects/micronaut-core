@@ -27,7 +27,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -71,7 +70,7 @@ public final class JsonNodeTreeCodec {
     public JsonNode readTree(JsonParser p) throws IOException {
         switch (p.hasCurrentToken() ? p.currentToken() : p.nextToken()) {
             case START_OBJECT:
-                Map<String, JsonNode> map = new LinkedHashMap<>();
+                var map = new LinkedHashMap<String, JsonNode>();
                 while (p.nextToken() != JsonToken.END_OBJECT) {
                     String name = p.currentName();
                     p.nextToken();
@@ -79,7 +78,7 @@ public final class JsonNodeTreeCodec {
                 }
                 return JsonNode.createObjectNode(map);
             case START_ARRAY:
-                List<JsonNode> list = new ArrayList<>();
+                var list = new ArrayList<JsonNode>();
                 while (p.nextToken() != JsonToken.END_ARRAY) {
                     list.add(readTree(p));
                 }
@@ -120,7 +119,7 @@ public final class JsonNodeTreeCodec {
      * Write a json node to a json stream.
      *
      * @param generator The output json stream.
-     * @param tree      The node to write.
+     * @param tree The node to write.
      * @throws IOException IOException
      */
     public void writeTree(JsonGenerator generator, JsonNode tree) throws IOException {

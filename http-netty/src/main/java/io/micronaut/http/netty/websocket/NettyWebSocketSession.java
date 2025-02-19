@@ -24,6 +24,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
@@ -64,7 +65,6 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final HttpRequest<?> request;
     private final String protocolVersion;
     private final boolean isSecure;
-    private final MediaTypeCodecRegistry codecRegistry;
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -74,6 +74,7 @@ public class NettyWebSocketSession implements WebSocketSession {
      * @param channel The channel
      * @param request The original request used to create the session
      * @param codecRegistry The codec registry
+     * @param handlerRegistry The handlers registry
      * @param protocolVersion The protocol version
      * @param isSecure Whether the session is secure
      */
@@ -82,6 +83,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             Channel channel,
             HttpRequest<?> request,
             MediaTypeCodecRegistry codecRegistry,
+            MessageBodyHandlerRegistry handlerRegistry,
             String protocolVersion,
             boolean isSecure) {
         this.id = id;
@@ -90,8 +92,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         this.protocolVersion = protocolVersion;
         this.isSecure = isSecure;
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
-        this.codecRegistry = codecRegistry;
-        this.messageEncoder = new WebSocketMessageEncoder(this.codecRegistry);
+        this.messageEncoder = new WebSocketMessageEncoder(codecRegistry, handlerRegistry);
         this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(MutableConvertibleValuesMap::new);
     }
 

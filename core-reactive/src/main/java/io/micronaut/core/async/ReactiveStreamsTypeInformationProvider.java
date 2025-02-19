@@ -34,7 +34,7 @@ public final class ReactiveStreamsTypeInformationProvider implements TypeInforma
     public boolean isSpecifiedSingle(@NonNull AnnotationMetadataProvider annotationMetadataProvider) {
         AnnotationMetadata annotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
         return annotationMetadata.hasStereotype(SingleResult.class) &&
-                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
+            annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
     }
 
     @Override

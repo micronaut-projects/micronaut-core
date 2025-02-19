@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.CookieValue
@@ -69,10 +70,12 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         result == "Cookie Value: foo"
     }
 
+    @Requires(property = "spec.name", value = "CookieBindingSpec")
     @Client('/cookie')
     static interface CookieClient extends CookieApi {
     }
 
+    @Requires(property = "spec.name", value = "CookieBindingSpec")
     @Controller("/cookie")
     static class CookieController implements CookieApi {
 

@@ -17,6 +17,8 @@ package io.micronaut.http.server.netty.converters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.netty.DefaultHttpClient
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
@@ -84,5 +86,16 @@ class ConverterRegistrySpec extends Specification {
 
         cleanup:
         ctx1.close()
+    }
+
+    def "config properties"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['micronaut.http.client.channel-options.SO_TIMEOUT': 1])
+
+        expect:
+        ((DefaultHttpClient) ctx.getBean(HttpClient)).connectionManager().bootstrap.config().options().get(ChannelOption.SO_TIMEOUT) == 1
+
+        cleanup:
+        ctx.close()
     }
 }

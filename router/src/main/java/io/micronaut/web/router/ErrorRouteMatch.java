@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -58,7 +57,7 @@ class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     @Override
     public Collection<Argument<?>> getRequiredArguments() {
         Argument<?>[] arguments = getArguments();
-        List<Argument<?>> list = new ArrayList<>(arguments.length);
+        var list = new ArrayList<Argument<?>>(arguments.length);
         for (Argument<?> argument : arguments) {
             if (!argument.getType().isInstance(error)) {
                 list.add(argument);

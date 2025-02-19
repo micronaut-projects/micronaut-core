@@ -22,7 +22,6 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
@@ -35,22 +34,23 @@ import java.util.Optional;
  */
 @Singleton
 @Produces
-public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
-
+public class HttpStatusHandler extends ErrorResponseProcessorExceptionHandler<HttpStatusException> {
     /**
      * Constructor.
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
+        super(responseProcessor);
     }
 
     @Override
-    public HttpResponse handle(HttpRequest request, HttpStatusException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(exception.getStatus());
+    protected MutableHttpResponse<?> createResponse(HttpStatusException exception) {
+        return HttpResponse.status(exception.getStatus());
+    }
+
+    @Override
+    public HttpResponse<?> handle(HttpRequest request, HttpStatusException exception) {
+        MutableHttpResponse<?> response = createResponse(exception);
         Optional<Object> body = exception.getBody();
         if (body.isPresent()) {
             return response.body(body.get());

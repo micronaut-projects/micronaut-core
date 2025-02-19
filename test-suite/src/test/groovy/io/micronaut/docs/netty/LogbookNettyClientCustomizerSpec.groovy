@@ -12,38 +12,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
-import io.micronaut.http.server.netty.NettyHttpServer
 import io.micronaut.runtime.server.EmbeddedServer
-import io.netty.buffer.Unpooled
-import io.netty.channel.ChannelHandlerContext
-import io.netty.channel.ChannelOutboundHandlerAdapter
-import io.netty.channel.ChannelPromise
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.handler.codec.http.DefaultFullHttpRequest
-import io.netty.handler.codec.http.FullHttpResponse
-import io.netty.handler.codec.http.HttpClientCodec
-import io.netty.handler.codec.http.HttpClientUpgradeHandler
-import io.netty.handler.codec.http.HttpHeaderNames
-import io.netty.handler.codec.http.HttpHeaderValues
-import io.netty.handler.codec.http.HttpMethod
-import io.netty.handler.codec.http.HttpObjectAggregator
-import io.netty.handler.codec.http.HttpResponseStatus
-import io.netty.handler.codec.http.HttpVersion
-import io.netty.handler.codec.http2.DefaultHttp2Connection
-import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener
-import io.netty.handler.codec.http2.Http2ClientUpgradeCodec
-import io.netty.handler.codec.http2.Http2SecurityUtil
-import io.netty.handler.codec.http2.Http2Settings
-import io.netty.handler.codec.http2.HttpConversionUtil
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder
-import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder
-import io.netty.handler.ssl.ApplicationProtocolConfig
-import io.netty.handler.ssl.ApplicationProtocolNames
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
-import io.netty.handler.ssl.SslContextBuilder
-import io.netty.handler.ssl.SupportedCipherSuiteFilter
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Singleton
 import org.zalando.logbook.HttpRequest
 import org.zalando.logbook.HttpResponse
@@ -51,8 +20,6 @@ import org.zalando.logbook.Logbook
 import org.zalando.logbook.Origin
 import org.zalando.logbook.Strategy
 import spock.lang.Specification
-
-import java.nio.charset.StandardCharsets
 
 class LogbookNettyClientCustomizerSpec extends Specification {
     def 'plaintext http 1'() {
@@ -88,6 +55,7 @@ class LogbookNettyClientCustomizerSpec extends Specification {
                 'micronaut.server.http-version'       : '2.0',
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port':            0,
                 'micronaut.http.client.http-version'  : '2.0',
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'spec.name'                           : 'LogbookNettyClientCustomizerSpec'
@@ -121,6 +89,7 @@ class LogbookNettyClientCustomizerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port':            0,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'spec.name'                           : 'LogbookNettyClientCustomizerSpec'
         ])
@@ -181,6 +150,22 @@ class LogbookNettyClientCustomizerSpec extends Specification {
                 '200',
                 'bar',
         ]
+    }
+
+    @Controller("/logbook/logged")
+    @Requires(property = 'spec.name', value = 'LogbookNettyClientCustomizerSpec')
+    static class LoggedController {
+        @Get("/")
+        @Produces(MediaType.TEXT_PLAIN)
+        String index() {
+            return "hello"
+        }
+
+        @Post("/")
+        @Produces(MediaType.TEXT_PLAIN)
+        String index(@Body String body) {
+            return body
+        }
     }
 
     @Requires(property = 'spec.name', value = 'LogbookNettyClientCustomizerSpec')

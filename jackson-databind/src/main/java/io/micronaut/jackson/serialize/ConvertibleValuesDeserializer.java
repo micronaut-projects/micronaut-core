@@ -86,11 +86,11 @@ final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<Convertibl
                 return (ConvertibleValues<V>) ctxt.handleUnexpectedToken(handledType(), p);
             }
 
-            MutableConvertibleValuesMap<V> map = new MutableConvertibleValuesMap<>();
+            var map = new MutableConvertibleValuesMap<V>();
             map.setConversionService(conversionService);
             for (; p.getCurrentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
                 // Must point to field name now
-                String fieldName = p.getCurrentName();
+                String fieldName = p.currentName();
                 p.nextToken();
                 map.put(fieldName, valueDeserializer.deserialize(p, ctxt));
             }

@@ -109,12 +109,12 @@ The create-* commands generate a basic Micronaut project, with optional flags to
 a|
 [source,bash]
 ----
---features security-jwt,mongo-gorm
+--features security-jwt,mongo-reactive
 ----
 or
 [source,bash]
 ----
--f security-jwt -f mongo-gorm
+-f security-jwt -f mongo-reactive
 ----
 
 |`-i`, `--inplace`

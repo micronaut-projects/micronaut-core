@@ -18,7 +18,6 @@ package io.micronaut.web.router
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.filter.AroundLegacyFilter
 import io.micronaut.http.filter.FilterChain
 import io.micronaut.http.filter.FilterOrder
 import io.micronaut.http.filter.FilterPatternStyle
@@ -72,9 +71,9 @@ class DefaultFilterRouteSpec extends Specification {
         }).methods(HttpMethod.POST, HttpMethod.PUT)
 
         then: //get does not match
-        !route.match(HttpMethod.GET, URI.create('/foo')).isPresent()
-        route.match(HttpMethod.POST, URI.create('/foo')).isPresent()
-        route.match(HttpMethod.PUT, URI.create('/foo')).isPresent()
+        !route.match(HttpMethod.GET, '/foo').isPresent()
+        route.match(HttpMethod.POST, '/foo').isPresent()
+        route.match(HttpMethod.PUT, '/foo').isPresent()
     }
 
     void "test filter route matching with regex pattern style specified"() {
@@ -95,8 +94,8 @@ class DefaultFilterRouteSpec extends Specification {
         }).patternStyle(FilterPatternStyle.REGEX)
 
         then: //get does not match
-        route.match(HttpMethod.GET, URI.create('/foo')).isPresent()
-        !route.match(HttpMethod.POST, URI.create('/foe')).isPresent()
-        route.match(HttpMethod.PUT, URI.create('/foa')).isPresent()
+        route.match(HttpMethod.GET, '/foo').isPresent()
+        !route.match(HttpMethod.POST, '/foe').isPresent()
+        route.match(HttpMethod.PUT, '/foa').isPresent()
     }
 }

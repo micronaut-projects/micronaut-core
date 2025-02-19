@@ -6,11 +6,17 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '6.7.0'
+    id 'io.micronaut.build.shared.settings' version '7.3.2'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = 'micronaut'
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'micronaut-parent'
 
 include "aop"
 include "core-bom"
@@ -59,7 +65,6 @@ include "websocket"
 
 // test suites
 include "test-suite"
-include "test-suite-geb"
 include "test-suite-helper"
 include "test-suite-http-client-jdk-ssl"
 include "test-suite-http-client-tck-netty"
@@ -71,13 +76,23 @@ include "test-suite-http-server-tck-netty"
 include "test-suite-http2-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-kotlin-ksp"
+include "test-suite-kotlin-ksp-all-open"
 include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
 include "test-suite-netty-ssl-graalvm"
+include "test-suite-kotlin-graalvm"
 include "test-utils"
+include "test-suite-annotation-remapper"
+include "test-suite-annotation-remapper-visitor"
 
 // benchmarks
 include "benchmarks"
+
+micronautBuild {
+    useStandardizedProjectNames = true
+    nonStandardProjectNamePrefixes.addAll(["test-", "benchmarks"])
+    importMicronautCatalog("boms-micronaut-sourcegen")
+}

@@ -15,35 +15,72 @@
  */
 package io.micronaut.http.body;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 
 /**
  * Body writer for {@link CharSequence}s.
  *
- * @since 4.0.0
  * @author Graeme Rocher
+ * @since 4.0.0
  */
 @Singleton
-@Experimental
-public final class CharSequenceBodyWriter implements MessageBodyWriter<CharSequence> {
+@Internal
+public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<CharSequence>, ResponseBodyWriter<CharSequence> {
+
+    private final Charset defaultCharset;
+
+    @Inject
+    CharSequenceBodyWriter(ApplicationConfiguration applicationConfiguration) {
+        this(applicationConfiguration.getDefaultCharset());
+    }
+
+    public CharSequenceBodyWriter(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset;
+    }
+
     @Override
     public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        if (mediaType != null) {
+            ((MutableHttpHeaders) outgoingHeaders).contentTypeIfMissing(mediaType);
         }
         try {
-            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+            outputStream.write(object.toString().getBytes(MessageBodyWriter.findCharset(mediaType, outgoingHeaders).orElse(defaultCharset)));
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
+        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<CharSequence> type, @NonNull MediaType mediaType, CharSequence object) {
+        return bodyFactory.copyOf(object, MessageBodyWriter.getCharset(mediaType, response.getHeaders()));
+    }
+
+    @Override
+    public Argument<CharSequence> getType() {
+        return Argument.of(CharSequence.class);
     }
 }

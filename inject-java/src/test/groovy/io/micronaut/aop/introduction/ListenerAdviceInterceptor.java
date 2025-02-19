@@ -30,15 +30,15 @@ import java.util.Set;
 @Singleton
 public class ListenerAdviceInterceptor implements MethodInterceptor<Object, Object> {
 
-    private Set<Object> recievedMessages = new HashSet<>();
+    private Set<Object> receivedMessages = new HashSet<>();
 
     @Override
     public int getOrder() {
         return StubIntroducer.POSITION - 10;
     }
 
-    public Set<Object> getRecievedMessages() {
-        return recievedMessages;
+    public Set<Object> getReceivedMessages() {
+        return receivedMessages;
     }
 
     @Nullable
@@ -46,7 +46,7 @@ public class ListenerAdviceInterceptor implements MethodInterceptor<Object, Obje
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if(context.getMethodName().equalsIgnoreCase("onApplicationEvent")) {
             Object v = context.getParameterValues()[0];
-            recievedMessages.add(v);
+            receivedMessages.add(v);
             return null;
         }
         else {

@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanType;
@@ -177,8 +178,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         if (CollectionUtils.isEmpty(supportedAnnotationNames) && CollectionUtils.isEmpty(supportedInterceptorTypes)) {
             return "@InterceptorBinding(NONE)";
         } else {
-            return supportedAnnotationNames.keySet().stream().map((name) -> "@InterceptorBinding(" + name + ")").collect(Collectors.joining(" ")) +
-                    supportedInterceptorTypes.stream().map((name) -> "@InterceptorBinding(interceptorType = " + name + ")").collect(Collectors.joining(" "));
+            return supportedAnnotationNames.keySet().stream().map((name) -> "@InterceptorBinding(" + NameUtils.getShortenedName(name) + ")").collect(Collectors.joining(" ")) +
+                    supportedInterceptorTypes.stream().map((type) -> "@InterceptorBinding(interceptorType = " + NameUtils.getShortenedName(type.getTypeName()) + ")").collect(Collectors.joining(" "));
         }
     }
 

@@ -16,9 +16,11 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
@@ -31,6 +33,8 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.sourcegen.model.AnnotationDef;
+import io.micronaut.sourcegen.model.ClassDef;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -128,5 +132,17 @@ public final class EvaluatedExpressionProcessor {
 
     public boolean hasEvaluatedExpressions() {
         return !this.evaluatedExpressions.isEmpty();
+    }
+
+    public void registerExpressionForBuildTimeInit(ClassDef.ClassDefBuilder classDefBuilder) {
+        String[] expressionClassNames = getEvaluatedExpressions()
+            .stream().map(ExpressionWithContext::expressionClassName).toArray(String[]::new);
+        if (ArrayUtils.isNotEmpty(expressionClassNames)) {
+            classDefBuilder.addAnnotation(
+                AnnotationDef.builder(BuildTimeInit.class)
+                    .addMember("value", expressionClassNames)
+                    .build()
+            );
+        }
     }
 }

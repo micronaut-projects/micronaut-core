@@ -188,6 +188,16 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
+    public Argument<T> withName(String name) {
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+    }
+
+    @Override
+    public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+    }
+
+    @Override
     public boolean isTypeVariable() {
         return isTypeVar;
     }
@@ -248,11 +258,22 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     @Override
     public String toString() {
-        if (this.name == null) {
-            return getType().getSimpleName();
-        } else {
-            return getType().getSimpleName() + " " + getName();
+        StringBuilder builder = new StringBuilder(getType().getSimpleName());
+        if (typeParameterArray != null && typeParameterArray.length > 0) {
+            builder.append("<");
+            for (int i = 0, typeParameterArrayLength = typeParameterArray.length; i < typeParameterArrayLength; i++) {
+                Argument<?> argument = typeParameterArray[i];
+                builder.append(argument.toString());
+                if (i + 1 != typeParameterArrayLength) {
+                    builder.append(", ");
+                }
+            }
+            builder.append(">");
         }
+        if (this.name != null) {
+            builder.append(" ").append(getName());
+        }
+        return builder.toString();
     }
 
     @Override

@@ -24,7 +24,9 @@ import io.netty.handler.ssl.OpenSslX509KeyManagerFactory;
 import io.netty.handler.ssl.SslProvider;
 
 import javax.net.ssl.KeyManagerFactory;
+import java.security.Key;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.util.Optional;
 
 /**
@@ -41,6 +43,8 @@ public final class NettyTlsUtils {
 
     /**
      * The SSL provider to use.
+     *
+     * @param sslConfiguration The ssl configuration
      *
      * @return The provider
      */
@@ -77,7 +81,34 @@ public final class NettyTlsUtils {
         if (keyPassword == null && pwd.isPresent()) {
             keyPassword = pwd.get().toCharArray();
         }
+        if (keyStore != null && ssl.getKey().getAlias().isPresent()) {
+            keyStore = extractKeystoreAlias(keyStore, ssl.getKey().getAlias().get(), keyPassword);
+        }
         keyManagerFactory.init(keyStore, keyPassword);
         return keyManagerFactory;
+    }
+
+    /**
+     * Creates a new {@link KeyStore} from the original containing only the selected alias.
+     *
+     * @param rootKeystore The original keystore
+     * @param alias The selected alias
+     * @param password Password of Alias
+     * @return {@link KeyStore} containing only the selected alias
+     */
+    @NonNull
+    private static KeyStore extractKeystoreAlias(@NonNull KeyStore rootKeystore, @NonNull String alias, @Nullable char[] password) throws Exception {
+        if (!rootKeystore.containsAlias(alias)) {
+            throw new IllegalArgumentException("Alias " + alias + " not found in keystore");
+        }
+        Key key = rootKeystore.getKey(alias, password);
+        if (key == null) {
+            throw new IllegalStateException("There are no keys associated with the alias " + alias);
+        }
+        Certificate[] certChain = rootKeystore.getCertificateChain(alias);
+        KeyStore aliasKeystore = KeyStore.getInstance(rootKeystore.getType());
+        aliasKeystore.load(null, null);
+        aliasKeystore.setKeyEntry(alias, key, password, certChain);
+        return aliasKeystore;
     }
 }

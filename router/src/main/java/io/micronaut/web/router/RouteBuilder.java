@@ -1183,7 +1183,7 @@ public interface RouteBuilder {
                 return uri;
             }
             Class<?> beanType;
-            if (beanDefinition instanceof ProxyBeanDefinition pbd) {
+            if (beanDefinition instanceof ProxyBeanDefinition<?> pbd) {
                 beanType = pbd.getTargetType();
             } else {
                 beanType = beanDefinition.getBeanType();

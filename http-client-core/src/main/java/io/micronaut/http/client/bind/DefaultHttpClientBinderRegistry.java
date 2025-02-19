@@ -109,9 +109,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         byAnnotation.put(Header.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
             String headerName = annotationMetadata
-                    .stringValue(Header.class)
-                    .filter(StringUtils::isNotEmpty)
-                    .orElse(NameUtils.hyphenate(context.getArgument().getName()));
+                .stringValue(Header.class)
+                .filter(StringUtils::isNotEmpty)
+                .orElseGet(() -> annotationMetadata.stringValue(Header.class, "name").orElse(NameUtils.hyphenate(context.getArgument().getName())));
 
             conversionService.convert(value, String.class)
                     .ifPresent(header -> request.getHeaders().set(headerName, header));

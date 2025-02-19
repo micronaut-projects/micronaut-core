@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element
 
-import io.netty.channel.socket.SocketChannel
+
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import spock.lang.Specification
 
@@ -98,7 +98,7 @@ class AccessLogFormatParserSpec extends Specification {
         def element = new HeaderElement(true, "User-Agent")
 
         when:
-        def headerVal = element.onRequestHeaders(Mock(SocketChannel.class), "POST", headers, "/test", "http")
+        def headerVal = element.onRequestHeaders(ConnectionMetadata.empty(), "POST", headers, "/test", "http")
 
         then:
         headers.contains("User-Agent")

@@ -53,8 +53,8 @@ public interface WebSocketClient extends AutoCloseable {
      * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     <T extends AutoCloseable> Publisher<T> connect(
-            Class<T> clientEndpointType,
-            MutableHttpRequest<?> request
+        Class<T> clientEndpointType,
+        MutableHttpRequest<?> request
     );
 
     /**
@@ -67,8 +67,8 @@ public interface WebSocketClient extends AutoCloseable {
      * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     <T extends AutoCloseable> Publisher<T> connect(
-            Class<T> clientEndpointType,
-            Map<String, Object> parameters
+        Class<T> clientEndpointType,
+        Map<String, Object> parameters
     );
 
     @Override
@@ -83,8 +83,8 @@ public interface WebSocketClient extends AutoCloseable {
      * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     default <T extends AutoCloseable> Publisher<T> connect(
-            Class<T> clientEndpointType,
-            String uri
+        Class<T> clientEndpointType,
+        String uri
     ) {
         return connect(clientEndpointType, URI.create(uri));
     }
@@ -98,8 +98,8 @@ public interface WebSocketClient extends AutoCloseable {
      * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     default <T extends AutoCloseable> Publisher<T> connect(
-            Class<T> clientEndpointType,
-            URI uri
+        Class<T> clientEndpointType,
+        URI uri
     ) {
         return connect(clientEndpointType, HttpRequest.GET(uri));
     }

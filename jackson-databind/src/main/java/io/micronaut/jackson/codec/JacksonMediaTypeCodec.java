@@ -27,8 +27,8 @@ import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.databind.JacksonDatabindMapper;
-import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -36,13 +36,16 @@ import java.io.IOException;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
- *
+ * <p>
  * Note: will be replaced by {@link MapperMediaTypeCodec} in the future, but that class is currently experimental.
  *
  * @author Graeme Rocher
  * @since 1.0.0
+ * @deprecated Replaced with message body writers / readers API
  */
+@Deprecated(forRemoval = true, since = "4.7")
 public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
+
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
 
     public JacksonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapperProvider,
@@ -50,10 +53,22 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
         super(
-                () -> new JacksonDatabindMapper(objectMapperProvider.get()),
-                applicationConfiguration,
-                codecConfiguration,
-                mediaType
+            new JacksonDatabindMapper(objectMapperProvider.get()),
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType
+        );
+    }
+
+    public JacksonMediaTypeCodec(BeanProvider<JacksonDatabindMapper> objectMapperProvider,
+                                 ApplicationConfiguration applicationConfiguration,
+                                 MediaType mediaType,
+                                 CodecConfiguration codecConfiguration) {
+        super(
+            objectMapperProvider.get(),
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType
         );
     }
 
@@ -62,10 +77,10 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
         super(
-                new JacksonDatabindMapper(objectMapper),
-                applicationConfiguration,
-                codecConfiguration,
-                mediaType
+            new JacksonDatabindMapper(objectMapper),
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType
         );
     }
 
@@ -99,7 +114,7 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
      *
      * @param type The type
      * @param node The Json Node
-     * @param <T>  The generic type
+     * @param <T> The generic type
      * @return The decoded object
      * @throws CodecException When object cannot be decoded
      */

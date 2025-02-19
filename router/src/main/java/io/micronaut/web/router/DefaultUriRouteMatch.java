@@ -22,7 +22,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -37,11 +36,12 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
+public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private Map<String, Object> variables;
 
     /**
      * @param matchInfo The URI match info
@@ -66,21 +66,19 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
 
     @Override
     public Map<String, Object> getVariableValues() {
-        Map<String, Object> variables = matchInfo.getVariableValues();
-        if (CollectionUtils.isNotEmpty(variables)) {
-            final String charset = defaultCharset.toString();
-            Map<String, Object> decoded = CollectionUtils.newLinkedHashMap(variables.size());
-            variables.forEach((k, v) -> {
-                if (v instanceof CharSequence) {
-                    try {
-                        v = URLDecoder.decode(v.toString(), charset);
-                    } catch (UnsupportedEncodingException e) {
-                        // ignore
+        if (variables == null) {
+            Map<String, Object> matchVariables = matchInfo.getVariableValues();
+            if (CollectionUtils.isNotEmpty(matchVariables)) {
+                variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                matchVariables.forEach((k, v) -> {
+                    if (v instanceof CharSequence) {
+                        v = URLDecoder.decode(v.toString(), defaultCharset);
                     }
-                }
-                decoded.put(k, v);
-            });
-            return decoded;
+                    variables.put(k, v);
+                });
+            } else {
+                variables = Map.of();
+            }
         }
         return variables;
     }

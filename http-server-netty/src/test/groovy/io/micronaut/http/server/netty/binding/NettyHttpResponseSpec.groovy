@@ -62,10 +62,35 @@ class NettyHttpResponseSpec extends Specification {
         expect:
         response.status == HttpStatus."$status"
         response.headers.get(header) == value
+        response.getCookies().size() == 1
+        response.getCookies().get("foo").value == "bar"
+        response.getCookie("foo").get().value == "bar"
 
         where:
         status        | header                 | value
         HttpStatus.OK | HttpHeaders.SET_COOKIE | "foo=bar"
+    }
+
+    void "test add multiple cookies"() {
+        given:
+        DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultMutableConversionService())
+
+        response.status(HttpStatus."$status")
+        response.cookies(Set.of(Cookie.of("foo", "bar"), Cookie.of("xyz", "abc")))
+
+        expect:
+        response.status == HttpStatus."$status"
+        response.headers.getAll(header).toSet() == value
+        response.getCookies().size() == 2
+        response.getCookies().get("foo").value == "bar"
+        response.getCookie("foo").get().value == "bar"
+        response.getCookies().get("xyz").value == "abc"
+        response.getCookie("xyz").get().value == "abc"
+
+        where:
+        status        | header                 | value
+        HttpStatus.OK | HttpHeaders.SET_COOKIE | ["foo=bar", "xyz=abc"] as Set
     }
 
     void "test add cookie with max age"() {

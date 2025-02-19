@@ -2,6 +2,7 @@ package io.micronaut.inject.annotation.modify
 
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
@@ -138,6 +139,7 @@ class AnnotatePropertyBean2 {
 
     static class AnnotatePropertyVisitor implements TypeElementVisitor<Object, Object> {
 
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING;

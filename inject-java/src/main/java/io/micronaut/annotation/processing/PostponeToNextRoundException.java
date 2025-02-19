@@ -25,7 +25,7 @@ public final class PostponeToNextRoundException extends RuntimeException {
 
     /**
      * @param originatingElement Teh originating element
-     * @param path               The originating element path
+     * @param path The originating element path
      */
     public PostponeToNextRoundException(Object originatingElement, String path) {
         this.errorElement = originatingElement;

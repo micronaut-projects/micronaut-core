@@ -1,0 +1,23 @@
+:jackson-annotations: https://fasterxml.github.io/jackson-annotations/javadoc/2.9/
+:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
+
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, the Jackson's `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+
+All Jackson configuration keys start with `jackson`.
+
+|=======
+| dateFormat | String | The date format
+| locale     | String | Uses link:{jdkapi}/java.base/java/util/Locale.html#forLanguageTag-java.lang.String-[Locale.forLanguageTag]. Example: `en-US`
+| timeZone   | String |Uses link:{jdkapi}/java.base/java/util/TimeZone.html#getTimeZone-java.lang.String-[TimeZone.getTimeZone]. Example: `PST`
+| serializationInclusion | String | One of link:{jackson-annotations}com/fasterxml/jackson/annotation/JsonInclude.Include.html[JsonInclude.Include]. Example: `ALWAYS`
+| propertyNamingStrategy | String | Name of an instance of link:{jackson-databind}com/fasterxml/jackson/databind/PropertyNamingStrategy.html[PropertyNamingStrategy]. Example: `SNAKE_CASE`
+| defaultTyping          | String | The global defaultTyping for polymorphic type handling from enum link:{jackson-databind}com/fasterxml/jackson/databind/ObjectMapper.DefaultTyping.html[ObjectMapper.DefaultTyping]. Example: `NON_FINAL`
+|=======
+
+Example:
+
+[configuration]
+----
+jackson:
+  serializationInclusion: ALWAYS
+----

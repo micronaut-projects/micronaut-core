@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.annotation.NonNull;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -63,9 +64,27 @@ public interface LogElement {
      * @param uri The request uri.
      * @param protocol The request protocol.
      * @return The processed value.
+     * @deprecated Does not work for unix or embedded channels. Please implement and use {@link #onRequestHeaders(ConnectionMetadata, String, HttpHeaders, String, String)} instead.
      */
+    @Deprecated
     default String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         return ConstantElement.UNKNOWN_VALUE;
+    }
+
+    /**
+     * Responds to an ON_REQUEST_HEADERS event.
+     * Also used for ConstantElement with all parameters as null.
+     *
+     * @param metadata The connection metadata.
+     * @param method The http method.
+     * @param headers The request headers.
+     * @param uri The request uri.
+     * @param protocol The request protocol.
+     * @return The processed value.
+     */
+    default String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+        SocketChannel ch = metadata instanceof ConnectionMetadataImpl.SocketChannelMetadata m ? m.ch() : null;
+        return onRequestHeaders(ch, method, headers, uri, protocol);
     }
 
     /**

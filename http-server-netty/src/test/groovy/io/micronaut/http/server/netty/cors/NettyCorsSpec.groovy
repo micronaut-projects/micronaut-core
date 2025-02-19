@@ -273,7 +273,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         }).blockFirst()
 
         expect:
-        response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+        response.code() == HttpStatus.FORBIDDEN.code
     }
 
     void "test control headers are applied to error response routes"() {
@@ -365,7 +365,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
         @Get("/error")
         String error() {
-            throw new RuntimeException("error")
+            throw new CustomRuntimeException("error")
         }
 
         @Get("/error-checked")
@@ -378,9 +378,15 @@ class NettyCorsSpec extends AbstractMicronautSpec {
             HttpResponse.badRequest()
         }
 
-        @Error(exception = RuntimeException)
+        @Error(exception = CustomRuntimeException)
         HttpResponse onError() {
             HttpResponse.badRequest()
+        }
+    }
+
+    static class CustomRuntimeException extends RuntimeException {
+        CustomRuntimeException(String message) {
+            super(message);
         }
     }
 }

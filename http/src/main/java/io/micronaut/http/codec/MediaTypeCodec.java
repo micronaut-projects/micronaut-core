@@ -33,7 +33,9 @@ import java.util.Collection;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced with {@link io.micronaut.http.body.MessageBodyHandler}
  */
+@Deprecated(since = "4.7")
 @Indexed(MediaTypeCodec.class)
 public interface MediaTypeCodec {
 

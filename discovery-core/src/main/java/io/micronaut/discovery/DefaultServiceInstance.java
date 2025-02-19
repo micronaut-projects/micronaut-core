@@ -49,7 +49,7 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
     /**
      * Construct a default implementation for the given service identified by id and URI.
      *
-     * @param id  The identifier of the service used for purposes of service discovery
+     * @param id The identifier of the service used for purposes of service discovery
      * @param uri The service URI
      */
     DefaultServiceInstance(String id, URI uri) {
@@ -118,7 +118,7 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
         }
         DefaultServiceInstance that = (DefaultServiceInstance) o;
         return Objects.equals(id, that.id) &&
-                Objects.equals(uri, that.uri);
+            Objects.equals(uri, that.uri);
     }
 
     @Override
@@ -164,7 +164,7 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
             if (this.metadata == ConvertibleValues.EMPTY) {
                 this.metadata = ConvertibleValues.of(metadata);
             } else {
-                Map<String, String> newMetadata = new LinkedHashMap<>();
+                var newMetadata = new LinkedHashMap<String, String>();
                 for (Map.Entry<String, String> entry : this.metadata) {
                     newMetadata.put(entry.getKey(), entry.getValue());
                 }

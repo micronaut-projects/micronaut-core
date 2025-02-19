@@ -57,6 +57,7 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled Enable the distributed configuration
      */
     public void setEnabled(boolean enabled) {

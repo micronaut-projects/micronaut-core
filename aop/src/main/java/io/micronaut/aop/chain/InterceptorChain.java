@@ -15,14 +15,24 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.context.BeanRegistration;
-import io.micronaut.core.annotation.*;
-import io.micronaut.aop.*;
+import io.micronaut.aop.Adapter;
+import io.micronaut.aop.Around;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.Introduction;
+import io.micronaut.aop.InvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -30,16 +40,17 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
- *
  * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
  *
  * @param <B> The declaring type
  * @param <R> The result of the method call
- *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -76,6 +87,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
     }
 
+    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
@@ -91,6 +103,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         return proceed();
     }
 
+    @NonNull
     @Override
     public B getTarget() {
         return target;
@@ -137,8 +150,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * Resolves the {@link Around} interceptors for a method.
      *
      * @param interceptorRegistry the interceptor registry
-     * @param method              The method
-     * @param interceptors        The array of interceptors
+     * @param method The method
+     * @param interceptors The array of interceptors
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
      * @since 4.3.0
@@ -177,8 +190,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * Resolves the {@link Introduction} interceptors for a method.
      *
      * @param interceptorRegistry the interceptor registry
-     * @param method              The method
-     * @param interceptors        The array of interceptors
+     * @param method The method
+     * @param interceptors The array of interceptors
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
      * @since 4.3.0
@@ -233,7 +246,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
-                introductionInterceptors = new Interceptor[] { new AdapterIntroduction(beanContext, method) };
+                introductionInterceptors = new Interceptor[] {new AdapterIntroduction(beanContext, method)};
             } else {
                 throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
 
@@ -279,7 +292,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
 
         Set<Class<?>> applicableClasses = new HashSet<>();
 
-        for (Class<? extends Annotation> aClass: annotations) {
+        for (Class<? extends Annotation> aClass : annotations) {
             if (annotationType == Around.class && aClass.getAnnotation(Around.class) == null && aClass.getAnnotation(Introduction.class) != null) {
                 continue;
             } else if (annotationType == Introduction.class && aClass.getAnnotation(Introduction.class) == null && aClass.getAnnotation(Around.class) != null) {

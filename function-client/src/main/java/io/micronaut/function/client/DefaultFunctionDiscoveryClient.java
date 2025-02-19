@@ -18,7 +18,6 @@ package io.micronaut.function.client;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
-import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
@@ -68,37 +67,37 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     public Publisher<FunctionDefinition> getFunction(String functionName) {
         if (functionDefinitionMap.containsKey(functionName)) {
             return Publishers.just(functionDefinitionMap.get(functionName));
-        } else {
-            Flux<ServiceInstance> serviceInstanceLocator = Flux.from(discoveryClient.getServiceIds())
-                .flatMap(Flux::fromIterable)
-                .flatMap(discoveryClient::getInstances)
-                .flatMap(Flux::fromIterable)
-                .filter(instance -> {
-                        boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
-                        return isAvailable && instance.getMetadata().names().stream()
-                            .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
-                    }
-
-                ).switchIfEmpty(Flux.error(new FunctionNotFoundException(functionName)));
-            return serviceInstanceLocator.map(instance -> {
-                Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
-                if (uri.isPresent()) {
-                    URI resolvedURI = instance.getURI().resolve(uri.get());
-                    return new FunctionDefinition() {
-
-                        @Override
-                        public String getName() {
-                            return functionName;
-                        }
-
-                        @Override
-                        public Optional<URI> getURI() {
-                            return Optional.of(resolvedURI);
-                        }
-                    };
-                }
-                throw new FunctionNotFoundException(functionName);
-            });
         }
+        return Flux.from(discoveryClient.getServiceIds())
+            .flatMap(Flux::fromIterable)
+            .flatMap(discoveryClient::getInstances)
+            .flatMap(Flux::fromIterable)
+            .filter(instance -> {
+                    boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
+                    return isAvailable && instance.getMetadata().names().stream()
+                        .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
+                }
+
+            ).switchIfEmpty(Flux.error(new FunctionNotFoundException(functionName)))
+            .map(instance -> {
+                    Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
+                    if (uri.isPresent()) {
+                        URI resolvedURI = instance.getURI().resolve(uri.get());
+                        return new FunctionDefinition() {
+
+                            @Override
+                            public String getName() {
+                                return functionName;
+                            }
+
+                            @Override
+                            public Optional<URI> getURI() {
+                                return Optional.of(resolvedURI);
+                            }
+                        };
+                    }
+                    throw new FunctionNotFoundException(functionName);
+                }
+            );
     }
 }

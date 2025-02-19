@@ -52,7 +52,7 @@ import static io.micronaut.core.util.StringUtils.SPACE;
  * limits the maximum number of decoded key-value parameter pairs, up to {@literal 1024} by
  * default, and you can configure it when you construct the decoder by passing an additional
  * integer parameter.
- *
+ * <p>
  * Note: Forked from Netty core.
  */
 @Internal
@@ -63,6 +63,7 @@ final class QueryStringDecoder {
     private final Charset charset;
     private final String uri;
     private final int maxParams;
+    private final boolean semicolonIsNormalChar;
     private int pathEndIdx;
     private String path;
     private Map<String, List<String>> params;
@@ -121,9 +122,14 @@ final class QueryStringDecoder {
      * @param maxParams The maximum number of params
      */
     QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams) {
+        this(uri, charset, hasPath, maxParams, false);
+    }
+
+    QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams, boolean semicolonIsNormalChar) {
         this.uri = Objects.requireNonNull(uri, "uri");
         this.charset = Objects.requireNonNull(charset, "charset");
-        this.maxParams = Objects.requireNonNull(maxParams, "maxParams");
+        this.maxParams = maxParams;
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
 
         // `-1` means that path end index will be initialized lazily
         pathEndIdx = hasPath ? -1 : 0;
@@ -159,15 +165,18 @@ final class QueryStringDecoder {
      * @param maxParams The maximum number of params
      */
     QueryStringDecoder(URI uri, Charset charset, int maxParams) {
+        this(uri, charset, maxParams, false);
+    }
+
+    QueryStringDecoder(URI uri, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
         String rawPath = uri.getRawPath();
         if (rawPath == null) {
             rawPath = EMPTY_STRING;
         }
-        String rawQuery = uri.getRawQuery();
-        // Also take care of cut of things like "http://localhost"
-        this.uri = rawQuery == null ? rawPath : rawPath + '?' + rawQuery;
+        this.uri = uriToString(uri);
         this.charset = Objects.requireNonNull(charset, "charset");
         this.maxParams = ArgumentUtils.requirePositive("maxParams", maxParams);
+        this.semicolonIsNormalChar = semicolonIsNormalChar;
         pathEndIdx = rawPath.length();
     }
 
@@ -198,7 +207,7 @@ final class QueryStringDecoder {
      */
     public Map<String, List<String>> parameters() {
         if (params == null) {
-            params = decodeParams(uri, pathEndIdx(), charset, maxParams);
+            params = decodeParams(uri, pathEndIdx(), charset, maxParams, semicolonIsNormalChar);
         }
         return params;
     }
@@ -225,7 +234,47 @@ final class QueryStringDecoder {
         return pathEndIdx;
     }
 
+    static Map<String, List<String>> decodeParams(URI uri) {
+        return decodeParams(uriToString(uri));
+    }
+
+    /**
+     * Helper method to decode parameters map from URI string.
+     *
+     * @param uri URI string
+     *
+     * @return URI parameters map
+     */
+    static Map<String, List<String>> decodeParams(String uri) {
+        return decodeParams(uri, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Helper method to decode parameters map from URI string.
+     *
+     * @param uri URI string
+     *
+     * @return URI parameters map
+     */
+    static Map<String, List<String>> decodeParams(String uri, Charset charset) {
+        return decodeParams(uri, findPathEndIndex(uri), charset, DEFAULT_MAX_PARAMS);
+    }
+
+    private static String uriToString(URI uri) {
+        String rawPath = uri.getRawPath();
+        if (rawPath == null) {
+            rawPath = EMPTY_STRING;
+        }
+        String rawQuery = uri.getRawQuery();
+        // Also take care of cut of things like "http://localhost"
+        return rawQuery == null ? rawPath : rawPath + '?' + rawQuery;
+    }
+
     private static Map<String, List<String>> decodeParams(String s, int from, Charset charset, int paramsLimit) {
+        return decodeParams(s, from, charset, paramsLimit, false);
+    }
+
+    private static Map<String, List<String>> decodeParams(String s, int from, Charset charset, int paramsLimit, boolean semicolonIsNormalChar) {
         int len = s.length();
         if (from >= len) {
             return Collections.emptyMap();
@@ -233,7 +282,7 @@ final class QueryStringDecoder {
         if (s.charAt(from) == '?') {
             from++;
         }
-        Map<String, List<String>> params = new LinkedHashMap<>();
+        var params = new LinkedHashMap<String, List<String>>();
         int nameStart = from;
         int valueStart = -1;
         int i;
@@ -249,6 +298,9 @@ final class QueryStringDecoder {
                     break;
                 case '&':
                 case ';':
+                    if (semicolonIsNormalChar) {
+                        continue;
+                    }
                     if (addParam(s, nameStart, valueStart, i, params, charset)) {
                         paramsLimit--;
                         if (paramsLimit == 0) {
@@ -321,11 +373,8 @@ final class QueryStringDecoder {
         }
         String name = decodeComponent(s, nameStart, valueStart - 1, charset, false);
         String value = decodeComponent(s, valueStart, valueEnd, charset, false);
-        List<String> values = params.get(name);
-        if (values == null) {
-            values = new ArrayList<>(1);  // Often there's only 1 value.
-            params.put(name, values);
-        }
+        List<String> values = params.computeIfAbsent(name, k -> new ArrayList<>(1));
+        // Often there's only 1 value.
         values.add(value);
         return true;
     }
@@ -354,7 +403,7 @@ final class QueryStringDecoder {
         ByteBuffer byteBuf = ByteBuffer.allocate(decodedCapacity);
         CharBuffer charBuf = CharBuffer.allocate(decodedCapacity);
 
-        StringBuilder strBuf = new StringBuilder(len);
+        var strBuf = new StringBuilder(len);
         strBuf.append(s, from, firstEscaped);
 
         for (int i = firstEscaped; i < toExcluded; i++) {

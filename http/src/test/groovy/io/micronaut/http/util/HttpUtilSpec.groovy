@@ -1,6 +1,6 @@
 package io.micronaut.http.util
 
-import io.micronaut.http.HttpHeaders
+
 import io.micronaut.http.HttpMessage
 import io.micronaut.http.MediaType
 import spock.lang.Issue
@@ -20,5 +20,16 @@ class HttpUtilSpec extends Specification {
 
         then:
         charset.get() == StandardCharsets.UTF_8
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/4332")
+    void "test an invalid charset returns the default 2"() {
+        when:
+        Charset charset = HttpUtil.getCharset(Mock(HttpMessage) {
+            getContentType() >> Optional.of(MediaType.of("text/xml;charset=\"invalid\""))
+        })
+
+        then:
+        charset == StandardCharsets.UTF_8
     }
 }

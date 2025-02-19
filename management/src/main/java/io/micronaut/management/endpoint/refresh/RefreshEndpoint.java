@@ -43,7 +43,7 @@ public class RefreshEndpoint {
     private final ApplicationEventPublisher<RefreshEvent> eventPublisher;
 
     /**
-     * @param environment    The Environment
+     * @param environment The Environment
      * @param eventPublisher The Application event publisher
      */
     public RefreshEndpoint(Environment environment, ApplicationEventPublisher<RefreshEvent> eventPublisher) {

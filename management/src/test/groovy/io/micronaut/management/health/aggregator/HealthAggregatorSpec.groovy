@@ -43,9 +43,10 @@ class HealthAggregatorSpec extends Specification {
                 assert appender.events.isEmpty()
                 break
             case Level.DEBUG:
-                assert appender.events.size() == 8
+                assert appender.events.size() == 9
                 assert appender.events[0] == 'Health result for compositeDiscoveryClient(): status UP'
-                assert appender.events[1] == 'Health result for diskSpace: status UP'
+                assert appender.events[1] == 'Health result for deadlockedThreads: status UP'
+                assert appender.events[2] == 'Health result for diskSpace: status UP'
                 assert appender.events[2] == 'Health result for gracefulShutdown: status UP'
                 assert appender.events[3] == 'Health result for jdbc: status UP'
                 assert appender.events[4] == 'Health result for jdbc:h2:mem:oneDb: status UP'
@@ -54,9 +55,10 @@ class HealthAggregatorSpec extends Specification {
                 assert appender.events[7] == 'Health result for service: status UP'
                 break
             case Level.TRACE:
-                assert appender.events.size() == 8
+                assert appender.events.size() == 9
                 assert appender.events[0].contains('Health result for compositeDiscoveryClient(): status UP, details {')
-                assert appender.events[1].contains('Health result for diskSpace: status UP, details {')
+                assert appender.events[1] == 'Health result for deadlockedThreads: status UP, details {}'
+                assert appender.events[2].contains('Health result for diskSpace: status UP, details {')
                 assert appender.events[2] == 'Health result for gracefulShutdown: status UP, details {}'
                 assert appender.events[3].contains('Health result for jdbc: status UP, details {')
                 assert appender.events[4].contains('Health result for jdbc:h2:mem:oneDb: status UP, details {')

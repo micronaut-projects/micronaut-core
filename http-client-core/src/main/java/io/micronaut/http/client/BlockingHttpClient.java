@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -33,7 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Blocking
-public interface BlockingHttpClient extends Closeable {
+public interface BlockingHttpClient extends Closeable, LifeCycle<BlockingHttpClient> {
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
@@ -267,5 +268,15 @@ public interface BlockingHttpClient extends Closeable {
      */
     default <O, E> HttpResponse<O> exchange(String uri, Class<O> bodyType, Class<E> errorType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType), Argument.of(errorType));
+    }
+
+    /**
+     * Refreshes the {@code BlockingHttpClient} by stopping the current instance and starting a new one.
+     * @return refreshed instance of {@code BlockingHttpClient}
+     */
+    @Override
+    default BlockingHttpClient refresh() {
+        this.stop();
+        return this.start();
     }
 }

@@ -9,16 +9,23 @@ quickStart:
   ideSetup:
     title: Setting up an IDE
     ideaSetup: IntelliJ IDEA
+    vsCodeSetup: Visual Studio Code
     eclipseSetup: Eclipse
     netbeansSetup: Apache NetBeans
-    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
-  title: Inversion of Control
+  title: Dependency Injection
   beans: Defining Beans
   how: How Does it Work?
+  iocDebugging: Debugging Dependency Injection
   beanContext: The BeanContext
+  injection:
+    title: Dependency Injection Types
+    constructorInjection: Constructor Injection
+    fieldInjection: Field Injection
+    methodInjection: Method Injection
+    nullableInjection: Nullable Injection
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   typed: Limiting Injectable Types
@@ -107,7 +114,22 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-  jsonBinding: JSON Binding
+  jsonBinding:
+    title: JSON Binding
+    serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
+    serializationUsingJacksonDatabind: Serialization using Jackson Databind
+    jsonMapper: JsonMapper
+    bindingUsingReactiveFrameworks: Binding using Reactive Frameworks
+    bindingUsingCompletableFuture: Binding Using CompletableFuture
+    bindingUsingPOJOs: Binding using POJOs
+    jacksonConfiguration:
+      title: Jackson Configuration
+      jacksonConfigurationFeatures: Features
+      jacksonConfigurationFurtherCustomisingJsonFactory: Further customising `JsonFactory`
+      jacksonConfigurationSupportForJsonView: Support for `@JsonView`
+      jacksonConfigurationBeans: Beans
+      jacksonConfigurationServiceLoader: Service Loader
+      jacksonConfigurationNumberPrecision: Number Precision
   plainTextResponses: Plain Text Responses
   datavalidation:
     title: Data Validation
@@ -134,6 +156,7 @@ httpServer:
     filtermethods:
       title: Filter Methods
       filtermethodsexample: Server Filter with Filter Methods
+      filtermethodproceed: Proceeding with Filter Methods
       errorStates: Error States
       continuations: Continuations
       order: Filter Order
@@ -141,6 +164,11 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+  byteBody:
+    title: Advanced body access
+    byteBodyPrimary: Primary operations
+    byteBodySplitting: Splitting
+    byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
@@ -212,6 +240,7 @@ httpClient:
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
+  nettyPooling: Connection pooling in the netty client
 contextPropagation:
   title: Context propagation
   reactorContextPropagation: Reactor context propagation
@@ -226,7 +255,7 @@ cloud:
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
     distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
-    distributedConfigurationPubSub: Google Cloud Pub/Sub Support
+    distributedConfigurationGoogleCloudSecretManager: Google Cloud Secret Manager Support
     distributedConfigurationKubernetes: Kubernetes Support
   serviceDiscovery:
     title: Service Discovery
@@ -318,7 +347,9 @@ management:
     title: Built-In Endpoints
     beansEndpoint: The Beans Endpoint
     infoEndpoint: The Info Endpoint
-    healthEndpoint: The Health Endpoint
+    healthEndpoint:
+      title: The Health Endpoint
+      deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint

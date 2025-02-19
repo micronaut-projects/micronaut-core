@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
  * Example usage:
  *
  * <pre><code>
- *{@literal @}MessageHeaders({
+ * {@literal @}MessageHeaders({
  *     {@literal @}Header(name = "Content-type", value = "application/octet-stream"),
  *     {@literal @}Header(name = "Content-length", value = "2048")
  * })

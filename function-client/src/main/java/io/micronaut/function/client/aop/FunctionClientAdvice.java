@@ -52,8 +52,8 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     /**
      * Constructor.
      *
-     * @param conversionService      The conversion service
-     * @param discoveryClient        discoveryClient
+     * @param conversionService The conversion service
+     * @param discoveryClient discoveryClient
      * @param functionInvokerChooser functionInvokerChooser
      */
     public FunctionClientAdvice(ConversionService conversionService, FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
@@ -79,9 +79,9 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         }
 
         String functionName = context.stringValue(AnnotationUtil.NAMED)
-                .orElse(NameUtils.hyphenate(context.getMethodName(), true));
+            .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
-        Flux<FunctionDefinition> functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
+        var functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             switch (interceptedMethod.resultType()) {
@@ -90,7 +90,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 }
                 case COMPLETION_STAGE -> {
                     return interceptedMethod.handleResult(toCompletableFuture(
-                            invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
+                        invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
                     ));
                 }
                 case SYNCHRONOUS -> {
@@ -111,15 +111,15 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         return functionDefinition.next().flatMap(def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
             return Mono.from((Publisher<Object>) functionInvoker.invoke(
-                    def,
-                    body,
-                    Argument.of(Publisher.class, valueType)
+                def,
+                body,
+                Argument.of(Publisher.class, valueType)
             ));
         }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName))).flux();
     }
 
     private CompletableFuture<Object> toCompletableFuture(Flux<Object> flowable) {
-        CompletableFuture<Object> completableFuture = new CompletableFuture<>();
+        var completableFuture = new CompletableFuture<>();
         flowable.next().subscribe(completableFuture::complete, completableFuture::completeExceptionally, () -> completableFuture.complete(null));
         return completableFuture;
     }

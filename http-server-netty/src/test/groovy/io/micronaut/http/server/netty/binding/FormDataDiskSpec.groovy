@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -22,7 +23,8 @@ class FormDataDiskSpec extends Specification {
                 'micronaut.server.multipart.disk': true,
                 'micronaut.server.multipart.mixed': true,
                 'micronaut.server.thread-selection': 'IO',
-                'netty.resource-leak-detector-level': 'paranoid'
+                'netty.resource-leak-detector-level': 'paranoid',
+                "spec.name": "FormDataDiskSpec"
         ])
         def client = server.applicationContext.createBean(HttpClient, server.URI)
 
@@ -47,7 +49,8 @@ class FormDataDiskSpec extends Specification {
         def server = (EmbeddedServer) ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.multipart.mixed': true,
                 'micronaut.server.thread-selection': 'IO',
-                'netty.resource-leak-detector-level': 'paranoid'
+                'netty.resource-leak-detector-level': 'paranoid',
+                "spec.name": "FormDataDiskSpec"
         ])
         def client = server.applicationContext.createBean(HttpClient, server.URI)
 
@@ -67,6 +70,7 @@ class FormDataDiskSpec extends Specification {
     }
 
     @Controller(value = '/form-disk', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+    @Requires(property = "spec.name", value = "FormDataDiskSpec")
     static class FormController {
         @Post('/object')
         Object object(@Body Object object) {

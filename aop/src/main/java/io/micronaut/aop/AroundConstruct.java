@@ -32,5 +32,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
 @InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
-public @interface AroundConstruct  {
+public @interface AroundConstruct {
 }

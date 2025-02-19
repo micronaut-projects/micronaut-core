@@ -31,6 +31,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
+import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,9 @@ import java.util.regex.Pattern;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
+    public static final DefaultPropertyEntry NULL_ENTRY = new DefaultPropertyEntry(
+        "NULL", null, null, null
+    );
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
@@ -76,9 +80,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
-    protected final Map<String, Object>[] catalog = new Map[58];
-    protected final Map<String, Object>[] rawCatalog = new Map[58];
-    protected final Map<String, Object>[] nonGenerated = new Map[58];
+    protected final Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
+    protected final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
+    protected final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
 
     protected Logger log;
 
@@ -171,7 +175,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Boolean result = containsCache.get(name);
         if (result == null) {
             for (PropertyCatalog convention : CONVENTIONS) {
-                Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, convention);
                 if (entries != null) {
                     if (entries.containsKey(name)) {
                         result = true;
@@ -193,7 +197,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return false;
         }
         for (PropertyCatalog propertyCatalog : CONVENTIONS) {
-            Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
+            Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
             if (entries != null) {
                 if (entries.containsKey(name)) {
                     return true;
@@ -213,10 +217,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @NonNull
     @Override
     public Collection<String> getPropertyEntries(@NonNull String name) {
+        return getPropertyEntries(name, io.micronaut.core.value.PropertyCatalog.NORMALIZED);
+    }
+
+    @NonNull
+    @Override
+    public Collection<String> getPropertyEntries(@NonNull String name, @NonNull io.micronaut.core.value.PropertyCatalog propertyCatalog) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptySet();
         }
-        Map<String, Object> entries = resolveEntriesForKey(name, false, PropertyCatalog.NORMALIZED);
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, PropertyCatalog.valueOf(propertyCatalog.name()));
         if (entries == null) {
             return Collections.emptySet();
         }
@@ -244,7 +254,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (StringUtils.isEmpty(pathPattern)) {
             return Collections.emptySet();
         }
-        Map<String, Object> entries = resolveEntriesForKey(pathPattern, false, null);
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(pathPattern, false, null);
         if (entries == null) {
             return Collections.emptySet();
         }
@@ -285,7 +295,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (StringUtils.isEmpty(name)) {
             return Collections.emptyMap();
         }
-        Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
         if (entries != null) {
             if (keyFormat == null) {
                 keyFormat = StringConvention.RAW;
@@ -330,7 +340,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
         Object value = placeholderResolutionCache.get(name);
         // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
-        Map<String, Object> entries = null;
+        Map<String, DefaultPropertyEntry> entries = null;
         if (value == null) {
             entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
             if (entries == null) {
@@ -339,14 +349,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
         if (entries != null || value != null) {
             if (value == null) {
-                value = entries.get(name);
+                value = entries.getOrDefault(name, NULL_ENTRY).value();
             }
             if (value == null) {
-                value = entries.get(normalizeName(name));
+                value = entries.getOrDefault(normalizeName(name), NULL_ENTRY).value();
                 if (value == null && name.indexOf('[') == -1) {
                     // last chance lookup the raw value
-                    Map<String, Object> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
-                    value = rawEntries != null ? rawEntries.get(name) : null;
+                    Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                    value = rawEntries != null ? rawEntries.getOrDefault(name, NULL_ENTRY).value() : null;
                     if (value != null) {
                         entries = rawEntries;
                     }
@@ -356,7 +366,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 int i = name.indexOf('[');
                 if (i > -1 && name.endsWith("]")) {
                     String newKey = name.substring(0, i);
-                    value = entries.get(newKey);
+                    value = entries.getOrDefault(newKey, NULL_ENTRY).value();
                     String index = name.substring(i + 1, name.length() - 1);
                     if (StringUtils.isNotEmpty(index)) {
                         if (value != null) {
@@ -375,7 +385,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             }
                         } else {
                             String subKey = newKey + '.' + index;
-                            value = entries.get(subKey);
+                            value = entries.getOrDefault(subKey, NULL_ENTRY).value();
                         }
                     }
                 }
@@ -450,9 +460,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)
-            .forEach((Map.Entry<String, Object> entry) -> {
+            .forEach((Map.Entry<String, DefaultPropertyEntry> entry) -> {
                 String k = keyConvention.format(entry.getKey());
-                Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
+                Object value = resolvePlaceHoldersIfNecessary(entry.getValue().value());
                 Map finalMap = map;
                 int index = k.indexOf('.');
                 if (index != -1 && isNested) {
@@ -481,7 +491,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param conversionContext The conversion context
      * @return The subproperties
      */
-    protected Properties resolveSubProperties(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
+    protected Properties resolveSubProperties(String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
@@ -494,7 +504,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         entries.entrySet().stream()
             .filter(map -> map.getKey().startsWith(prefix))
             .forEach(entry -> {
-                Object value = entry.getValue();
+                DefaultPropertyEntry propertyEntry = entry.getValue();
+                Object value = propertyEntry.value();
                 if (value != null) {
                     String key = entry.getKey().substring(prefix.length());
                     key = keyConvention != null ? keyConvention.format(key) : key;
@@ -511,7 +522,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param conversionContext The conversion context
      * @return The submap
      */
-    protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
+    protected Map<String, Object> resolveSubMap(String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(null);
@@ -539,7 +550,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @NonNull
     protected Map<String, Object> resolveSubMap(
             String name,
-            Map<String, Object> entries,
+            Map<String, DefaultPropertyEntry> entries,
             ArgumentConversionContext<?> conversionContext,
             @Nullable StringConvention keyConvention,
             MapFormat.MapTransformation transformation) {
@@ -548,7 +559,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Map<String, Object> subMap = CollectionUtils.newLinkedHashMap(entries.size());
 
         String prefix = name + '.';
-        for (Map.Entry<String, Object> entry : entries.entrySet()) {
+        for (Map.Entry<String, DefaultPropertyEntry> entry : entries.entrySet()) {
             final String key = entry.getKey();
 
             if (valueTypeIsList && key.contains("[") && key.endsWith("]")) {
@@ -558,7 +569,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (key.startsWith(prefix)) {
                 String subMapKey = key.substring(prefix.length());
 
-                Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
+                Object value = resolvePlaceHoldersIfNecessary(entry.getValue().value());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention != null ? keyConvention.format(subMapKey) : subMapKey;
@@ -597,39 +608,74 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     int i = resolvedProperty.indexOf('[');
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
-                        Map<String, Object> entries = resolveEntriesForKey(propertyName, true, PropertyCatalog.GENERATED);
+                        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(propertyName, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
-                            entries.put(resolvedProperty, value);
-                            expandProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                            entries.put(resolvedProperty, new DefaultPropertyEntry(
+                                resolvedProperty,
+                                value,
+                                property,
+                                properties.getOrigin()
+                            ));
+                            expandProperty(
+                                resolvedProperty.substring(i),
+                                val -> entries.put(propertyName, new DefaultPropertyEntry(
+                                    propertyName,
+                                    val,
+                                    property,
+                                    properties.getOrigin()
+                                )),
+                                () -> entries.getOrDefault(propertyName, NULL_ENTRY).value(),
+                                value
+                            );
                         }
                         if (first) {
-                            Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                            Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
                             if (normalized != null) {
-                                normalized.put(propertyName, value);
+                                normalized.put(propertyName, new DefaultPropertyEntry(
+                                    propertyName,
+                                    value,
+                                    property,
+                                    properties.getOrigin()
+                                ));
                             }
                             first = false;
                         }
                     } else {
-                        Map<String, Object> entries = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.GENERATED);
+                        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
                             if (value instanceof List || value instanceof Map) {
-                                collapseProperty(resolvedProperty, entries, value);
+                                collapseProperty(property, resolvedProperty, entries, value, properties.getOrigin());
                             }
-                            entries.put(resolvedProperty, value);
+                            entries.put(resolvedProperty, new DefaultPropertyEntry(
+                                resolvedProperty,
+                                value,
+                                property,
+                                properties.getOrigin()
+                            ));
                         }
                         if (first) {
-                            Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                            Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
                             if (normalized != null) {
-                                normalized.put(resolvedProperty, value);
+                                normalized.put(resolvedProperty, new DefaultPropertyEntry(
+                                    resolvedProperty,
+                                    value,
+                                    property,
+                                    properties.getOrigin()
+                                ));
                             }
                             first = false;
                         }
                     }
                 }
 
-                final Map<String, Object> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
+                final Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
                 if (rawEntries != null) {
-                    rawEntries.put(property, value);
+                    rawEntries.put(property, new DefaultPropertyEntry(
+                        property,
+                        value,
+                        property,
+                        properties.getOrigin()
+                    ));
                 }
             }
         }
@@ -691,24 +737,39 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private void collapseProperty(String prefix, Map<String, Object> entries, Object value) {
+    private void collapseProperty(
+        String originalProperty,
+        String prefix,
+        Map<String, DefaultPropertyEntry> entries,
+        Object value,
+        PropertySource.Origin origin) {
         if (value instanceof List<?> list) {
             for (int i = 0; i < list.size(); i++) {
                 Object item = list.get(i);
                 if (item != null) {
-                    collapseProperty(prefix + "[" + i + "]", entries, item);
+                    collapseProperty(originalProperty, prefix + "[" + i + "]", entries, item, origin);
                 }
             }
-            entries.put(prefix, value);
+            entries.put(prefix, new DefaultPropertyEntry(
+                prefix,
+                value,
+                originalProperty,
+                origin
+            ));
         } else if (value instanceof Map<?, ?> map) {
             for (Map.Entry<?, ?> entry: map.entrySet()) {
                 Object key = entry.getKey();
                 if (key instanceof CharSequence charSequence) {
-                    collapseProperty(prefix + "." + charSequence, entries, entry.getValue());
+                    collapseProperty(originalProperty, prefix + "." + charSequence, entries, entry.getValue(), origin);
                 }
             }
         } else {
-            entries.put(prefix, value);
+            entries.put(prefix, new DefaultPropertyEntry(
+                prefix,
+                value,
+                originalProperty,
+                origin
+            ));
         }
     }
 
@@ -719,13 +780,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The map with the resolved entries for the name
      */
     @SuppressWarnings("MagicNumber")
-    protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
+    protected Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (name.isEmpty()) {
             return null;
         }
-        final Map<String, Object>[] catalog = getCatalog(propertyCatalog);
+        final Map<String, DefaultPropertyEntry>[] catalog = getCatalog(propertyCatalog);
 
-        Map<String, Object> entries = null;
+        Map<String, DefaultPropertyEntry> entries = null;
         char firstChar = name.charAt(0);
         if (Character.isLetter(firstChar)) {
             int index = firstChar - 65;
@@ -740,7 +801,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return entries;
     }
 
-    private Map<String, Object>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
+    /**
+     * Obtain a property catalog.
+     * @param propertyCatalog The catalog
+     * @return The catalog
+     */
+    private Map<String, DefaultPropertyEntry>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
         propertyCatalog = propertyCatalog != null ? propertyCatalog : PropertyCatalog.GENERATED;
         return switch (propertyCatalog) {
             case RAW -> this.rawCatalog;
@@ -833,29 +899,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (propertyPlaceholderResolver instanceof AutoCloseable autoCloseable) {
             autoCloseable.close();
         }
-    }
-
-
-    /**
-     * The property catalog to use.
-     */
-    protected enum PropertyCatalog {
-        /**
-         * The catalog that contains the raw keys.
-         */
-        RAW,
-        /**
-         * The catalog that contains normalized keys. A key is normalized into
-         * lower case hyphen separated form. For example an environment variable {@code FOO_BAR} would be
-         * normalized to {@code foo.bar}.
-         */
-        NORMALIZED,
-        /**
-         * The catalog that contains normalized keys and also generated keys. A synthetic key can be generated from
-         * an environment variable such as {@code FOO_BAR_BAZ} which will produce the following keys: {@code foo.bar.baz},
-         * {@code foo.bar-baz}, and {@code foo-bar.baz}.
-         */
-        GENERATED
     }
 
     private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {

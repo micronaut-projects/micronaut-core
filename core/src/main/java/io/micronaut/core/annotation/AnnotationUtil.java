@@ -136,6 +136,11 @@ public class AnnotationUtil {
     public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
 
     /**
+     * The adapter annotation type.
+     */
+    public static final String ANN_ADAPTER = "io.micronaut.aop.Adapter";
+
+    /**
      * Name of the interceptor binding type.
      */
     public static final String ANN_INTERCEPTOR_BINDING = "io.micronaut.aop.InterceptorBinding";
@@ -194,6 +199,10 @@ public class AnnotationUtil {
      * The inherited annotation.
      */
     public static final String ANN_INHERITED = Inherited.class.getName();
+    /**
+     * The name of the required member.
+     */
+    public static final String MEMBER_REQUIRED = "required";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

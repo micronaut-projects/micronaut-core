@@ -55,7 +55,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     /**
      * Execute the function for the given input and output.
      *
-     * @param input  The input
+     * @param input The input
      * @param output The output
      * @throws IOException If an I/O exception occurs
      */
@@ -66,8 +66,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     /**
      * Execute the function with given context object.
      *
-     * @param input   The {@link InputStream}
-     * @param output  THe {@link OutputStream}
+     * @param input The {@link InputStream}
+     * @param output THe {@link OutputStream}
      * @param context The context object
      * @throws IOException If an error occurs
      */
@@ -140,7 +140,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * @param registry local function registry
      * @param returnType return type as Class
      * @param result result object
-     * @param output outputstream
+     * @param output output stream
      * @throws IOException input/output exception
      */
     static void encode(Environment environment, LocalFunctionRegistry registry, Class<?> returnType, Object result, OutputStream output) throws IOException {
@@ -216,7 +216,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     }
 
     private Object doConvertInput(ConversionService conversionService, Argument<?> arg, Object object) {
-        ArgumentConversionContext conversionContext = ConversionContext.of(arg);
+        ArgumentConversionContext<?> conversionContext = ConversionContext.of(arg);
         Optional<?> convert = conversionService.convert(object, conversionContext);
         if (convert.isPresent()) {
             return convert.get();

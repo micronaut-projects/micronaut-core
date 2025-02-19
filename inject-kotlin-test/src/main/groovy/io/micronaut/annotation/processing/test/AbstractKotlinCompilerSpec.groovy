@@ -87,6 +87,19 @@ class AbstractKotlinCompilerSpec extends Specification {
      * @param cls The source
      * @return The class element
      */
+    ClassElement buildClassElementJava(String className, @Language("java") String cls) {
+        List<ClassElement> elements = []
+        KotlinCompiler.compileJava(className, cls,  {
+            elements.add(it)
+        })
+        return elements.find { it.name == className }
+    }
+
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
     boolean buildClassElement(String className, @Language("kotlin") String cls, @NonNull Consumer<ClassElement> processor) {
         boolean invoked = false
         KotlinCompiler.compile(className, cls) {
@@ -106,6 +119,21 @@ class AbstractKotlinCompilerSpec extends Specification {
     ClassElement buildClassElementTransformed(String className, @Language("kotlin") String cls, @NonNull Function<ClassElement, ClassElement> processor) {
         List<ClassElement> elements = []
         KotlinCompiler.compile(className, cls,  {
+            if (it.name == className) {
+                elements.add(processor.apply(it))
+            }
+        })
+        return elements.first()
+    }
+
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The result
+     */
+    <T> T buildClassElementTransformedJava(String className, @Language("java") String cls, @NonNull Function<ClassElement, T> processor) {
+        List<T> elements = []
+        KotlinCompiler.compileJava(className, cls,  {
             if (it.name == className) {
                 elements.add(processor.apply(it))
             }

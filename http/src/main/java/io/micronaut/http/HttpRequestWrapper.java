@@ -18,6 +18,7 @@ package io.micronaut.http;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.cookie.Cookies;
 
+import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
@@ -82,6 +83,11 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     @Override
     public Optional<Certificate> getCertificate() {
         return getDelegate().getCertificate();
+    }
+
+    @Override
+    public Optional<SSLSession> getSslSession() {
+        return getDelegate().getSslSession();
     }
 
     @Override

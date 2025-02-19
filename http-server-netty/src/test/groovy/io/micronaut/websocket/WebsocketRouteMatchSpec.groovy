@@ -2,7 +2,6 @@ package io.micronaut.websocket
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
@@ -12,6 +11,7 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.micronaut.web.router.RouteAttributes
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnClose
@@ -98,7 +98,7 @@ class WebsocketRouteMatchSpec extends Specification {
     static class SecurityFilter implements HttpServerFilter {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null)
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null)
             routeMatch != null ? chain.proceed(request) : Mono.just(HttpResponse.serverError())
         }
     }

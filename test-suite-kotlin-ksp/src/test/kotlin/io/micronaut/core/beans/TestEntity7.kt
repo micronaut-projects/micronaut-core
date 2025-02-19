@@ -1,0 +1,48 @@
+package io.micronaut.core.beans
+
+import io.micronaut.core.annotation.Introspected
+import java.time.LocalDate
+
+@Introspected
+class TestEntity7(
+    val a0: String,
+    val a1: String,
+    val a2: String,
+    val a3: String,
+    val a4: String,
+    val a5: String,
+    val a6: String,
+    val a7: String,
+    val a8: String,
+    val a9: String,
+    val a10: String,
+    val a11: String,
+    val a12: String,
+    val a13: String,
+    val a14: String,
+    val a15: String,
+    val a16: String,
+    val a17: String,
+    val a18: String,
+    val a19: String,
+    val a20: String,
+    val a21: String,
+    val a22: String,
+    val a23: String,
+    val a24: String,
+    val a25: String,
+    val a26: String,
+    val a27: String,
+    val a28: String,
+    val a29: String,
+    val a30: String,
+    val a31: String = "a31",
+    val a32: LocalDate = LocalDate.now(),
+    val a33: LocalDate,
+    val a34: LocalDate,
+    val a35: LocalDate,
+    val a36: LocalDate,
+    val a37: LocalDate,
+    val a38: LocalDate,
+    val a39: LocalDate,
+)

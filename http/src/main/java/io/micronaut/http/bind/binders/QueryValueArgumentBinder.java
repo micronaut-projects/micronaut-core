@@ -22,10 +22,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.Collections;
@@ -48,6 +47,21 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
      */
     public QueryValueArgumentBinder(ConversionService conversionService) {
         super(conversionService);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param conversionService conversion service
+     * @param argument The argument
+     */
+    public QueryValueArgumentBinder(ConversionService conversionService, Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        return new QueryValueArgumentBinder<>(conversionService, argument);
     }
 
     @Override
@@ -90,11 +104,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             return () -> multiValueConversion;
         }
 
-        String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(argument.getName());
 
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *, e.g. ?pojo*
-        boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
+        String parameterName = resolvedParameterName(argument);
+        boolean bindAll = BasicHttpAttributes.getRouteMatchInfo(source)
             .map(umi -> {
                 UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
                 return uriMatchVariable != null && uriMatchVariable.isExploded();
@@ -104,7 +118,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             Object value;
             // Only maps and POJOs will "bindAll", lists work like normal
             if (Iterable.class.isAssignableFrom(argument.getType())) {
-                value = doResolve(context, parameters, parameterName);
+                value = doResolve(context, parameters);
                 if (value == null) {
                     value = Collections.emptyList();
                 }
@@ -113,6 +127,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             }
             return doConvert(value, context);
         }
-        return doBind(context, parameters, parameterName, BindingResult.unsatisfied());
+        return doBind(context, parameters, BindingResult.unsatisfied());
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
+        return argument.getAnnotationMetadata().stringValue(QueryValue.class).orElse(argument.getName());
     }
 }

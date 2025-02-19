@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -31,10 +32,10 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
-     * @param owningClass            The declaring class
-     * @param nativeElement             The native element
+     * @param owningClass The declaring class
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaConstructorElement(JavaClassElement owningClass,
                            JavaNativeElement.Method nativeElement,
@@ -49,12 +50,12 @@ class JavaConstructorElement extends JavaMethodElement implements ConstructorEle
     }
 
     @Override
-    public boolean overrides(MethodElement overridden) {
+    public boolean overrides(@NonNull MethodElement overridden) {
         return false;
     }
 
     @Override
-    public boolean hides(MemberElement hidden) {
+    public boolean hides(@NonNull MemberElement hidden) {
         return false;
     }
 }

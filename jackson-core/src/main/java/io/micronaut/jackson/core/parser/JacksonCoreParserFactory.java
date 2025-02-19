@@ -36,6 +36,7 @@ import java.io.InputStream;
  */
 @Internal
 public final class JacksonCoreParserFactory {
+
     private static final boolean HAS_NETTY_BUFFER;
 
     private JacksonCoreParserFactory() {
@@ -56,7 +57,7 @@ public final class JacksonCoreParserFactory {
      * Create a jackson {@link JsonParser} for the given input bytes.
      *
      * @param factory The jackson {@link JsonFactory} for parse features
-     * @param buffer  The input data
+     * @param buffer The input data
      * @return The created parser
      * @throws IOException On failure of jackson createParser methods
      */

@@ -27,7 +27,17 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>An annotation to apply to an interface to indicate which implementation
- * is the default implementation. The initial use case is to redirect {@link Replaces}
+ * is the default implementation.</p>
+ *
+ * <p>When a bean is looked up and if there are multiple possible candidates with
+ * no concrete {@link Primary} this annotation will impact bean selection by
+ * selecting the default implementation.</p>
+ *
+ * <p>It should be noted that {@link Primary} and {@link io.micronaut.core.order.Ordered}
+ * take precedence over this an annotation and a fallback to the default implementation only
+ * occurs if no primary candidate can be established.</p>
+ *
+ * <p>Note that this annotation also has an impact on bean replacement via {@link Replaces}
  * to another class to allow the replacement of an implementation that isn't
  * accessible due to visibility restrictions.</p>
  *

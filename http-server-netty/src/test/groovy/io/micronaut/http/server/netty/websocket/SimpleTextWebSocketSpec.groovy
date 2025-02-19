@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.util.StreamUtils
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
@@ -34,7 +33,7 @@ class SimpleTextWebSocketSpec extends Specification {
     @Retry
     void "test simple text websocket exchange"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'SimpleTextWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
         def uri = embeddedServer.getURI()
         uri = new URI(scheme, uri.schemeSpecificPart, uri.fragment) // apply wss scheme
@@ -113,6 +112,7 @@ class SimpleTextWebSocketSpec extends Specification {
     void "test simple text websocket connection over SSL"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'SimpleTextWebSocketSpec',
                 'micronaut.server.netty.log-level':'TRACE',
                 'micronaut.server.ssl.enabled':true,
                 'micronaut.server.ssl.port': -1,
@@ -198,7 +198,7 @@ class SimpleTextWebSocketSpec extends Specification {
 
     void "test simple text websocket connection with query"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level': 'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'SimpleTextWebSocketSpec', 'micronaut.server.netty.log-level': 'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 2, delay: 0.5)
 
         when: "a websocket connection is established"
@@ -224,6 +224,7 @@ class SimpleTextWebSocketSpec extends Specification {
     void "test a filter responding to a websocket upgrade request"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder(
+                'spec.name': 'SimpleTextWebSocketSpec',
                 'websocket-filter-respond': true
         ).run(EmbeddedServer)
 
@@ -238,7 +239,7 @@ class SimpleTextWebSocketSpec extends Specification {
 
     void "test filters are invoked for web socket requests that don't match any routes"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder().run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'SimpleTextWebSocketSpec'])
 
         when:
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())

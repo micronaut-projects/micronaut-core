@@ -1,6 +1,6 @@
 Introduction advice is distinct from Around advice in that it involves providing an implementation instead of decorating.
 
-Examples of introduction advice include https://gorm.grails.org[GORM] and https://spring.io/projects/spring-data/[Spring Data] which implement persistence logic for you.
+Examples of introduction advice includes https://spring.io/projects/spring-data/[Spring Data] which implements persistence logic for you.
 
 Micronaut api:http.client.annotation.Client[] annotation is another example of introduction advice where the Micronaut framework implements HTTP client interfaces for you at compile time.
 

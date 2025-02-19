@@ -1,0 +1,1 @@
+Any modules registered via the service loader are also added to the default object mapper.

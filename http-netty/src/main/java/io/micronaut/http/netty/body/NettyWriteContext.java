@@ -18,14 +18,8 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
+import io.micronaut.http.body.ByteBody;
 import io.netty.handler.codec.http.HttpResponse;
-import org.reactivestreams.Publisher;
-
-import java.io.InputStream;
-import java.util.concurrent.ExecutorService;
 
 /**
  * This interface is used to write the different kinds of netty responses.
@@ -36,43 +30,18 @@ import java.util.concurrent.ExecutorService;
 @Experimental
 public interface NettyWriteContext {
     /**
-     * @return The bytebuf allocator.
+     * Write a response.
+     *
+     * @param response The response status, headers etc
+     * @param body     The response body
      */
-    @NonNull
-    ByteBufAllocator alloc();
+    void write(@NonNull HttpResponse response, @NonNull ByteBody body);
 
     /**
-     * Write a full response.
+     * Write a response to a {@code HEAD} request. This is special because it never has a body but
+     * may still have a non-zero {@code Content-Length} header.
      *
-     * @param response The response to write
+     * @param response The response status, headers etc
      */
-    default void writeFull(@NonNull FullHttpResponse response) {
-        writeFull(response, false);
-    }
-
-    /**
-     * Write a full response.
-     *
-     * @param response The response to write
-     * @param headResponse If {@code true}, this is a response to a {@code HEAD} request, so the
-     * {@code Content-Length} header should not be overwritten.
-     */
-    void writeFull(@NonNull FullHttpResponse response, boolean headResponse);
-
-    /**
-     * Write a streamed response.
-     *
-     * @param response The response to write
-     * @param content  The body
-     */
-    void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
-
-    /**
-     * Write a response with a body that is a blocking stream.
-     *
-     * @param response        The response. <b>Must not</b> be a {@link FullHttpResponse}
-     * @param stream          The stream to read from
-     * @param executorService The executor for IO operations
-     */
-    void writeStream(@NonNull HttpResponse response, @NonNull InputStream stream, @NonNull ExecutorService executorService);
+    void writeHeadResponse(@NonNull HttpResponse response);
 }

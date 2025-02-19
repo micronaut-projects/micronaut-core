@@ -18,7 +18,6 @@ package io.micronaut.http.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
 import jakarta.inject.Singleton;
@@ -42,7 +41,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target(ElementType.TYPE)
 @Bean
 @DefaultScope(Singleton.class)
-@Experimental
 public @interface ClientFilter {
     /**
      * Pattern used to match all requests.

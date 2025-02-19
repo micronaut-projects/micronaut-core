@@ -1,6 +1,7 @@
 package io.micronaut.http.netty.cookies
 
 import io.micronaut.http.cookie.Cookie
+import io.micronaut.http.cookie.HttpCookieFactory
 import io.micronaut.http.cookie.SameSite
 import io.micronaut.http.cookie.ServerCookieEncoder
 import spock.lang.Specification
@@ -37,6 +38,41 @@ class NettyServerCookieEncoderSpec extends Specification {
         when:
         long maxAge = 2592000
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge)
+        String result = cookieEncoder.encode(cookie).get(0)
+        String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge)
+        String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge + 1) // To prevent flakiness
+        String expected3 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge - 1) // To prevent flakiness
+
+        then:
+        expected == result || expected2 == result || expected3 == result
+    }
+
+    void "netty server cookie encoder can correctly encode a cookie from HttpCookieFactory"() {
+        given:
+        HttpCookieFactory factory = new HttpCookieFactory();
+        ServerCookieEncoder cookieEncoder = new NettyServerCookieEncoder()
+
+        when:
+        Cookie cookie = factory.create("SID", "31d4d96e407aad42").path("/").domain("example.com")
+
+        then:
+        "SID=31d4d96e407aad42; Path=/; Domain=example.com" == cookieEncoder.encode(cookie)[0]
+
+        when:
+        cookie = factory.create("SID", "31d4d96e407aad42").path("/").domain("example.com").sameSite(SameSite.Strict)
+
+        then:
+        "SID=31d4d96e407aad42; Path=/; Domain=example.com; SameSite=Strict" == cookieEncoder.encode(cookie)[0]
+
+        when:
+        cookie = factory.create("SID", "31d4d96e407aad42").path("/").secure().httpOnly()
+
+        then: 'Netty uses HTTPOnly instead of HttpOnly'
+        "SID=31d4d96e407aad42; Path=/; Secure; HTTPOnly" == cookieEncoder.encode(cookie)[0]
+
+        when:
+        long maxAge = 2592000
+        cookie = factory.create("id", "a3fWa").maxAge(maxAge)
         String result = cookieEncoder.encode(cookie).get(0)
         String expected = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge)
         String expected2 = "id=a3fWa; Max-Age=2592000; " + Cookie.ATTRIBUTE_EXPIRES + "=" + expires(maxAge + 1) // To prevent flakiness

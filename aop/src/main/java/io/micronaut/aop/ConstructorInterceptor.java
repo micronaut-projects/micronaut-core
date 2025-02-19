@@ -35,7 +35,8 @@ public interface ConstructorInterceptor<T> extends Interceptor<T, T> {
      * @param context The context
      * @return The constructed object. Should never be <code>null</code>.
      */
-    @NonNull T intercept(@NonNull ConstructorInvocationContext<T> context);
+    @NonNull
+    T intercept(@NonNull ConstructorInvocationContext<T> context);
 
     @Override
     default @NonNull T intercept(@NonNull InvocationContext<T, T> context) {

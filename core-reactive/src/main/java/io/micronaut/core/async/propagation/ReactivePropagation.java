@@ -16,6 +16,7 @@
 package io.micronaut.core.async.propagation;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -40,36 +41,47 @@ public final class ReactivePropagation {
      * Creates propagation context aware {@link Publisher}.
      *
      * @param propagatedContext The context
-     * @param actual            The publisher
-     * @param <T>               The publisher element type
+     * @param actual The publisher
+     * @param <T> The publisher element type
      * @return propagation aware publisher
      */
     public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, Publisher<T> actual) {
-        if (actual instanceof CorePublisher) {
-            return new CorePublisher<>() {
-                @Override
-                public void subscribe(CoreSubscriber<? super T> subscriber) {
-                    CorePublisher<T> actualCorePublisher = (CorePublisher<T>) actual;
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actualCorePublisher.subscribe(propagate(propagatedContext, subscriber));
-                    }
-                }
-
-                @Override
-                public void subscribe(Subscriber<? super T> subscriber) {
-                    if (subscriber instanceof CoreSubscriber<? super T> coreSubscriber) {
-                        subscribe(coreSubscriber);
-                        return;
-                    }
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        actual.subscribe(propagate(propagatedContext, subscriber));
-                    }
-                }
-            };
+        if (actual instanceof CorePublisher<T> corePublisher) {
+            return propagate(propagatedContext, corePublisher);
         }
         return subscriber -> {
             try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                 actual.subscribe(propagate(propagatedContext, subscriber));
+            }
+        };
+    }
+    /**
+     * Creates propagation context aware {@link Publisher}.
+     *
+     * @param propagatedContext The context
+     * @param actual The publisher
+     * @param <T> The publisher element type
+     * @return propagation aware publisher
+     * @since 4.8
+     */
+    public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, CorePublisher<T> actual) {
+        return new CorePublisher<>() {
+            @Override
+            public void subscribe(@NonNull CoreSubscriber<? super T> subscriber) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    actual.subscribe(propagate(propagatedContext, subscriber));
+                }
+            }
+
+            @Override
+            public void subscribe(Subscriber<? super T> subscriber) {
+                if (subscriber instanceof CoreSubscriber<? super T> coreSubscriber) {
+                    subscribe(coreSubscriber);
+                    return;
+                }
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    actual.subscribe(propagate(propagatedContext, subscriber));
+                }
             }
         };
     }
@@ -78,23 +90,27 @@ public final class ReactivePropagation {
      * Creates propagation context aware {@link Subscriber}.
      *
      * @param propagatedContext The context
-     * @param actual            The subscriber
-     * @param <T>               The subscriber element type
+     * @param actual The subscriber
+     * @param <T> The subscriber element type
      * @return propagation aware subscriber
      */
     public static <T> Subscriber<T> propagate(PropagatedContext propagatedContext, Subscriber<T> actual) {
         return new CoreSubscriber<>() {
 
+            @NonNull
             @Override
             public Context currentContext() {
-                if (actual instanceof CoreSubscriber) {
-                    return ((CoreSubscriber<T>) actual).currentContext();
+                Context ctx;
+                if (actual instanceof CoreSubscriber<T> actualSubscriber) {
+                    ctx = actualSubscriber.currentContext();
+                } else {
+                    ctx = Context.empty();
                 }
-                return CoreSubscriber.super.currentContext();
+                return ReactorPropagation.addPropagatedContext(ctx, propagatedContext);
             }
 
             @Override
-            public void onSubscribe(Subscription s) {
+            public void onSubscribe(@NonNull Subscription s) {
                 try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onSubscribe(s);
                 }

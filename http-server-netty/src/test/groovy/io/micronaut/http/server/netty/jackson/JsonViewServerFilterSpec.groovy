@@ -33,7 +33,8 @@ class JsonViewServerFilterSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'jackson.json-view.enabled': true
+                    'jackson.json-view.enabled': true,
+                    'spec.name': 'JsonViewServerFilterSpec'
             ],
             "test")
 

@@ -16,13 +16,8 @@
 package io.micronaut.inject.failures.ctorcirculardependency
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
-
-import jakarta.inject.Singleton
 
 class ConstructorCircularDependencyFailureSpec extends Specification {
 
@@ -31,20 +26,44 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
         e.message.normalize() == '''\
-Failed to inject value for field [a] of class: io.micronaut.inject.failures.ctorcirculardependency.B
+Failed to inject value for field [propA] of class: io.micronaut.inject.failures.ctorcirculardependency.MyClassB
 
 Message: Circular dependency detected
-Path Taken: 
-new B() --> B.a --> new A([C c]) --> new C([B b])
-^                                              |
-|                                              |
-|                                              |
-+----------------------------------------------+'''
+Path Taken:
+new @j.i.Singleton i.m.i.f.c.MyClassB()
+      \\---> @j.i.Singleton i.m.i.f.c.MyClassB#propA
+            ^  \\---> new @j.i.Singleton i.m.i.f.c.MyClassA([MyClassC propC])
+            |        \\---> new i.m.i.f.c.MyClassC([MyClassB propB])
+            |              |
+            +--------------+'''
+    }
+
+    void "test another constructor circular dependency failure"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
+
+        when:"A bean is obtained that has a setter with @Inject"
+        context.getBean(MyClassD)
+
+        then:"The implementation is injected"
+        def e = thrown(CircularDependencyException)
+        e.message.normalize() == '''\
+Failed to inject value for field [propA] of class: io.micronaut.inject.failures.ctorcirculardependency.MyClassB
+
+Message: Circular dependency detected
+Path Taken:
+new @j.i.Singleton i.m.i.f.c.MyClassD(MyClassB propB)
+      \\---> new @j.i.Singleton i.m.i.f.c.MyClassD([MyClassB propB])
+            \\---> @j.i.Singleton i.m.i.f.c.MyClassB#propA
+                  ^  \\---> new @j.i.Singleton i.m.i.f.c.MyClassA([MyClassC propC])
+                  |        \\---> new i.m.i.f.c.MyClassC([MyClassB propB])
+                  |              |
+                  +--------------+'''
     }
 
     void "test multiple optionals do not cause a circular dependency exception"() {

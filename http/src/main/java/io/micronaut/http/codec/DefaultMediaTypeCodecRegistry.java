@@ -30,7 +30,9 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced with {@link io.micronaut.http.body.MessageBodyHandlerRegistry}.
  */
+@Deprecated(forRemoval = true, since = "4.7")
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
     Map<String, Optional<MediaTypeCodec>> decodersByExtension = new LinkedHashMap<>(3);

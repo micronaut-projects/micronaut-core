@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.*
@@ -83,6 +84,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
         response.getBody().get() == "Parameter Value: The Stand"
     }
 
+    @Requires(property = 'spec.name', value = 'CustomParameterBindingSpec')
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
         @CustomHttpMethod(method="REPORT")

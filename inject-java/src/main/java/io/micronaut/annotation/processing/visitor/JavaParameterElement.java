@@ -42,11 +42,11 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
     /**
      * Default constructor.
      *
-     * @param owningType                The owning class
-     * @param methodElement             The method element
-     * @param nativeElement             The native element
+     * @param owningType The owning class
+     * @param methodElement The method element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaParameterElement(JavaClassElement owningType,
                          MethodElement methodElement,
@@ -58,6 +58,7 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
         this.methodElement = methodElement;
     }
 
+    @NonNull
     @Override
     public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();

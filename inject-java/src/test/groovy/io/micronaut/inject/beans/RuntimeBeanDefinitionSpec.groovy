@@ -17,6 +17,19 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
     @Shared
     BeanContext sharedContext = BeanContext.build()
 
+    void "test runtime bean definition registered with builder"() {
+        given:
+        def foo = new Foo()
+        def context = ApplicationContext.builder()
+            .beanDefinitions(RuntimeBeanDefinition.of(foo))
+            .build()
+            .start()
+
+        expect:
+        context.getBeanDefinition(Foo)
+        context.getBean(Foo).is(foo)
+    }
+
     void 'test simple runtime bean definition'() {
         given:
 

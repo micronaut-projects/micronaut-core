@@ -52,7 +52,7 @@ public class ModelUtils {
 
     /**
      * @param elementUtils The {@link Elements}
-     * @param typeUtils    The {@link Types}
+     * @param typeUtils The {@link Types}
      */
     protected ModelUtils(Elements elementUtils, Types typeUtils) {
         this.elementUtils = elementUtils;
@@ -96,11 +96,12 @@ public class ModelUtils {
      * @param element The element
      * @return The {@link TypeElement}
      */
-    @Nullable public final TypeElement classElementFor(Element element) {
+    @Nullable
+    public final TypeElement classElementFor(Element element) {
         while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isRecord(element) || JavaModelUtils.isEnum(element))) {
             element = element.getEnclosingElement();
         }
-        if (element instanceof  TypeElement e) {
+        if (element instanceof TypeElement e) {
             return e;
         }
         return null;
@@ -174,7 +175,7 @@ public class ModelUtils {
      *
      * @param element The element
      * @param expected The expected kind
-     * @return The kind if it is resolvable and matches the expected kind
+     * @return The kind, if it is resolvable and matches the expected kind
      */
     public Optional<ElementKind> resolveKind(Element element, ElementKind expected) {
         final Optional<ElementKind> elementKind = resolveKind(element);
@@ -189,7 +190,7 @@ public class ModelUtils {
      * handles exceptions when calling the getKind() method to avoid this scenario and should be used instead of {@link Element#getKind()}.
      *
      * @param element The element
-     * @return The kind if it is resolvable
+     * @return The kind, if it is resolvable
      */
     public Optional<ElementKind> resolveKind(Element element) {
         if (element != null) {

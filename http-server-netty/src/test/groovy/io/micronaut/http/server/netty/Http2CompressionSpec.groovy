@@ -9,6 +9,7 @@ class Http2CompressionSpec extends CompressionSpec {
 
                 'micronaut.server.http-version': '2.0',
                 'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': 0,
                 'micronaut.server.ssl.build-self-signed': true,
         ] as Map<String, Object>
     }

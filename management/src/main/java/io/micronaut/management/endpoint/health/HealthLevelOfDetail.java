@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.health;
 
 /**
- *
  * <p>This class provides a set of common constants to indicate the level of detail to be included in the Health status response.</p>
  *
  * @author Sergio del Amo

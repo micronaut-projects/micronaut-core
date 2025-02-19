@@ -19,6 +19,7 @@ class CookieHttpCookieAdapterTest {
         assertFalse(cookie.isHttpOnly());
         assertFalse(cookie.isSecure());
         assertTrue(cookie.getSameSite().isEmpty());
+        assertEquals(Cookie.UNDEFINED_MAX_AGE, cookie.getMaxAge());
 
         cookie = cookie.value("bar")
                 .httpOnly()

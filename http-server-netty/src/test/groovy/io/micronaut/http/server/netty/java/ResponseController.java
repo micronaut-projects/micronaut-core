@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.java;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
@@ -29,6 +30,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = "spec.name", value = "ParameterBindingSpec")
 @Controller("/java/response")
 public class ResponseController {
 

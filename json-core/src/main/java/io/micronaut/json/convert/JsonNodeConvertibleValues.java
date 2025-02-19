@@ -16,6 +16,7 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -25,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,7 +34,6 @@ import java.util.Set;
  * Simple facade over a {@link JsonNode} to make it a {@link ConvertibleValues}.
  *
  * @param <V> The generic type for values
- *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,7 +44,7 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
     private final ConversionService conversionService;
 
     /**
-     * @param objectNode        The node that maps to JSON object structure
+     * @param objectNode The node that maps to JSON object structure
      * @param conversionService To convert the JSON node into given type
      */
     public JsonNodeConvertibleValues(JsonNode objectNode, ConversionService conversionService) {
@@ -58,7 +57,7 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     @Override
     public Set<String> names() {
-        Set<String> set = new LinkedHashSet<>();
+        var set = new LinkedHashSet<String>();
         for (Map.Entry<String, JsonNode> entry : objectNode.entries()) {
             set.add(entry.getKey());
         }
@@ -68,7 +67,7 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
     @SuppressWarnings("unchecked")
     @Override
     public Collection<V> values() {
-        List<V> values = new ArrayList<>();
+        var values = new ArrayList<V>();
         objectNode.values().forEach(v -> values.add((V) v));
         return Collections.unmodifiableCollection(values);
     }
@@ -85,7 +84,7 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
     }
 
     @Override
-    public ConversionService getConversionService() {
+    public @NonNull ConversionService getConversionService() {
         return conversionService;
     }
 }

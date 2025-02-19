@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binding
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -260,6 +261,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+    @Requires(property = "spec.name", value = "FormDataBindingSpec")
     static class FormController {
 
         @Post('/string')
@@ -296,6 +298,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Controller('/form/saml/test')
+    @Requires(property = "spec.name", value = "FormDataBindingSpec")
     static class MainController {
 
         @Post(consumes = MediaType.APPLICATION_FORM_URLENCODED)

@@ -22,6 +22,7 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 import jakarta.inject.Inject;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -35,8 +36,8 @@ import java.util.Map;
  * @since 1.2.0
  */
 @Endpoint(
-        id = EnvironmentEndpoint.NAME,
-        defaultEnabled = false
+    id = EnvironmentEndpoint.NAME,
+    defaultEnabled = false
 )
 public class EnvironmentEndpoint {
 
@@ -80,10 +81,10 @@ public class EnvironmentEndpoint {
         result.put("packages", environment.getPackages());
         Collection<Map<String, Object>> propertySources = new ArrayList<>();
         environment.getPropertySources()
-                .stream()
-                .sorted(Comparator.comparing(PropertySource::getOrder))
-                .map(ps -> buildPropertySourceInfo(ps, filter))
-                .forEach(propertySources::add);
+            .stream()
+            .sorted(Comparator.comparing(PropertySource::getOrder))
+            .map(ps -> buildPropertySourceInfo(ps, filter))
+            .forEach(propertySources::add);
         result.put("propertySources", propertySources);
         return result;
     }
@@ -97,11 +98,11 @@ public class EnvironmentEndpoint {
         EnvironmentFilterSpecification filter = createFilterSpecification();
 
         return environment.getPropertySources()
-                .stream()
-                .filter(ps -> ps.getName().equals(propertySourceName))
-                .findFirst()
-                .map(ps -> buildPropertySourceInfo(ps, filter))
-                .orElse(null);
+            .stream()
+            .filter(ps -> ps.getName().equals(propertySourceName))
+            .findFirst()
+            .map(ps -> buildPropertySourceInfo(ps, filter))
+            .orElse(null);
     }
 
     private EnvironmentFilterSpecification createFilterSpecification() {

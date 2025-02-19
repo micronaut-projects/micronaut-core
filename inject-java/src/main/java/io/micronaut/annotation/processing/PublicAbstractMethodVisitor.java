@@ -17,7 +17,11 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +46,7 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
     private final ModelUtils modelUtils;
     private final Elements elementUtils;
 
-    private Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
+    private final Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
 
     /**
      * @param classElement The class element
@@ -59,7 +63,7 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
     @Override
     protected boolean isAcceptable(Element element) {
         if (element.getKind() == ElementKind.METHOD) {
-            ExecutableElement executableElement = (ExecutableElement) element;
+            var executableElement = (ExecutableElement) element;
             Set<Modifier> modifiers = executableElement.getModifiers();
             String methodName = executableElement.getSimpleName().toString();
             boolean acceptable = isAcceptableMethod(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
@@ -83,6 +87,7 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
 
     /**
      * Return whether the given executable element is acceptable. By default, just checks if the method is abstract.
+     *
      * @param executableElement The method
      * @return True if it is
      */

@@ -42,15 +42,15 @@ final class LoadedVisitor implements Ordered {
 
     private static final String OBJECT_CLASS = Object.class.getName();
 
-    private final TypeElementVisitor visitor;
+    private final TypeElementVisitor<?, ?> visitor;
     private final String classAnnotation;
     private final String elementAnnotation;
 
     /**
-     * @param visitor               The {@link TypeElementVisitor}
+     * @param visitor The {@link TypeElementVisitor}
      * @param processingEnvironment The {@link ProcessingEnvironment}
      */
-    public LoadedVisitor(TypeElementVisitor visitor,
+    public LoadedVisitor(TypeElementVisitor<?, ?> visitor,
                          ProcessingEnvironment processingEnvironment) {
         this.visitor = visitor;
         Class<? extends TypeElementVisitor> aClass = visitor.getClass();
@@ -116,7 +116,7 @@ final class LoadedVisitor implements Ordered {
     /**
      * Finds the generic types for the given interface for the given class element.
      *
-     * @param element       The class element
+     * @param element The class element
      * @param interfaceName The interface
      * @return The generic types or an empty list
      */
@@ -141,7 +141,7 @@ final class LoadedVisitor implements Ordered {
     /**
      * @return The visitor
      */
-    public TypeElementVisitor getVisitor() {
+    public TypeElementVisitor<?, ?> getVisitor() {
         return visitor;
     }
 

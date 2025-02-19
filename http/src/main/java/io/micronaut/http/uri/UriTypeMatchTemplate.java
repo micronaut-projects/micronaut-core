@@ -33,6 +33,9 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  */
 public class UriTypeMatchTemplate extends UriMatchTemplate {
 
+    private static final String PATTERN_DECIMAL = "([\\d.+]";
+    private static final String PATTERN_INT = "([\\d+]";
+
     private Class<?>[] variableTypes;
 
     /**
@@ -99,9 +102,9 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
     protected String resolveTypePattern(Class<?> variableType, String variable, char operator) {
         if (Number.class.isAssignableFrom(variableType)) {
             if (Double.class == variableType || Float.class == variableType || BigDecimal.class == variableType) {
-                return "([\\d\\.+]";
+                return PATTERN_DECIMAL;
             } else {
-                return "([\\d+]";
+                return PATTERN_INT;
             }
         } else {
             return VARIABLE_MATCH_PATTERN;

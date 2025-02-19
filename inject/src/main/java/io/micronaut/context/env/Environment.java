@@ -16,6 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.ResourceLoader;
@@ -30,6 +32,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -238,8 +241,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
     Environment removePropertySource(PropertySource propertySource);
 
     /**
-     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA
-     * or GORM).
+     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA).
      *
      * @param pkg The package to add
      * @return This environment
@@ -285,7 +287,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * @param name   The name
      * @param values The values
      * @return This environment
+     * @deprecated Use {@link #addPropertySource(PropertySource)}
      */
+    @Deprecated(forRemoval = true, since = "4.8.0")
     default Environment addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
         if (StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
             return addPropertySource(PropertySource.of(name, values));
@@ -294,8 +298,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
     }
 
     /**
-     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA
-     * or GORM).
+     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA).
      *
      * @param pkg The package to add
      * @return This environment
@@ -361,4 +364,16 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * @return A collection of {@link PropertySourceLoader}
      */
     Collection<PropertySourceLoader> getPropertySourceLoaders();
+
+    /**
+     * Resolve information about a property.
+     *
+     * @param name The property name
+     * @return The entry.
+     * @since 4.8.0
+     */
+    @Experimental
+    default Optional<PropertyEntry> getPropertyEntry(@NonNull String name) {
+        return Optional.empty();
+    }
 }

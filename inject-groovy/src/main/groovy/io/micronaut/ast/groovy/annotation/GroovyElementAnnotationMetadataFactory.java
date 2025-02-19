@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.annotation;
 
 import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
@@ -44,7 +45,7 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     }
 
     @Override
-    public ElementAnnotationMetadataFactory readOnly() {
+    public @NonNull ElementAnnotationMetadataFactory readOnly() {
         return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
     }
 
@@ -55,24 +56,24 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
-        GroovyNativeElement clazz = (GroovyNativeElement) classElement.getNativeType();
+        var clazz = (GroovyNativeElement) classElement.getNativeType();
         return metadataBuilder.lookupOrBuild(clazz, getTypeAnnotationsOnly((ClassNode) clazz.annotatedNode()));
     }
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
-        GroovyNativeElement.Placeholder placeholder = (GroovyNativeElement.Placeholder) placeholderElement.getGenericNativeType();
+        var placeholder = (GroovyNativeElement.Placeholder) placeholderElement.getGenericNativeType();
         return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.annotatedNode()));
     }
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
-        GroovyNativeElement wildcard = (GroovyNativeElement) wildcardElement.getGenericNativeType();
+        var wildcard = (GroovyNativeElement) wildcardElement.getGenericNativeType();
         return metadataBuilder.lookupOrBuild(wildcard, getTypeAnnotationsOnly((ClassNode) wildcard.annotatedNode()));
     }
 
     private AnnotatedNode getTypeAnnotationsOnly(ClassNode classNode) {
-        AnnotatedNode annotatedNode = new AnnotatedNode();
+        var annotatedNode = new AnnotatedNode();
         List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
         if (CollectionUtils.isNotEmpty(typeAnnotations)) {
             annotatedNode.addAnnotations(typeAnnotations);

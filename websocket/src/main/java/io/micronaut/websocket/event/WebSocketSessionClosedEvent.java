@@ -27,6 +27,7 @@ public class WebSocketSessionClosedEvent extends WebSocketEvent {
 
     /**
      * Default constructor.
+     *
      * @param session The web socket session
      */
     public WebSocketSessionClosedEvent(WebSocketSession session) {

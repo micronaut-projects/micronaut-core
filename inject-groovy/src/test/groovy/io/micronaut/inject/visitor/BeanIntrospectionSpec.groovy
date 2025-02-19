@@ -2522,4 +2522,56 @@ class Holder<A extends Animal> {
             animal.isTypeVariable()
     }
 
+    void "test package private property introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.inject.visitor.MySuperclass
+
+@Introspected
+class Test extends MySuperclass {
+
+    String name
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test package private property introspection in same package"() {
+        when:
+        def introspection = buildBeanIntrospection('io.micronaut.inject.visitor.Test', '''
+package io.micronaut.inject.visitor
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test extends MySuperclass {
+
+    String name
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is introspected, as we are in the same package'
+        introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
 }

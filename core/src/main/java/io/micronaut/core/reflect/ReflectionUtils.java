@@ -200,6 +200,29 @@ public class ReflectionUtils {
     }
 
     /**
+     * Invokes an inaccessible method.
+     *
+     * @param instance  The instance
+     * @param method    The method
+     * @param arguments The arguments
+     * @param <R>       The return type
+     * @param <T>       The instance type
+     * @return The result
+     * @since 4.8
+     */
+    @UsedByGeneratedCode
+    public static <R, T> R invokeInaccessibleMethod(T instance, Method method, Object... arguments) {
+        try {
+            method.setAccessible(true);
+            return (R) method.invoke(instance, arguments);
+        } catch (IllegalAccessException e) {
+            throw new InvocationException("Illegal access invoking method [" + method + "]: " + e.getMessage(), e);
+        } catch (InvocationTargetException e) {
+            throw new InvocationException("Exception occurred invoking method [" + method + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Finds a method on the given type for the given name.
      *
      * @param type          The type

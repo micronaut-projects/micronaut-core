@@ -1,12 +1,16 @@
 package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
-import io.micronaut.http.annotation.*
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Put
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Specification
 
 import javax.net.ssl.SSLContext
@@ -23,6 +27,7 @@ import static java.time.Duration.ofSeconds
 import static java.util.concurrent.CompletableFuture.supplyAsync
 
 @MicronautTest
+@Property(name = "spec.name", value = "Http2Java11ClientSpec")
 @Property(name = "micronaut.server.http-version", value = "2.0")
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
 @Property(name = "micronaut.server.ssl.port", value = "-1")
@@ -122,6 +127,7 @@ class Http2Java11ClientSpec extends Specification {
         return context
     }
 
+    @Requires(property = "spec.name", value = "Http2Java11ClientSpec")
     @Controller('/http2/java11')
     static class ExampleController {
 

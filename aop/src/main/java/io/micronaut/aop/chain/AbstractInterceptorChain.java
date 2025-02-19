@@ -90,17 +90,18 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
 
     @Override
     public @NonNull Map<String, MutableArgumentValue<?>> getParameters() {
-        Map<String, MutableArgumentValue<?>>  localParameters = this.parameters;
+        Map<String, MutableArgumentValue<?>> localParameters = this.parameters;
         if (localParameters == null) {
             synchronized (this) { // double check
                 localParameters = this.parameters;
                 if (localParameters == null) {
-                    Argument[] arguments = getArguments();
+                    Argument<?>[] arguments = getArguments();
                     localParameters = CollectionUtils.newLinkedHashMap(arguments.length);
                     for (int i = 0; i < arguments.length; i++) {
                         Argument argument = arguments[i];
                         int finalIndex = i;
                         localParameters.put(argument.getName(), new MutableArgumentValue<>() {
+                            @NonNull
                             @Override
                             public AnnotationMetadata getAnnotationMetadata() {
                                 return argument.getAnnotationMetadata();
@@ -177,6 +178,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
 
     /**
      * Resolve interceptor binding for the given annotation metadata and kind.
+     *
      * @param annotationMetadata The annotation metadata
      * @param kind The kind
      * @return The binding
@@ -187,9 +189,9 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             final List<AnnotationValue<InterceptorBinding>> declaredValues =
-                    annotationMetadataHierarchy.getDeclaredMetadata().getAnnotationValuesByType(InterceptorBinding.class);
+                annotationMetadataHierarchy.getDeclaredMetadata().getAnnotationValuesByType(InterceptorBinding.class);
             final List<AnnotationValue<InterceptorBinding>> parentValues =
-                    annotationMetadataHierarchy.getRootMetadata()
+                annotationMetadataHierarchy.getRootMetadata()
                     .getAnnotationValuesByType(InterceptorBinding.class);
             if (CollectionUtils.isEmpty(declaredValues) && CollectionUtils.isEmpty(parentValues)) {
                 return Collections.emptyList();
@@ -221,7 +223,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
             return resolved;
         } else {
             List<AnnotationValue<InterceptorBinding>> bindings = annotationMetadata
-                    .getAnnotationValuesByType(InterceptorBinding.class);
+                .getAnnotationValuesByType(InterceptorBinding.class);
             if (CollectionUtils.isEmpty(bindings)) {
                 return Collections.emptyList();
             }

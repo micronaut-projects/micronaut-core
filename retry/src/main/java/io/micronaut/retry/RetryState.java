@@ -34,7 +34,6 @@ public interface RetryState {
      * Should a retry attempt to occur.
      *
      * @param exception The error
-     *
      * @return True if it should
      */
     boolean canRetry(Throwable exception);

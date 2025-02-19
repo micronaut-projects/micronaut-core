@@ -25,7 +25,7 @@ import java.util.List;
 public class CustomEmbeddedIdMapper implements TypedAnnotationMapper<CustomEmbeddedId> {
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<CustomEmbeddedId> annotation, VisitorContext visitorContext) {
-        return Arrays.asList(
+        return List.of(
                 AnnotationValue.builder(EmbeddedId.class)
                         .build()
         );

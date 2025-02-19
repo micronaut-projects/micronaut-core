@@ -16,8 +16,8 @@
 package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.core.annotation.NonNull;
-
 import jakarta.validation.constraints.NotBlank;
+
 import java.util.Collection;
 
 /**
@@ -33,7 +33,8 @@ public interface ManagedLoggingSystem extends io.micronaut.logging.LoggingSystem
      *
      * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
-    @NonNull Collection<LoggerConfiguration> getLoggers();
+    @NonNull
+    Collection<LoggerConfiguration> getLoggers();
 
     /**
      * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found).
@@ -41,6 +42,7 @@ public interface ManagedLoggingSystem extends io.micronaut.logging.LoggingSystem
      * @param name the logger name
      * @return the logger configuration
      */
-    @NonNull LoggerConfiguration getLogger(@NotBlank String name);
+    @NonNull
+    LoggerConfiguration getLogger(@NotBlank String name);
 
 }

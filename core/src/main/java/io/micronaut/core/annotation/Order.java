@@ -24,8 +24,23 @@ import java.lang.annotation.Target;
 /**
  * Annotation for objects that are ordered.
  *
+ * <p>Order in a Micronaut application is important in multiple aspects including but note limited to:</p>
+ *
+ * <ul>
+ *     <li>Controlling bean selection and prioritization</li>
+ *     <li>Ordering injected {@link java.util.List} collections.</li>
+ *     <li>Ordering AOP method interceptors</li>
+ *     <li>Ordering HTTP filters</li>
+ * </ul>
+ *
+ * <p>This annotation can be used to control the order by specifying a numerical value
+ * that sorts components in the desired order</p>
+ *
  * @author Sean Carroll
  * @since 2.0
+ * @see io.micronaut.core.order.Ordered
+ * @see io.micronaut.core.order.Ordered#HIGHEST_PRECEDENCE
+ * @see io.micronaut.core.order.Ordered#LOWEST_PRECEDENCE
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})

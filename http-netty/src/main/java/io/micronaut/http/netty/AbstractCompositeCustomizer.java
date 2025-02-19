@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 /**
  * Base class for the composite customizers for the client and server. The APIs are structured
@@ -75,12 +76,23 @@ public abstract class AbstractCompositeCustomizer<C, R> {
 
     @NonNull
     public final C specializeForChannel(@NonNull Channel channel, @NonNull R role) {
+        return specialize(c -> specializeForChannel(c, channel, role));
+    }
+
+    /**
+     * Specialize all members with the given action.
+     *
+     * @param specializeAction The specialization action. Input is the old member customizer, output
+     *                         is the new member customizer.
+     * @return The specialized composite customizer
+     */
+    protected final C specialize(UnaryOperator<C> specializeAction) {
         List<C> specialized = null;
         for (int i = 0; i < this.members.size(); i++) {
             C old = this.members.get(i);
             C nev;
             try {
-                nev = specializeForChannel(old, channel, role);
+                nev = specializeAction.apply(old);
                 Objects.requireNonNull(nev, "specializeForChannel must not return null");
             } catch (Exception e) {
                 LOG.error("Failed to specialize customizer", e);

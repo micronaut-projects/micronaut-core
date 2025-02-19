@@ -1,5 +1,5 @@
 plugins {
-    id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.convention-core-library")
 }
 
 micronautBuild {
@@ -9,12 +9,12 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor(projects.injectJava)
-    api(projects.httpClientCore)
-    compileOnly(projects.httpClient)
+    annotationProcessor(projects.micronautInjectJava)
+    api(projects.micronautHttpClientCore)
+    compileOnly(projects.micronautHttpClient)
     implementation(libs.managed.reactor)
-    testImplementation(projects.jacksonDatabind)
-    testImplementation(projects.httpServerNetty)
+    testImplementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautHttpServerNetty)
     testImplementation(libs.bcpkix)
     testImplementation(libs.testcontainers.spock)
 }

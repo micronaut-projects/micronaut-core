@@ -23,14 +23,15 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.ServerSocketChannel;
 
 import java.util.List;
 import java.util.Optional;
@@ -116,12 +117,18 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default ServerSocketChannel getServerSocketChannelInstance(EventLoopGroupConfiguration workerConfig) {
-        return getDelegate().getServerSocketChannelInstance(workerConfig);
+    default <E> ApplicationEventPublisher<E> getEventPublisher(Class<E> eventClass) {
+        return getDelegate().getEventPublisher(eventClass);
     }
 
     @Override
-    default <E> ApplicationEventPublisher<E> getEventPublisher(Class<E> eventClass) {
-        return getDelegate().getEventPublisher(eventClass);
+    default @NonNull Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+        return getDelegate().getChannelInstance(type, workerConfig, parent, fd);
+    }
+
+    @Override
+    @NonNull
+    default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
+        return getDelegate().getChannelInstance(type, workerConfig);
     }
 }

@@ -71,9 +71,9 @@ public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Obje
         } else {
             healthStatus = HealthStatus.DOWN;
             detail.put("error", (
-            "Free disk space below threshold. "
-            + "Available: %d bytes (threshold: %d bytes)").formatted(
-            freeSpace, threshold));
+                "Free disk space below threshold. "
+                    + "Available: %d bytes (threshold: %d bytes)").formatted(
+                freeSpace, threshold));
         }
 
         return detail;

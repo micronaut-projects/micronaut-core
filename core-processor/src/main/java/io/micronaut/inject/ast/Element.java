@@ -166,53 +166,63 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
+    @NonNull
     @Override
-    default Element removeAnnotation(String annotationType) {
+    default Element removeAnnotation(@NonNull String annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
+    default <T extends Annotation> Element removeAnnotation(@NonNull Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
     }
 
+    @NonNull
     @Override
-    default Element removeStereotype(String annotationType) {
+    default Element removeStereotype(@NonNull String annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
+    default <T extends Annotation> Element removeStereotype(@NonNull Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
+    @NonNull
     @Override
-    default Element annotate(String annotationType) {
+    default Element annotate(@NonNull String annotationType) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(Class<T> annotationType) {
+    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
+    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+    default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationValue);
     }
 }

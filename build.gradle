@@ -5,10 +5,6 @@ plugins {
     id "io.micronaut.build.internal.convention-quality"
 }
 
-repositories {
-    mavenCentral()
-}
-
 tasks.named("updateVersionCatalogs") {
     // we set the list to empty because we accept upgrades which improve the status
     rejectedQualifiers = []

@@ -60,6 +60,7 @@ public class DigitalOceanMetadataConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled Enable or disable the Amazon EC2 configuration
      */
     public void setEnabled(boolean enabled) {
@@ -75,6 +76,7 @@ public class DigitalOceanMetadataConfiguration implements Toggleable {
 
     /**
      * Default value ({@value #DEFAULT_URL}).
+     *
      * @param url The url
      */
     public void setUrl(String url) {

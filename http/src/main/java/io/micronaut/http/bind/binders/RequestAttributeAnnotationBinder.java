@@ -15,11 +15,9 @@
  */
 package io.micronaut.http.bind.binders;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -32,7 +30,6 @@ import io.micronaut.http.annotation.RequestAttribute;
  *
  * @param <T> A type
  * @author Ahmed Lafta
- * @see io.micronaut.http.HttpAttributes
  */
 public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<T>
     implements AnnotatedRequestArgumentBinder<RequestAttribute, T>, PostponedRequestArgumentBinder<T> {
@@ -44,6 +41,20 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<
         super(conversionService);
     }
 
+    /**
+     * @param conversionService conversionService
+     * @param argument argument
+     */
+    public RequestAttributeAnnotationBinder(ConversionService conversionService,
+                                            Argument<T> argument) {
+        super(conversionService, argument);
+    }
+
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        return new RequestAttributeAnnotationBinder<>(conversionService, argument);
+    }
+
     @Override
     public Class<RequestAttribute> getAnnotationType() {
         return RequestAttribute.class;
@@ -51,10 +62,12 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
-        MutableConvertibleValues<Object> parameters = source.getAttributes();
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(RequestAttribute.class).orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName, BindingResult.unsatisfied());
+        return doBind(argument, source.getAttributes(), BindingResult.unsatisfied());
+    }
+
+    @Override
+    protected String getParameterName(Argument<T> argument) {
+        return argument.getAnnotationMetadata().stringValue(RequestAttribute.class).orElse(argument.getName());
     }
 
     @Override

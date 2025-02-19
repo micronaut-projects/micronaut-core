@@ -15,9 +15,13 @@ Micronaut framework by default contains `PropertySourceLoader` implementations t
 . Properties from `MICRONAUT_APPLICATION_JSON`
 . Java System Properties
 . OS environment variables
-. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma-separated list of paths with the last file having precedence. The files can be referenced from the file system as a path, or the classpath with a `classpath:` prefix.
+. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma-separated list of paths with the last file having precedence. The files can be referenced from:
+.. the file system as an absolute path (without any prefix), 
+.. the classpath with a `classpath:` prefix.
 . Environment-specific properties from `application-{environment}.{extension}`
 . Application-specific properties from `application.{extension}`
+
+NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.yml. Loading additional configuration files from a configuration file is not supported
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 

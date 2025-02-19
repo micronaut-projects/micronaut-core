@@ -71,4 +71,36 @@ enum MyEnum {
         expect:
         element.values().size() == 2;
     }
+
+    void "get enum constantValue for final fields"() {
+        given:
+        def element = (EnumElement) buildClassElement("""
+package test;
+
+enum MyEnum {
+
+  ENUM_VAL1(10),
+  ENUM_VAL2(11),
+  UNRECOGNIZED(-1),
+  ;
+
+  public static final int ENUM_VAL1_VALUE = 10;
+  public static final int ENUM_VAL2_VALUE = 11;
+  
+  private final int value;
+
+  MyEnum(int value) {
+    this.value = value;
+  }
+}  
+""")
+        expect:
+        for (def field : element.fields) {
+            if (field.name == 'ENUM_VAL1_VALUE') {
+                field.constantValue == 10
+            } else if (field.name == 'ENUM_VAL2_VALUE') {
+                field.constantValue == 11
+            }
+        }
+    }
 }

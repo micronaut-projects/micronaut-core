@@ -23,6 +23,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.NettyChannelType
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
@@ -257,7 +258,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         option == EpollChannelOption.TCP_QUICKACK
-        eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
+        eventLoopGroupFactory.channelClass(NettyChannelType.SERVER_SOCKET) == EpollServerSocketChannel.class
 
         when:
         NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)

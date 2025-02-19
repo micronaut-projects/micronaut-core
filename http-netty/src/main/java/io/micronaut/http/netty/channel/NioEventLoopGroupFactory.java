@@ -22,12 +22,11 @@ import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.channel.socket.nio.NioDomainSocketChannel;
+import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
@@ -70,37 +69,6 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return withIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
     }
 
-    /**
-     * Returns the server channel class.
-     *
-     * @return NioServerSocketChannel.
-     */
-    @Override
-    public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
-        return NioServerSocketChannel.class;
-    }
-
-    @Override
-    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("UNIX domain sockets are not supported by the NIO implementation right now, please switch to epoll or kqueue");
-    }
-
-    @Override
-    public NioServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
-        return new NioServerSocketChannel();
-    }
-
-    @NonNull
-    @Override
-    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        return NioSocketChannel.class;
-    }
-
-    @Override
-    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
-        return new NioSocketChannel();
-    }
-
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
         if (ioRatio != null) {
             group.setIoRatio(ioRatio);
@@ -113,7 +81,8 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> NioServerSocketChannel.class;
             case CLIENT_SOCKET -> NioSocketChannel.class;
-            case DOMAIN_SERVER_SOCKET, DOMAIN_SOCKET -> throw new UnsupportedOperationException("NIO does not support domain sockets");
+            case DOMAIN_SERVER_SOCKET -> NioServerDomainSocketChannel.class;
+            case DOMAIN_SOCKET -> NioDomainSocketChannel.class;
             case DATAGRAM_SOCKET -> NioDatagramChannel.class;
         };
     }
@@ -128,7 +97,8 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return switch (type) {
             case SERVER_SOCKET -> new NioServerSocketChannel();
             case CLIENT_SOCKET -> new NioSocketChannel();
-            case DOMAIN_SERVER_SOCKET, DOMAIN_SOCKET -> throw new UnsupportedOperationException("NIO does not support domain sockets");
+            case DOMAIN_SERVER_SOCKET -> new NioServerDomainSocketChannel();
+            case DOMAIN_SOCKET -> new NioDomainSocketChannel();
             case DATAGRAM_SOCKET -> new NioDatagramChannel();
         };
     }
@@ -157,7 +127,18 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
                 }
                 yield new NioSocketChannel(parent, sc);
             }
-            case DOMAIN_SERVER_SOCKET, DOMAIN_SOCKET -> throw new UnsupportedOperationException("NIO does not support domain sockets");
+            case DOMAIN_SERVER_SOCKET -> {
+                if (!(inheritedChannel instanceof java.nio.channels.ServerSocketChannel ssc)) {
+                    throw new IllegalArgumentException("Inherited channel is not a ServerSocketChannel. You probably have to pass it as 'accepted-fd' instead of 'fd'.");
+                }
+                yield new NioServerDomainSocketChannel(ssc);
+            }
+            case DOMAIN_SOCKET -> {
+                if (!(inheritedChannel instanceof java.nio.channels.SocketChannel sc)) {
+                    throw new IllegalArgumentException("Inherited channel is not a SocketChannel. You probably have to pass it as 'fd' instead of 'accepted-fd'.");
+                }
+                yield new NioDomainSocketChannel(parent, sc);
+            }
             case DATAGRAM_SOCKET -> {
                 if (!(inheritedChannel instanceof java.nio.channels.DatagramChannel dc)) {
                     throw new IllegalArgumentException("Inherited channel is not a DatagramChannel.");

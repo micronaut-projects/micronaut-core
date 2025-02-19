@@ -18,6 +18,7 @@ package io.micronaut.web.router.version;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
@@ -54,7 +55,7 @@ public class VersionAwareRouterListener implements BeanCreatedEventListener<Rout
      * @return The wrapper router bean
      */
     @Override
-    public Router onCreated(BeanCreatedEvent<Router> event) {
+    public Router onCreated(@NonNull BeanCreatedEvent<Router> event) {
         return new FilteredRouter(event.getBean(), routeVersionFilter);
     }
 }

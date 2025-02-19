@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.PackageElement;
@@ -32,9 +33,9 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
     private final PackageElement element;
 
     /**
-     * @param element                   The {@link PackageElement}
+     * @param element The {@link PackageElement}
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The Java visitor context
+     * @param visitorContext The Java visitor context
      */
     public JavaPackageElement(PackageElement element,
                               ElementAnnotationMetadataFactory annotationMetadataFactory,
@@ -48,11 +49,13 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
         return new JavaPackageElement(element, elementAnnotationMetadataFactory, visitorContext);
     }
 
+    @NonNull
     @Override
     public String getName() {
         return element.getQualifiedName().toString();
     }
 
+    @NonNull
     @Override
     public String getSimpleName() {
         return element.getSimpleName().toString();

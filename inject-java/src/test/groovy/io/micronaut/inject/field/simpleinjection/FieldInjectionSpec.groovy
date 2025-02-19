@@ -18,7 +18,7 @@ package io.micronaut.inject.field.simpleinjection
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.BeanResolutionTraceMode
 
 class FieldInjectionSpec extends AbstractTypeElementSpec {
 
@@ -32,7 +32,7 @@ import jakarta.inject.*;
 @Singleton
 class Test {
     @Inject
-    java.util.List<Bar> bars;   
+    java.util.List<Bar> bars;
 }
 
 class Bar {
@@ -45,7 +45,9 @@ class Bar {
 
     void "test injection via field with interface"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.builder()
+                                            .beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT)
+                                            .start()
 
         when:"Alpha bean is obtained that has a field with @Inject"
         B b =  context.getBean(B)

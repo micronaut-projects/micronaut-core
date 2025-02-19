@@ -37,6 +37,7 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
 
     /**
      * Default constructor.
+     *
      * @param id The id
      * @param loadBalancedURIs The URIs
      */
@@ -46,6 +47,7 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
 
     /**
      * Default constructor.
+     *
      * @param id The id
      * @param loadBalancedURIs The URIs
      * @param contextPath The context path

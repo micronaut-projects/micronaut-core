@@ -57,6 +57,7 @@ public interface LocalFunctionRegistry {
 
     /**
      * Find the first available registered function.
+     *
      * @param <T> The declaring type
      * @param <R> The result of the method call
      * @return The {@link ExecutableMethod} method representing the function
@@ -65,6 +66,7 @@ public interface LocalFunctionRegistry {
 
     /**
      * Find the first available registered function.
+     *
      * @param <T> The declaring type
      * @param <R> The result of the method call
      * @param name the name
@@ -76,7 +78,7 @@ public interface LocalFunctionRegistry {
      * Find a {@link Supplier} for the given name.
      *
      * @param name The name
-     * @param <T>  The type
+     * @param <T> The type
      * @return An {@link Optional} of a {@link Supplier}
      */
     <T> Optional<ExecutableMethod<Supplier<T>, T>> findSupplier(String name);
@@ -85,7 +87,7 @@ public interface LocalFunctionRegistry {
      * Find a {@link Consumer} for the given name.
      *
      * @param name The name
-     * @param <T>  The type
+     * @param <T> The type
      * @return An {@link Optional} of a {@link Consumer}
      */
     <T> Optional<ExecutableMethod<Consumer<T>, Void>> findConsumer(String name);
@@ -94,7 +96,7 @@ public interface LocalFunctionRegistry {
      * Find a {@link java.util.function.Function} for the given name.
      *
      * @param name The name
-     * @param <T>  The type
+     * @param <T> The type
      * @param <R> The result of the method call
      * @return An {@link Optional} of a {@link java.util.function.Function}
      */
@@ -104,7 +106,7 @@ public interface LocalFunctionRegistry {
      * Find a {@link java.util.function.BiFunction} for the given name.
      *
      * @param name The name
-     * @param <T>  The type
+     * @param <T> The type
      * @param <U> the type of the second argument to the function
      * @param <R> The result of the method call
      * @return An {@link Optional} of a {@link java.util.function.BiFunction}

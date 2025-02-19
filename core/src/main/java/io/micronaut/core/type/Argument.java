@@ -220,6 +220,28 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates a copy of this argument with a different name.
+     * @param name The new name
+     * @return A new argument
+     * @since 4.6
+     */
+    @NonNull
+    default Argument<T> withName(@Nullable String name) {
+        return Argument.of(getType(), name, getAnnotationMetadata(), getTypeParameters());
+    }
+
+    /**
+     * Creates a copy of this argument with a different annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @return A new argument
+     * @since 4.6
+     */
+    @NonNull
+    default Argument<T> withAnnotationMetadata(@NonNull AnnotationMetadata annotationMetadata) {
+        return Argument.of(getType(), getName(), annotationMetadata, getTypeParameters());
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments
@@ -491,6 +513,19 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     static <T> Argument<T> of(
             @NonNull Class<T> type) {
         return new DefaultArgument<>(type, null, AnnotationMetadata.EMPTY_METADATA, Collections.emptyMap(), Argument.ZERO_ARGUMENTS);
+    }
+
+    /**
+     * Creates a new argument for the type of the given instance.
+     *
+     * @param instance The argument instance
+     * @param <T>      The generic type
+     * @return The argument instance
+     * @since 4.6
+     */
+    @NonNull
+    static <T> Argument<T> ofInstance(@NonNull T instance) {
+        return Argument.of((Class<T>) instance.getClass());
     }
 
     /**

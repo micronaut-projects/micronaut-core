@@ -8,8 +8,6 @@ snippet::io.micronaut.docs.requires.JdbcBookService[tags="requires",indent=0, ti
 
 The above bean defines two requirements. The first indicates that a `DataSource` bean must be present for the bean to load. The second requirement ensures that the `datasource.url` property is set before loading the `JdbcBookService` bean.
 
-NOTE: Kotlin currently does not support repeatable annotations. Use the `@Requirements` annotation when multiple requires are needed. For example, `@Requirements(Requires(...), Requires(...))`. See https://youtrack.jetbrains.com/issue/KT-12794 to track this feature.
-
 If multiple beans require the same combination of requirements, you can define a meta-annotation with the requirements:
 
 snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, title="Using a @Requires meta-annotation"]

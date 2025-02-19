@@ -71,7 +71,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
         String v = getEnvValue();
         if (v != null) {
             String encoding = CachedEnvironment.getProperty("file.encoding");
-            Charset charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
+            var charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
             return Optional.of(new ByteArrayInputStream(v.getBytes(charset)));
         }
         return Optional.empty();

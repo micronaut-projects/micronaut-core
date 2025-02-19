@@ -22,8 +22,8 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 /**
  * Groovy implementation of {@link io.micronaut.inject.ast.AnnotationElement}.
  *
- * @since 3.1.0
  * @author graemerocher
+ * @since 3.1.0
  */
 @Internal
 final class GroovyAnnotationElement extends GroovyClassElement implements AnnotationElement {

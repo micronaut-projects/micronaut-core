@@ -30,14 +30,15 @@ import java.io.IOException;
  */
 @Internal
 public final class JsonStreamTransfer {
+
     private JsonStreamTransfer() {
     }
 
     /**
      * Transfer tokens, starting with the next token.
      *
-     * @param from   Parser to transfer data from.
-     * @param to     Generator to transfer data to.
+     * @param from Parser to transfer data from.
+     * @param to Generator to transfer data to.
      * @param config Configuration to use for copying.
      * @throws IOException IOException
      */
@@ -49,8 +50,8 @@ public final class JsonStreamTransfer {
     /**
      * Transfer tokens, starting with the current token.
      *
-     * @param from   Parser to transfer data from.
-     * @param to     Generator to transfer data to.
+     * @param from Parser to transfer data from.
+     * @param to Generator to transfer data to.
      * @param config Configuration to use for copying.
      * @throws IOException IOException
      */
@@ -66,15 +67,15 @@ public final class JsonStreamTransfer {
     /**
      * Transfer a single token.
      *
-     * @param from   Parser to transfer data from.
-     * @param to     Generator to transfer data to.
+     * @param from Parser to transfer data from.
+     * @param to Generator to transfer data to.
      * @param config Configuration to use for copying.
      * @throws IOException IOException
      */
     public static void transferCurrentToken(
-            JsonParser from,
-            JsonGenerator to,
-            JsonStreamConfig config
+        JsonParser from,
+        JsonGenerator to,
+        JsonStreamConfig config
     ) throws IOException {
         switch (from.currentToken()) {
             case START_OBJECT:

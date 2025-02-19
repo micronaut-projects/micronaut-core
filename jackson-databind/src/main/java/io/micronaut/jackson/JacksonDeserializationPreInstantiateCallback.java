@@ -31,7 +31,7 @@ public interface JacksonDeserializationPreInstantiateCallback {
      * The callback before the bean is constructed.
      *
      * @param beanIntrospection The bean introspection
-     * @param arguments         The argument values
+     * @param arguments The argument values
      */
     void preInstantiate(BeanIntrospection<?> beanIntrospection, Object... arguments);
 

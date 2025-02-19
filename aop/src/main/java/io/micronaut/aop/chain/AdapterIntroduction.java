@@ -26,7 +26,10 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import static io.micronaut.aop.Adapter.InternalAttributes.*;
+import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES;
+import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_BEAN;
+import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_METHOD;
+import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_QUALIFIER;
 
 /**
  * Internal class that implements introduction advice for the {@link io.micronaut.aop.Adapter} annotation.
@@ -43,7 +46,7 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      * Default constructor.
      *
      * @param beanContext The bean context
-     * @param method      The target method
+     * @param method The target method
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         Class<?> beanType = method.classValue(Adapter.class, ADAPTED_BEAN).orElse(null);

@@ -15,11 +15,16 @@
  */
 package io.micronaut.messaging.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.core.bind.annotation.Bindable;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>An annotation that can be applied to method argument to indicate that the method argument is bound from a message header.</p>
@@ -37,12 +42,14 @@ public @interface MessageHeader {
 
     /**
      * If used as a bound parameter, this is the header name. If used on a class level this is value and not the header name.
+     *
      * @return The name of the header, otherwise it is inferred from the parameter name
      */
     String value() default "";
 
     /**
      * If used on a class level with @Headers this is the header name and value is the value.
+     *
      * @return name of header when using with @Headers
      */
     String name() default "";

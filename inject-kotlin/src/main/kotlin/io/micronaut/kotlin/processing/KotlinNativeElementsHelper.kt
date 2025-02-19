@@ -30,7 +30,7 @@ import io.micronaut.kotlin.processing.visitor.KotlinMethodNativeElement
  * @author Denis Stepanov
  * @since 4.3.0
  */
-internal class KotlinNativeElementsHelper(private val resolver: Resolver) : NativeElementsHelper<KSClassDeclaration, KSFunctionDeclaration>() {
+internal class KotlinNativeElementsHelper(var resolver: Resolver) : NativeElementsHelper<KSClassDeclaration, KSFunctionDeclaration>() {
 
     override fun getClassCacheKey(classElement: KSClassDeclaration): Any {
         return KotlinClassNativeElement(classElement, null, null)
@@ -98,7 +98,10 @@ internal class KotlinNativeElementsHelper(private val resolver: Resolver) : Nati
         return t == builtIns.anyType ||
                 t == builtIns.nothingType ||
                 t == builtIns.unitType ||
-                classNode.qualifiedName.toString() == Enum::class.java.name
+                (classNode.qualifiedName != null && (
+                        classNode.qualifiedName!!.asString() == Enum::class.java.name ||
+                                classNode.qualifiedName!!.asString() == Record::class.java.name
+                        ))
     }
 
     override fun isInterface(classNode: KSClassDeclaration): Boolean {

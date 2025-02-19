@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -67,6 +68,7 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         '/header/with-value'      | "Header: application/json"   | ['Content-Type': 'application/json']
     }
 
+    @Requires(property = 'spec.name', value = 'HeaderBindingSpec')
     @Controller("/header")
     static class HeaderController {
 

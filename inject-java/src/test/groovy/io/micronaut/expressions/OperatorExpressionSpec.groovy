@@ -590,7 +590,7 @@ class OperatorExpressionSpec extends AbstractEvaluatedExpressionsSpec {
         results[23] instanceof Boolean && results[23] == true
     }
 
-    void "test comparables"() {
+    void "test comparable"() {
         given:
         Object[] results = evaluateMultipleAgainstContext("""
 

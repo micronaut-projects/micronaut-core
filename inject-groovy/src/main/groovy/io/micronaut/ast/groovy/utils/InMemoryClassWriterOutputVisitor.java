@@ -21,7 +21,6 @@ import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.util.LinkedHashMap;
@@ -33,8 +32,8 @@ import java.util.Set;
 /**
  * Utility class for testing Groovy visitors.
  *
- * @since 3.0.0
  * @author graemerocher
+ * @since 3.0.0
  */
 public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisitor {
     private final Map<String, ByteArrayOutputStream> classStreams = new LinkedHashMap<>();
@@ -49,7 +48,7 @@ public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisito
     }
 
     @Override
-    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
+    public OutputStream visitClass(String classname, Element... originatingElements) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         classStreams.put(classname, stream);
         return stream;

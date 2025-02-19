@@ -2,7 +2,7 @@ Micronaut framework is an implementation of the JSR-330 specification for Depend
 
 Dependency Injection (or Inversion of Control) is a widely adopted and common pattern in Java that allows loosely decoupling components to allow applications to be easily extended and tested.
 
-The way in which objects are wired together is decoupled from the objects themselves in this model by a separate programming model. In the case of Micronaut this model is based on annotations defined within the JSR-330 specification plus an extended set of annotations located within the api:inject.context.annotation.package-info[io.micronaut.context.annotation] package.
+The way in which objects are wired together is decoupled from the objects themselves in this model by a separate programming model. In the case of Micronaut this model is based on annotations defined within the JSR-330 specification plus an extended set of annotations located within the link:../api/micronaut.context/annotation/package-summary.html[io.micronaut.context.annotation] package.
 
 These annotations are visited by the <<compilerArch, Micronaut Compiler>> which traverses the source code language AST and builds a model used to wire objects together at runtime.
 

@@ -364,7 +364,7 @@ class HttpHeadSpec extends Specification {
         body == "success"
 
         cleanup:
-        client.close()
+        client.refresh()
     }
 
     void "test multiple uris"() {

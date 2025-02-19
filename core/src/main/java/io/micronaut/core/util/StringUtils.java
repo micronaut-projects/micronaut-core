@@ -366,18 +366,35 @@ public final class StringUtils {
      * @return A combined uri string
      */
     public static String prependUri(String baseUri, String uri) {
-        if (!uri.startsWith("/") && !uri.startsWith("?")) {
-            uri = "/" + uri;
+        StringBuilder builder = new StringBuilder(baseUri);
+        if (!uri.isEmpty() && (uri.length() != 1 || uri.charAt(0) != '/')) {
+            if (!uri.startsWith("/") && !uri.startsWith("?")) {
+                builder.append('/');
+            }
+            builder.append(uri);
         }
-        if (uri.length() == 1 && uri.charAt(0) == '/') {
-            uri = "";
+        if (builder.isEmpty()) {
+            return "";
         }
-        uri = baseUri + uri;
-        if (uri.startsWith("/")) {
-            return uri.replaceAll("/{2,}", "/");
-        } else {
-            return uri.replaceAll("(?<=[^:])/{2,}", "/");
+
+        int i = 0;
+        if (builder.charAt(0) != '/' && builder.indexOf("://") != -1) {
+            // skip until after scheme
+            while (i < builder.length() && builder.charAt(i) != ':') {
+                i++;
+            }
+            i += 2;
         }
+        // replace double slashes
+        for (; i < builder.length() - 1; i++) {
+            if (builder.charAt(i) == '/' && builder.charAt(i + 1) == '/') {
+                builder.deleteCharAt(i);
+                i--;
+            } else if (builder.charAt(i) == '?') {
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     /**
@@ -441,7 +458,7 @@ public final class StringUtils {
      */
     public static Iterable<String> splitOmitEmptyStrings(final CharSequence sequence, final char splitCharacter) {
         Objects.requireNonNull(sequence);
-        return () -> new SplitOmitEmptyIterator(sequence, splitCharacter);
+        return new SplitOmitEmptyIterator(sequence, splitCharacter);
     }
 
     /**
@@ -489,7 +506,7 @@ public final class StringUtils {
      * @author Denis Stepanov
      * @since 2.5.0
      */
-    private static final class SplitOmitEmptyIterator implements Iterator<String> {
+    private static final class SplitOmitEmptyIterator implements Iterator<String>, Iterable<String> {
 
         private final CharSequence sequence;
         private final char splitCharacter;
@@ -557,5 +574,12 @@ public final class StringUtils {
             end = true;
         }
 
-    };
+        @Override
+        public Iterator<String> iterator() {
+            if (index == 0) {
+                return this;
+            }
+            return new SplitOmitEmptyIterator(sequence, splitCharacter);
+        }
+    }
 }

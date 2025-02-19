@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
@@ -41,7 +42,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-        return visitClass(classname, new Element[]{ originatingElement });
+        return visitClass(classname, new Element[] {originatingElement});
     }
 
     @Override
@@ -49,7 +50,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
+                classesDir
             );
             return outputVisitor.visitClass(classname, originatingElements);
         } else {
@@ -62,7 +63,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
                     }
 
                     @Override
-                    public void write(byte[] b) {
+                    public void write(byte @NonNull [] b) {
                         ((InMemoryByteCodeGroovyClassLoader) compilationUnit.getClassLoader()).addClass(classname, b);
                     }
                 };
@@ -78,7 +79,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
+                classesDir
             );
             outputVisitor.visitServiceDescriptor(type, classname);
             outputVisitor.finish();
@@ -91,7 +92,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
+                classesDir
             );
             outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
             outputVisitor.finish();
@@ -104,7 +105,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
+                classesDir
             );
             return outputVisitor.visitMetaInfFile(path, originatingElements);
         }
@@ -122,7 +123,7 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
+                classesDir
             );
             return outputVisitor.visitGeneratedFile(path);
         }

@@ -146,7 +146,7 @@ public final class TestScenario {
         /**
          *
          * @param request HTTP Request to be sent in the test scenario
-         * @return The Test Scneario Builder
+         * @return The Test Scenario Builder
          */
         public Builder request(HttpRequest<?> request) {
             this.request = server -> request;

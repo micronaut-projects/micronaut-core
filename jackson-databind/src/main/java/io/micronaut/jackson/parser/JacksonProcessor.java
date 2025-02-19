@@ -94,7 +94,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * Construct with given JSON factory.
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
-     *                    and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
+     * and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
      * @param deserializationConfig The jackson deserialization configuration
      */
     public JacksonProcessor(JsonFactory jsonFactory, DeserializationConfig deserializationConfig) {
@@ -105,7 +105,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * Construct with given JSON factory.
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
-     *                    and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
+     * and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
      */
     public JacksonProcessor(JsonFactory jsonFactory) {
         this(jsonFactory, false, null);
@@ -113,6 +113,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     /**
      * Construct with default JSON factory.
+     *
      * @param deserializationConfig The jackson deserialization configuration
      */
     public JacksonProcessor(DeserializationConfig deserializationConfig) {
@@ -298,8 +299,8 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
         // it is an array and the stack size is 1 which means the value is scalar
         if (rootIsArray && streamArray && nodeStack.size() == 1) {
-            final ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
-            if (arrayNode.size() > 0) {
+            final var arrayNode = (ArrayNode) nodeStack.peekFirst();
+            if (!arrayNode.isEmpty()) {
                 return arrayNode.remove(arrayNode.size() - 1);
             }
         }
@@ -308,26 +309,16 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     }
 
     private static String tokenType(JsonToken token) {
-        switch (token) {
-            case END_OBJECT:
-            case END_ARRAY:
-                return "container end";
-            case FIELD_NAME:
-                return "field";
-            case VALUE_NUMBER_INT:
-                return "integer";
-            case VALUE_STRING:
-                return "string";
-            case VALUE_NUMBER_FLOAT:
-                return "float";
-            case VALUE_NULL:
-                return "null";
-            case VALUE_TRUE:
-            case VALUE_FALSE:
-                return "boolean";
-            default:
-                return "";
-        }
+        return switch (token) {
+            case END_OBJECT, END_ARRAY -> "container end";
+            case FIELD_NAME -> "field";
+            case VALUE_NUMBER_INT -> "integer";
+            case VALUE_STRING -> "string";
+            case VALUE_NUMBER_FLOAT -> "float";
+            case VALUE_NULL -> "null";
+            case VALUE_TRUE, VALUE_FALSE -> "boolean";
+            default -> "";
+        };
     }
 
     private void addIntegerNumber(final JsonNode integerNode) throws IOException {

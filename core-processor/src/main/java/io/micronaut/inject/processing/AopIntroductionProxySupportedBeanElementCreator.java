@@ -69,7 +69,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
 
     @Override
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement readElement) {
-        if (readElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, readElement)) {
+        if (intercept(visitor, readElement)) {
             return true;
         }
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
@@ -77,7 +77,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
 
     @Override
     protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement writeElement) {
-        if (writeElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, writeElement)) {
+        if (intercept(visitor, writeElement)) {
             return true;
         }
         return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
@@ -85,10 +85,14 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
 
     @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, methodElement)) {
+        if (intercept(visitor, methodElement)) {
             return true;
         }
         return super.visitMethod(visitor, methodElement);
+    }
+
+    private boolean intercept(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        return !methodElement.isFinal() && visitIntrospectedMethod(visitor, classElement, methodElement);
     }
 
 }

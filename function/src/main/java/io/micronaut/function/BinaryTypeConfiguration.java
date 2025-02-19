@@ -52,11 +52,11 @@ public class BinaryTypeConfiguration {
     /**
      * If this is false then calls to {@link #isMediaTypeBinary(String)} will only check the additional types, and ignore the defaults.
      * The defaults are:
-     *  {@value MediaType#APPLICATION_OCTET_STREAM},
-     *  {@value MediaType#IMAGE_JPEG},
-     *  {@value MediaType#IMAGE_PNG},
-     *  {@value MediaType#IMAGE_GIF},
-     *  "application/zip"
+     * {@value MediaType#APPLICATION_OCTET_STREAM},
+     * {@value MediaType#IMAGE_JPEG},
+     * {@value MediaType#IMAGE_PNG},
+     * {@value MediaType#IMAGE_GIF},
+     * "application/zip"
      *
      * @return Whether to use the default binary types
      */
@@ -78,7 +78,7 @@ public class BinaryTypeConfiguration {
      *
      * @return A lists of {@link MediaType} objects
      */
-    public List<String> getAdditionalTypes() {
+    public @NonNull List<String> getAdditionalTypes() {
         return additionalTypes;
     }
 

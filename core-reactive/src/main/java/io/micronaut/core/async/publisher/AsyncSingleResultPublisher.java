@@ -26,16 +26,19 @@ import java.util.function.Supplier;
 
 /**
  * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result.
+ *
  * @param <T> The argument type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublisher<T> {
+
     private final ExecutorService executor;
     private final Supplier<T> supplier;
 
     /**
      * Constructor.
+     *
      * @param executor executor
      * @param supplier type of supplier
      */
@@ -46,6 +49,7 @@ public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublis
 
     /**
      * Constructor.
+     *
      * @param supplier type of supplier
      */
     public AsyncSingleResultPublisher(Supplier<T> supplier) {
@@ -60,6 +64,7 @@ public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublis
 
     /**
      * Subscription class.
+     *
      * @param <S> type of subscriber
      */
     static class ExecutorServiceSubscription<S> implements Subscription {
@@ -71,6 +76,7 @@ public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublis
 
         /**
          * Constructor.
+         *
          * @param subscriber subscriber
          * @param supplier supplier
          * @param executor executor
@@ -85,6 +91,7 @@ public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublis
 
         /**
          * Request execution.
+         *
          * @param n request number
          */
         @Override

@@ -46,11 +46,11 @@ public class ComputeInstanceMetadataResolverUtils {
     /**
      * Reads the result of a URL and parses it using the given {@link ObjectMapper}.
      *
-     * @param url                 the URL to read
+     * @param url the URL to read
      * @param connectionTimeoutMs connection timeout, in milliseconds
-     * @param readTimeoutMs       read timeout, in milliseconds
-     * @param objectMapper        Jackson's {@link ObjectMapper}
-     * @param requestProperties   any request properties to pass
+     * @param readTimeoutMs read timeout, in milliseconds
+     * @param objectMapper Jackson's {@link ObjectMapper}
+     * @param requestProperties any request properties to pass
      * @return a {@link JsonNode} instance
      * @throws IOException if any I/O error occurs
      */
@@ -63,12 +63,12 @@ public class ComputeInstanceMetadataResolverUtils {
     /**
      * Reads the result of a URL and parses it using the given {@link JsonFactory}.
      *
-     * @param url                 the URL to read
+     * @param url the URL to read
      * @param connectionTimeoutMs connection timeout, in milliseconds
-     * @param readTimeoutMs       read timeout, in milliseconds
-     * @param treeCodec           Tree codec to use (contains deserialization config)
-     * @param jsonFactory         Jackson's {@link JsonFactory}
-     * @param requestProperties   any request properties to pass
+     * @param readTimeoutMs read timeout, in milliseconds
+     * @param treeCodec Tree codec to use (contains deserialization config)
+     * @param jsonFactory Jackson's {@link JsonFactory}
+     * @param requestProperties any request properties to pass
      * @return a {@link JsonNode} instance
      * @throws IOException if any I/O error occurs
      */
@@ -83,11 +83,11 @@ public class ComputeInstanceMetadataResolverUtils {
     /**
      * Reads the result of a URL and parses it using the given {@link JsonMapper}.
      *
-     * @param url                 the URL to read
+     * @param url the URL to read
      * @param connectionTimeoutMs connection timeout, in milliseconds
-     * @param readTimeoutMs       read timeout, in milliseconds
-     * @param jsonMapper          JSON mapper to use for parsing
-     * @param requestProperties   any request properties to pass
+     * @param readTimeoutMs read timeout, in milliseconds
+     * @param jsonMapper JSON mapper to use for parsing
+     * @param requestProperties any request properties to pass
      * @return a {@link JsonNode} instance
      * @throws IOException if any I/O error occurs
      * @since 3.3.0
@@ -106,7 +106,7 @@ public class ComputeInstanceMetadataResolverUtils {
             urlConnection.connect();
             return urlConnection.getInputStream();
         } else {
-            HttpURLConnection uc = (HttpURLConnection) urlConnection;
+            var uc = (HttpURLConnection) urlConnection;
             uc.setConnectTimeout(connectionTimeoutMs);
             requestProperties.forEach(uc::setRequestProperty);
             uc.setReadTimeout(readTimeoutMs);
@@ -120,12 +120,12 @@ public class ComputeInstanceMetadataResolverUtils {
      * Populates the instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
      *
      * @param instanceMetadata The instance metadata
-     * @param metadata         A json object of metadata
+     * @param metadata A json object of metadata
      */
     @Experimental
     public static void populateMetadata(AbstractComputeInstanceMetadata instanceMetadata, JsonNode metadata) {
         if (metadata != null) {
-            Map<String, String> finalMetadata = CollectionUtils.newHashMap(metadata.size());
+            var finalMetadata = CollectionUtils.<String, String>newHashMap(metadata.size());
             for (Map.Entry<String, JsonNode> entry : metadata.entries()) {
                 JsonNode value = entry.getValue();
                 if (value.isString()) {
@@ -140,7 +140,7 @@ public class ComputeInstanceMetadataResolverUtils {
      * Resolve a value as a string from the metadata json.
      *
      * @param json The json
-     * @param key  The key
+     * @param key The key
      * @return An optional value
      */
     public static Optional<String> stringValue(com.fasterxml.jackson.databind.JsonNode json, String key) {
@@ -151,16 +151,16 @@ public class ComputeInstanceMetadataResolverUtils {
      * Populates the instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
      *
      * @param instanceMetadata The instance metadata
-     * @param metadata         A map of metadata
+     * @param metadata A map of metadata
      */
     public static void populateMetadata(AbstractComputeInstanceMetadata instanceMetadata, Map<?, ?> metadata) {
         if (metadata != null) {
-            Map<String, String> finalMetadata = CollectionUtils.newHashMap(metadata.size());
+            var finalMetadata = CollectionUtils.<String, String>newHashMap(metadata.size());
             for (Map.Entry<?, ?> entry : metadata.entrySet()) {
                 Object key = entry.getKey();
                 Object value = entry.getValue();
-                if (value instanceof String) {
-                    finalMetadata.put(key.toString(), value.toString());
+                if (value instanceof String strValue) {
+                    finalMetadata.put(key.toString(), strValue);
                 }
             }
             instanceMetadata.setMetadata(finalMetadata);

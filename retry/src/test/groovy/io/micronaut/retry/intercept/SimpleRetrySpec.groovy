@@ -327,6 +327,38 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test retry with value"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountValue(1)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes"
+        thrown(IllegalStateException)
+        counterService.countIncludes == 1
+
+        when:
+        counterService.getCountValue(2)
+
+        then: "retry kicks in because the exception thrown matches includes"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        counterService.setCountIncludes(1);
+
+        when:
+        counterService.getCountValue(3)
+
+        then: "retry kicks in because the exception thrown matches includes"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -427,6 +459,21 @@ class SimpleRetrySpec extends Specification {
                 }
             }
             return countExcludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', value = [MyCustomException.class,ArithmeticException.class])
+        Integer getCountValue(int illegalState) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (illegalState == 1) {
+                    throw new IllegalStateException("Bad count")
+                } else if(illegalState==2){
+                    throw new MyCustomException()
+                } else {
+                    throw new ArithmeticException("Arithmetic Error")
+                }
+            }
+            return countIncludes
         }
 
         @Retryable(attempts = '5', delay = '5ms')

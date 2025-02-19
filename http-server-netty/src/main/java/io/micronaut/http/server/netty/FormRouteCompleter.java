@@ -16,14 +16,13 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.server.netty.body.HttpBody;
-import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
+import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.web.router.RouteMatch;
@@ -36,24 +35,28 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 
 /**
- * Special {@link HttpBody} that "demultiplexes" form data. Basically, this class receives a stream
- * of {@link MicronautHttpData} and splits it into individual streams for each form field, and they
- * can all be subscribed to and bound independently.
+ * This class receives a stream of {@link MicronautHttpData} and splits it into individual streams
+ * for each form field, and they can all be subscribed to and bound independently.
  *
  * @since 4.0.0
  * @author Jonas Konrad
  */
 @Internal
-public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
+public final class FormRouteCompleter implements Subscriber<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
     private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
@@ -235,21 +238,42 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         return claimants.containsKey(name);
     }
 
-    @Override
     public void release() {
         for (MicronautHttpData<?> data : allData) {
             data.release();
         }
     }
 
-    @Nullable
-    @Override
-    public HttpBody next() {
-        return null;
+    public Map<String, Object> asMap(Charset defaultCharset) {
+        return toMap(defaultCharset, allData);
     }
 
-    public Map<String, Object> asMap(Charset defaultCharset) {
-        return ImmediateMultiObjectBody.toMap(defaultCharset, allData);
+    public static Map<String, Object> toMap(Charset charset, Collection<? extends MicronautHttpData<?>> dataList) {
+        Map<String, Object> singleMap = CollectionUtils.newLinkedHashMap(dataList.size());
+        Map<String, List<Object>> multiMap = new LinkedHashMap<>();
+        for (MicronautHttpData<?> data : dataList) {
+            String key = data.getName();
+            String newValue;
+            try {
+                newValue = data.getString(charset);
+            } catch (IOException e) {
+                throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
+            }
+            List<Object> multi = multiMap.get(key);
+            if (multi != null) {
+                multi.add(newValue);
+            } else {
+                Object existing = singleMap.put(key, newValue);
+                if (existing != null) {
+                    List<Object> combined = new ArrayList<>(2);
+                    combined.add(existing);
+                    combined.add(newValue);
+                    singleMap.put(key, combined);
+                    multiMap.put(key, combined);
+                }
+            }
+        }
+        return singleMap;
     }
 
     private class Claimant  {

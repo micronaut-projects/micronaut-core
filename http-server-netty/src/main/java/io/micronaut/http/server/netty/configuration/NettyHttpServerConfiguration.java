@@ -111,6 +111,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
 
     /**
+     * The default size of the largest data that can be encoded using the zstd algorithm.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_ZSTD_ENCODE_SIZE = 1024 * 1024 * 32;
+
+    /**
      * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
@@ -164,6 +170,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
+    /**
+     * Default value for {@link #formMaxFields}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_FIELDS = 128;
+
+    /**
+     * Default value for {@link #formMaxBufferedBytes}.
+     *
+     * @since 4.6.0
+     */
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -187,6 +207,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
+    private int maxZstdEncodeSize = DEFAULT_MAX_ZSTD_ENCODE_SIZE;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
@@ -197,7 +218,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private List<NettyListenerConfiguration> listeners = null;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
-    private boolean legacyMultiplexHandlers = true; // TODO
+    private boolean legacyMultiplexHandlers = false;
+    private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
+    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
 
     /**
      * Default empty constructor.
@@ -458,6 +481,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * The default maximum size of data that can be encoded using the zstd algorithm.
+     * Default value ({@value #DEFAULT_MAX_ZSTD_ENCODE_SIZE}).
+     *
+     * @return The maximum size of data that can be encoded using the zstd algorithm.
+     */
+    public int getMaxZstdEncodeSize() {
+        return maxZstdEncodeSize;
+    }
+
+    /**
      * @return The Netty child channel options.
      * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
@@ -643,6 +676,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Sets the maximum size of data that can be encoded using the zstd algorithm. Default value ({@value #DEFAULT_MAX_ZSTD_ENCODE_SIZE}).
+     *
+     * @param maxZstdEncodeSize The maximum size of block.
+     */
+    public void setMaxZstdEncodeSize(int maxZstdEncodeSize) {
+        this.maxZstdEncodeSize = maxZstdEncodeSize;
+    }
+
+    /**
      * Whether to send connection keep alive on internal server errors. Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR}).
      * @param keepAliveOnServerError The keep alive on server error flag
      */
@@ -763,6 +805,48 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
         this.legacyMultiplexHandlers = legacyMultiplexHandlers;
+    }
+
+    /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @return The maximum number of form fields
+     * @since 4.6.0
+     */
+    public int getFormMaxFields() {
+        return formMaxFields;
+    }
+
+    /**
+     * The maximum number of form fields permitted in a request.
+     *
+     * @param formMaxFields The maximum number of form fields
+     * @since 4.6.0
+     */
+    public void setFormMaxFields(int formMaxFields) {
+        this.formMaxFields = formMaxFields;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @return The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public int getFormMaxBufferedBytes() {
+        return formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
+     * This sets a limit on form field size.
+     *
+     * @param formMaxBufferedBytes The maximum number of buffered bytes
+     * @since 4.6.0
+     */
+    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+        this.formMaxBufferedBytes = formMaxBufferedBytes;
     }
 
     /**
@@ -1113,7 +1197,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @author James Kleeh
      * @author graemerocher
      * @since 3.1.0
+     * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration}
      */
+    @Deprecated(since = "4.8.0", forRemoval = true)
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {
 
@@ -1142,14 +1228,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Inject
         public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
                                             @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
-            if (cacheSeconds != null) {
-                this.cacheSeconds = cacheSeconds;
-                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-seconds` instead.");
-            }
-            if (isPublic != null) {
-                this.cacheControl.setPublic(isPublic);
-                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-control.public` instead.");
-            }
         }
 
         /**
@@ -1185,7 +1263,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
         /**
          * Configuration for the Cache-Control header.
+         *
+         * @deprecated Replaced by {@link HttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration}
          */
+        @Deprecated(since = "4.8.0", forRemoval = true)
         @ConfigurationProperties("cache-control")
         public static class CacheControlConfiguration {
 
@@ -1264,7 +1345,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
-         * Sets the name of the executor.
+         * A named executor service to use for event loop threads
+         * (optional). This property is very specialized. In particular,
+         * it will <i>not</i> solve read timeouts or fix blocking
+         * operations on the event loop, in fact it may do the opposite.
+         * Don't use unless you really know what this does.
+         *
          * @param executor The executor
          */
         public void setExecutor(String executor) {

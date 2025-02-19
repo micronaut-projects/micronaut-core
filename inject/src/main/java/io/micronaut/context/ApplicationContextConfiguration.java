@@ -34,6 +34,15 @@ import java.util.Optional;
 public interface ApplicationContextConfiguration extends BeanContextConfiguration {
 
     /**
+     * The loaded {@link ApplicationContextConfigurer}.
+     * @return The context configurer.
+     * @since 4.5.0
+     */
+    default Optional<ApplicationContextConfigurer> getContextConfigurer() {
+        return Optional.empty();
+    }
+
+    /**
      * @return The environment names
      */
     @NonNull List<String> getEnvironments();

@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy;
 
 import groovy.lang.GroovyObject;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.utils.NativeElementsHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -65,7 +66,7 @@ public final class GroovyNativeElementHelper extends NativeElementsHelper<ClassN
     }
 
     @Override
-    protected String getMethodName(MethodNode element) {
+    protected @NonNull String getMethodName(MethodNode element) {
         return element.getName();
     }
 
@@ -75,12 +76,12 @@ public final class GroovyNativeElementHelper extends NativeElementsHelper<ClassN
     }
 
     @Override
-    protected Collection<ClassNode> getInterfaces(ClassNode classNode) {
+    protected @NonNull Collection<ClassNode> getInterfaces(ClassNode classNode) {
         return List.of(classNode.getInterfaces());
     }
 
     @Override
-    protected List<MethodNode> getMethods(ClassNode classNode) {
+    protected @NonNull List<MethodNode> getMethods(ClassNode classNode) {
         return classNode.getMethods();
     }
 

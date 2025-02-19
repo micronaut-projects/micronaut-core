@@ -327,7 +327,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         final BeanReadProperty<T, ?> prop = getReadProperty(name).orElse(null);
         if (prop != null && type.isAssignableFrom(prop.getType())) {
             //noinspection unchecked
-            return Optional.of((BeanProperty<T, P>) prop);
+            return Optional.of((BeanReadProperty<T, P>) prop);
         }
         return Optional.empty();
     }

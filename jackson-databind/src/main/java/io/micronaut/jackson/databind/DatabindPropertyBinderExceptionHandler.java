@@ -42,7 +42,7 @@ final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBi
     public Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e) {
         if (e instanceof InvalidFormatException ife) {
             Object originalValue = ife.getValue();
-            ConversionError conversionError = new ConversionError() {
+            var conversionError = new ConversionError() {
                 @Override
                 public Exception getCause() {
                     return e;

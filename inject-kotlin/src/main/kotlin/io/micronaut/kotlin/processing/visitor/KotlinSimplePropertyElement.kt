@@ -15,8 +15,10 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyAccessor
+import com.google.devtools.ksp.symbol.Visibility
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
@@ -102,5 +104,18 @@ internal class KotlinSimplePropertyElement(
         visitorContext,
         isExcluded
     )
+
+    override fun isPublic(): Boolean {
+        if (fieldElement.isPresent && fieldElement.get().isPublic) {
+            return true
+        }
+        if (readMethod.isPresent && readMethod.get().isPublic) {
+            return true
+        }
+        if (writeMethod.isPresent && writeMethod.get().isPublic) {
+            return true
+        }
+        return false
+    }
 
 }

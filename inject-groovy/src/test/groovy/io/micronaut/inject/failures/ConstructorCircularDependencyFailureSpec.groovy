@@ -31,36 +31,66 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        context.getBean(MyClassB)
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
         e.message.normalize() == '''\
-Failed to inject value for field [a] of class: io.micronaut.inject.failures.ConstructorCircularDependencyFailureSpec$B
+Failed to inject value for field [propA] of class: io.micronaut.inject.failures.ConstructorCircularDependencyFailureSpec$MyClassB
 
 Message: Circular dependency detected
-Path Taken: 
-new B() --> B.a --> new A([C c]) --> new C([B b])
-^                                              |
-|                                              |
-|                                              |
-+----------------------------------------------+'''
+Path Taken:
+new @j.i.Singleton i.m.i.f.C$MyClassB()
+      \\---> @j.i.Singleton i.m.i.f.C$MyClassB#propA
+            ^  \\---> new @j.i.Singleton i.m.i.f.C$MyClassA([MyClassC propC])
+            |        \\---> new i.m.i.f.C$MyClassC([MyClassB propB])
+            |              |
+            +--------------+'''
 
         cleanup:
         context.close()
     }
 
-    static class C {
-        @Inject C( B b ) {}
+    void "test another constructor circular dependency failure"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
+
+        when:"A bean is obtained that has a setter with @Inject"
+        context.getBean(MyClassD)
+
+        then:"The implementation is injected"
+        def e = thrown(CircularDependencyException)
+        e.message.normalize() == '''\
+Failed to inject value for field [propA] of class: io.micronaut.inject.failures.ConstructorCircularDependencyFailureSpec$MyClassB
+
+Message: Circular dependency detected
+Path Taken:
+new @j.i.Singleton i.m.i.f.C$MyClassD(MyClassB propB)
+      \\---> new @j.i.Singleton i.m.i.f.C$MyClassD([MyClassB propB])
+            \\---> @j.i.Singleton i.m.i.f.C$MyClassB#propA
+                  ^  \\---> new @j.i.Singleton i.m.i.f.C$MyClassA([MyClassC propC])
+                  |        \\---> new i.m.i.f.C$MyClassC([MyClassB propB])
+                  |              |
+                  +--------------+'''
+    }
+
+    static class MyClassC {
+        @Inject
+        MyClassC(MyClassB propB) {}
     }
     @Singleton
-    static class A {
-        A(C c) {}
+    static class MyClassA {
+        MyClassA(MyClassC propC) {}
     }
 
     @Singleton
-    static class B {
-        @Inject protected A a
+    static class MyClassB {
+        @Inject protected MyClassA propA
+    }
+
+    @Singleton
+    static class MyClassD {
+        MyClassD(MyClassB propB) {}
     }
 }
 

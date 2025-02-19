@@ -21,11 +21,11 @@ import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.LoggersManager;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
 import jakarta.inject.Singleton;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -71,14 +71,14 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
      * @return A Map from logger name to logger configuration data
      */
     private static Map<String, Object> getLoggerData(
-            Collection<LoggerConfiguration> configurations) {
+        Collection<LoggerConfiguration> configurations) {
         return configurations
-                .stream()
-                .collect(Collectors.toMap(
-                        LoggerConfiguration::getName,
-                        LoggerConfiguration::getData,
-                        (l1, l2) -> l1,
-                        LinkedHashMap::new));
+            .stream()
+            .collect(Collectors.toMap(
+                LoggerConfiguration::getName,
+                LoggerConfiguration::getData,
+                (l1, l2) -> l1,
+                LinkedHashMap::new));
     }
 
     /**
@@ -86,7 +86,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
      * @return The logger configuration data
      */
     private static Map<String, Object> getLoggerData(
-            LoggerConfiguration configuration) {
+        LoggerConfiguration configuration) {
         return configuration.getData();
     }
 

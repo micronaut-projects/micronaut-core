@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -8,6 +9,7 @@ import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
+@Requires(property = "spec.name", value = "SimpleTextWebSocketSpec")
 @ServerWebSocket("/charity")
 public class QueryParamServerWebSocket {
 

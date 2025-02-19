@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -71,6 +72,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
         ]
     }
 
+    @Requires(property = 'spec.name', value = 'RequestCertificateSpec')
     @Controller
     static class TestController {
 

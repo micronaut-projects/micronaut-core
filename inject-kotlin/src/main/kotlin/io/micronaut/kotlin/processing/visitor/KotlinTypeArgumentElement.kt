@@ -68,11 +68,15 @@ internal class KotlinTypeArgumentElement(
     }
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
-        AnnotationMetadataHierarchy(
-            true,
-            elementAnnotationMetadata,
-            resolvedGenericTypeAnnotationMetadata
-        )
+        if (presetAnnotationMetadata != null) {
+            presetAnnotationMetadata
+        } else {
+            AnnotationMetadataHierarchy(
+                true,
+                elementAnnotationMetadata,
+                resolvedGenericTypeAnnotationMetadata
+            )
+        }
     }
 
     private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {

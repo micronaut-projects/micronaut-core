@@ -22,8 +22,8 @@ import io.micronaut.json.JsonMapperSupplier;
 /**
  * Implementation of {@link JsonMapperSupplier} for Jackson.
  *
- * @since 4.0.0
  * @author Graeme Rocher
+ * @since 4.0.0
  */
 @Internal
 public final class JacksonDatabindMapperSupplier implements JsonMapperSupplier {

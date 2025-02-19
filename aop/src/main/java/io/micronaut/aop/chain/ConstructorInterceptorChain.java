@@ -15,7 +15,11 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.ConstructorInvocationContext;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.InvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -33,7 +37,11 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Implementation of {@link InvocationContext} for constructor interception.
@@ -52,14 +60,14 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     /**
      * Default constructor.
      *
-     * @param beanConstructor    The bean constructor
-     * @param interceptors       The method interceptors to be passed to the final object to be constructed
+     * @param beanConstructor The bean constructor
+     * @param interceptors The method interceptors to be passed to the final object to be constructed
      * @param originalParameters The parameters
      */
     private ConstructorInterceptorChain(
-            @NonNull BeanConstructor<T> beanConstructor,
-            @NonNull Interceptor<T, T>[] interceptors,
-            Object... originalParameters) {
+        @NonNull BeanConstructor<T> beanConstructor,
+        @NonNull Interceptor<T, T>[] interceptors,
+        Object... originalParameters) {
         super(interceptors, originalParameters);
         this.beanConstructor = Objects.requireNonNull(beanConstructor, "Bean constructor cannot be null");
     }
@@ -67,19 +75,19 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     /**
      * Default constructor.
      *
-     * @param beanDefinition                       The bean constructor
-     * @param beanConstructor                      The bean constructor
-     * @param interceptors                         The interceptors
-     * @param originalParameters                   The parameters
+     * @param beanDefinition The bean constructor
+     * @param beanConstructor The bean constructor
+     * @param interceptors The interceptors
+     * @param originalParameters The parameters
      * @param additionalInterceptorParametersCount The additional interceptor parameters count
      */
     @UsedByGeneratedCode
     private ConstructorInterceptorChain(
-            @NonNull BeanDefinition<T> beanDefinition,
-            @NonNull BeanConstructor<T> beanConstructor,
-            @NonNull Interceptor<T, T>[] interceptors,
-            int additionalInterceptorParametersCount,
-            Object... originalParameters) {
+        @NonNull BeanDefinition<T> beanDefinition,
+        @NonNull BeanConstructor<T> beanConstructor,
+        @NonNull Interceptor<T, T>[] interceptors,
+        int additionalInterceptorParametersCount,
+        Object... originalParameters) {
         this(beanConstructor, interceptors, resolveConcreteSubset(beanDefinition, originalParameters, additionalInterceptorParametersCount));
         internalParameters = resolveInterceptorArguments(beanDefinition, originalParameters, additionalInterceptorParametersCount);
     }
@@ -90,11 +98,13 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         return InterceptorKind.AROUND_CONSTRUCT;
     }
 
+    @NonNull
     @Override
     public T getTarget() {
         throw new UnsupportedOperationException("The target cannot be retrieved for Constructor interception");
     }
 
+    @NonNull
     @Override
     public T proceed() throws RuntimeException {
         Interceptor<T, T> interceptor;
@@ -137,12 +147,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * Internal methods that handles the logic of instantiating a bean that has constructor interception applied.
      *
      * @param resolutionContext The resolution context
-     * @param beanContext       The bean context
-     * @param interceptors      The interceptors. Can be null and if so should be resolved from the context.
-     * @param definition        The definition
-     * @param constructor       The bean constructor
-     * @param parameters        The resolved parameters
-     * @param <T1>              The bean type
+     * @param beanContext The bean context
+     * @param interceptors The interceptors. Can be null and if so should be resolved from the context.
+     * @param definition The definition
+     * @param constructor The bean constructor
+     * @param parameters The resolved parameters
+     * @param <T1> The bean type
      * @return The instantiated bean
      * @since 3.0.0
      */
@@ -151,12 +161,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     @NonNull
     @Deprecated
     public static <T1> T1 instantiate(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext beanContext,
-            @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
-            @NonNull BeanDefinition<T1> definition,
-            @NonNull BeanConstructor<T1> constructor,
-            @NonNull Object... parameters) {
+        @NonNull BeanResolutionContext resolutionContext,
+        @NonNull BeanContext beanContext,
+        @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
+        @NonNull BeanDefinition<T1> definition,
+        @NonNull BeanConstructor<T1> constructor,
+        @NonNull Object... parameters) {
         int micronaut3additionalProxyConstructorParametersCount = 3;
         return instantiate(resolutionContext, beanContext, interceptors, definition, constructor, micronaut3additionalProxyConstructorParametersCount, parameters);
     }
@@ -164,14 +174,14 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     /**
      * Internal methods that handles the logic of instantiating a bean that has constructor interception applied.
      *
-     * @param resolutionContext                         The resolution context
-     * @param beanContext                               The bean context
-     * @param interceptors                              The interceptors. Can be null and if so should be resolved from the context.
-     * @param definition                                The definition
-     * @param constructor                               The bean constructor
+     * @param resolutionContext The resolution context
+     * @param beanContext The bean context
+     * @param interceptors The interceptors. Can be null and if so should be resolved from the context.
+     * @param definition The definition
+     * @param constructor The bean constructor
      * @param additionalProxyConstructorParametersCount The additional proxy constructor parameters count
-     * @param parameters                                The resolved parameters
-     * @param <T1>                                      The bean type
+     * @param parameters The resolved parameters
+     * @param <T1> The bean type
      * @return The instantiated bean
      * @since 3.0.0
      */
@@ -179,34 +189,34 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     @UsedByGeneratedCode
     @NonNull
     public static <T1> T1 instantiate(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext beanContext,
-            @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
-            @NonNull BeanDefinition<T1> definition,
-            @NonNull BeanConstructor<T1> constructor,
-            int additionalProxyConstructorParametersCount,
-            @NonNull Object... parameters) {
+        @NonNull BeanResolutionContext resolutionContext,
+        @NonNull BeanContext beanContext,
+        @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
+        @NonNull BeanDefinition<T1> definition,
+        @NonNull BeanConstructor<T1> constructor,
+        int additionalProxyConstructorParametersCount,
+        @NonNull Object... parameters) {
 
         if (interceptors == null) {
             final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
             final Collection<AnnotationValue<?>> annotationValues = resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
 
             final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
-                    resolutionContext,
-                    Interceptor.ARGUMENT,
-                    Qualifiers.byInterceptorBindingValues(annotationValues)
+                resolutionContext,
+                Interceptor.ARGUMENT,
+                Qualifiers.byInterceptorBindingValues(annotationValues)
             );
             interceptors = new ArrayList(resolved);
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor<T1, T1>[] resolvedInterceptors = interceptorRegistry
-                .resolveConstructorInterceptors(constructor, interceptors);
-        return Objects.requireNonNull(new ConstructorInterceptorChain<T1>(
-                definition,
-                constructor,
-                resolvedInterceptors,
-                additionalProxyConstructorParametersCount,
-                parameters
+            .resolveConstructorInterceptors(constructor, interceptors);
+        return Objects.requireNonNull(new ConstructorInterceptorChain<>(
+            definition,
+            constructor,
+            resolvedInterceptors,
+            additionalProxyConstructorParametersCount,
+            parameters
         ).proceed(), "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
     }
 
@@ -223,9 +233,9 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
-                    originalParameters,
-                    0,
-                    originalParameters.length - additionalProxyConstructorParametersCount
+                originalParameters,
+                0,
+                originalParameters.length - additionalProxyConstructorParametersCount
             );
         }
         return originalParameters;
@@ -244,9 +254,9 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
-                    originalParameters,
-                    originalParameters.length - additionalProxyConstructorParametersCount,
-                    originalParameters.length
+                originalParameters,
+                originalParameters.length - additionalProxyConstructorParametersCount,
+                originalParameters.length
             );
         }
         return originalParameters;

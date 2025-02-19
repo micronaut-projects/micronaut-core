@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 3.1
  */
 final class JsonString extends JsonScalar {
+
     @NonNull
     private final String value;
 

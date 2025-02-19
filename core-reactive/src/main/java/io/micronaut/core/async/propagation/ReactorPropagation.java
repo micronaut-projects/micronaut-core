@@ -44,6 +44,7 @@ public final class ReactorPropagation {
 
     /**
      * Adds propagated context to the Reactors' context.
+     *
      * @param context The context to be extended
      * @param propagatedContext The propagated context
      * @return The modified context
@@ -58,6 +59,7 @@ public final class ReactorPropagation {
 
     /**
      * Adds a context element to the Reactor's context.
+     *
      * @param context The context to be extended
      * @param contextElement The propagated context element
      * @return The modified context
@@ -69,6 +71,7 @@ public final class ReactorPropagation {
 
     /**
      * Finds the context element by the type.
+     *
      * @param contextView The Reactor's context
      * @param contextElementType The element type
      * @param <E> The element type
@@ -82,6 +85,7 @@ public final class ReactorPropagation {
 
     /**
      * Finds all context elements by the type.
+     *
      * @param contextView The Reactor's context
      * @param contextElementType The element type
      * @param <E> All elements if the type
@@ -96,6 +100,7 @@ public final class ReactorPropagation {
 
     /**
      * Finds propagated context in the Reactor's context.
+     *
      * @param contextView The context
      * @return optional propagated context
      */

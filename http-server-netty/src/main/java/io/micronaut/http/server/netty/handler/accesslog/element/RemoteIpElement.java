@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpHeaders;
-import io.netty.channel.socket.SocketChannel;
 
 import java.util.Locale;
 import java.util.Set;
@@ -56,7 +56,7 @@ final class RemoteIpElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, io.netty.handler.codec.http.HttpHeaders headers, String uri, String protocol) {
+    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, io.netty.handler.codec.http.@NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
         // maybe this request was proxied or load balanced.
         // try and get the real originating IP
         final String xforwardedFor = headers.get(X_FORWARDED_FOR, null);
@@ -71,7 +71,7 @@ final class RemoteIpElement implements LogElement {
         } else {
             return processXForwardedFor(xforwardedFor);
         }
-        return channel.remoteAddress().getAddress().getHostAddress();
+        return metadata.remoteAddress().flatMap(ConnectionMetadata::getHostAddress).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 
     private static String processXForwardedFor(String xforwardedFor) {

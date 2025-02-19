@@ -40,7 +40,7 @@ import java.util.Optional;
 public class StaticResourceConfiguration implements Toggleable {
 
     /**
-     * The prefix for static resources configuration.
+     * The prefix for static resource configuration.
      */
     public static final String PREFIX = "micronaut.router.static-resources";
 

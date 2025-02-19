@@ -49,8 +49,8 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
      * sensitive.
      *
      * @param endpointConfigurations The endpoint configurations
-     * @param defaultConfiguration   The default endpoint configuration
-     * @param propertyResolver       The property resolver
+     * @param defaultConfiguration The default endpoint configuration
+     * @param propertyResolver The property resolver
      */
     @Inject
     public EndpointSensitivityProcessor(List<EndpointConfiguration> endpointConfigurations,
@@ -80,23 +80,23 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
                     boolean defaultValue = method.booleanValue(Sensitive.class, "defaultValue").orElse(true);
                     if (propertyResolver != null) {
                         return method.stringValue(Sensitive.class, "property").map(key ->
-                                        propertyResolver.get(prefix + "." + id + "." + key, Boolean.class).orElse(defaultValue))
-                                .orElse(defaultValue);
+                                propertyResolver.get(prefix + "." + id + "." + key, Boolean.class).orElse(defaultValue))
+                            .orElse(defaultValue);
                     } else {
                         return defaultValue;
                     }
                 });
             } else {
                 EndpointConfiguration configuration = endpointConfigurations.stream()
-                        .filter(c -> c.getId().equals(id))
-                        .findFirst()
-                        .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
+                    .filter(c -> c.getId().equals(id))
+                    .findFirst()
+                    .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
 
                 sensitive = configuration
-                        .isSensitive()
-                        .orElseGet(() -> beanDefinition.booleanValue(Endpoint.class, "defaultSensitive").orElseGet(() ->
-                                beanDefinition.getDefaultValue(Endpoint.class, "defaultSensitive", Boolean.class).orElse(Endpoint.SENSITIVE)
-                        ));
+                    .isSensitive()
+                    .orElseGet(() -> beanDefinition.booleanValue(Endpoint.class, "defaultSensitive").orElseGet(() ->
+                        beanDefinition.getDefaultValue(Endpoint.class, "defaultSensitive", Boolean.class).orElse(Endpoint.SENSITIVE)
+                    ));
             }
             endpointMethods.put(method, sensitive);
         });

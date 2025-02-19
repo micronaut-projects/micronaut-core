@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emitter<T> {
+
     private static final Logger LOG = LoggerFactory.getLogger(CompletionAwareSubscriber.class);
 
     protected Subscription subscription;

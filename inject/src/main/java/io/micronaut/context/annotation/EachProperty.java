@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.value.PropertyCatalog;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Documented;
@@ -91,6 +92,13 @@ public @interface EachProperty {
      */
     @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     String value();
+
+    /**
+     * @return property catalog to use. By default, uses NORMALIZATION catalog
+     *
+     * @since 4.7.0
+     */
+    PropertyCatalog catalog() default PropertyCatalog.NORMALIZED;
 
     /**
      * @return The name of the key returned by {@link #value()} that should be regarded as the {@link Primary} bean

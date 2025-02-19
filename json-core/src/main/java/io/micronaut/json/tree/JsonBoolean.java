@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 3.1
  */
 final class JsonBoolean extends JsonScalar {
+
     private static final JsonBoolean TRUE = new JsonBoolean(true);
     private static final JsonBoolean FALSE = new JsonBoolean(false);
 

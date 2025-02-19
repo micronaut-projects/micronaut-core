@@ -142,6 +142,8 @@ class Test {
         hierarchy.synthesizeDeclared().length == 2
         hierarchy.synthesizeAnnotationsByType(Property).length == 5
         hierarchy.synthesizeDeclaredAnnotationsByType(Property).length == 5
+        hierarchy.synthesizeAll()[0].toString().contains("io.micronaut.context.annotation.PropertySource")
+        hierarchy.synthesizeAll()[1].toString().contains("io.micronaut.context.annotation.PropertySource")
     }
 
     void "test default values are propagated"() {

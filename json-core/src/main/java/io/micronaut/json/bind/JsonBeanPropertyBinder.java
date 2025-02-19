@@ -55,8 +55,8 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
     private final BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers;
 
     /**
-     * @param jsonMapper        To read/write JSON
-     * @param configuration     The configuration for Jackson JSON parser
+     * @param jsonMapper To read/write JSON
+     * @param configuration The configuration for Jackson JSON parser
      * @param exceptionHandlers Exception handlers for binding exceptions
      */
     JsonBeanPropertyBinder(JsonMapper jsonMapper, JsonConfiguration configuration, BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers) {
@@ -126,7 +126,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
     /**
      * @param object The bean
-     * @param e      The exception object
+     * @param e The exception object
      * @return The new conversion error
      */
     private ConversionErrorException newConversionError(Object object, Exception e) {
@@ -141,7 +141,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     private JsonNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws IOException {
-        ObjectBuilder rootNode = new ObjectBuilder();
+        var rootNode = new ObjectBuilder();
         for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
             CharSequence key = entry.getKey();
             Object value = entry.getValue();
@@ -207,7 +207,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         if (valueBuilder instanceof ArrayBuilder arrayBuilder) {
             return arrayBuilder;
         }
-        ArrayBuilder arrayBuilder = new ArrayBuilder();
+        var arrayBuilder = new ArrayBuilder();
         objectNode.values.put(key, arrayBuilder);
         return arrayBuilder;
     }
@@ -217,7 +217,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         if (jsonNode instanceof ObjectBuilder objectBuilder) {
             return objectBuilder;
         }
-        ObjectBuilder objectBuilder = new ObjectBuilder();
+        var objectBuilder = new ObjectBuilder();
         arrayNode.values.set(arrayIndex, objectBuilder);
         return objectBuilder;
     }
@@ -254,7 +254,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
         @Override
         public JsonNode build() {
-            Map<String, JsonNode> built = CollectionUtils.newLinkedHashMap(values.size());
+            var built = CollectionUtils.<String, JsonNode>newLinkedHashMap(values.size());
             for (Map.Entry<String, ValueBuilder> entry : values.entrySet()) {
                 built.put(entry.getKey(), entry.getValue().build());
             }

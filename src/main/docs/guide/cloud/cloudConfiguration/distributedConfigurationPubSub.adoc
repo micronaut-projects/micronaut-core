@@ -1,1 +1,0 @@
-See the https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#distributedConfiguration[Micronaut GCP Pub/Sub^] documentation.

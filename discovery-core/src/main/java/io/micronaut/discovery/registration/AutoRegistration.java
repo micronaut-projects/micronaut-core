@@ -70,7 +70,7 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
      * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server.
      *
      * @param instance The instance
-     * @param status   The {@link HealthStatus}
+     * @param status The {@link HealthStatus}
      */
     protected abstract void pulsate(ServiceInstance instance, HealthStatus status);
 

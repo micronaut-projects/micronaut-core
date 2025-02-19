@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.*
@@ -107,6 +108,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         response.body().contains('Unexpected token (VALUE_STRING), expected END_ARRAY')
     }
 
+    @Requires(property = 'spec.name', value = 'ParameterBindingSpec')
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
         @Get

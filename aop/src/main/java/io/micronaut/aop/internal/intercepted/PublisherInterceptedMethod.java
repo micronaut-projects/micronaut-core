@@ -102,6 +102,7 @@ sealed class PublisherInterceptedMethod implements InterceptedMethod permits Rea
 
     /**
      * Allows for a soft reference on reactive streams.
+     *
      * @param reactiveType The type
      * @return True if the reactive type is convertible to a reactive streams publisher
      */
@@ -114,18 +115,18 @@ sealed class PublisherInterceptedMethod implements InterceptedMethod permits Rea
             return result;
         }
         return conversionService.convert(result, returnType.asArgument())
-                .orElseThrow(() -> new IllegalStateException("Cannot convert publisher result: " + result + " to '" + returnType.getType().getName() + "'"));
+            .orElseThrow(() -> new IllegalStateException("Cannot convert publisher result: " + result + " to '" + returnType.getType().getName() + "'"));
     }
 
     protected Publisher<?> convertToPublisher(Object result) {
         if (result == null) {
             return Publishers.empty();
         }
-        if (result instanceof Publisher publisher) {
+        if (result instanceof Publisher<?> publisher) {
             return publisher;
         }
         return conversionService
-                .convert(result, Publisher.class)
-                .orElseThrow(() -> new IllegalStateException("Cannot convert reactive type " + result + " to 'org.reactivestreams.Publisher'"));
+            .convert(result, Publisher.class)
+            .orElseThrow(() -> new IllegalStateException("Cannot convert reactive type " + result + " to 'org.reactivestreams.Publisher'"));
     }
 }

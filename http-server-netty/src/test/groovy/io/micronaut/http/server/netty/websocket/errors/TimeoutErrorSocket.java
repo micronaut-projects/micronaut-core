@@ -15,15 +15,16 @@
  */
 package io.micronaut.http.server.netty.websocket.errors;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
+@Requires(property = "spec.name", value = "WebSocketErrorsSpec")
 @ServerWebSocket("/ws/timeout/message")
 public class TimeoutErrorSocket {
 
     boolean closed = false;
-
 
     @OnMessage
     public void onMessage(String blah) {

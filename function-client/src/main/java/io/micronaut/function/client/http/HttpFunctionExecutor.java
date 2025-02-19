@@ -32,7 +32,6 @@ import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.net.URI;
 import java.util.Optional;
 
@@ -54,7 +53,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
      * Constructor.
      *
      * @param conversionService The conversion service
-     * @param httpClient        The HTTP client
+     * @param httpClient The HTTP client
      */
     public HttpFunctionExecutor(ConversionService conversionService, HttpClient httpClient) {
         super();
@@ -65,11 +64,11 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
     @Override
     public O invoke(FunctionDefinition definition, I input, Argument<O> outputType) {
         Optional<URI> opt = definition.getURI();
-        if (!opt.isPresent()) {
+        if (opt.isEmpty()) {
             throw new FunctionNotFoundException(definition.getName());
         } else {
             URI uri = opt.get();
-            HttpRequest request;
+            MutableHttpRequest<?> request;
             if (input == null) {
                 request = HttpRequest.GET(uri.toString());
             } else {
@@ -77,23 +76,23 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             }
 
             if (input != null && ClassUtils.isJavaLangType(input.getClass())) {
-                ((MutableHttpRequest) request).contentType(MediaType.TEXT_PLAIN_TYPE);
+                request.contentType(MediaType.TEXT_PLAIN_TYPE);
             }
 
             Class<O> outputJavaType = outputType.getType();
 
             if (ClassUtils.isJavaLangType(outputJavaType)) {
-                ((MutableHttpRequest) request).accept(MediaType.TEXT_PLAIN_TYPE);
+                request.accept(MediaType.TEXT_PLAIN_TYPE);
             }
 
             if (Publishers.isConvertibleToPublisher(outputJavaType)) {
-                Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
+                Publisher<?> publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
                 return Publishers.convertPublisher(conversionService, publisher, outputJavaType);
             } else if (outputType.isVoid()) {
                 httpClient.toBlocking().exchange(request);
                 return null;
             } else {
-                return (O) httpClient.toBlocking().retrieve(request, outputType);
+                return httpClient.toBlocking().retrieve(request, outputType);
             }
         }
     }
@@ -102,7 +101,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
     @Override
     public <I1, O2> Optional<FunctionInvoker<I1, O2>> choose(FunctionDefinition definition) {
         if (definition.getURI().isPresent()) {
-            return Optional.of((FunctionInvoker) this);
+            return Optional.of((FunctionInvoker<I1, O2>) this);
         }
 
         return Optional.empty();
@@ -110,7 +109,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
     @Override
     @PreDestroy
-    public void close() throws IOException {
+    public void close() {
         httpClient.close();
     }
 }

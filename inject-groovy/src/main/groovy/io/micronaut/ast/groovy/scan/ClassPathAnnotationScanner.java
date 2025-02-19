@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.scan;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.scan.AnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;
@@ -85,11 +86,11 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * Scan the given packages.
      *
      * @param annotation The annotation to scan for
-     * @param pkg        The package to scan
+     * @param pkg The package to scan
      * @return A stream of classes
      */
     @Override
-    public Stream<Class<?>> scan(String annotation, String pkg) {
+    public @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull String pkg) {
         if (pkg == null) {
             return Stream.empty();
         }
@@ -99,13 +100,13 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
 
     /**
      * @param annotation The annotation
-     * @param pkg        The package
+     * @param pkg The package
      * @return The list of class
      */
     protected List<Class<?>> doScan(String annotation, String pkg) {
         try {
             String packagePath = pkg.replace('.', '/').concat("/");
-            List<Class<?>> classes = new ArrayList<>();
+            var classes = new ArrayList<Class<?>>();
             Enumeration<URL> resources = classLoader.getResources(packagePath);
             if (!resources.hasMoreElements() && LOG.isDebugEnabled()) {
                 LOG.debug("No resources found under package path: {}", packagePath);
@@ -163,8 +164,8 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
 
     /**
      * @param annotation The annotation
-     * @param classes    The classes
-     * @param filePath   The filePath
+     * @param classes The classes
+     * @param filePath The filePath
      */
     protected void traverseFile(String annotation, List<Class<?>> classes, Path filePath) {
         if (Files.isDirectory(filePath)) {
@@ -188,8 +189,8 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
 
     /**
      * @param annotation The annotation
-     * @param filePath   The file path
-     * @param classes    The classes
+     * @param filePath The file path
+     * @param classes The classes
      */
     protected void scanFile(String annotation, Path filePath, List<Class<?>> classes) {
         String fileName = filePath.getFileName().toString();
@@ -210,8 +211,8 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     }
 
     private void scanInputStream(String annotation, InputStream inputStream, List<Class<?>> classes) throws IOException, ClassNotFoundException {
-        AnnotationClassReader annotationClassReader = new AnnotationClassReader(inputStream);
-        AnnotatedTypeInfoVisitor classVisitor = new AnnotatedTypeInfoVisitor();
+        var annotationClassReader = new AnnotationClassReader(inputStream);
+        var classVisitor = new AnnotatedTypeInfoVisitor();
         annotationClassReader.accept(classVisitor, AnnotationClassReader.SKIP_DEBUG);
         if (classVisitor.hasAnnotation(annotation)) {
             classes.add(classLoader.loadClass(classVisitor.getTypeName()));

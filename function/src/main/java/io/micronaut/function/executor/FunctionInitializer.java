@@ -26,7 +26,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.function.Function;
 
@@ -54,8 +53,8 @@ public class FunctionInitializer extends AbstractExecutor {
         annotationMetadata.addDeclaredAnnotation(Secondary.class.getName(), Collections.emptyMap());
         applicationContext.registerBeanDefinition(
             RuntimeBeanDefinition.builder(this)
-                                 .annotationMetadata(annotationMetadata)
-                                 .build()
+                .annotationMetadata(annotationMetadata)
+                .build()
         );
         this.closeContext = true;
     }
@@ -85,7 +84,7 @@ public class FunctionInitializer extends AbstractExecutor {
 
     @Override
     @Internal
-    public void close() throws IOException {
+    public void close() {
         if (closeContext && applicationContext != null) {
             applicationContext.close();
         }
@@ -94,11 +93,10 @@ public class FunctionInitializer extends AbstractExecutor {
     /**
      * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method.
      *
-     * @param args     The arguments passed to main
+     * @param args The arguments passed to main
      * @param supplier The function that executes this function
-     * @throws IOException If an error occurs
      */
-    public void run(String[] args, Function<ParseContext, ?> supplier) throws IOException {
+    public void run(String[] args, Function<ParseContext, ?> supplier) {
         ApplicationContext applicationContext = this.applicationContext;
         this.functionExitHandler = applicationContext.findBean(FunctionExitHandler.class).orElse(this.functionExitHandler);
         ParseContext context = new ParseContext(args);

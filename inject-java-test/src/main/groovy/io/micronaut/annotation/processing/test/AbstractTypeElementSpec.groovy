@@ -22,7 +22,6 @@ import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.JavaNativeElementsHelper
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
-import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
@@ -34,6 +33,7 @@ import io.micronaut.context.Qualifier
 import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
@@ -323,6 +323,7 @@ class Test {
                 @Override
                 protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
                     return new TypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors
@@ -333,6 +334,7 @@ class Test {
                 @Override
                 protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
                     return new AggregatingTypeElementVisitorProcessor() {
+                        @NonNull
                         @Override
                         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
                             return visitors
@@ -537,23 +539,20 @@ class Test {
 
     @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        ByteArrayOutputStream stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, null, toWrite, true)
-                .writeTo(stream)
+        byte[] bytecode = AnnotationMetadataWriter.write(className, toWrite)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    byte[] bytes = stream.toByteArray()
+                    byte[] bytes = bytecode
                     return defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
             }
         }
 
-        AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
-        return metadata
+        return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
     }
 
     protected JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
@@ -599,13 +598,13 @@ class Test {
                 @Override
                 protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
                     def loadedTransformers = super.getAnnotationTransformers(annotationName)
-                    def localTransfomers = getLocalAnnotationTransformers(annotationName)
-                    if (localTransfomers) {
+                    def localTransformers = getLocalAnnotationTransformers(annotationName)
+                    if (localTransformers) {
                         def newList = []
                         if (loadedTransformers) {
                             newList.addAll(loadedTransformers)
                         }
-                        newList.addAll(localTransfomers)
+                        newList.addAll(localTransformers)
                         return newList
                     } else {
                         return loadedTransformers

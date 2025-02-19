@@ -1,6 +1,7 @@
 package io.micronaut.inject.beanbuilder;
 
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -30,7 +31,7 @@ public class TestBeanFactoryDefiningVisitor implements TypeElementVisitor<Protot
     }
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

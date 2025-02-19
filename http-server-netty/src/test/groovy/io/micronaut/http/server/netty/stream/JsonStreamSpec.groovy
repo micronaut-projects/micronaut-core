@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.stream
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -37,7 +38,10 @@ import io.micronaut.core.async.annotation.SingleResult
  */
 class JsonStreamSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'JsonStreamSpec'])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        'micronaut.server.serverHeader': 'JsonStreamSpec',
+        'spec.name': 'JsonStreamSpec',
+    ])
 
     void "test json stream response content type"() {
         given:
@@ -97,6 +101,7 @@ class JsonStreamSpec extends Specification {
     }
 
     @Controller("/json/stream")
+    @Requires(property = "spec.name", value = "JsonStreamSpec")
     static class StreamController {
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)

@@ -34,6 +34,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Scope
 @Retention(RUNTIME)
-@Deprecated
+@Deprecated(forRemoval = true, since = "3.0.0")
 public @interface Provided {
 }

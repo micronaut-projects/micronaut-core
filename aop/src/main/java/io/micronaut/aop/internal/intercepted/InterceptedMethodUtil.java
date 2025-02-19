@@ -49,7 +49,7 @@ public final class InterceptedMethodUtil {
     /**
      * Find possible {@link InterceptedMethod} implementation.
      *
-     * @param context           The {@link MethodInvocationContext}
+     * @param context The {@link MethodInvocationContext}
      * @param conversionService The {@link ConversionService}
      * @return The {@link InterceptedMethod}
      * @since 4.0.0
@@ -85,7 +85,7 @@ public final class InterceptedMethodUtil {
      * Resolve interceptor binding annotations from the metadata.
      *
      * @param annotationMetadata The annotation metadata
-     * @param interceptorKind    The interceptor kind
+     * @param interceptorKind The interceptor kind
      * @return the annotation values
      */
     public static io.micronaut.core.annotation.AnnotationValue<?>[] resolveInterceptorBinding(

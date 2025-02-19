@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -26,6 +27,7 @@ import org.reactivestreams.Publisher;
 /**
  * Tests filters with the context path already prepended still work
  */
+@Requires(property = "tests", value = "io.micronaut.http.server.netty.interceptor")
 @Filter("/context/path/**")
 public class ContextPathFilter implements HttpServerFilter {
 

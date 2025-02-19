@@ -63,6 +63,12 @@ public final class HttpVersionSelection {
         true
     );
 
+    private static final HttpVersionSelection WEBSOCKET_1 = new HttpVersionSelection(
+        HttpVersionSelection.PlaintextMode.HTTP_1,
+        true,
+        new String[]{HttpVersionSelection.ALPN_HTTP_1},
+        false);
+
     private final PlaintextMode plaintextMode;
     private final boolean alpn;
     private final String[] alpnSupportedProtocols;
@@ -98,6 +104,17 @@ public final class HttpVersionSelection {
             default:
                 throw new IllegalArgumentException("HTTP version " + httpVersion + " not supported here");
         }
+    }
+
+    /**
+     * Get the {@link HttpVersionSelection} to be used for a WebSocket connection, which will enable
+     * ALPN but constrain the mode to HTTP 1.1.
+     *
+     * @return The version selection for WebSocket
+     */
+    @NonNull
+    public static HttpVersionSelection forWebsocket() {
+        return WEBSOCKET_1;
     }
 
     /**

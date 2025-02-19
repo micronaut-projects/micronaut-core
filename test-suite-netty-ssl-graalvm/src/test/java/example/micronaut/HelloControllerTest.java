@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @MicronautTest
 @Property(name = "micronaut.server.ssl.enabled", value = "true")
 @Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "0")
 @Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = "true")
 public class HelloControllerTest {
 

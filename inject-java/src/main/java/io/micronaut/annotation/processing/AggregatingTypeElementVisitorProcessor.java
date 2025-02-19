@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.SupportedOptions;
-
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -45,7 +44,7 @@ public class AggregatingTypeElementVisitorProcessor extends TypeElementVisitorPr
         }
         if (isIncremental(processingEnv)) {
             List<LoadedVisitor> loadedVisitors = getLoadedVisitors();
-            Set<String> annotationNames = new HashSet<>();
+            var annotationNames = new HashSet<String>();
             // try and narrow the annotations to only the ones interesting to the visitors
             // if a visitor is interested in Object than fall back to all
             for (LoadedVisitor loadedVisitor : loadedVisitors) {

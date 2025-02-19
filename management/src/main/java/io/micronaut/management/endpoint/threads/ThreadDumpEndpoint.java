@@ -48,6 +48,6 @@ public class ThreadDumpEndpoint {
     @Read
     Publisher getThreadDump() {
         return threadInfoMapper.mapThreadInfo(
-                Flux.fromArray(ManagementFactory.getThreadMXBean().dumpAllThreads(true, true)));
+            Flux.fromArray(ManagementFactory.getThreadMXBean().dumpAllThreads(true, true)));
     }
 }

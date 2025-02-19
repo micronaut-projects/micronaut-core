@@ -17,6 +17,7 @@ package io.micronaut.docs.config.value;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 
 import jakarta.inject.Singleton;
 // end::imports[]
@@ -28,6 +29,10 @@ public class EngineImpl implements Engine {
     @Value("${my.engine.cylinders:6}") // <1>
     protected int cylinders;
 
+    @Nullable
+    @Value("${my.engine.description}")
+    protected String description;
+
     @Override
     public int getCylinders() {
         return cylinders;
@@ -36,6 +41,11 @@ public class EngineImpl implements Engine {
     @Override
     public String start() {// <2>
         return "Starting V" + getCylinders() + " Engine";
+    }
+
+    @Override
+    public String getDescription() {
+        return description;
     }
 
 }

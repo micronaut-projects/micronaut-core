@@ -211,7 +211,7 @@ class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
         definition != null
     }
 
-    void "test recusive generic type parameter"() {
+    void "test recursive generic type parameter"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet', '''\
 package test;

@@ -167,6 +167,15 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     /**
+     * Whether an accessible constructor exists.
+     * @return True if a default constructor exists
+     * @since 4.7.11
+     */
+    protected boolean hasConstructor() {
+        return false;
+    }
+
+    /**
      * Reflection free bean instantiation implementation for the given arguments.
      *
      * @param arguments The arguments
@@ -393,7 +402,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public Argument<?>[] getConstructorArguments() {
-        return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
+        if (hasConstructor()) {
+            return constructorArguments;
+        } else {
+            return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
+        }
     }
 
     @NonNull
@@ -472,9 +485,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
             AnnotationValue<Introspected.IntrospectionBuilder> builderAnn = getAnnotationMetadata().findAnnotation(Introspected.class)
                 .flatMap(a -> a.getAnnotation("builder", Introspected.IntrospectionBuilder.class)).orElse(null);
-            if (builderAnn != null) {
-                Class<?> builderClass = getAnnotationMetadata().classValue(Introspected.class, "builderClass").orElse(null);
-                if (builderClass != null) {
+            Class<?> builderClass = getAnnotationMetadata().classValue(Introspected.class, "builderClass").orElse(null);
+            if (builderAnn != null || builderClass != null) {
+                if (builderClass == null) {
+                    throw new IntrospectionException("Introspection defines invalid builder member for type: " + getBeanType());
+                } else {
                     BeanIntrospection<Object> builderIntrospection = (BeanIntrospection<Object>) BeanIntrospection.getIntrospection(builderClass);
                     Collection<BeanMethod<Object, Object>> beanMethods = builderIntrospection.getBeanMethods();
 
@@ -520,8 +535,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                             arguments.toArray(Argument.ZERO_ARGUMENTS)
                         );
                     }
-                } else {
-                    throw new IntrospectionException("Introspection defines invalid builder member for type: " + getBeanType());
                 }
             } else {
                 int constructorLength = constructorArguments.length;
@@ -804,7 +817,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 if (constructorLength == params.length) {
                     return introspection.instantiateInternal(params);
                 } else {
-                    Object[] constructorParams = Arrays.copyOfRange(params, 0, constructorLength);
+                    Object[] constructorParams = new Object[constructorLength];
+                    System.arraycopy(params, 0, constructorParams, 0, constructorLength);
                     B bean = introspection.instantiateInternal(constructorParams);
                     UnsafeBeanProperty<Object, Object>[] writeableProperties = builderData.writeableProperties;
                     if (writeableProperties != null) {
@@ -933,7 +947,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             ArgumentUtils.requireNonNull("bean", bean);
 
             if (!beanType.isInstance(bean)) {
-                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + bean);
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (isReadOnly()) {
                 throw new UnsupportedOperationException("Cannot write a read-only property: " + getName());

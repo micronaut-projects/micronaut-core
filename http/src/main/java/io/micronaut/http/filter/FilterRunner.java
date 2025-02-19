@@ -49,10 +49,13 @@ import java.util.function.BiFunction;
 @Internal
 public class FilterRunner {
 
+    @Nullable
+    private final List<InternalHttpFilter> preMatchingFilters;
     /**
      * All filters to run. Request filters are executed in order from first to last, response
      * filters in the reverse order.
      */
+    @Nullable
     private final List<InternalHttpFilter> filters;
     private final BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider;
 
@@ -63,7 +66,33 @@ public class FilterRunner {
      * @param responseProvider The response provider
      */
     public FilterRunner(List<GenericHttpFilter> filters, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
-        this.filters = (List) filters; // GenericHttpFilter is sealed and all implementations implement InternalHttpFilter
+        this(null, filters, responseProvider);
+    }
+
+    /**
+     * Create a new filter runner, to be used only once.
+     *
+     * @param filters          The filters to run
+     * @since 4.6
+     */
+    public FilterRunner(List<GenericHttpFilter> filters) {
+        this(null, filters, null);
+    }
+
+    /**
+     * Create a new filter runner, to be used only once.
+     *
+     * @param preMatchingFilters          The pre matching filters
+     * @param filters          The filters to run
+     * @param responseProvider The response provider
+     * @since 4.6
+     */
+    public FilterRunner(@Nullable List<GenericHttpFilter> preMatchingFilters,
+                        @Nullable List<GenericHttpFilter> filters,
+                        BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+        // GenericHttpFilter is sealed and all implementations implement InternalHttpFilter
+        this.preMatchingFilters = (List) preMatchingFilters;
+        this.filters = (List) filters;
         this.responseProvider = responseProvider;
     }
 
@@ -80,6 +109,9 @@ public class FilterRunner {
      * @param filters The list of filters to sort in place
      */
     public static void sort(@NonNull List<GenericHttpFilter> filters) {
+        if (filters.isEmpty()) {
+            return;
+        }
         checkOrdered(filters);
         OrderUtil.sortOrdered((List) filters); // All filters are implementing ordered
     }
@@ -91,8 +123,21 @@ public class FilterRunner {
      * @param filters The list of filters to sort in place
      */
     public static void sortReverse(@NonNull List<GenericHttpFilter> filters) {
+        if (filters.isEmpty()) {
+            return;
+        }
         checkOrdered(filters);
         OrderUtil.reverseSortOrdered((List) filters); // All filters are implementing ordered
+    }
+
+    /**
+     * Do the route match and set it into the request.
+     *
+     * @param request The request
+     * @since 4.6
+     */
+    protected void doRouteMatch(@NonNull HttpRequest<?> request) {
+        throw new IllegalStateException("Route match not supported");
     }
 
     /**
@@ -125,13 +170,42 @@ public class FilterRunner {
     }
 
     /**
+     * Provide response.
+     *
+     * @param request           The request
+     * @param propagatedContext The propagatedContext
+     * @return The flow
+     */
+    @NonNull
+    protected ExecutionFlow<HttpResponse<?>> provideResponse(@NonNull HttpRequest<?> request, @NonNull PropagatedContext propagatedContext) {
+        return responseProvider.apply(request, propagatedContext);
+    }
+
+    /**
+     * Find filters after route is found.
+     * @param request The request
+     * @return The filters
+     * @since 4.6
+     */
+    @NonNull
+    protected List<GenericHttpFilter> findFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+        throw new IllegalStateException("Find filters not supported");
+    }
+
+    @NonNull
+    private List<InternalHttpFilter> findInternalFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+        return filters == null ? (List) findFiltersAfterRouteMatch(request) : filters;
+    }
+
+    /**
      * Execute the filters for the given request. May only be called once
      *
      * @param request The request
      * @return The flow that completes after all filters and the terminal operation, with the final
      * response
      */
-    public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request) {
+    @NonNull
+    public final ExecutionFlow<HttpResponse<?>> run(@NonNull HttpRequest<?> request) {
         return run(request, PropagatedContext.getOrEmpty());
     }
 
@@ -145,22 +219,48 @@ public class FilterRunner {
      */
     public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request,
                                                     PropagatedContext propagatedContext) {
-        List<InternalHttpFilter> filtersToRun = new ArrayList<>(filters.size());
-        for (InternalHttpFilter filter : filters) {
-            if (filter.isEnabled(request)) {
-                filtersToRun.add(filter);
+        ListIterator<InternalHttpFilter> iterator;
+        if (preMatchingFilters != null) {
+            List<InternalHttpFilter> filtersToRun = filterFilters(preMatchingFilters, request);
+            if (filtersToRun.isEmpty()) {
+                // No pre-matching filters
+                try {
+                    doRouteMatch(request);
+                } catch (Throwable t) {
+                    return processFailure(request, t, propagatedContext);
+                }
+                filtersToRun = filterFilters(findInternalFiltersAfterRouteMatch(request), request);
+                iterator = filtersToRun.listIterator();
+            } else {
+                // Pre-matching filters plus route match resolver
+                var f = new RouteMatchResolverHttpFilter();
+                filtersToRun.add(f);
+                iterator = filtersToRun.listIterator();
+                f.filterIterator = iterator;
             }
+        } else {
+            iterator = filterFilters(filters, request).listIterator();
         }
-        if (filtersToRun.isEmpty()) {
-            return responseProvider.apply(request, propagatedContext);
+        if (!iterator.hasNext()) {
+            return provideResponse(request, propagatedContext);
         }
-        ListIterator<InternalHttpFilter> iterator = filtersToRun.listIterator();
         ExecutionFlow<FilterContext> flow = filterRequest(new FilterContext(request, propagatedContext), iterator);
         FilterContext flowContext = flow.tryCompleteValue();
         if (flowContext != null) {
             return filterResponse(flowContext, iterator, null);
         }
         return flow.flatMap(context -> filterResponse(context, iterator, null));
+    }
+
+    private List<InternalHttpFilter> filterFilters(List<InternalHttpFilter> filters, HttpRequest<?> request) {
+        // 1 free spot for the RouteMatchResolverHttpFilter
+        List<InternalHttpFilter> filtersToRun = new ArrayList<>(filters.size() + 1);
+        for (InternalHttpFilter filter : filters) {
+            if (filter.isEnabled(request)) {
+                filtersToRun.add(filter);
+            }
+        }
+        return filtersToRun;
     }
 
     private ExecutionFlow<FilterContext> filterRequest(FilterContext context,
@@ -204,7 +304,7 @@ public class FilterRunner {
             FilterContext finalContext = context;
             return flow.onErrorResume(throwable -> processFailureFilterException(finalContext, iterator, throwable));
         }
-        return provideResponse(context, iterator);
+        return provideResponseAndHandleErrors(context, iterator);
     }
 
     private ExecutionFlow<HttpResponse<?>> filterResponse(FilterContext context,
@@ -267,9 +367,9 @@ public class FilterRunner {
         return flow.map(context::withResponse);
     }
 
-    private ExecutionFlow<FilterContext> provideResponse(FilterContext context,
-                                                         ListIterator<InternalHttpFilter> iterator) {
-        ExecutionFlow<HttpResponse<?>> flow = responseProvider.apply(context.request(), context.propagatedContext());
+    private ExecutionFlow<FilterContext> provideResponseAndHandleErrors(FilterContext context,
+                                                                        ListIterator<InternalHttpFilter> iterator) {
+        ExecutionFlow<HttpResponse<?>> flow = provideResponse(context.request(), context.propagatedContext());
         if (flow.tryCompleteValue() != null) {
             return flow.map(context::withResponse);
         }
@@ -288,4 +388,42 @@ public class FilterRunner {
         return flow.map(context::withResponse);
     }
 
+    /**
+     * The route matching filter will resolve the route and replace the iterator with post-matching filters.
+     *
+     * @since 4.6
+     */
+    final class RouteMatchResolverHttpFilter implements InternalHttpFilter {
+
+        private ListIterator<InternalHttpFilter> filterIterator;
+
+        @Override
+        public boolean isFiltersRequest() {
+            return true;
+        }
+
+        @Override
+        public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+            HttpRequest<?> request = context.request();
+            try {
+                doRouteMatch(request);
+                return ExecutionFlow.just(context);
+            } catch (Throwable throwable) {
+                return processFailurePropagateException(throwable, context);
+            } finally {
+                filterIterator.remove();
+                while (filterIterator.hasPrevious()) {
+                    filterIterator.previous();
+                    filterIterator.remove();
+                }
+                List<InternalHttpFilter> postFilters = findInternalFiltersAfterRouteMatch(request);
+                for (InternalHttpFilter postFilter : postFilters) {
+                    filterIterator.add(postFilter);
+                }
+                while (filterIterator.hasPrevious()) {
+                    filterIterator.previous();
+                }
+            }
+        }
+    }
 }

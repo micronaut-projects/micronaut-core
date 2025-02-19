@@ -42,9 +42,9 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     protected List<String> values;
 
     /**
-     * @param nativeElement              The native element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
+     * @param visitorContext The visitor context
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
@@ -53,10 +53,10 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     }
 
     /**
-     * @param nativeElement              The native element
+     * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
-     * @param arrayDimensions           The number of array dimensions
+     * @param visitorContext The visitor context
+     * @param arrayDimensions The number of array dimensions
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,

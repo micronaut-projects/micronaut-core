@@ -55,7 +55,7 @@ public interface HealthResult {
     /**
      * Creates a builder to build a {@link HealthResult}.
      *
-     * @param name   The name of the result
+     * @param name The name of the result
      * @param status The status
      * @return The builder
      */
@@ -83,7 +83,7 @@ public interface HealthResult {
         private Object details;
 
         /**
-         * @param name   The name of the health result
+         * @param name The name of the health result
          * @param status The status
          */
         Builder(String name, HealthStatus status) {
@@ -92,7 +92,7 @@ public interface HealthResult {
         }
 
         /**
-         * @param name   The name of the health result
+         * @param name The name of the health result
          */
         Builder(String name) {
             this.name = name;
@@ -143,9 +143,9 @@ public interface HealthResult {
          */
         public HealthResult build() {
             return new DefaultHealthResult(
-                    name,
-                    status != null ? status : HealthStatus.UNKNOWN,
-                    details
+                name,
+                status != null ? status : HealthStatus.UNKNOWN,
+                details
             );
         }
     }

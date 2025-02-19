@@ -27,6 +27,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -34,7 +35,9 @@ import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.cookie.ServerCookieEncoder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
@@ -42,6 +45,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -50,9 +54,11 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+
+import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Delegates to Netty's {@link FullHttpResponse}.
@@ -164,6 +170,38 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         }
     }
 
+    /**
+     * Create a non-body netty response from the given MN response.
+     *
+     * @param response The mn response
+     * @return The netty response
+     */
+    public static @NonNull HttpResponse toNoBodyResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
+        Objects.requireNonNull(response, "The response cannot be null");
+        while (response instanceof HttpResponseWrapper<?> wrapper) {
+            response = wrapper.getDelegate();
+        }
+        HttpVersion version;
+        HttpResponseStatus status;
+        if (response instanceof NettyMutableHttpResponse<?> nmhr) {
+            version = nmhr.getNettyHttpVersion();
+            status = nmhr.getNettyHttpStatus();
+        } else {
+            version = HttpVersion.HTTP_1_1;
+            status = new HttpResponseStatus(response.code(), response.reason());
+        }
+        io.micronaut.http.HttpHeaders mnHeaders = response.getHeaders();
+        HttpHeaders nettyHeaders;
+        if (mnHeaders instanceof NettyHttpHeaders nhh) {
+            nettyHeaders = nhh.getNettyHeaders();
+        } else {
+            nettyHeaders = new DefaultHttpHeaders();
+            response.getHeaders()
+                .forEach((s, strings) -> nettyHeaders.add(s, strings));
+        }
+        return new DefaultHttpResponse(version, status, nettyHeaders);
+    }
+
     @Override
     public Optional<MessageBodyWriter<B>> getBodyWriter() {
         return Optional.ofNullable(messageBodyWriter);
@@ -219,7 +257,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4));
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
                     this.attributes = attributes;
                 }
             }
@@ -265,6 +303,16 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             cookie(cookie);
         }
         return this;
+    }
+
+    @Override
+    public Cookies getCookies() {
+        return new NettyCookies(nettyHeaders, conversionService);
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name) {
+        return getCookies().findCookie(name);
     }
 
     @Override

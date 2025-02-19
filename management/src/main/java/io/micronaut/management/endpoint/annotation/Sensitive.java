@@ -25,20 +25,20 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotation that can be applied to endpoint methods to control sensitivity at the method level.
- *
+ * <p>
  * For example:
  * {@code
- *     {@literal @}Endpoint(id = "loggers", prefix = "myapp")
- *     public class LoggersEndpoint {
- *
- *         {@literal @}Write
- *         {@literal @}Sensitive(property = "write-sensitive", defaultValue = true)
- *         public void setLogLevel@Selector String name) {
- *
- *         }
- *     }
+ * {@literal @}Endpoint(id = "loggers", prefix = "myapp")
+ * public class LoggersEndpoint {
+ * <p>
+ * {@literal @}Write
+ * {@literal @}Sensitive(property = "write-sensitive", defaultValue = true)
+ * public void setLogLevel@Selector String name) {
+ * <p>
  * }
- *
+ * }
+ * }
+ * <p>
  * The configuration key {@code myapp.loggers.write-sensitive} will determine the sensitivity
  * of the method, defaulting to true if not present.
  *
@@ -64,6 +64,7 @@ public @interface Sensitive {
 
     /**
      * Only to be used in conjunction with {@link #property()}.
+     *
      * @return The default value if the configuration key is not present
      */
     boolean defaultValue() default true;

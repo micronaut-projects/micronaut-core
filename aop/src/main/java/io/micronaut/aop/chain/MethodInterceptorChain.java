@@ -15,7 +15,12 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.Introduced;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -57,8 +62,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Constructor for empty parameters.
      *
-     * @param interceptors    array of interceptors
-     * @param target          target
+     * @param interceptors array of interceptors
+     * @param target target
      * @param executionHandle executionHandle
      */
     @UsedByGeneratedCode
@@ -69,16 +74,16 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Constructor for empty parameters.
      *
-     * @param interceptors    array of interceptors
-     * @param target          target
+     * @param interceptors array of interceptors
+     * @param target target
      * @param executionHandle executionHandle
-     * @param kind            The interception kind
+     * @param kind The interception kind
      */
     public MethodInterceptorChain(
-            Interceptor<T, R>[] interceptors,
-            T target,
-            ExecutableMethod<T, R> executionHandle,
-            @Nullable InterceptorKind kind) {
+        Interceptor<T, R>[] interceptors,
+        T target,
+        ExecutableMethod<T, R> executionHandle,
+        @Nullable InterceptorKind kind) {
         super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
         this.kind = kind;
     }
@@ -87,9 +92,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Constructor.
      *
-     * @param interceptors       array of interceptors
-     * @param target             target
-     * @param executionHandle    executionHandle
+     * @param interceptors array of interceptors
+     * @param target target
+     * @param executionHandle executionHandle
      * @param originalParameters originalParameters
      */
     @UsedByGeneratedCode
@@ -162,6 +167,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         return executionHandle.getReturnType();
     }
 
+    @NonNull
     @Override
     public Class<T> getDeclaringType() {
         return executionHandle.getDeclaringType();
@@ -181,12 +187,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#POST_CONSTRUCT} interception.
      *
-     * @param resolutionContext   The resolution context
-     * @param beanContext         The bean context
-     * @param definition          The definition
+     * @param resolutionContext The resolution context
+     * @param beanContext The bean context
+     * @param definition The definition
      * @param postConstructMethod The post construct method
-     * @param bean                The bean
-     * @param <T1>                The bean type
+     * @param bean The bean
+     * @param <T1> The bean type
      * @return the bean instance
      * @since 3.0.0
      */
@@ -194,18 +200,18 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @UsedByGeneratedCode
     @NonNull
     public static <T1> T1 initialize(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext beanContext,
-            @NonNull BeanDefinition<T1> definition,
-            @NonNull ExecutableMethod<T1, T1> postConstructMethod,
-            @NonNull T1 bean) {
+        @NonNull BeanResolutionContext resolutionContext,
+        @NonNull BeanContext beanContext,
+        @NonNull BeanDefinition<T1> definition,
+        @NonNull ExecutableMethod<T1, T1> postConstructMethod,
+        @NonNull T1 bean) {
         return doIntercept(
-                resolutionContext,
-                beanContext,
-                definition,
-                postConstructMethod,
-                bean,
-                InterceptorKind.POST_CONSTRUCT
+            resolutionContext,
+            beanContext,
+            definition,
+            postConstructMethod,
+            bean,
+            InterceptorKind.POST_CONSTRUCT
         );
     }
 
@@ -213,11 +219,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * Internal method that handles the logic for executing {@link InterceptorKind#PRE_DESTROY} interception.
      *
      * @param resolutionContext The resolution context
-     * @param beanContext       The bean context
-     * @param definition        The definition
-     * @param preDestroyMethod  The pre destroy method
-     * @param bean              The bean
-     * @param <T1>              The bean type
+     * @param beanContext The bean context
+     * @param definition The definition
+     * @param preDestroyMethod The pre destroy method
+     * @param bean The bean
+     * @param <T1> The bean type
      * @return the bean instance
      * @since 3.0.0
      */
@@ -225,55 +231,55 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @UsedByGeneratedCode
     @NonNull
     public static <T1> T1 dispose(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext beanContext,
-            @NonNull BeanDefinition<T1> definition,
-            @NonNull ExecutableMethod<T1, T1> preDestroyMethod,
-            @NonNull T1 bean) {
+        @NonNull BeanResolutionContext resolutionContext,
+        @NonNull BeanContext beanContext,
+        @NonNull BeanDefinition<T1> definition,
+        @NonNull ExecutableMethod<T1, T1> preDestroyMethod,
+        @NonNull T1 bean) {
         return doIntercept(
-                resolutionContext,
-                beanContext,
-                definition,
-                preDestroyMethod,
-                bean,
-                InterceptorKind.PRE_DESTROY
+            resolutionContext,
+            beanContext,
+            definition,
+            preDestroyMethod,
+            bean,
+            InterceptorKind.PRE_DESTROY
         );
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T1> T1 doIntercept(
-            BeanResolutionContext resolutionContext,
-            BeanContext beanContext,
-            BeanDefinition<T1> definition,
-            ExecutableMethod<T1, T1> interceptedMethod,
-            T1 bean,
-            InterceptorKind kind) {
+        BeanResolutionContext resolutionContext,
+        BeanContext beanContext,
+        BeanDefinition<T1> definition,
+        ExecutableMethod<T1, T1> interceptedMethod,
+        T1 bean,
+        InterceptorKind kind) {
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
-                resolutionContext,
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(binding)
+            resolutionContext,
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBindingValues(binding)
         );
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
-                .resolveInterceptors(
-                        (ExecutableMethod) interceptedMethod,
-                        (Collection) resolved,
-                        kind
-                );
+            .resolveInterceptors(
+                (ExecutableMethod) interceptedMethod,
+                (Collection) resolved,
+                kind
+            );
 
         if (ArrayUtils.isNotEmpty(resolvedInterceptors)) {
             final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<>(
-                    resolvedInterceptors,
-                    bean,
-                    interceptedMethod,
-                    kind
+                resolvedInterceptors,
+                bean,
+                interceptedMethod,
+                kind
             );
             return Objects.requireNonNull(
-                    chain.proceed(),
-                    kind.name() + " interceptor chain illegal returned null for type: " + definition.getBeanType()
+                chain.proceed(),
+                kind.name() + " interceptor chain illegal returned null for type: " + definition.getBeanType()
             );
         } else {
             return interceptedMethod.invoke(bean);

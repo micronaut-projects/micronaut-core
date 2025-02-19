@@ -32,6 +32,7 @@ import io.micronaut.http.codec.CodecException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
  * An interface that allows writing a message body for the client or the server.
@@ -89,13 +90,54 @@ public interface MessageBodyWriter<T> {
      * @return The charset
      */
     static @NonNull Charset getCharset(@NonNull Headers headers) {
-        if (headers instanceof HttpHeaders httpHeaders) {
-            Charset charset = httpHeaders.acceptCharset();
-            if (charset != null) {
-                return charset;
-            }
+        return findCharset(headers).orElse(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Resolve the charset.
+     *
+     * @param mediaType The mediaType
+     * @param headers   The headers
+     * @return The charset
+     */
+    static @NonNull Charset getCharset(@Nullable MediaType mediaType, @NonNull Headers headers) {
+        Charset charset = mediaType == null ? null : mediaType.getCharset().orElse(null);
+        if (charset == null) {
+            return getCharset(headers);
         }
-        return StandardCharsets.UTF_8;
+        return charset;
+    }
+
+    /**
+     * Resolve the charset.
+     *
+     * @param mediaType The mediaType
+     * @param headers   The headers
+     * @return The charset
+     */
+    static Optional<Charset> findCharset(@Nullable MediaType mediaType, @NonNull Headers headers) {
+        if (mediaType == null) {
+            return findCharset(headers);
+        }
+        return mediaType.getCharset().or(() -> findCharset(headers));
+    }
+
+    /**
+     * Resolve the charset.
+     *
+     * @param headers The headers
+     * @return The charset
+     */
+    static Optional<Charset> findCharset(@NonNull Headers headers) {
+        return Optional.ofNullable(findCharset0(headers));
+    }
+
+    @Nullable
+    private static Charset findCharset0(Headers headers) {
+        if (headers instanceof HttpHeaders httpHeaders) {
+            return httpHeaders.acceptCharset();
+        }
+        return null;
     }
 
     /**

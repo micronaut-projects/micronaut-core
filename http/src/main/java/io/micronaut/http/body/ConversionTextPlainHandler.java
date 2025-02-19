@@ -18,9 +18,11 @@ package io.micronaut.http.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -43,8 +45,9 @@ import java.io.OutputStream;
  *
  * @since 4.0.0
  * @author Jonas Konrad
- * @param <T> The tye
+ * @param <T> The type
  */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
@@ -87,11 +90,11 @@ final class ConversionTextPlainHandler<T> implements MessageBodyHandler<T> {
 
     @Override
     public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        if (mediaType != null) {
+            outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, mediaType);
         }
         try {
-            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, outgoingHeaders)));
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }

@@ -41,13 +41,14 @@ public interface InterceptorRegistry {
      * @param method The method interceptors
      * @param interceptors The pre-resolved interceptors
      * @param interceptorKind The interceptor kind
-     * @return An array of interceptors
      * @param <T> the bean type
+     * @return An array of interceptors
      */
-    @NonNull <T> Interceptor<T, ?>[] resolveInterceptors(
-            @NonNull Executable<T, ?> method,
-            @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-            @NonNull InterceptorKind interceptorKind
+    @NonNull
+    <T> Interceptor<T, ?>[] resolveInterceptors(
+        @NonNull Executable<T, ?> method,
+        @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
+        @NonNull InterceptorKind interceptorKind
     );
 
     /**
@@ -55,11 +56,12 @@ public interface InterceptorRegistry {
      *
      * @param constructor The constructor
      * @param interceptors The pre-resolved interceptors
-     * @return An array of interceptors
      * @param <T> The bean type
+     * @return An array of interceptors
      */
-    @NonNull <T> Interceptor<T, T>[] resolveConstructorInterceptors(
-            @NonNull BeanConstructor<T> constructor,
-            @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors
+    @NonNull
+    <T> Interceptor<T, T>[] resolveConstructorInterceptors(
+        @NonNull BeanConstructor<T> constructor,
+        @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors
     );
 }

@@ -12,6 +12,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -50,6 +51,65 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test inner introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test$Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @Introspected
+    record Foo(String name) {}
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD)
+    static class Bar {
+        String name;
+    }
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanType().simpleName == 'Foo'
+    }
+
+    void "test inner introspection - without outer annotation"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test$Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.value.OptionalMultiValues;
+import java.util.*;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+class Test {
+    @Introspected
+    record Foo(String name) {}
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD)
+    static class Bar {
+        String name;
+    }
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanType().simpleName == 'Foo'
+    }
 
     void "test annotations"() {
         when:
@@ -739,6 +799,59 @@ class Test {
 ''')
         expect:
         introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test read property by type is defined by its reader field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getReadProperty("foo", String.class).isEmpty()
+        introspection.getReadProperty("foo", Optional.class).get().type == Optional.class
+
+    }
+
+    void "test read property type is defined by its field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public void setFoo(Optional<String> foo) {
+        this.foo = foo.orElse(null);
+    }
+
+}
+''')
+        expect:
+        introspection.getReadProperty("foo", String.class).get().type == String.class
+        introspection.getReadProperty("foo", Optional.class).isEmpty()
     }
 
     void "test optional property type is defined by its setter"() {
@@ -5230,6 +5343,75 @@ class Holder<A extends Animal> {
         animal.isTypeVariable()
     }
 
+    void "test package private property introspection"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.MySuperclass;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is not introspected'
+        !introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test package private property introspection in same package"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('io.micronaut.inject.visitor.beans.Test', '''
+package io.micronaut.inject.visitor.beans;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test extends MySuperclass {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+        then: 'the property in this class is introspected'
+        introspection.getProperty("name").orElse(null)
+
+        and: 'the public property in the java superclass is introspected'
+        introspection.getProperty("publicProperty").orElse(null)
+
+        and: 'the private property in the java superclass is not introspected'
+        !introspection.getProperty("privateProperty").orElse(null)
+
+        and: 'the package private superclass property is introspected, as we are in the same package'
+        introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
     void "test private property 1"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
@@ -5255,6 +5437,7 @@ class OptionalDoubleHolder {
         introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
         introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
     }
+
     void "test private property 2"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
@@ -5304,6 +5487,23 @@ class Massive {
         introspection.getBeanProperties().size() == count
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10647")
+    void 'handles generic definitions as generated by protobuf'() {
+        when:
+        buildBeanIntrospection('test.MyMessage', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.Message;
+
+@Introspected
+class MyMessage extends Message {
+}
+''')
+        then:
+        noExceptionThrown()
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
@@ -5316,6 +5516,7 @@ class Massive {
 
     @SupportedAnnotationTypes("*")
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
+        @NonNull
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new io.micronaut.validation.visitor.IntrospectedValidationIndexesVisitor(), new IntrospectedTypeElementVisitor()]

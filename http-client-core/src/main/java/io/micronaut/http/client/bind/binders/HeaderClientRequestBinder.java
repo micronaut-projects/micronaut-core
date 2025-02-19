@@ -43,11 +43,8 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
             String headerValue = headerAnnotation.stringValue().orElse(null);
             MutableHttpHeaders headers = request.getHeaders();
 
-            if (StringUtils.isNotEmpty(headerName) &&
-                    StringUtils.isNotEmpty(headerValue) &&
-                    !headers.contains(headerName)
-            ) {
-                headers.set(headerName, headerValue);
+            if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
+                headers.setIfMissing(headerName, headerValue);
             }
         }
     }

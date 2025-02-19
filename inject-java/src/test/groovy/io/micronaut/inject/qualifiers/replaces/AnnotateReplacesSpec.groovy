@@ -8,6 +8,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -103,6 +104,7 @@ class Product {
 
     @SupportedAnnotationTypes("*")
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
+        @NonNull
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new MySpecializesVisitor(), new MyProducesVisitor()]
@@ -117,6 +119,7 @@ class Product {
             });
         }
 
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING
@@ -138,6 +141,7 @@ class Product {
             element.annotate(Bean)
         }
 
+        @NonNull
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING

@@ -57,10 +57,10 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLoggerContext()
-                .getLoggerList()
-                .stream()
-                .map(LogbackLoggingSystem::toLoggerConfiguration)
-                .collect(Collectors.toList());
+            .getLoggerList()
+            .stream()
+            .map(LogbackLoggingSystem::toLoggerConfiguration)
+            .collect(Collectors.toList());
     }
 
     @Override
@@ -87,9 +87,9 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
      */
     private static LoggerConfiguration toLoggerConfiguration(Logger logger) {
         return new LoggerConfiguration(
-                logger.getName(),
-                toLogLevel(logger.getLevel()),
-                toLogLevel(logger.getEffectiveLevel())
+            logger.getName(),
+            toLogLevel(logger.getLevel()),
+            toLogLevel(logger.getEffectiveLevel())
         );
     }
 

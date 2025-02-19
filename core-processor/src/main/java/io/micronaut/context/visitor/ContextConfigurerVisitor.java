@@ -41,7 +41,7 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
     );
 
     @Override
-    public VisitorKind getVisitorKind() {
+    public @NonNull VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 

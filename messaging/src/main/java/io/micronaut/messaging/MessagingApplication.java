@@ -57,7 +57,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     }
 
     @Override
-    public ApplicationContext getApplicationContext() {
+    public @NonNull ApplicationContext getApplicationContext() {
         return applicationContext;
     }
 
@@ -80,16 +80,14 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     @NonNull
     public MessagingApplication start() {
         ApplicationContext applicationContext = getApplicationContext();
-        if (applicationContext != null) {
-            if (!applicationContext.isRunning()) {
-                try {
-                    applicationContext.start();
-                } catch (Throwable e) {
-                    throw new ApplicationStartupException("Error starting messaging server: " + e.getMessage(), e);
-                }
+        if (!applicationContext.isRunning()) {
+            try {
+                applicationContext.start();
+            } catch (Throwable e) {
+                throw new ApplicationStartupException("Error starting messaging server: " + e.getMessage(), e);
             }
-            applicationContext.publishEvent(new ApplicationStartupEvent(this));
         }
+        applicationContext.publishEvent(new ApplicationStartupEvent(this));
         return this;
     }
 
@@ -97,7 +95,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     @NonNull
     public MessagingApplication stop() {
         ApplicationContext applicationContext = getApplicationContext();
-        if (applicationContext != null && applicationContext.isRunning()) {
+        if (applicationContext.isRunning()) {
             applicationContext.publishEvent(new ApplicationShutdownEvent(this));
             applicationContext.stop();
         }
@@ -105,7 +103,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     }
 
     @Override
-    public String getDescription() {
+    public @NonNull String getDescription() {
         Collection<BeanDefinition<?>> beanDefinitions = applicationContext.getBeanDefinitions(Qualifiers.byStereotype(MessageListener.class));
         return beanDefinitions.size() + " active message listeners.";
     }

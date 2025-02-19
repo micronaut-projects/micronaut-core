@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint;
 
 /**
  * If a bean of type {@link EndpointSensitivityHandler} is present the {@link EndpointsFilter} is not loaded.
+ *
  * @author Sergio del Amo
  * @since 4.0.0
  */

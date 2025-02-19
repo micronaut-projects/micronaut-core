@@ -41,8 +41,8 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
     private final CurrentHealthStatus currentHealthStatus;
 
     /**
-     * @param eventPublisher      To publish the events related to heartbeat
-     * @param configuration       The configurations for heartbeat
+     * @param eventPublisher To publish the events related to heartbeat
+     * @param configuration The configurations for heartbeat
      * @param currentHealthStatus The current status of health indicator
      */
     public HeartbeatTask(ApplicationEventPublisher eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
@@ -54,7 +54,7 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
      * Publish the heartbeat event with current health status.
      */
     @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}",
-               initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
+        initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
     public void pulsate() {
         for (ServiceInstance instance : eventsReference) {
             eventPublisher.publishEvent(new HeartbeatEvent(instance, currentHealthStatus.current()));

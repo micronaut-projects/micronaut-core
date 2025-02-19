@@ -10,7 +10,7 @@ abstract class AbstractClass : AbstractSuperClass() {
 
     abstract fun test(name: String): String
 
-    fun nonAbstract(name: String): String {
+    open fun nonAbstract(name: String): String {
         return test(name)
     }
 }

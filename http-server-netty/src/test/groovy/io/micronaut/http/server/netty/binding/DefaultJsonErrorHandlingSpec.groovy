@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.binding
 
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -36,6 +37,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
     }
 
     @Controller("/errors")
+    @Requires(property = "spec.name", value = "DefaultJsonErrorHandlingSpec")
     static class ErrorsController {
         @Post("/string")
         String string(@Body String text) {

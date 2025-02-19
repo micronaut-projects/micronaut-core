@@ -29,6 +29,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
+import io.micronaut.web.router.RouteAttributes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -249,6 +250,20 @@ public class ResponseFilterTest {
             .run();
     }
 
+    @Test
+    public void responseFilterHeadBody() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.HEAD("/response-filter/head-body"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .header("X-HEAD-BODY", "foo")
+                    .build());
+            })
+            .run();
+    }
+
     @ServerFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -320,6 +335,11 @@ public class ResponseFilterTest {
         public CompletionStage<MutableHttpResponse<?>> responseFilterReplaceCompletionResponse(HttpResponse<?> response) {
             return CompletableFuture.completedStage(HttpResponse.ok("responseFilterReplaceCompletionResponse " + response.body()));
         }
+
+        @ResponseFilter("/response-filter/head-body")
+        public void responseFilterHeadBody(MutableHttpResponse<?> response) {
+            response.header("X-HEAD-BODY", RouteAttributes.getHeadBody(response).map(o -> (String) o).orElse(""));
+        }
     }
 
     @Controller
@@ -387,6 +407,11 @@ public class ResponseFilterTest {
 
         @Get("/response-filter/replace-completion-response")
         public String responseFilterReplaceCompletionResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/head-body")
+        public String responseFilterHeadBody() {
             return "foo";
         }
     }

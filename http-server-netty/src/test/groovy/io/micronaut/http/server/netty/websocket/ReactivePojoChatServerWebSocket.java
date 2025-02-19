@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -26,6 +27,7 @@ import org.reactivestreams.Publisher;
 
 import java.util.function.Predicate;
 
+@Requires(property = "spec.name", value = "PojoWebSocketSpec")
 @ServerWebSocket("/pojo/chat/{topic}/{username}")
 public class ReactivePojoChatServerWebSocket {
 

@@ -231,7 +231,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([
                 'teams.one.value': 'My value',
                 'teams.one.super-value': 'My super value',
-                'teams.one.super-value-with-override': 'My super overriden value',
+                'teams.one.super-value-with-override': 'My super overridden value',
                 'teams.one.thing': 'This is the thing',
                 'teams.one.child-thing': 'My child thing',
         ])
@@ -243,7 +243,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         teamOne.name == 'one'
         teamOne.value == 'My value'
         teamOne.superValue == 'My super value'
-        teamOne.superValueWithOverride == 'My super overriden value'
+        teamOne.superValueWithOverride == 'My super overridden value'
         teamOne.thing == 'This is the thing'
         teamOne.childThing == 'My child thing'
     }

@@ -19,23 +19,25 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
+import jakarta.annotation.Nullable;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Handler for SSE events.
@@ -56,25 +58,29 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
     private static final List<MediaType> JSON_TYPE_LIST = List.of(MediaType.APPLICATION_JSON_TYPE);
 
-    private final Supplier<MessageBodyWriter<Object>> jsonWriter;
+    @Nullable
+    private final MessageBodyWriter<Object> specificBodyWriter;
+    private final MessageBodyHandlerRegistry registry;
 
+    @Inject
     TextStreamBodyWriter(MessageBodyHandlerRegistry registry) {
-        this(SupplierUtil.memoized(() -> registry.findWriter(Argument.OBJECT_ARGUMENT, JSON_TYPE_LIST).orElse(new DynamicMessageBodyWriter(registry, JSON_TYPE_LIST))));
+        this(registry, null);
     }
 
-    private TextStreamBodyWriter(Supplier<MessageBodyWriter<Object>> jsonWriter) {
-        this.jsonWriter = jsonWriter;
+    private TextStreamBodyWriter(MessageBodyHandlerRegistry registry, @Nullable MessageBodyWriter<Object> specificBodyWriter) {
+        this.registry = registry;
+        this.specificBodyWriter = specificBodyWriter;
     }
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new TextStreamBodyWriter<>(SupplierUtil.memoized(() -> jsonWriter.get().createSpecific(getBodyType(type))));
+        return new TextStreamBodyWriter<>(registry, registry.findWriter(getBodyType(type), JSON_TYPE_LIST).orElse(null));
     }
 
     @SuppressWarnings("unchecked")
     @NonNull
     private static Argument<Object> getBodyType(Argument<?> type) {
-        if (type.getType() == Event.class) {
+        if (type.getType().equals(Event.class)) {
             return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         } else {
             return (Argument<Object>) type;
@@ -83,28 +89,51 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     @Override
     public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        Event<?> event = object instanceof Event<?> e ? e : Event.of(object);
+        ByteBufferOutput output = new ByteBufferOutput(bufferFactory);
+        write0(type, mediaType, object, outgoingHeaders, output);
+        return output.buffer;
+    }
 
+    @Override
+    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        write0(type, mediaType, object, outgoingHeaders, new StreamOutput(outputStream));
+    }
+
+    private void write0(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, Output output) {
+        Argument<Object> bodyType = (Argument<Object>) type;
+        Event<?> event;
+        if (object instanceof Event<?> e) {
+            event = e;
+            bodyType = (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        } else {
+            event = Event.of(object);
+        }
         byte[] body;
-        if (event.getData() instanceof CharSequence s) {
+        Object data = event.getData();
+        if (data instanceof CharSequence s) {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
-            ByteBuffer buf = ((MessageBodyWriter) jsonWriter.get()).writeTo(getBodyType(type), MediaType.APPLICATION_JSON_TYPE, event.getData(), outgoingHeaders, bufferFactory);
-            body = buf.toByteArray();
-            if (buf instanceof ReferenceCounted rc) {
-                rc.release();
+            MessageBodyWriter<Object> messageBodyWriter = specificBodyWriter;
+            if (messageBodyWriter == null) {
+                messageBodyWriter = registry.findWriter(bodyType, JSON_TYPE_LIST).orElse(null);
+                if (messageBodyWriter == null) {
+                    bodyType = Argument.ofInstance(data);
+                    messageBodyWriter = registry.getWriter(bodyType, JSON_TYPE_LIST);
+                }
             }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            messageBodyWriter.writeTo(bodyType, MediaType.APPLICATION_JSON_TYPE, data, outgoingHeaders, baos);
+            body = baos.toByteArray();
         }
 
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.TEXT_EVENT_STREAM_TYPE);
 
-        ByteBuffer eventData = bufferFactory.buffer(body.length + 10);
-        writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
-        writeAttribute(eventData, ID_PREFIX, event.getId());
-        writeAttribute(eventData, EVENT_PREFIX, event.getName());
+        writeAttribute(output, COMMENT_PREFIX, event.getComment());
+        writeAttribute(output, ID_PREFIX, event.getId());
+        writeAttribute(output, EVENT_PREFIX, event.getName());
         Duration retry = event.getRetry();
         if (retry != null) {
-            writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
+            writeAttribute(output, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
 
         // Write the data
@@ -114,18 +143,12 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             if (end == -1) {
                 end = body.length - 1;
             }
-            eventData.write(DATA_PREFIX).write(body, start, end - start + 1);
+            output.write(DATA_PREFIX).write(body, start, end - start + 1);
             start = end + 1;
         }
 
         // Write new lines for event separation
-        eventData.write(NEWLINE).write(NEWLINE);
-        return eventData;
-    }
-
-    @Override
-    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        throw new UnsupportedOperationException();
+        output.write(NEWLINE).write(NEWLINE);
     }
 
     private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
@@ -142,11 +165,93 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
      * @param attribute The attribute
      * @param value     The value
      */
-    private static void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
+    private static void writeAttribute(Output eventData, byte[] attribute, String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)
                 .write(NEWLINE);
+        }
+    }
+
+    private sealed interface Output {
+        void allocate(int expectedLength);
+
+        Output write(byte[] b);
+
+        Output write(byte[] b, int off, int len);
+
+        Output write(String value, Charset charset);
+    }
+
+    private static final class ByteBufferOutput implements Output {
+        final ByteBufferFactory<?, ?> bufferFactory;
+        ByteBuffer<?> buffer;
+
+        ByteBufferOutput(ByteBufferFactory<?, ?> bufferFactory) {
+            this.bufferFactory = bufferFactory;
+        }
+
+        @Override
+        public void allocate(int expectedLength) {
+            buffer = bufferFactory.buffer(expectedLength);
+        }
+
+        @Override
+        public Output write(byte[] b) {
+            buffer.write(b);
+            return this;
+        }
+
+        @Override
+        public Output write(byte[] b, int off, int len) {
+            buffer.write(b, off, len);
+            return this;
+        }
+
+        @Override
+        public Output write(String value, Charset charset) {
+            buffer.write(value, charset);
+            return this;
+        }
+    }
+
+    private record StreamOutput(OutputStream stream) implements Output {
+        @Override
+        public void allocate(int expectedLength) {
+        }
+
+        private void handle(IOException ioe) {
+            throw new CodecException("Failed to write SSE data", ioe);
+        }
+
+        @Override
+        public Output write(byte[] b) {
+            try {
+                stream.write(b);
+            } catch (IOException e) {
+                handle(e);
+            }
+            return this;
+        }
+
+        @Override
+        public Output write(byte[] b, int off, int len) {
+            try {
+                stream.write(b, off, len);
+            } catch (IOException e) {
+                handle(e);
+            }
+            return this;
+        }
+
+        @Override
+        public Output write(String value, Charset charset) {
+            try {
+                stream.write(value.getBytes(charset));
+            } catch (IOException e) {
+                handle(e);
+            }
+            return this;
         }
     }
 }

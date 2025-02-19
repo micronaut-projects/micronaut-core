@@ -20,6 +20,7 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.GenericArgument;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
@@ -96,6 +97,69 @@ public interface BeanLocator {
         return getBean(
                 beanType,
                 null
+        );
+    }
+
+    /**
+     * Obtains a {@link BeanProvider} for the given type and qualifier.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type parameter
+     * @return The provider
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.5.0
+     */
+    default @NonNull <T> BeanProvider<T> getProvider(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return getProvider(Argument.of(beanType), qualifier);
+    }
+
+    /**
+     * Obtains a {@link BeanProvider} for the given type and qualifier.
+     *
+     * @param beanType  The bean type
+     * @param <T>       The bean type parameter
+     * @return The provider
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.5.0
+     */
+    default @NonNull <T> BeanProvider<T> getProvider(@NonNull Class<T> beanType) {
+        return getProvider(Argument.of(beanType), null);
+    }
+
+    /**
+     * Obtains a {@link BeanProvider} for the given type and qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type parameter
+     * @return The provider
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.5.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    default @NonNull <T> BeanProvider<T> getProvider(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Argument providerArgument = Argument.of(BeanProvider.class, beanType);
+        return (BeanProvider<T>) getBean(
+            providerArgument,
+            qualifier
+        );
+    }
+
+    /**
+     * Obtains a {@link BeanProvider} for the given type and qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param <T>       The bean type parameter
+     * @return A provider
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.5.0
+     */
+    default @NonNull <T> BeanProvider<T> getProvider(@NonNull Argument<T> beanType) {
+        return getProvider(
+            beanType,
+            null
         );
     }
 

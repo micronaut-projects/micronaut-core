@@ -28,7 +28,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Generic stereotype annotation that should be applied to other annotations that indicate to Micronaut,
- *  which classes are message listeners.
+ * which classes are message listeners.
  *
  * @author Graeme Rocher
  * @since 1.0

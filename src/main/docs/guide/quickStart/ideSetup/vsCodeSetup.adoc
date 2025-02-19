@@ -1,34 +1,27 @@
-The Micronaut framework can be set up within Visual Studio Code in one of two ways.
+The Micronaut framework can easily be set up within Visual Studio Code by installing the following two extensions:
 
-==== Option 1) GraalVM Extension Pack for Java
+* https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[The Microsoft Extension Pack for Java]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools[Tools for Micronaut® framework]
 
-The prefered way is using the https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.graalvm-pack[GraalVM Extension Pack for Java] which ships with an https://netbeans.apache.org/[Apache NetBeans] Language server.
+These extensions can be installed by clicking on the *Install* button in the banner of the pages linked above, or, by searching for the extensions within VS Code.
 
-NOTE: It is not possible to have both the official https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack] and the GraalVM Extension Pack for Java installed at the same time so if you prefer the former, skip this section and go to Option 2)
+image::installing-tools-for-micronaut-vs-code.gif[Installing Micronaut tools, 1024, 1024]
 
-The https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.graalvm[GraalVM Tools for Java] are preferred since they delegate to the build system for running applications and tests which means there is no additional setup or differences with regard to how javac is configured for annotation processing when compared to the https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack] which is based on the Eclipse compiler.
+Once they are installed they will give you access to a host of Micronaut specific features such as:
 
-The GraalVM Extension Pack also includes the https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut[GraalVM Tools for Micronaut] extension which features:
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut#create-a-new-micronaut-project[An application creation wizard]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#view-defined-beans-and-endpoints[Viewing beans and REST endpoints]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#compose-rest-queries[Composing REST queries and running them]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#editor-support-for-micronaut-expression-language[Support for the Micronaut Expression Language]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#monitor-and-manage-your-micronaut-application[A Micronaut Tools Activity view for running and monitoring your applications]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#observe-your-micronaut-application-using-the-micronaut-control-panel[Support for using the Micronaut Control Panel]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#debug-your-micronaut-application[Debugging your application]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#package-your-micronaut-application[Support for packaging your application as a container]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#connect-to-an-oracle-autonomous-database[Support for connecting to and working with an Oracle Database]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#deploy-your-micronaut-application-to-oracle-cloud-infrastructure[Advanced support for deploying your applications to Oracle Cloud Infrastructure]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#create-entity-classes-and-repository-interfaces-from-an-existing-database-schema[Advanced support for creating Micronaut Data entities, repositories and controllers from existing database schemas]
+* https://marketplace.visualstudio.com/items?itemName=oracle-labs-graalvm.micronaut-tools#create-tests-for-micronaut-controller-endpoints[Test creation for Micronaut Data controllers endpoints]
 
-* An application creation wizard
-* Code completion for YAML configuration
-* Pallet commands to build, deploy, create Native Images etc.
-
-==== Option 2) Red Hat/Microsoft Java Extension Pack
-
-First install the https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack].
-
-TIP: You can also optionally install https://marketplace.visualstudio.com/items?itemName=Pivotal.vscode-spring-boot[STS] to enable code completion for `application.yml`.
-
-If you use Gradle, prior to opening the project in VSC run the following command from a terminal window:
-
-[source,bash]
-----
-./gradlew eclipse
-----
-
-NOTE: If you don't run the above command beforehand then annotation processing will not be configured correctly and the application will not work.
-
-Once the extension pack is installed just type `code .` in any project directory and the project will be automatically set up.
+Once the extensions are installed just type `code .` in any Micronaut project directory and the project will be opened within VS Code.
 
 NOTE: For macOS, you need to install the `code` command https://code.visualstudio.com/docs/setup/mac[by following these instructions].

@@ -21,10 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -36,18 +33,18 @@ import java.util.function.Consumer;
 public final class HttpResponseAssertion {
     private final HttpStatus httpStatus;
     private final Map<String, String> headers;
-    private final BodyAssertion<?, ?> bodyAssertion;
+    private final List<BodyAssertion<?, ?>> bodyAssertions;
 
     @Nullable
     private final Consumer<HttpResponse<?>> responseConsumer;
 
     private HttpResponseAssertion(HttpStatus httpStatus,
                                   Map<String, String> headers,
-                                  BodyAssertion<?, ?> bodyAssertion,
+                                  List<BodyAssertion<?, ?>> bodyAssertions,
                                   @Nullable Consumer<HttpResponse<?>> responseConsumer) {
         this.httpStatus = httpStatus;
         this.headers = headers;
-        this.bodyAssertion = bodyAssertion;
+        this.bodyAssertions = bodyAssertions;
         this.responseConsumer = responseConsumer;
     }
 
@@ -77,8 +74,8 @@ public final class HttpResponseAssertion {
      * @return Expected HTTP Response body
      */
 
-    public BodyAssertion<?, ?> getBody() {
-        return bodyAssertion;
+    public List<BodyAssertion<?, ?>> getBody() {
+        return bodyAssertions;
     }
 
     /**
@@ -95,7 +92,7 @@ public final class HttpResponseAssertion {
     public static class Builder {
         private HttpStatus httpStatus;
         private Map<String, String> headers;
-        private BodyAssertion<?, ?> bodyAssertion;
+        private List<BodyAssertion<?, ?>> bodyAssertions;
 
         private Consumer<HttpResponse<?>> responseConsumer;
 
@@ -139,8 +136,7 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion Builder
          */
         public Builder body(String containsBody) {
-            this.bodyAssertion = BodyAssertion.builder().body(containsBody).contains();
-            return this;
+            return body(BodyAssertion.builder().body(containsBody).contains());
         }
 
         /**
@@ -149,7 +145,10 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion Builder
          */
         public Builder body(BodyAssertion<?, ?> bodyAssertion) {
-            this.bodyAssertion = bodyAssertion;
+            if (this.bodyAssertions == null) {
+                this.bodyAssertions = new ArrayList<>();
+            }
+            this.bodyAssertions.add(bodyAssertion);
             return this;
         }
 
@@ -168,7 +167,7 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion
          */
         public HttpResponseAssertion build() {
-            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, bodyAssertion, responseConsumer);
+            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, bodyAssertions, responseConsumer);
         }
     }
 }

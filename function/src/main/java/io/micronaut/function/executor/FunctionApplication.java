@@ -54,7 +54,7 @@ public class FunctionApplication extends StreamFunctionExecutor {
      * Run the given {@link StreamFunctionExecutor} for the given arguments.
      *
      * @param functionExecutor The function executor
-     * @param args             The arguments
+     * @param args The arguments
      */
     public static void run(StreamFunctionExecutor functionExecutor, String... args) {
         parseData(args, (data, isDebug) -> {

@@ -23,6 +23,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanContextConfigurable;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -34,7 +35,6 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.context.BeanContextConfigurable;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,12 +80,12 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
             return resolveToNone((ExecutableMethod<?, ?>) method, interceptorKind, annotationMetadata);
         }
         final Interceptor<T, ?>[] resolvedInterceptors = findInterceptors(
-                method.getDeclaringType(),
-                interceptors,
-                interceptorKind,
-                applicableBindings,
-                true,
-                false
+            method.getDeclaringType(),
+            interceptors,
+            interceptorKind,
+            applicableBindings,
+            true,
+            false
         );
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described d ? d.getDescription(true) : method.toString());
@@ -103,7 +103,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                                         AnnotationMetadata annotationMetadata) {
         if (interceptorKind == InterceptorKind.INTRODUCTION) {
             if (annotationMetadata.hasStereotype(Adapter.class)) {
-                return new MethodInterceptor[]{new AdapterIntroduction(beanContext, method)};
+                return new MethodInterceptor[] {new AdapterIntroduction(beanContext, method)};
             } else {
                 throw new IllegalStateException("At least one @Introduction method interceptor required, but missing for method: " + method.getDescription(true) + ". Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @InterceptorBean(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
 
@@ -131,7 +131,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {
             Interceptor<T, ?> bean = beanRegistration.getBean();
             if (selectMethodInterceptor && (bean instanceof MethodInterceptor || !(bean instanceof ConstructorInterceptor))
-                    || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor))) {
+                || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor))) {
                 selectedInterceptors.add(bean);
             }
         }
@@ -161,9 +161,9 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
         // these are the binding declared on the interceptor itself
         // an interceptor can declare one or more bindings
         final Collection<AnnotationValue<?>> interceptorValues = AbstractInterceptorChain
-                .resolveInterceptorValues(
-                        beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind
-                );
+            .resolveInterceptorValues(
+                beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind
+            );
         if (interceptorValues.isEmpty()) {
             // Bean is an interceptor but no bindings???
             return false;
@@ -205,7 +205,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,
-                                              AnnotationValue<?> applicableValue) {
+                                           AnnotationValue<?> applicableValue) {
         return applicableValue.classValue("interceptorType")
             .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
     }
@@ -222,12 +222,12 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
             InterceptorKind.AROUND_CONSTRUCT
         );
         final Interceptor<T, T>[] resolvedInterceptors = findInterceptors(
-                constructor.getDeclaringBeanType(),
-                (Collection) interceptors,
-                InterceptorKind.AROUND_CONSTRUCT,
-                applicableBindings,
-                false,
-                true
+            constructor.getDeclaringBeanType(),
+            (Collection) interceptors,
+            InterceptorKind.AROUND_CONSTRUCT,
+            applicableBindings,
+            false,
+            true
         );
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for constructor: {} - {}", resolvedInterceptors.length, InterceptorKind.AROUND_CONSTRUCT, interceptors.size(), constructor.getDeclaringBeanType(), constructor.getDescription(true));

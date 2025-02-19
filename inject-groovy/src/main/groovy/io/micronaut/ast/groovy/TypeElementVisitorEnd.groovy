@@ -23,7 +23,6 @@ import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
@@ -34,6 +33,7 @@ import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
+
 /**
  * Finishes the type element visitors.
  *
@@ -58,7 +58,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
-            for(loadedVisitor in values) {
+            for (loadedVisitor in values) {
                 try {
                     GroovyVisitorContext visitorContext = classWriterOutputVisitor != null ?
                             new GroovyVisitorContext(source, compilationUnit, classWriterOutputVisitor) :

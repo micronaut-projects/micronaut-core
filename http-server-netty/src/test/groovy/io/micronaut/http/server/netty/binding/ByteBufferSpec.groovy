@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -34,6 +35,7 @@ class ByteBufferSpec extends Specification {
 
     @Inject
     @Client("/")
+    @Shared
     @AutoCleanup
     HttpClient rxClient
 

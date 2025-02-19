@@ -20,8 +20,8 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -33,6 +33,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -141,23 +142,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
-        DefaultFilterRoute route = new BeanDefinitionFilterRoute(
-                pathPattern,
-                beanLocator,
-                beanDefinition
-        );
-        filterRoutes.add(route);
-        return route;
+    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> definition) {
+        FilterRoute fr = new DefaultFilterRoute(
+            pathPattern,
+            () -> GenericHttpFilter.createLegacyFilter(beanLocator.getBean(definition), new FilterOrder.Dynamic(definition.getOrder())),
+            definition,
+            false);
+        filterRoutes.add(fr);
+        return fr;
     }
 
-    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
-        FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return annotationMetadata;
-            }
-        };
+    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata, boolean isPreMatching) {
+        FilterRoute fr = new DefaultFilterRoute(internalFilter, annotationMetadata, isPreMatching);
         filterRoutes.add(fr);
         return fr;
     }
@@ -419,7 +415,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
-        UriRoute route;
+        DefaultUriRoute route;
         if (currentParentRoute != null) {
             route = new DefaultUriRoute(
                 httpMethod,
@@ -429,7 +425,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 httpMethodName,
                 conversionService
             );
-            currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
+            currentParentRoute.nestedRoutes.add(route);
         } else {
             route = new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
         }
@@ -460,11 +456,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Abstract class for base {@link MethodBasedRouteInfo}.
      */
-    abstract class AbstractRoute implements Route {
+    abstract static class AbstractRoute implements Route {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<Object, Object> targetMethod;
         protected final ConversionService conversionService;
-        protected List<MediaType> consumesMediaTypes = List.of();
+        protected List<MediaType> consumesMediaTypes;
         protected List<MediaType> producesMediaTypes = List.of();
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
@@ -662,13 +658,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public String toString() {
-            return new StringBuilder().append(' ')
-                .append(error.getSimpleName())
-                .append(" -> ")
-                .append(targetMethod.getDeclaringType().getSimpleName())
-                .append('#')
-                .append(targetMethod)
-                .toString();
+            return ' ' + error.getSimpleName()
+                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
+                    + '#' + targetMethod;
         }
     }
 
@@ -901,16 +893,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public String toString() {
-            return new StringBuilder(getHttpMethodName()).append(' ')
-                .append(uriMatchTemplate)
-                .append(" -> ")
-                .append(targetMethod.getDeclaringType().getSimpleName())
-                .append('#')
-                .append(targetMethod.getName())
-                .append(" (")
-                .append(String.join(",", consumesMediaTypes))
-                .append(")")
-                .toString();
+            return getHttpMethodName() + ' '
+                    + uriMatchTemplate
+                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
+                    + '#' + targetMethod.getName()
+                    + " (" + String.join(",", consumesMediaTypes) + ')';
         }
 
         @Override
@@ -974,7 +961,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public int compareTo(UriRoute o) {
+        public int compareTo(@NonNull UriRoute o) {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
         }
 
@@ -1207,7 +1194,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         private ResourceRoute handleExclude(List<HttpMethod> excluded) {
-            Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
+            var newMap = new LinkedHashMap<HttpMethod, Route>();
             this.resourceRoutes.forEach((key, value) -> {
                 if (excluded.contains(key)) {
                     DefaultRouteBuilder.this.uriRoutes.remove(value);

@@ -11,5 +11,6 @@ The implementation based on https://openjdk.org/groups/net/httpclient/intro.html
 * Streaming support.
 * Multipart requests.
 * H2C and HTTP/3.
+* pcap logging
 
 If you require any of these, we recommend you use the <<nettyHttpClient, implementation of the HTTP Client based on Netty>>.

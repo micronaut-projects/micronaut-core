@@ -23,8 +23,8 @@ import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
-import io.micronaut.jackson.core.tree.JsonStreamTransfer;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
+import io.micronaut.jackson.core.tree.JsonStreamTransfer;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
@@ -64,8 +64,8 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     /**
      * Creates a new JacksonProcessor.
      *
-     * @param streamArray           Whether arrays should be streamed
-     * @param jsonFactory           Factory to use for creating the parser
+     * @param streamArray Whether arrays should be streamed
+     * @param jsonFactory Factory to use for creating the parser
      * @param deserializationConfig The deserialization configuration (in particular bignum handling)
      */
     public JacksonCoreProcessor(boolean streamArray, JsonFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {

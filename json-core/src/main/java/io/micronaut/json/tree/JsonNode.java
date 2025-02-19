@@ -36,11 +36,13 @@ import java.util.Objects;
  */
 @Experimental
 public abstract class JsonNode {
+
     JsonNode() {
     }
 
     /**
      * Create a new {@link JsonNode} representing this value.
+     *
      * @param value to be converted to {@link JsonNode}
      * @return The {@link JsonNode} representing this value
      * @since 4.0.0
@@ -63,7 +65,7 @@ public abstract class JsonNode {
             return createArrayNode(list.stream().map(JsonNode::from).toList());
         }
         if (value instanceof Map<?, ?> map) {
-            Map<String, JsonNode> newMap = CollectionUtils.newLinkedHashMap(map.size());
+            var newMap = CollectionUtils.<String, JsonNode>newLinkedHashMap(map.size());
             for (Map.Entry<?, ?> e : map.entrySet()) {
                 Object key = e.getKey();
                 if (key instanceof String s) {
@@ -192,6 +194,7 @@ public abstract class JsonNode {
 
     /**
      * Get the value reprinting this node.
+     *
      * @return The value of the node
      * @since 4.0.0
      */
