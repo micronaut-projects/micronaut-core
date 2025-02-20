@@ -16,6 +16,8 @@ dependencies {
     compileOnly(libs.graal)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.common)
+
+    testImplementation(libs.managed.jackson.annotations)
 }
 
 spotless {
