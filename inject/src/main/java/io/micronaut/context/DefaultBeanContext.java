@@ -2670,9 +2670,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void loadEagerBeans(BeanDefinitionProducer producer, Collection<BeanDefinition<Object>> collector) {
-        BeanDefinition<Object> definition = producer.getDefinitionIfEnabled(this, null, true);
-        if (definition != null) {
-            collector.add(definition);
+        BeanDefinitionReference<Object> reference = producer.getReferenceIfEnabled(this, null);
+        if (reference != null) {
+            BeanDefinition<Object> beanDefinition = reference.load(this);
+            try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
+                if (beanDefinition.isEnabled(this, resolutionContext)) {
+                    collector.add(beanDefinition);
+                }
+            }
         }
     }
 
