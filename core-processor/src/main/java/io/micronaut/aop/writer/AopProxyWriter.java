@@ -59,13 +59,13 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
 import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -1125,7 +1125,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         proxyBeanDefinitionWriter.accept(visitor);
         try (OutputStream out = visitor.visitClass(proxyFullName, getOriginatingElements())) {
-            out.write(new ByteCodeWriter().write(proxyBuilder.build()));
+            out.write(ByteCodeWriterUtils.writeByteCode(proxyBuilder.build(), visitorContext));
         }
     }
 

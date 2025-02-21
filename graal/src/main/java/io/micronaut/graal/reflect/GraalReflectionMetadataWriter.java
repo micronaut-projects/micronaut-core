@@ -20,9 +20,10 @@ import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -53,12 +54,15 @@ final class GraalReflectionMetadataWriter implements ClassOutputWriter {
     private final ClassElement originatingElement;
     private final AnnotationMetadata annotationMetadata;
     private final String className;
+    private final VisitorContext visitorContext;
 
     public GraalReflectionMetadataWriter(ClassElement originatingElement,
-                                         AnnotationMetadata annotationMetadata) {
+                                         AnnotationMetadata annotationMetadata,
+                                         VisitorContext visitorContext) {
         this.annotationMetadata = annotationMetadata;
         this.originatingElement = originatingElement;
         this.className = resolveName(originatingElement);
+        this.visitorContext = visitorContext;
     }
 
     private static String resolveName(ClassElement originatingElement) {
@@ -95,7 +99,7 @@ final class GraalReflectionMetadataWriter implements ClassOutputWriter {
             if (!staticInit.isEmpty()) {
                 classDefBuilder.addStaticInitializer(StatementDef.multi(staticInit));
             }
-            outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
         }
         classWriterOutputVisitor.visitServiceDescriptor(
             GraalReflectionConfigurer.class,

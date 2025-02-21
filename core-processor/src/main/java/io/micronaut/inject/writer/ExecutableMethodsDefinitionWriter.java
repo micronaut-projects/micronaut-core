@@ -29,7 +29,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -106,16 +106,18 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     private ClassDef.ClassDefBuilder classDefBuilder;
 
     private final OriginatingElements originatingElements;
+    private final VisitorContext visitorContext;
 
     public ExecutableMethodsDefinitionWriter(EvaluatedExpressionProcessor evaluatedExpressionProcessor,
                                              AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
-                                             OriginatingElements originatingElements) {
+                                             OriginatingElements originatingElements, VisitorContext visitorContext) {
         this.originatingElements = originatingElements;
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
         this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
+        this.visitorContext = visitorContext;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
         this.methodDispatchWriter = new DispatchWriter();
@@ -227,7 +229,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElements.getOriginatingElements())) {
-            outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
         }
     }
 

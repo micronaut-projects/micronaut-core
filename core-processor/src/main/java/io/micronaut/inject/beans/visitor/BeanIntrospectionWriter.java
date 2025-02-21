@@ -48,13 +48,13 @@ import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
 import io.micronaut.inject.writer.EvaluatedExpressionProcessor;
-import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.MethodGenUtils;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -206,6 +206,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
     private final OriginatingElements originatingElements;
 
     private CopyConstructorDispatchTarget copyConstructorDispatchTarget;
+    private VisitorContext visitorContext;
 
     /**
      * Default constructor.
@@ -226,6 +227,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         this.originatingElements = OriginatingElements.of(beanClassElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
+        this.visitorContext = visitorContext;
     }
 
     /**
@@ -791,7 +793,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
-            outputStream.write(new ByteCodeWriter(false, true).write(classDefBuilder.build()));
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
         }
     }
 
