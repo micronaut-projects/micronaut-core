@@ -18,6 +18,7 @@ package io.micronaut.runtime.server;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -38,7 +39,7 @@ import java.util.concurrent.TimeoutException;
 @Singleton
 @Requires(bean = GracefulShutdownManager.class)
 @Requires(property = GracefulShutdownConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-public final class GracefulShutdownListener implements ApplicationEventListener<ShutdownEvent> {
+public final class GracefulShutdownListener implements ApplicationEventListener<ShutdownEvent>, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(GracefulShutdownListener.class);
 
     private final GracefulShutdownManager manager;
@@ -73,5 +74,10 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
         } catch (TimeoutException e) {
             LOG.warn("Timeout hit in graceful shutdown, forcing stop");
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE;
     }
 }
