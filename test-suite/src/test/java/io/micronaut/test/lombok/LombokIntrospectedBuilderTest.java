@@ -16,6 +16,15 @@ import java.util.UUID;
 public class LombokIntrospectedBuilderTest {
 
     @Test
+    void testLombokInheritance() {
+        Foo foo = Foo.builder().name("Name").build();
+        final BeanIntrospection<Foo> introspection = BeanIntrospection.getIntrospection(Foo.class);
+
+        Assertions.assertEquals("Name", foo.getName());
+        Assertions.assertNotNull(introspection);
+    }
+
+    @Test
     void testNoArgsAndAllArgsConstructor() {
         BeanIntrospection<BarCommand> introspection = BeanIntrospection.getIntrospection(BarCommand.class);
 
