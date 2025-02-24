@@ -16,7 +16,6 @@
 package io.micronaut.runtime.server;
 
 import com.fasterxml.jackson.annotation.JsonValue;
-import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
@@ -35,14 +34,13 @@ import java.util.stream.Stream;
  * Interface implemented by beans that support graceful shutdown.
  *
  * @author Jonas Konrad
- * @since 4.5.0
+ * @since 4.9.0
  */
 public interface GracefulShutdownCapable {
 
     /**
      * Trigger a graceful shutdown. The returned {@link CompletionStage} will complete when the
-     * shutdown is complete, i.e. a normal {@link LifeCycle#stop()} will not interrupt any
-     * processes.
+     * shutdown is complete.
      * <p>
      * Note that the completion of the returned future may be user-dependent. If a user does not
      * close their connection, the future may never terminate. Always add a timeout for a hard

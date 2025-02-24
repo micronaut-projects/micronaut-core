@@ -819,7 +819,7 @@ final class HttpPipelineBuilder implements Closeable {
         }
     }
 
-    private static abstract class Http23GracefulShutdownBase implements GracefulShutdownCapable {
+    private abstract static class Http23GracefulShutdownBase implements GracefulShutdownCapable {
         final ChannelHandlerContext ctx;
 
         Http23GracefulShutdownBase(ChannelHandlerContext ctx) {

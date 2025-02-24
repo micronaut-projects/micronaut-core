@@ -217,6 +217,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     if (exposedPort == -1 || exposedPort == 0 || implicit.stream().noneMatch(cfg -> cfg.getPort() == exposedPort)) {
                         NettyHttpServerConfiguration.NettyListenerConfiguration mgmt = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false);
                         mgmt.setExposeDefaultRoutes(false);
+                        mgmt.setSupportGracefulShutdown(false);
                         implicit.add(mgmt);
                     }
                 }
@@ -1015,6 +1016,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         public @NonNull Optional<ShutdownState> reportShutdownState() {
+            if (!config.isSupportGracefulShutdown()) {
+                return Optional.empty();
+            }
+
             Iterator<HttpPipelineBuilder.ConnectionPipeline> itr = activeConnections.iterator();
             if (!itr.hasNext()) {
                 return Optional.empty();

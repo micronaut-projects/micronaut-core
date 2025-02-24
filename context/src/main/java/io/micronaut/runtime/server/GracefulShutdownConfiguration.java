@@ -1,0 +1,65 @@
+package io.micronaut.runtime.server;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
+
+import java.time.Duration;
+
+/**
+ * Configuration for graceful shutdown.
+ *
+ * @since 4.9.0
+ * @author Jonas Konrad
+ */
+@ConfigurationProperties(GracefulShutdownConfiguration.PREFIX)
+@Requires(property = GracefulShutdownConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+public final class GracefulShutdownConfiguration implements Toggleable {
+    public static final String PREFIX = "micronaut.lifecycle.graceful-shutdown";
+    public static final String ENABLED = PREFIX + ".enabled";
+
+    private boolean enabled;
+    @NonNull
+    private Duration gracePeriod = Duration.ofSeconds(15);
+
+    /**
+     * Whether to enable graceful shutdown on normal shutdown. Off by default.
+     *
+     * @return {@code true} to enable graceful shutdown
+     */
+    @Bindable(defaultValue = StringUtils.FALSE)
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * Whether to enable graceful shutdown on normal shutdown. Off by default.
+     *
+     * @param enabled {@code true} to enable graceful shutdown
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Duration to wait until forcing a shutdown.
+     *
+     * @return The maximum graceful shutdown duration
+     */
+    @NonNull
+    public Duration getGracePeriod() {
+        return gracePeriod;
+    }
+
+    /**
+     * Duration to wait until forcing a shutdown.
+     *
+     * @param gracePeriod The maximum graceful shutdown duration
+     */
+    public void setGracePeriod(@NonNull Duration gracePeriod) {
+        this.gracePeriod = gracePeriod;
+    }
+}
