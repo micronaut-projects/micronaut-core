@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.server;
+package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Singleton;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeoutException;
 @Singleton
 @Requires(bean = GracefulShutdownManager.class)
 @Requires(property = GracefulShutdownConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@Experimental
 public final class GracefulShutdownListener implements ApplicationEventListener<ShutdownEvent>, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(GracefulShutdownListener.class);
 

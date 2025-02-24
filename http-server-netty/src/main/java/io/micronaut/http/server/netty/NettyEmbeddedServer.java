@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.GracefulShutdownCapable;
 
 import java.util.Collections;
 import java.util.Set;

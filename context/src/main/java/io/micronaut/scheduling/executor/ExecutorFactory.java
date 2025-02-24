@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.runtime.server.GracefulShutdownCapable;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
 

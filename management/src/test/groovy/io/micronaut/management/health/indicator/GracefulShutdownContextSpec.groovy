@@ -6,8 +6,8 @@ import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.runtime.graceful.GracefulShutdownConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.runtime.server.GracefulShutdownConfiguration
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions

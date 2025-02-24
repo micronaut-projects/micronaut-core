@@ -14,8 +14,8 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.runtime.graceful.GracefulShutdownManager
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.runtime.server.GracefulShutdownManager
 import jakarta.inject.Singleton
 import spock.lang.Specification
 

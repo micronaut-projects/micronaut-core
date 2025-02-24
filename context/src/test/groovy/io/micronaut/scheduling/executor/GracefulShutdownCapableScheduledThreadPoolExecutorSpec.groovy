@@ -2,7 +2,7 @@ package io.micronaut.scheduling.executor
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.runtime.server.GracefulShutdownManager
+import io.micronaut.runtime.graceful.GracefulShutdownManager
 import io.micronaut.scheduling.TaskExecutors
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions

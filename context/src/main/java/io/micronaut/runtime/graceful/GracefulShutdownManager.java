@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.server;
+package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 
@@ -31,6 +32,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Singleton
 @Requires(classes = GracefulShutdownCapable.class)
+@Experimental
 public final class GracefulShutdownManager {
     private final List<GracefulShutdownCapable> delegates;
 

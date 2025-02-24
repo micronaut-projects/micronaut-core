@@ -6,8 +6,8 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.runtime.graceful.GracefulShutdownManager
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.runtime.server.GracefulShutdownManager
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel

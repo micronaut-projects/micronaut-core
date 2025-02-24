@@ -17,7 +17,7 @@ package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.runtime.server.GracefulShutdownCapable;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
