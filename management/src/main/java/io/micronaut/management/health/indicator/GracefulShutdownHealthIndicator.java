@@ -34,7 +34,7 @@ import java.util.concurrent.CompletionStage;
  * Health indicator that goes DOWN when a graceful shutdown is initiated.
  *
  * @author Jonas Konrad
- * @since 4.5.0
+ * @since 4.9.0
  */
 @Singleton
 @Readiness

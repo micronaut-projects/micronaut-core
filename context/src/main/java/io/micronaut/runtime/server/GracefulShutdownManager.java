@@ -26,7 +26,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Helper class that can be used to call all {@link GracefulShutdownCapable} beans.
  *
- * @since 4.5.0
+ * @since 4.9.0
  * @author Jonas Konrad
  */
 @Singleton
@@ -56,6 +56,7 @@ public final class GracefulShutdownManager {
      *
      * @return The combined number of active tasks
      */
+    @NonNull
     public OptionalLong reportActiveTasks() {
         return GracefulShutdownCapable.combineActiveTasks(delegates);
     }

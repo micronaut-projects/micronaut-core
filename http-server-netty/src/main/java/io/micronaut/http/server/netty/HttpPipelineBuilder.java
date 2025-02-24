@@ -188,14 +188,6 @@ final class HttpPipelineBuilder implements Closeable {
         return requestHandler;
     }
 
-    static String toString(@Nullable SocketAddress address) {
-        if (address instanceof InetSocketAddress inet) {
-            return inet.getHostString() + ":" + inet.getPort();
-        } else {
-            return "unknown";
-        }
-    }
-
     private BodySizeLimits bodySizeLimits() {
         return new BodySizeLimits(server.getServerConfiguration().getMaxRequestSize(), server.getServerConfiguration().getMaxRequestBufferSize());
     }
@@ -884,11 +876,6 @@ final class HttpPipelineBuilder implements Closeable {
         public Http3GracefulShutdown(ChannelHandlerContext ctx, AtomicLong maxStreamId) {
             super(ctx);
             this.maxStreamId = maxStreamId;
-        }
-
-        String key() {
-            QuicChannel quicChannel = (QuicChannel) ctx.channel();
-            return "c:" + HttpPipelineBuilder.toString(quicChannel.remoteSocketAddress()) + " s:" + HttpPipelineBuilder.toString(quicChannel.localSocketAddress()) + " cid:" + quicChannel.id().asLongText();
         }
 
         @Override

@@ -11,7 +11,6 @@ dependencies {
     compileOnly(projects.micronautCoreReactive)
     compileOnly(libs.log4j)
     compileOnly(libs.logback.classic)
-    compileOnly(libs.managed.jackson.annotations)
 
     // Support validation annotations
     compileOnly(platform(libs.test.boms.micronaut.validation))

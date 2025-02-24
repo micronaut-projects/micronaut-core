@@ -40,7 +40,7 @@ public interface NettyEmbeddedServer
                 ChannelPipelineCustomizer,
                 RefreshEventListener,
                 NettyServerCustomizer.Registry,
-    GracefulShutdownCapable {
+                GracefulShutdownCapable {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.
