@@ -6,17 +6,17 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.i18n.ResourceBundleMessageSource;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.Status;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.server.exceptions.ErrorResponseProcessorExceptionHandler;
+import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.validation.Valid;
@@ -100,6 +100,14 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
         assertExpectedSubstringInHtml("Es posible que haya escrito mal la dirección o que la página se haya movido.", html);
     }
 
+    @Test
+    void userNotFoundExceptionHandlerReturnsNotFound(@Client("/") HttpClient httpClient) {
+        BlockingHttpClient client = httpClient.toBlocking();
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class,
+            () -> client.exchange(HttpRequest.GET("/throws").accept(MediaType.TEXT_HTML)));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
     private void assertExpectedSubstringInHtml(String expected, String html) {
         if (!html.contains(expected)) {
             LOG.trace("{}", html);
@@ -130,5 +138,35 @@ class DefaultHtmlErrorResponseBodyProviderTest extends Specification {
 
     @Introspected
     record Book(@NotBlank String title, @NotBlank String author, @Max(4032) int pages) {
+    }
+
+    static class UserNotFoundException extends RuntimeException {
+    }
+
+    @Requires(property = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
+    @Produces
+    @Singleton
+    @Requires(classes = {UserNotFoundException.class, ExceptionHandler.class})
+    static class UserNotFoundExceptionHandler extends ErrorResponseProcessorExceptionHandler<UserNotFoundException> {
+        protected UserNotFoundExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+            super(responseProcessor);
+        }
+
+        @Override
+        protected @NonNull MutableHttpResponse<?> createResponse(UserNotFoundException exception) {
+            return HttpResponse.notFound();
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DefaultHtmlBodyErrorResponseProviderTest")
+    @Controller("/throws")
+    static class ThrowingController {
+        @Produces(MediaType.TEXT_HTML)
+        @PermitAll
+        @Get
+        @Status(HttpStatus.OK)
+        void index() {
+            throw new UserNotFoundException();
+        }
     }
 }
