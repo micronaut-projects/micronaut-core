@@ -20,6 +20,12 @@ import io.micronaut.core.annotation.Internal;
 import java.util.BitSet;
 import java.util.Locale;
 
+/**
+ * Utility class for different URL percent encoding sets.
+ *
+ * @since 4.9.0
+ * @author Jonas Konrad
+ */
 @Internal
 final class PercentEncoder {
     static final PercentEncoder C0 = new PercentEncoder(new BitSet());
@@ -30,6 +36,7 @@ final class PercentEncoder {
         }
     }
 
+    // whatwg sets
     static final PercentEncoder FRAGMENT = C0.addEncode(' ', '"', '<', '>', '`');
     static final PercentEncoder QUERY = C0.addEncode(' ', '"', '<', '>', '#');
     static final PercentEncoder SPECIAL_QUERY = QUERY.addEncode('\'');
@@ -38,6 +45,7 @@ final class PercentEncoder {
     static final PercentEncoder COMPONENT = USERINFO.addEncode('+', ',').addEncodeRange('$', '&');
     static final PercentEncoder FORM = COMPONENT.addEncode('!', '~').addEncodeRange('\'', ')');
 
+    // RFC 3986 (URI) sets
     static final PercentEncoder RFC3986_UNRESERVED = new PercentEncoder(new BitSet())
         .removeEncodeRange('a', 'z')
         .removeEncodeRange('A', 'Z')
