@@ -91,12 +91,12 @@ import java.net.UnixDomainSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -857,16 +857,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public @NonNull Optional<ShutdownState> reportShutdownState() {
-        List<Listener> listeners = activeListeners;
+    public OptionalLong reportActiveTasks() {
+        List<Listener> listeners = this.activeListeners;
         if (listeners == null) {
-            return Optional.empty();
+            return OptionalLong.empty();
         }
-        return CombinedShutdownState.combineShutdownState(
-            listeners,
-            l -> l.config.getName(),
-            n -> Map.entry("other", new SingleShutdownState("And " + n + " other listeners"))
-        );
+        return GracefulShutdownCapable.combineActiveTasks(listeners);
     }
 
     @Override
@@ -1015,25 +1011,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         @Override
-        public @NonNull Optional<ShutdownState> reportShutdownState() {
-            if (!config.isSupportGracefulShutdown()) {
-                return Optional.empty();
+        public OptionalLong reportActiveTasks() {
+            if (config.isSupportGracefulShutdown()) {
+                return GracefulShutdownCapable.combineActiveTasks(activeConnections);
+            } else {
+                return OptionalLong.empty();
             }
-
-            Iterator<HttpPipelineBuilder.ConnectionPipeline> itr = activeConnections.iterator();
-            if (!itr.hasNext()) {
-                return Optional.empty();
-            }
-            HttpPipelineBuilder.ConnectionPipeline first = itr.next();
-            if (!itr.hasNext() && first.channel instanceof DatagramChannel) {
-                // HTTP/3 only has one connection
-                return first.reportShutdownState();
-            }
-            return CombinedShutdownState.combineShutdownState(
-                activeConnections,
-                c -> "c:" + HttpPipelineBuilder.toString(c.channel.remoteAddress()) + " s:" + HttpPipelineBuilder.toString(c.channel.localAddress()) + " cid:" + c.channel.id().asLongText(),
-                n -> Map.entry("other", new SingleShutdownState("And " + n + " other connections"))
-            );
         }
     }
 

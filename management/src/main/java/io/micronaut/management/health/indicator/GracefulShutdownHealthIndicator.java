@@ -26,6 +26,7 @@ import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -50,10 +51,10 @@ final class GracefulShutdownHealthIndicator implements HealthIndicator, Graceful
 
     @Override
     public Publisher<HealthResult> getResult() {
-        return Mono.just(HealthResult.builder(NAME)
-            .status(shuttingDown ? HealthStatus.DOWN : HealthStatus.UP)
-            .details(manager.get().reportShutdownState().orElse(null))
-            .build());
+        HealthResult.Builder builder = HealthResult.builder(NAME)
+            .status(shuttingDown ? HealthStatus.DOWN : HealthStatus.UP);
+        manager.get().reportActiveTasks().ifPresent(n -> builder.details(Map.of("activeTasks", n)));
+        return Mono.just(builder.build());
     }
 
     @Override

@@ -95,8 +95,8 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -403,8 +403,8 @@ final class HttpPipelineBuilder implements Closeable {
                 }
 
                 @Override
-                public @NonNull Optional<ShutdownState> reportShutdownState() {
-                    return CombinedShutdownState.combineShutdownState(activeChannels, Http3GracefulShutdown::key, n -> Map.entry("other", new SingleShutdownState("And " + n + " other connections")));
+                public OptionalLong reportActiveTasks() {
+                    return GracefulShutdownCapable.combineActiveTasks(activeChannels);
                 }
             };
         }
@@ -690,10 +690,12 @@ final class HttpPipelineBuilder implements Closeable {
         }
 
         @Override
-        public Optional<ShutdownState> reportShutdownState() {
-            return Optional.of(Optional.ofNullable(this.specificGracefulShutdown)
-                .flatMap(GracefulShutdownCapable::reportShutdownState)
-                .orElse(new SingleShutdownState("Waiting for connection channel to close")));
+        public OptionalLong reportActiveTasks() {
+            GracefulShutdownCapable specificGracefulShutdown = this.specificGracefulShutdown;
+            if (specificGracefulShutdown == null) {
+                return OptionalLong.of(1);
+            }
+            return specificGracefulShutdown.reportActiveTasks();
         }
     }
 
@@ -827,8 +829,8 @@ final class HttpPipelineBuilder implements Closeable {
         }
 
         @Override
-        public @NonNull Optional<ShutdownState> reportShutdownState() {
-            return Optional.of(new SingleShutdownState("Waiting for client to terminate the HTTP/2 connection. Still active streams: " + numberOfActiveStreams()));
+        public OptionalLong reportActiveTasks() {
+            return OptionalLong.of(1); // just count the connection, not each stream
         }
 
         @Override

@@ -20,8 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -52,18 +51,12 @@ public final class GracefulShutdownManager {
     }
 
     /**
-     * Report the {@link GracefulShutdownCapable#reportShutdownState() shutdown state} of all
-     * capable beans. This will return a {@link GracefulShutdownCapable.CombinedShutdownState}
-     * where the key is the bean class name.
+     * Report the {@link GracefulShutdownCapable#reportActiveTasks() shutdown state} of all
+     * capable beans.
      *
-     * @return The combined shutdown state
+     * @return The combined number of active tasks
      */
-    @NonNull
-    public Optional<GracefulShutdownCapable.ShutdownState> reportShutdownState() {
-        return GracefulShutdownCapable.CombinedShutdownState.combineShutdownState(
-            delegates,
-            d -> d.getClass().getSimpleName(),
-            n -> Map.entry("other", new GracefulShutdownCapable.SingleShutdownState("And " + n + " other beans"))
-        );
+    public OptionalLong reportActiveTasks() {
+        return GracefulShutdownCapable.combineActiveTasks(delegates);
     }
 }

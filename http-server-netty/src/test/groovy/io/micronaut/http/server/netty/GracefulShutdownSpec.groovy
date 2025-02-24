@@ -316,11 +316,7 @@ class GracefulShutdownSpec extends Specification {
         TimeUnit.SECONDS.sleep(1)
 
         then:
-        gracefulShutdown.reportShutdownState().get()
-                .members()["NettyHttpServer"] // select bean
-                .members().values().first() // select listener
-                .members().values().first() // select connection
-                .description() == "Waiting to write response"
+        gracefulShutdown.reportActiveTasks().getAsLong() == 1
 
         when:
         sink.tryEmitNext("bar")
@@ -417,11 +413,7 @@ class GracefulShutdownSpec extends Specification {
         !shFuture.isDone()
 
         new PollingConditions().eventually {
-            gracefulShutdown.reportShutdownState().get()
-                    .members()["NettyHttpServer"] // select bean
-                    .members().values().first() // select listener
-                    .members().values().first() // select connection
-                    .description() == "Waiting for client to terminate the HTTP/2 connection. Still active streams: 1"
+            gracefulShutdown.reportActiveTasks().getAsLong() == 1
         }
 
         when:
@@ -538,11 +530,7 @@ class GracefulShutdownSpec extends Specification {
             connectionHandler.goAwayReceived
             !shFuture.isDone()
 
-            gracefulShutdown.reportShutdownState().get()
-                    .members()["NettyHttpServer"] // select bean
-                    .members().values().first() // select listener
-                    .members().values().first() // select connection
-                    .description() == "Waiting for client to terminate the HTTP/2 connection. Still active streams: -1"
+            gracefulShutdown.reportActiveTasks().getAsLong() == 1
         }
 
         when:

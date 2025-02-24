@@ -75,7 +75,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
 
@@ -320,8 +319,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public @NonNull Optional<ShutdownState> reportShutdownState() {
-        return Optional.of(new SingleShutdownState("Waiting to write response"));
+    public OptionalLong reportActiveTasks() {
+        return OptionalLong.of(1);
     }
 
     @Override
