@@ -1,0 +1,10 @@
+In some deployments, it is desirable to "gracefully" shut down an application, that is, to stop accepting new work but
+to finish in-progress tasks. In the Micronaut framework, a graceful shutdown means the following:
+
+* No new HTTP connections will be accepted
+* Existing connections will serve no new requests, but in-progress requests will still be served
+* Scheduled tasks will stop running, but in-progress tasks will finish uninterrupted
+
+If the `micronaut.lifecycle.graceful-shutdown.enabled` config property is set to `true`, a graceful shutdown is
+triggered automatically when the context stops (`ApplicationContext.stop()`). There is also a programmatic
+api:runtime.graceful.GracefulShutdownManager[] API if you want more control over the shutdown process.

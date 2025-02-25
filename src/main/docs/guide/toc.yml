@@ -41,6 +41,7 @@ ioc:
   replaces: Bean Replacement
   beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
+  gracefulShutdown: Graceful Shutdown
   contextEvents: Context Events
   events: Bean Events
   introspection:
