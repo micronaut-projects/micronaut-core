@@ -8,3 +8,12 @@ to finish in-progress tasks. In the Micronaut framework, a graceful shutdown mea
 If the `micronaut.lifecycle.graceful-shutdown.enabled` config property is set to `true`, a graceful shutdown is
 triggered automatically when the context stops (`ApplicationContext.stop()`). There is also a programmatic
 api:runtime.graceful.GracefulShutdownManager[] API if you want more control over the shutdown process.
+
+Graceful shutdown status can be read using the health management endpoint. This also returns the number of still-active
+tasks (e.g. connections or running scheduled tasks).
+
+If you want to add graceful shutdown support to your own beans, implement
+api:runtime.graceful.GracefulShutdownCapable[]. You will implement a `shutdownGracefully` method that triggers shutdown
+and returns a future that should complete once the graceful shutdown is complete (e.g. all clients have closed their
+connection). You can also optionally implement `reportActiveTasks` to give a number of active tasks for the health
+endpoint.
