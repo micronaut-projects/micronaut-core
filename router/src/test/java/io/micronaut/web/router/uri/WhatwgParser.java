@@ -724,18 +724,18 @@ final class WhatwgParser {
         if (info.hasErrors()) {
             for (IDNA.Error error : info.getErrors()) {
                 switch (error) {
-                    case Error.LEADING_HYPHEN, Error.TRAILING_HYPHEN, Error.HYPHEN_3_4, Error.LABEL_TOO_LONG,
-                         Error.DOMAIN_NAME_TOO_LONG -> {
+                    case LEADING_HYPHEN, TRAILING_HYPHEN, HYPHEN_3_4, LABEL_TOO_LONG,
+                         DOMAIN_NAME_TOO_LONG -> {
                         if (beStrict) {
                             throw fatalValidationError(ValidationError.DOMAIN_TO_ASCII);
                         }
                     }
-                    case Error.BIDI, Error.CONTEXTJ, Error.PUNYCODE, Error.LABEL_HAS_DOT, Error.LEADING_COMBINING_MARK,
-                         Error.DISALLOWED, Error.INVALID_ACE_LABEL ->
+                    case BIDI, CONTEXTJ, PUNYCODE, LABEL_HAS_DOT, LEADING_COMBINING_MARK,
+                         DISALLOWED, INVALID_ACE_LABEL ->
                         throw fatalValidationError(ValidationError.DOMAIN_TO_ASCII);
-                    case Error.CONTEXTO_PUNCTUATION, Error.CONTEXTO_DIGITS ->
+                    case CONTEXTO_PUNCTUATION, CONTEXTO_DIGITS ->
                         throw new AssertionError("ContextO checking should not be enabled");
-                    case Error.EMPTY_LABEL -> {
+                    case EMPTY_LABEL -> {
                     }
                 }
             }
