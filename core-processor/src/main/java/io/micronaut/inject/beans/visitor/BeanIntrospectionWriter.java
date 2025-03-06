@@ -821,28 +821,29 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     .asStatementSwitch(returnType, keys.stream()
                         .collect(Collectors.toMap(
                             ExpressionDef::constant,
-                            annotationName -> onMatch(aThis, methodParameters, annotationName, returnType)
+                            annotationName -> onAnnotationNameMatch(aThis, methodParameters, annotationName, returnType)
                         )), ExpressionDef.nullValue().returning()));
     }
 
-    private StatementDef onMatch(VariableDef.This aThis, List<VariableDef.MethodParameter> parameters, String annotationName, TypeDef returnType) {
+    private StatementDef onAnnotationNameMatch(VariableDef.This aThis,
+                                               List<VariableDef.MethodParameter> parameters,
+                                               String annotationName,
+                                               TypeDef returnType) {
         List<StatementDef> statements = new ArrayList<>();
         VariableDef.MethodParameter annotationValueParameter = parameters.get(1);
+        ExpressionDef nullValue;
         if (indexByAnnotationAndValue.keySet().stream().anyMatch(s -> s.annotationName.equals(annotationName) && s.value == null)) {
             String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, null));
             int propertyIndex = getPropertyIndex(propertyName);
-            statements.add(
-                annotationValueParameter.ifNonNull(
-                    aThis.invoke(FIND_PROPERTY_BY_INDEX_METHOD, ExpressionDef.constant(propertyIndex)).returning()
-                )
-            );
+            nullValue = aThis.invoke(FIND_PROPERTY_BY_INDEX_METHOD, ExpressionDef.constant(propertyIndex));
         } else {
-            statements.add(
-                annotationValueParameter.ifNull(
-                    ExpressionDef.nullValue().returning()
-                )
-            );
+            nullValue = ExpressionDef.nullValue();
         }
+        statements.add(
+            annotationValueParameter.ifNull(
+                nullValue.returning()
+            )
+        );
         Set<String> valueMatches = indexByAnnotationAndValue.keySet()
             .stream()
             .filter(s -> s.annotationName.equals(annotationName) && s.value != null)
