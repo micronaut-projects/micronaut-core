@@ -134,7 +134,10 @@ internal class KotlinVisitorContext(
     override fun getClassElement(name: String): Optional<ClassElement> {
         var declaration = resolver.getClassDeclarationByName(name)
         if (declaration == null) {
-            declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
+            declaration = resolver.getClassDeclarationByName(
+                name.replace(".$", ".")
+                    .replace('$', '.')
+            )
         }
         return Optional.ofNullable(declaration)
             .map(elementFactory::newClassElement)

@@ -77,6 +77,7 @@ managed-jackson = "2.18.3"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
 managed-jackson-databind = "2.18.2"
 managed-kotlin = "1.9.25"
+managed-kotlin2 = "2.1.20"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.19.0"
 managed-netty = "4.2.2.Final"
@@ -87,6 +88,7 @@ managed-reactor = "3.7.6"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.26.4"
 managed-ksp = "1.9.25-1.0.20"
+managed-ksp2 = "2.1.20-2.0.2-SNAPSHOT"
 sonatype-scan = "3.0.0"
 micronaut-docs = "2.0.0"
 
@@ -137,6 +139,13 @@ managed-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version
 managed-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
 managed-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
 
+managed-kotlin2-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin2" }
+managed-kotlin2-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin2" }
+managed-kotlin2-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin2" }
+managed-kotlin2-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin2" }
+managed-kotlin2-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin2" }
+managed-kotlin2-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin2" }
+
 managed-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "managed-kotlin-coroutines" }
 managed-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "managed-kotlin-coroutines" }
 managed-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "managed-kotlin-coroutines" }
@@ -146,6 +155,10 @@ managed-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-c
 
 managed-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
 managed-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
+
+managed-ksp2-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp2" }
+managed-ksp2 = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp2" }
+
 managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
@@ -305,6 +318,9 @@ mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 
+ksp2-commonDeps = { module = "com.google.devtools.ksp:symbol-processing-common-deps", version.ref = "managed-ksp2" }
+ksp2-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embeddable", version.ref = "managed-ksp2" }
+
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
 [plugins]
@@ -313,3 +329,6 @@ managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref =
 managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
 managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
 managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
+
+managed-kotlin2-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin2" }
+managed-ksp2 = { id = "com.google.devtools.ksp", version.ref = "managed-ksp2" }

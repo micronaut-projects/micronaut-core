@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing
 
+import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -89,7 +90,7 @@ internal class KotlinNativeElementsHelper(var resolver: Resolver) : NativeElemen
     }
 
     override fun getMethods(classNode: KSClassDeclaration): MutableList<KSFunctionDeclaration> {
-        return classNode.getAllFunctions().toMutableList()
+        return classNode.getDeclaredFunctions().toMutableList()
     }
 
     override fun excludeClass(classNode: KSClassDeclaration): Boolean {

@@ -19,6 +19,7 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.kotlin.processing.getBinaryName
 import java.util.function.Function
 import java.util.stream.Collectors
 
@@ -31,7 +32,7 @@ internal open class KotlinMethodElement(
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinMethodElement<KotlinMethodNativeElement>(
     KotlinMethodNativeElement(declaration),
-    visitorContext.resolver.getJvmName(declaration)!!,
+    declaration.getBinaryName(visitorContext.resolver),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext

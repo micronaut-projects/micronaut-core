@@ -43,9 +43,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Writer for compile-time expressions.
@@ -59,11 +57,11 @@ public final class EvaluatedExpressionWriter implements ClassOutputWriter {
     private static final Method DO_EVALUATE_METHOD
         = ReflectionUtils.getRequiredMethod(AbstractEvaluatedExpression.class, "doEvaluate", ExpressionEvaluationContext.class);
 
-    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
-
     private final ExpressionWithContext expressionMetadata;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
+
+    private byte[] output;
 
     public EvaluatedExpressionWriter(ExpressionWithContext expressionMetadata,
                                      VisitorContext visitorContext,
@@ -73,22 +71,24 @@ public final class EvaluatedExpressionWriter implements ClassOutputWriter {
         this.originatingElement = originatingElement;
     }
 
+    /**
+     * Finish generating the expression class.
+     */
+    public void finish() {
+        String expressionClassName = expressionMetadata.expressionClassName();
+        ClassDef objectDef = generateClassDef(expressionClassName);
+        output = ByteCodeWriterUtils.writeByteCode(
+            objectDef,
+            visitorContext
+        );
+    }
+
     @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        String expressionClassName = expressionMetadata.expressionClassName();
-        if (WRITTEN_CLASSES.contains(expressionClassName)) {
-            return;
+        try (OutputStream outputStream = outputVisitor.visitClass(expressionMetadata.expressionClassName(), originatingElement)) {
+            outputStream.write(output);
         }
-        try (OutputStream outputStream = outputVisitor.visitClass(expressionClassName, originatingElement)) {
-            ClassDef objectDef = generateClassDef(expressionClassName);
-            outputStream.write(
-                ByteCodeWriterUtils.writeByteCode(
-                    objectDef,
-                    visitorContext
-                )
-            );
-            WRITTEN_CLASSES.add(expressionClassName);
-        }
+        output = null;
     }
 
     private ClassDef generateClassDef(String expressionClassName) {

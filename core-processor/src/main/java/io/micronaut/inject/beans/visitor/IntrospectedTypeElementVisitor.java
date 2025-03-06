@@ -403,6 +403,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     );
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);
+                builderWriter.finish();
                 writers.put(builderWriter.getBeanType().getName(), builderWriter);
             } else {
                 context.fail("No build method found in builder: " + builderType.getName(), classToBuild);
@@ -480,6 +481,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getName(), writer);
 
         addExecutableMethods(ce, writer, beanProperties);
+
+        writer.finish();
     }
 
     private AnnotationMetadata mergeAnnotations(AnnotationMetadata annotationMetadata) {
