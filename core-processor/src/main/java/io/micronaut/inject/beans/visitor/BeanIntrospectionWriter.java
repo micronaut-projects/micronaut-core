@@ -419,7 +419,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
     }
 
     private ExpressionDef pushBeanPropertyReference(BeanPropertyData beanPropertyData,
-                                                    List<StatementDef> staticStatements,
+                                                    List<StatementDef> statements,
                                                     Function<String, ExpressionDef> loadClassValueExpressionFn) {
         ClassTypeDef beanPropertyRefDef = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
 
@@ -434,7 +434,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             loadClassValueExpressionFn
         ).newLocal(beanPropertyData.name + "Arg");
 
-        staticStatements.add(defineAndAssign);
+        statements.add(defineAndAssign);
 
         VariableDef mainArgument = defineAndAssign.variable();
         ExpressionDef readArgument = null;
@@ -603,13 +603,32 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .build();
             classDefBuilder.addField(beanPropertiesField);
+            ClassTypeDef beanPropertyRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
+            List<ExpressionDef> propsExpressions = new ArrayList<>();
+            for (BeanPropertyData beanProperty : beanProperties) {
+                MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + "$metadata")
+                    .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                    .returns(beanPropertyRefType)
+                    .build((aThis, methodParameters) -> {
+                        List<StatementDef> statements = new ArrayList<>();
+                        statements.add(
+                            pushBeanPropertyReference(beanProperty, statements, loadClassValueExpressionFn).returning()
+                        );
+                        return StatementDef.multi(statements);
+                    });
+                classDefBuilder.addMethod(
+                    metadataMethod
+                );
+                propsExpressions.add(
+                    thisType.invokeStatic(metadataMethod)
+                );
+            }
+
             staticStatements.add(
                 thisType.getStaticField(beanPropertiesField).put(
-                    ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class).array()
+                    beanPropertyRefType.array()
                         .instantiate(
-                            beanProperties.stream()
-                                .map(e -> pushBeanPropertyReference(e, staticStatements, loadClassValueExpressionFn))
-                                .toList()
+                            propsExpressions
                         )
                 )
             );
@@ -617,14 +636,33 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             beanPropertiesField = null;
         }
         if (!beanMethods.isEmpty()) {
+            ClassTypeDef beanMethodRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class);
+            Set<String> usedNames = new HashSet<>();
+            List<ExpressionDef> methodsExpressions = new ArrayList<>();
+            for (BeanMethodData beanMethod : beanMethods) {
+                String methodName = beanMethod.methodElement().getName();
+                int index = 2;
+                while (!usedNames.add(methodName)) {
+                    methodName += index++;
+                }
+                MethodDef metadataMethod = MethodDef.builder("$method$" + methodName + "$metadata")
+                    .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                    .returns(beanMethodRefType)
+                    .build((aThis, methodParameters) -> newBeanMethodRef(beanMethod, loadClassValueExpressionFn).returning());
+                classDefBuilder.addMethod(
+                    metadataMethod
+                );
+                methodsExpressions.add(
+                    thisType.invokeStatic(metadataMethod)
+                );
+            }
+
             beanMethodsField = FieldDef.builder(FIELD_BEAN_METHODS_REFERENCES, AbstractInitializableBeanIntrospection.BeanMethodRef[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .initializer(
-                    ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanMethodRef.class).array()
+                    beanMethodRefType.array()
                         .instantiate(
-                            beanMethods.stream()
-                                .map(e -> newBeanMethodRef(e, loadClassValueExpressionFn))
-                                .toList()
+                            methodsExpressions
                         )
                 )
                 .build();
