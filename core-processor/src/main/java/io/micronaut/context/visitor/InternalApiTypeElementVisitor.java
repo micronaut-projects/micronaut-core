@@ -57,7 +57,7 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
 
     @Override
     public Set<String> getSupportedOptions() {
-        return Set.of(MICRONAUT_PROCESSING_INTERNAL_WARNINGS)
+        return Set.of(MICRONAUT_PROCESSING_INTERNAL_WARNINGS);
     }
 
     @NonNull
