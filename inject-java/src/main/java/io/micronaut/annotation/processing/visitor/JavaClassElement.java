@@ -42,6 +42,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -271,13 +272,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            resolvedInterfaces = classElement.getInterfaces().stream().filter(this::onlyAvailable).map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            resolvedInterfaces = classElement.getInterfaces().stream()
+                .map(mirror -> {
+                    if (mirror.getKind() == TypeKind.ERROR) {
+                        throw new ElementPostponedToNextRoundException(this);
+                    }
+                    return newClassElement(mirror, getTypeArguments());
+                }).toList();
         }
         return resolvedInterfaces;
-    }
-
-    private boolean onlyAvailable(TypeMirror mirror) {
-        return !(mirror instanceof DeclaredType declaredType) || declaredType.getKind() != TypeKind.ERROR;
     }
 
     @Override
@@ -286,6 +289,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             final TypeMirror superclass = classElement.getSuperclass();
             if (superclass == null) {
                 return Optional.empty();
+            }
+            if (superclass.getKind() == TypeKind.ERROR) {
+                throw new ElementPostponedToNextRoundException(this);
             }
             final Element element = visitorContext.getTypes().asElement(superclass);
             if (element instanceof TypeElement superElement) {

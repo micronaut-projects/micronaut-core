@@ -30,6 +30,7 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -91,7 +92,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     private Set<String> beanDefinitions;
     private final Set<String> processed = new HashSet<>();
-    private final Map<String, PostponeToNextRoundException> postponed = new HashMap<>();
+    private final Map<String, Element> postponed = new HashMap<>();
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
@@ -197,7 +198,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             error(((JavaNativeElement) ex.getOriginatingElement()).element(), ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
-                            postponed.put(className, e);
+                            postponed.put(className, (Element) e.getErrorElement());
+                        } catch (ElementPostponedToNextRoundException e) {
+                            processed.remove(className);
+                            postponed.put(className, ((JavaNativeElement) e.getOriginatingElement().getNativeType()).element());
                         }
                     }
                 }
@@ -209,9 +213,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         processing round.
         */
         if (processingOver) {
-            for (Map.Entry<String, PostponeToNextRoundException> e : postponed.entrySet()) {
-                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error: [" + e.getValue().getPath() + "]." +
-                    " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", (Element) e.getValue().getErrorElement());
+            for (Map.Entry<String, Element> e : postponed.entrySet()) {
+                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error." +
+                    " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", e.getValue());
             }
 
             try {
