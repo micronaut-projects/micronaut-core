@@ -5,15 +5,10 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class WitherVisitor implements TypeElementVisitor<Wither, Object> {
-    Set<String> processed = new HashSet<>();
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (!processed.contains(element.getName())) {
             context.visitGeneratedSourceFile(
                 "test",
                 "WalrusWither",
@@ -43,13 +38,10 @@ public class WitherVisitor implements TypeElementVisitor<Wither, Object> {
                             }
                         }
                         """));
-                    processed.add(element.getName());
                 } catch (Exception e) {
                     throw new ProcessingException(element, "Failed to generate a Wither: " + e.getMessage(), e);
                 }
             });
-
-        }
     }
 
 }
