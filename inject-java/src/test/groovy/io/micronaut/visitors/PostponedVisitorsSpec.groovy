@@ -14,16 +14,26 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.visitors.Wither;
+import io.micronaut.visitors.Builder;
 
-@Introspected
+@Introspected(builder = @Introspected.IntrospectionBuilder(
+    builderClass = WalrusBuilder.class
+))
 @Wither
+@Builder
 public record Walrus (
     @NonNull
     String name,
     int age,
     byte[] chipInfo
 ) implements WalrusWither  {
+
+    @Vetoed
+    public static WalrusBuilder builder() {
+        return new WalrusBuilder();
+    }
 }
 
 ''')
@@ -31,7 +41,6 @@ public record Walrus (
             definition
     }
 
-    @PendingFeature(reason = "It is currently not possible to implement a generated interface")
     void 'test postpone introduction generation implementing generated interface'() {
         when:
         def context = buildContext('test.MyIntroduction' + BeanDefinitionVisitor.PROXY_SUFFIX, '''

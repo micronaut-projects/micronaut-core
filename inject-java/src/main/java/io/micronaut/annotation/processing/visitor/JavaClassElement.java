@@ -24,18 +24,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.ElementQuery;
-import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.PackageElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PropertyElement;
-import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
@@ -190,6 +179,32 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public boolean hasUnresolvedTypes(UnresolvedTypeKind... kind) {
+        List<? extends TypeMirror> interfaces = this.classElement.getInterfaces();
+        for (UnresolvedTypeKind unresolvedTypeKind : kind) {
+            switch (unresolvedTypeKind) {
+                case INTERFACE -> {
+                    for (TypeMirror anInterface : interfaces) {
+                        if (anInterface.getKind() == TypeKind.ERROR) {
+                            return true;
+                        }
+                    }
+                }
+                case SUPERCLASS -> {
+                    TypeMirror superclass = this.classElement.getSuperclass();
+                    if (superclass.getKind() == TypeKind.ERROR) {
+                        return true;
+                    }
+                }
+                default -> {
+                    // no-op
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public JavaNativeElement.@NonNull Class getNativeType() {
         return (JavaNativeElement.Class) super.getNativeType();
     }
@@ -271,7 +286,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            resolvedInterfaces = classElement.getInterfaces().stream().filter(this::onlyAvailable).map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            resolvedInterfaces = classElement.getInterfaces().stream()
+                .filter(this::onlyAvailable)
+                .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
         }
         return resolvedInterfaces;
     }
