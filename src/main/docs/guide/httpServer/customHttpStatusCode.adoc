@@ -1,4 +1,5 @@
 The Micronaut framework supports custom HTTP status codes. This feature enables developers to define and use HTTP status codes beyond the standard ones, allowing integration with systems or APIs that rely on non-standard status codes.
+
 === Custom HTTP Status Codes
 Micronaut supports arbitrary HTTP status codes that are not part of the predefined `HttpStatus` enum. Developers can specify any valid HTTP status code within the range `100-599`.
 
