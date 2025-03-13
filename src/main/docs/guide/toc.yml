@@ -109,7 +109,6 @@ httpServer:
   statusAnnotation: Response Status
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
-  customHttpStatusCode: Supporting Custom Http Status Code
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
