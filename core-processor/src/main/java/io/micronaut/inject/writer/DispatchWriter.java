@@ -514,7 +514,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchExpression(ExpressionDef bean) {
-            final TypeDef propertyType = TypeDef.of(beanField.getType());
+            final TypeDef propertyType = TypeDef.erasure(beanField.getType());
             final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
 
             if (beanField.isReflectionRequired()) {
@@ -569,7 +569,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
-            final TypeDef propertyType = TypeDef.of(beanField.getType());
+            final TypeDef propertyType = TypeDef.erasure(beanField.getType());
             final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
             if (beanField.isReflectionRequired()) {
                 return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
@@ -824,8 +824,8 @@ public final class DispatchWriter implements ClassOutputWriter {
             boolean suspend = methodElement.isSuspend();
             ExpressionDef.InvokeInstanceMethod invoke = target.cast(proxyType).invoke(
                 interceptedProxyBridgeMethodName,
-                Arrays.stream(methodElement.getSuspendParameters()).map(p -> TypeDef.of(p.getType())).toList(),
-                suspend ? TypeDef.OBJECT : TypeDef.of(methodElement.getReturnType()),
+                Arrays.stream(methodElement.getSuspendParameters()).map(p -> TypeDef.erasure(p.getType())).toList(),
+                suspend ? TypeDef.OBJECT : TypeDef.erasure(methodElement.getReturnType()),
                 IntStream.range(0, methodElement.getSuspendParameters().length).mapToObj(valuesArray::arrayElement).toList()
             );
             if (dispatchTarget.getMethodElement().getReturnType().isVoid() && !suspend) {

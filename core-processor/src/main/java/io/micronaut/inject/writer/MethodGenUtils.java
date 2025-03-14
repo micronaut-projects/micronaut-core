@@ -166,7 +166,7 @@ public final class MethodGenUtils {
         newValues.addAll(List.of(masks)); // Bit mask of defaults
         newValues.add(ExpressionDef.nullValue()); // Last parameter is just a marker and is always null
 
-        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.of(declaringType), methodElement, numberOfMasks);
+        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.erasure(declaringType), methodElement, numberOfMasks);
 
         return ClassTypeDef.of(declaringType).invokeStatic(defaultKotlinMethod, newValues);
     }
