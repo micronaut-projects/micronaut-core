@@ -8,3 +8,5 @@ IMPORTANT: The one exception to this rule is HTTP Not Found (404) responses. Thi
 HTTP Not Found (404) responses for blocking return types is *not* considered an error condition and the client exception will *not* be thrown. That behavior includes methods that return `void`.
 
 If the method returns an `HttpResponse`, the original response is returned. If the return type is `Optional`, an empty optional is returned. For all other types, `null` is returned.
+
+When combining client calls with api:retry.annotation.Retryable[], all thrown exceptions will be retried by default. This will include all 4XX responses, except HTTP Not Found (404) as noted above. Specific retry criteria can be configured with a api:retry.annotation.RetryPredicate[] to filter out responses that shouldn't be retried.
