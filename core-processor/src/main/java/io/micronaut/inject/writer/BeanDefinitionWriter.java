@@ -2620,14 +2620,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
-     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @param interceptedProxyType             The intercepted proxy type
+     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method name
      * @return The index of a new method.
      */
     public int visitExecutableMethod(TypedElement declaringType,
                                      MethodElement methodElement,
-                                     String interceptedProxyClassName,
-                                     String interceptedProxyBridgeMethodName) {
+                                     ClassTypeDef interceptedProxyType,
+                                     MethodDef interceptedProxyBridgeMethod) {
 
         if (executableMethodsDefinitionWriter == null) {
             executableMethodsDefinitionWriter = new ExecutableMethodsDefinitionWriter(
@@ -2639,7 +2639,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 visitorContext
             );
         }
-        return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+        return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
     }
 
     @Override

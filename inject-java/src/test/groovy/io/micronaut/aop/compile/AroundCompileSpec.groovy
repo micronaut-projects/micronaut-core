@@ -142,6 +142,114 @@ class TestInterceptor implements Interceptor {
             interceptor.invoked
     }
 
+    void 'test apply interceptor using interface return ENUM'() {
+        given:
+            ApplicationContext context = buildContext('''
+package test;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+interface IMyBean {
+    @TestAnn
+    <E extends Enum<E>> E test();
+}
+
+@Singleton
+class MyBean implements IMyBean {
+
+    @Override
+    public <E extends Enum<E>> E test() {
+        return null;
+    }
+
+}
+
+@Inherited
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+''')
+            def instance = getBean(context, 'test.MyBean')
+            def interceptor = getBean(context, 'test.TestInterceptor')
+
+        when:
+            instance.test() == null
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            interceptor.invoked
+    }
+
+    void 'test apply interceptor using interface parameter ENUM'() {
+        given:
+            ApplicationContext context = buildContext('''
+package test;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+interface IMyBean {
+    @TestAnn
+    <E extends Enum<E>> String test(E param);
+}
+
+@Singleton
+class MyBean implements IMyBean {
+
+    @Override
+    public <E extends Enum<E>> String test(E param) {
+        return "sss";
+    }
+
+}
+
+@Inherited
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+''')
+            def instance = getBean(context, 'test.MyBean')
+            def interceptor = getBean(context, 'test.TestInterceptor')
+
+        when:
+            instance.test(null) == "sss"
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            interceptor.invoked
+    }
+
     void 'test stereotype method level interceptor matching'() {
         given:
         ApplicationContext context = buildContext('''

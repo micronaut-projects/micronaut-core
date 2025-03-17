@@ -160,21 +160,21 @@ public final class DispatchWriter implements ClassOutputWriter {
      *
      * @param declaringType                    The declaring type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The interceptedProxyClassName
-     * @param interceptedProxyBridgeMethodName The interceptedProxyBridgeMethodName
+     * @param interceptedProxyType             The interceptedProxyType
+     * @param interceptedProxyBridgeMethod     The interceptedProxyBridgeMethod
      * @return the target index
      */
     public int addInterceptedMethod(TypedElement declaringType,
                                     MethodElement methodElement,
-                                    String interceptedProxyClassName,
-                                    String interceptedProxyBridgeMethodName) {
+                                    ClassTypeDef interceptedProxyType,
+                                    MethodDef interceptedProxyBridgeMethod) {
         hasInterceptedMethod = true;
         return addDispatchTarget(new InterceptableMethodDispatchTarget(
             findDispatchTarget(declaringType, methodElement, false),
             declaringType,
             methodElement,
-            interceptedProxyClassName,
-            interceptedProxyBridgeMethodName)
+            interceptedProxyType,
+            interceptedProxyBridgeMethod)
         );
     }
 
@@ -514,7 +514,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchExpression(ExpressionDef bean) {
-            final TypeDef propertyType = TypeDef.erasure(beanField.getType());
+            final TypeDef propertyType = TypeDef.of(beanField.getType());
             final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
 
             if (beanField.isReflectionRequired()) {
@@ -569,7 +569,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
-            final TypeDef propertyType = TypeDef.erasure(beanField.getType());
+            final TypeDef propertyType = TypeDef.of(beanField.getType());
             final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
             if (beanField.isReflectionRequired()) {
                 return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
@@ -770,20 +770,20 @@ public final class DispatchWriter implements ClassOutputWriter {
     public static final class InterceptableMethodDispatchTarget extends AbstractDispatchTarget {
         private final TypedElement declaringType;
         private final DispatchTarget dispatchTarget;
-        private final String interceptedProxyClassName;
-        private final String interceptedProxyBridgeMethodName;
+        private final ClassTypeDef interceptedProxyType;
+        private final MethodDef interceptedProxyBridgeMethod;
         private final MethodElement methodElement;
 
         private InterceptableMethodDispatchTarget(DispatchTarget dispatchTarget,
                                                   TypedElement declaringType,
                                                   MethodElement methodElement,
-                                                  String interceptedProxyClassName,
-                                                  String interceptedProxyBridgeMethodName) {
+                                                  ClassTypeDef interceptedProxyType,
+                                                  MethodDef interceptedProxyBridgeMethod) {
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.dispatchTarget = dispatchTarget;
-            this.interceptedProxyClassName = interceptedProxyClassName;
-            this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
+            this.interceptedProxyType = interceptedProxyType;
+            this.interceptedProxyBridgeMethod = interceptedProxyBridgeMethod;
         }
 
         @Override
@@ -811,23 +811,21 @@ public final class DispatchWriter implements ClassOutputWriter {
             VariableDef.Field interceptableField = new VariableDef.This()
                 .field(FIELD_INTERCEPTABLE, TypeDef.of(boolean.class));
 
-            ClassTypeDef proxyType = ClassTypeDef.of(interceptedProxyClassName);
 
-            return interceptableField.isTrue().and(target.instanceOf(proxyType))
+            return interceptableField.isTrue().and(target.instanceOf(interceptedProxyType))
                 .doIfElse(
-                    invokeProxyBridge(proxyType, target, valuesArray),
+                    invokeProxyBridge(interceptedProxyType, target, valuesArray),
                     dispatchTarget.dispatch(target, valuesArray)
                 );
         }
 
         private StatementDef invokeProxyBridge(ClassTypeDef proxyType, ExpressionDef target, ExpressionDef valuesArray) {
             boolean suspend = methodElement.isSuspend();
-            ExpressionDef.InvokeInstanceMethod invoke = target.cast(proxyType).invoke(
-                interceptedProxyBridgeMethodName,
-                Arrays.stream(methodElement.getSuspendParameters()).map(p -> TypeDef.erasure(p.getType())).toList(),
-                suspend ? TypeDef.OBJECT : TypeDef.erasure(methodElement.getReturnType()),
-                IntStream.range(0, methodElement.getSuspendParameters().length).mapToObj(valuesArray::arrayElement).toList()
-            );
+            ExpressionDef.InvokeInstanceMethod invoke = target.cast(proxyType)
+                .invoke(
+                    interceptedProxyBridgeMethod,
+                    IntStream.range(0, methodElement.getSuspendParameters().length).mapToObj(valuesArray::arrayElement).toList()
+                );
             if (dispatchTarget.getMethodElement().getReturnType().isVoid() && !suspend) {
                 return StatementDef.multi(
                     invoke,

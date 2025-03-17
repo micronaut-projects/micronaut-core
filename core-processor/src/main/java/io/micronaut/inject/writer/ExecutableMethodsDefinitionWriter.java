@@ -197,14 +197,14 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
-     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @param interceptedProxyType             The intercepted proxy type
+     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method
      * @return The method index
      */
     public int visitExecutableMethod(TypedElement declaringType,
                                      MethodElement methodElement,
-                                     String interceptedProxyClassName,
-                                     String interceptedProxyBridgeMethodName) {
+                                     ClassTypeDef interceptedProxyType,
+                                     MethodDef interceptedProxyBridgeMethod) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
@@ -219,10 +219,10 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             return index;
         }
         addedMethods.add(methodKey);
-        if (interceptedProxyClassName == null) {
+        if (interceptedProxyType == null) {
             return methodDispatchWriter.addMethod(declaringType, methodElement);
         } else {
-            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
         }
     }
 
