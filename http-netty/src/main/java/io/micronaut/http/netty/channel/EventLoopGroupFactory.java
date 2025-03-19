@@ -73,7 +73,7 @@ public interface EventLoopGroupFactory {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
         return createEventLoopGroup(
-                configuration.getNumThreads(),
+                DefaultEventLoopGroupRegistry.numThreads(configuration),
                 threadFactory,
                 configuration.getIoRatio().orElse(null)
         );

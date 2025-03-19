@@ -29,6 +29,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
@@ -105,7 +106,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         if (executor != null) {
             eventLoopGroup = beanLocator.findBean(Executor.class, Qualifiers.byName(executor))
                 .map(executorService -> eventLoopGroupFactory.createEventLoopGroup(
-                    configuration.getNumThreads(),
+                    numThreads(configuration),
                     executorService,
                     configuration.getIoRatio().orElse(null)
                 )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
@@ -156,5 +157,20 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     public Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         return beanLocator.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(name));
+    }
+
+    /**
+     * Calculate the number of threads from {@link EventLoopGroupConfiguration#getNumThreads()} and
+     * {@link EventLoopGroupConfiguration#getThreadCoreRatio()}.
+     *
+     * @param configuration The configuration
+     * @return The actual number of threads to use
+     */
+    public static int numThreads(EventLoopGroupConfiguration configuration) {
+        int explicit = configuration.getNumThreads();
+        if (explicit != 0) {
+            return explicit;
+        }
+        return Math.toIntExact(Math.round(configuration.getThreadCoreRatio() * NettyRuntime.availableProcessors()));
     }
 }

@@ -32,6 +32,7 @@ import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
@@ -770,7 +771,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     .flatMap(name -> applicationContext.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
             if (executorService != null) {
                 return nettyEmbeddedServices.createEventLoopGroup(
-                        config.getNumThreads(),
+                        DefaultEventLoopGroupRegistry.numThreads(config),
                         executorService,
                         config.getIoRatio().orElse(null)
                 );
@@ -964,7 +965,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private static class DomainSocketHolder {
+    private static final class DomainSocketHolder {
         @NonNull
         private static SocketAddress makeDomainSocketAddress(String path) {
             try {

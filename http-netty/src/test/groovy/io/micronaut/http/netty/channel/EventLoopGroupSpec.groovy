@@ -89,6 +89,29 @@ class EventLoopGroupSpec extends Specification {
         eventLoopGroup.isShuttingDown()
     }
 
+    void "test core ratio"(int ratio) {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.thread-core-ratio': ratio
+        )
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        !eventLoopGroup.isTerminated()
+        eventLoopGroup.executorCount() == ratio * Runtime.getRuntime().availableProcessors()
+
+        when:
+        context.close()
+
+        then:
+        eventLoopGroup.isShuttingDown()
+
+        where:
+        ratio << [1, 2, 3]
+    }
+
     void "test configure additional event loop groups"() {
         given:
         def context = ApplicationContext.run(
