@@ -129,7 +129,7 @@ class EventLoopGroupSpec extends Specification {
 
         then:
         !eventLoopGroup.isTerminated()
-        eventLoopGroup.executorCount() == NettyRuntime.availableProcessors() * 2
+        eventLoopGroup.executorCount() == NettyRuntime.availableProcessors()
 
         when:
         def eventLoopGroup2 = context.getBean(EventLoopGroup, Qualifiers.byName("one"))
