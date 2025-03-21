@@ -86,22 +86,8 @@ public class HttpUtil {
     @SuppressWarnings("Duplicates")
     @NonNull
     public static Charset getCharset(@NonNull HttpMessage<?> request) {
-        try {
-            MediaType contentType = request.getContentType().orElse(null);
-            if (contentType != null) {
-                String charset = contentType.getParametersMap().get(MediaType.CHARSET_PARAMETER);
-                if (charset != null) {
-                    try {
-                        return Charset.forName(charset);
-                    } catch (Exception e) {
-                        // unsupported charset, default to UTF-8
-                        return Charset.defaultCharset();
-                    }
-                }
-            }
-        } catch (UnsupportedCharsetException e) {
-            return StandardCharsets.UTF_8;
-        }
-        return request.getHeaders().findAcceptCharset().orElse(StandardCharsets.UTF_8);
+        MediaType contentType = request.getContentType().orElse(null);
+        return HttpHeadersUtil.parseCharacterEncoding(contentType,
+            request.getHeaders().findAcceptCharset().orElse(StandardCharsets.UTF_8));
     }
 }

@@ -6,8 +6,11 @@ import ch.qos.logback.core.AppenderBase
 import io.micronaut.http.HttpHeaders
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import spock.lang.See
 import spock.lang.Specification
 
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -76,6 +79,40 @@ class HttpHeadersUtilSpec extends Specification {
         "fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5" | "fr-CH"
         "fr-CH;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5"     | "fr-CH"
         "*"                                            | null
+    }
+
+    @See("https://udn.realityripple.com/docs/Web/HTTP/Headers/Accept-Charset")
+    void "acceptCharset"(String headerValue, Charset expectedCharset) {
+        when:
+        Charset charset = HttpHeadersUtil.parseAcceptCharset(headerValue)
+
+        then:
+        charset == expectedCharset
+
+        where:
+        headerValue                        || expectedCharset
+        'iso-8859-1'                       || StandardCharsets.ISO_8859_1
+        'utf-8, iso-8859-1;q=0.5, *;q=0.1' || StandardCharsets.UTF_8
+        'utf-8, iso-8859-1;q=0.5'          || StandardCharsets.UTF_8
+
+    }
+
+    void "parse character encoding based on the Content-Type and Accept-Charset Header values"(String contentTypeHeaderValue, String acceptCharsetHeaderValue , Charset expectedCharset) {
+        when:
+        Charset charset = HttpHeadersUtil.parseCharacterEncoding(contentTypeHeaderValue, acceptCharsetHeaderValue)
+
+        then:
+        charset == expectedCharset
+
+        where:
+        contentTypeHeaderValue            | acceptCharsetHeaderValue  || expectedCharset
+        null                              | 'iso-8859-1'              || StandardCharsets.ISO_8859_1
+        null                              | 'utf-8, iso-8859-1;q=0.5, *;q=0.1' || StandardCharsets.UTF_8
+        null                              | 'utf-8, iso-8859-1;q=0.5' || StandardCharsets.UTF_8
+        'application/json; charset=utf-8' | 'iso-8859-1'              || StandardCharsets.UTF_8
+        'application/json'                | 'iso-8859-1'              || StandardCharsets.ISO_8859_1
+        null                              | null                      || StandardCharsets.UTF_8
+        'application/json; charset=bogus' | 'iso-8859-1'              || StandardCharsets.UTF_8
     }
 
     static class MemoryAppender extends AppenderBase<ILoggingEvent> {
