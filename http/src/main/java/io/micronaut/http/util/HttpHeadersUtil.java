@@ -152,7 +152,7 @@ public final class HttpHeadersUtil {
     @NonNull
     public static Charset parseCharacterEncoding(@Nullable String contentTypeHeaderValue, @Nullable String acceptCharsetHeaderValue) {
         MediaType contentType = contentTypeHeaderValue == null ? null : MediaType.of(contentTypeHeaderValue);
-        Charset charset = acceptCharsetHeaderValue != null ? HttpHeadersUtil.parseAcceptCharset(acceptCharsetHeaderValue) : StandardCharsets.UTF_8;
+        Charset charset = acceptCharsetHeaderValue != null ? parseAcceptCharset(acceptCharsetHeaderValue) : StandardCharsets.UTF_8;
         return parseCharacterEncoding(contentType, charset);
     }
 
