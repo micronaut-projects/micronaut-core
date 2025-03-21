@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import jakarta.annotation.PreDestroy;
@@ -112,7 +113,11 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         } else {
             ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
                     .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
-            eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
+            eventLoopGroup = new MultiThreadIoEventLoopGroup(
+                configuration.getNumThreads(),
+                threadFactory,
+                eventLoopGroupFactory.createIoHandlerFactory(configuration)
+            );
         }
         eventLoopGroups.put(eventLoopGroup, configuration);
         return eventLoopGroup;
@@ -131,7 +136,11 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
         EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
-        EventLoopGroup eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
+        EventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(
+            configuration.getNumThreads(),
+            threadFactory,
+            eventLoopGroupFactory.createIoHandlerFactory(configuration)
+        );
         eventLoopGroups.put(eventLoopGroup, configuration);
         return eventLoopGroup;
     }

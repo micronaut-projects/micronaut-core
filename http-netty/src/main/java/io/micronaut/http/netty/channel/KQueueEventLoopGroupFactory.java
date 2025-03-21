@@ -20,11 +20,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.Channel;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueDatagramChannel;
 import io.netty.channel.kqueue.KQueueDomainSocketChannel;
-import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueIoHandler;
 import io.netty.channel.kqueue.KQueueServerDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
@@ -32,9 +32,6 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for KQueueEventLoopGroup.
@@ -49,42 +46,14 @@ import java.util.concurrent.ThreadFactory;
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     private static final Logger LOG = LoggerFactory.getLogger(KQueueEventLoopGroupFactory.class);
 
-    /**
-     * Creates a KQueueEventLoopGroup.
-     *
-     * @param threads       The number of threads to use.
-     * @param threadFactory The thread factory.
-     * @param ioRatio       The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(threads, threadFactory), ioRatio);
-    }
-
-    /**
-     * Creates a KQueueEventLoopGroup.
-     *
-     * @param threads  The number of threads to use.
-     * @param executor An Executor.
-     * @param ioRatio  The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
+    public IoHandlerFactory createIoHandlerFactory() {
+        return KQueueIoHandler.newFactory();
     }
 
     @Override
     public boolean isNative() {
         return true;
-    }
-
-    private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {
-        if (ioRatio != null) {
-            group.setIoRatio(ioRatio);
-        }
-        return group;
     }
 
     @Override

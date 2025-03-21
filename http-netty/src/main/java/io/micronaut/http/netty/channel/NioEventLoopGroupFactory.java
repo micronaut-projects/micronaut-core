@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.Channel;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
@@ -30,8 +30,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for NioEventLoopGroup.
@@ -43,37 +41,9 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    /**
-     * Creates a NioEventLoopGroup.
-     *
-     * @param threads       The number of threads to use.
-     * @param threadFactory The thread factory.
-     * @param ioRatio       The io ratio.
-     * @return A NioEventLoopGroup.
-     */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(threads, threadFactory), ioRatio);
-    }
-
-    /**
-     * Creates a NioEventLoopGroup.
-     *
-     * @param threads  The number of threads to use.
-     * @param executor An Executor.
-     * @param ioRatio  The io ratio.
-     * @return A NioEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
-    }
-
-    private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
-        if (ioRatio != null) {
-            group.setIoRatio(ioRatio);
-        }
-        return group;
+    public IoHandlerFactory createIoHandlerFactory() {
+        return NioIoHandler.newFactory();
     }
 
     @Override

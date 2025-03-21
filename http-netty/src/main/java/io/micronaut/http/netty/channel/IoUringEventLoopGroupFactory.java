@@ -21,17 +21,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
-import io.netty.channel.EventLoopGroup;
-import io.netty.incubator.channel.uring.IOUring;
-import io.netty.incubator.channel.uring.IOUringDatagramChannel;
-import io.netty.incubator.channel.uring.IOUringEventLoopGroup;
-import io.netty.incubator.channel.uring.IOUringServerSocketChannel;
-import io.netty.incubator.channel.uring.IOUringSocketChannel;
+import io.netty.channel.IoHandlerFactory;
+import io.netty.channel.uring.IoUring;
+import io.netty.channel.uring.IoUringDatagramChannel;
+import io.netty.channel.uring.IoUringIoHandler;
+import io.netty.channel.uring.IoUringServerSocketChannel;
+import io.netty.channel.uring.IoUringSocketChannel;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for IOUringEventLoopGroup.
@@ -40,7 +37,7 @@ import java.util.concurrent.ThreadFactory;
  * @since 4.0.0
  */
 @Singleton
-@Requires(classes = IOUring.class, condition = IoUringAvailabilityCondition.class)
+@Requires(classes = IoUring.class, condition = IoUringAvailabilityCondition.class)
 @Internal
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
@@ -48,30 +45,9 @@ import java.util.concurrent.ThreadFactory;
 @Order(200)
 public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    /**
-     * Creates an IOUringEventLoopGroup.
-     *
-     * @param threads       The number of threads to use.
-     * @param threadFactory The thread factory.
-     * @param ioRatio       The io ratio.
-     * @return An IOUringEventLoopGroup.
-     */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return new IOUringEventLoopGroup(threads, threadFactory);
-    }
-
-    /**
-     * Creates an IOUringEventLoopGroup.
-     *
-     * @param threads  The number of threads to use.
-     * @param executor An Executor.
-     * @param ioRatio  The io ratio.
-     * @return An IOUringEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return new IOUringEventLoopGroup(threads, executor);
+    public IoHandlerFactory createIoHandlerFactory() {
+        return IoUringIoHandler.newFactory();
     }
 
     @Override
@@ -82,9 +58,9 @@ public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
         return switch (type) {
-            case SERVER_SOCKET -> IOUringServerSocketChannel.class;
-            case CLIENT_SOCKET -> IOUringSocketChannel.class;
-            case DATAGRAM_SOCKET -> IOUringDatagramChannel.class;
+            case SERVER_SOCKET -> IoUringServerSocketChannel.class;
+            case CLIENT_SOCKET -> IoUringSocketChannel.class;
+            case DATAGRAM_SOCKET -> IoUringDatagramChannel.class;
             default -> throw new UnsupportedOperationException("Channel type not supported");
         };
     }
@@ -97,9 +73,9 @@ public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
         return switch (type) {
-            case SERVER_SOCKET -> new IOUringServerSocketChannel();
-            case CLIENT_SOCKET -> new IOUringSocketChannel();
-            case DATAGRAM_SOCKET -> new IOUringDatagramChannel();
+            case SERVER_SOCKET -> new IoUringServerSocketChannel();
+            case CLIENT_SOCKET -> new IoUringSocketChannel();
+            case DATAGRAM_SOCKET -> new IoUringDatagramChannel();
             default -> throw new UnsupportedOperationException("Channel type not supported");
         };
     }
