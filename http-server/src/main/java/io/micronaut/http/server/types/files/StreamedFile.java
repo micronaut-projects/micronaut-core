@@ -139,7 +139,7 @@ public class StreamedFile implements FileCustomizableResponseType {
     static String buildAttachmentHeader(String attachmentName) {
         // https://httpwg.org/specs/rfc6266.html#advice.generating
         // 'filename' parameter is the fallback for legacy browsers, 'filename*' is the supported approach.
-        return "attachment; filename=\"" + sanitizeAscii(attachmentName) + "\"; filename*=utf-8''" + encodeRfc6987(attachmentName);
+        return "attachment; filename=\"" + sanitizeAscii(attachmentName) + "\"; filename*=utf-8''" + encodeRfc6266(attachmentName);
     }
 
     private static String sanitizeAscii(String s) {
@@ -157,7 +157,7 @@ public class StreamedFile implements FileCustomizableResponseType {
     // this is mostly copied from netty QueryStringEncoder
 
     @SuppressWarnings({"java:S3776", "java:S135", "java:S127"}) // stay close to netty impl
-    static String encodeRfc6987(String s) {
+    static String encodeRfc6266(String s) {
         StringBuilder uriBuilder = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
