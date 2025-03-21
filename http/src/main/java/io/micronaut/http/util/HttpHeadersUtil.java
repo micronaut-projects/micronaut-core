@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
  * @since 3.8.0
  */
 public final class HttpHeadersUtil {
+    private final static Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -175,13 +176,12 @@ public final class HttpHeadersUtil {
                     try {
                         return Charset.forName(charset);
                     } catch (Exception e) {
-                        // unsupported charset, default to UTF-8
-                        return Charset.defaultCharset();
+                        return DEFAULT_CHARSET;
                     }
                 }
             }
         } catch (UnsupportedCharsetException e) {
-            return StandardCharsets.UTF_8;
+            return DEFAULT_CHARSET;
         }
         return acceptCharset;
     }
@@ -201,6 +201,6 @@ public final class HttpHeadersUtil {
             } catch (Exception ignored) {
             }
         }
-        return StandardCharsets.UTF_8;
+        return DEFAULT_CHARSET;
     }
 }
