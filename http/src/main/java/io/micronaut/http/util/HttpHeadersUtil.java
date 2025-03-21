@@ -160,6 +160,7 @@ public final class HttpHeadersUtil {
      * Resolve the {@link Charset} to use for the request.
      *
      * @param contentType ContenType
+     * @param acceptCharset Accept Charset
      * @return An {@link Optional} of {@link Charset}
      * @since 4.8.8
      */

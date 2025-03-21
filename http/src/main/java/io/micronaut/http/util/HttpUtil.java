@@ -32,6 +32,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public class HttpUtil {
+    private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
     /**
      * Return whether the given request features {@link MediaType#APPLICATION_FORM_URLENCODED} or
@@ -88,6 +89,6 @@ public class HttpUtil {
     public static Charset getCharset(@NonNull HttpMessage<?> request) {
         MediaType contentType = request.getContentType().orElse(null);
         return HttpHeadersUtil.parseCharacterEncoding(contentType,
-            request.getHeaders().findAcceptCharset().orElse(StandardCharsets.UTF_8));
+            request.getHeaders() != null ? request.getHeaders().findAcceptCharset().orElse(DEFAULT_CHARSET) : DEFAULT_CHARSET);
     }
 }
