@@ -222,7 +222,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
-        this.dispatchWriter = new DispatchWriter();
+        this.dispatchWriter = new DispatchWriter(introspectionName);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.originatingElements = OriginatingElements.of(beanClassElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
@@ -253,7 +253,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
-        this.dispatchWriter = new DispatchWriter();
+        this.dispatchWriter = new DispatchWriter(introspectionName);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.originatingElements = OriginatingElements.of(originatingElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
@@ -1120,6 +1120,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                         FieldElement field = fieldGetDispatchTarget.getField();
                         propertyType = field.getGenericType();
                         member = field;
+                    } else if (dispatchTarget instanceof DispatchWriter.FieldGetReflectionDispatchTarget fieldGetDispatchTarget) {
+                        FieldElement field = fieldGetDispatchTarget.getField();
+                        propertyType = field.getGenericType();
+                        member = field;
                     } else {
                         throw new IllegalStateException();
                     }
@@ -1205,6 +1209,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                             } else if (readDispatch instanceof DispatchWriter.FieldGetDispatchTarget fieldGetDispatchTarget) {
                                 FieldElement fieldElement = fieldGetDispatchTarget.getField();
                                 oldValueExp = prevBeanVar.field(fieldElement);
+                            } else if (readDispatch instanceof DispatchWriter.FieldGetReflectionDispatchTarget fieldGetDispatchTarget) {
+                                FieldElement fieldElement = fieldGetDispatchTarget.getField();
+                                oldValueExp = prevBeanVar.field(fieldElement);
                             } else {
                                 throw new IllegalStateException();
                             }
@@ -1219,6 +1226,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                                         )
                                 );
                             } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget fieldSetDispatchTarget) {
+                                FieldElement fieldElement = fieldSetDispatchTarget.getField();
+                                statements.add(
+                                        newBeanVar.field(fieldElement).assign(oldValueExp)
+                                );
+                            } else if (writeDispatch instanceof DispatchWriter.FieldSetReflectionDispatchTarget fieldSetDispatchTarget) {
                                 FieldElement fieldElement = fieldSetDispatchTarget.getField();
                                 statements.add(
                                         newBeanVar.field(fieldElement).assign(oldValueExp)

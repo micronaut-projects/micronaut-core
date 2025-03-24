@@ -120,7 +120,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         this.visitorContext = visitorContext;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
-        this.methodDispatchWriter = new DispatchWriter();
+        this.methodDispatchWriter = new DispatchWriter(className);
     }
 
     /**

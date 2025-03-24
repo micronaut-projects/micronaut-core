@@ -96,6 +96,12 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     private boolean hasInterceptedMethod;
 
+    private final String thisType;
+
+    public DispatchWriter(String thisType) {
+        this.thisType = thisType;
+    }
+
     /**
      * Adds new set field dispatch target.
      *
@@ -103,6 +109,9 @@ public final class DispatchWriter implements ClassOutputWriter {
      * @return the target index
      */
     public int addSetField(FieldElement beanField) {
+        if (beanField.isReflectionRequired(ClassElement.of(thisType))) {
+            return addDispatchTarget(new FieldSetReflectionDispatchTarget(beanField));
+        }
         return addDispatchTarget(new FieldSetDispatchTarget(beanField));
     }
 
@@ -113,6 +122,9 @@ public final class DispatchWriter implements ClassOutputWriter {
      * @return the target index
      */
     public int addGetField(FieldElement beanField) {
+        if (beanField.isReflectionRequired(ClassElement.of(thisType))) {
+            return addDispatchTarget(new FieldGetReflectionDispatchTarget(beanField));
+        }
         return addDispatchTarget(new FieldGetDispatchTarget(beanField));
     }
 
@@ -144,7 +156,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
         boolean isKotlinDefault = argumentTypes.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
         ClassElement declaringClassType = (ClassElement) declaringType;
-        if (methodElement.isReflectionRequired()) {
+        if (methodElement.isReflectionRequired(ClassElement.of(thisType))) {
             if (isKotlinDefault) {
                 throw new ProcessingException(methodElement, "Kotlin default methods are not supported for reflection invocation");
             }
@@ -514,19 +526,57 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchExpression(ExpressionDef bean) {
-            final TypeDef propertyType = TypeDef.of(beanField.getType());
-            final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
+            return bean.cast(ClassTypeDef.of(beanField.getOwningType()))
+                .field(beanField)
+                .cast(TypeDef.of(beanField.getType()));
+        }
 
-            if (beanField.isReflectionRequired()) {
-                return TYPE_REFLECTION_UTILS.invokeStatic(
-                    METHOD_GET_FIELD_VALUE,
-                    ExpressionDef.constant(targetType), // Target class
-                    ExpressionDef.constant(beanField.getName()), // Field name,
-                    bean // Target instance
-                ).cast(propertyType);
-            } else {
-                return bean.cast(targetType).field(beanField).cast(propertyType);
-            }
+        @NonNull
+        public FieldElement getField() {
+            return beanField;
+        }
+    }
+
+    /**
+     * Field get dispatch target.
+     */
+    @Internal
+    public static final class FieldGetReflectionDispatchTarget extends AbstractDispatchTarget {
+        @NonNull
+        final FieldElement beanField;
+
+        public FieldGetReflectionDispatchTarget(FieldElement beanField) {
+            this.beanField = beanField;
+        }
+
+        @Override
+        public boolean supportsDispatchOne() {
+            return true;
+        }
+
+        @Override
+        public boolean supportsDispatchMulti() {
+            return false;
+        }
+
+        @Override
+        public MethodElement getMethodElement() {
+            return null;
+        }
+
+        @Override
+        public TypedElement getDeclaringType() {
+            return null;
+        }
+
+        @Override
+        public ExpressionDef dispatchExpression(ExpressionDef bean) {
+            return TYPE_REFLECTION_UTILS.invokeStatic(
+                METHOD_GET_FIELD_VALUE,
+                ExpressionDef.constant(ClassTypeDef.of(beanField.getOwningType())), // Target class
+                ExpressionDef.constant(beanField.getName()), // Field name,
+                bean // Target instance
+            ).cast(TypeDef.of(beanField.getType()));
         }
 
         @NonNull
@@ -569,21 +619,58 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
-            final TypeDef propertyType = TypeDef.of(beanField.getType());
-            final ClassTypeDef targetType = ClassTypeDef.of(beanField.getOwningType());
-            if (beanField.isReflectionRequired()) {
-                return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
-                    ExpressionDef.constant(targetType), // Target class
-                    ExpressionDef.constant(beanField.getName()), // Field name
-                    target, // Target instance
-                    value // Field value
-                ).after(ExpressionDef.nullValue().returning());
-            } else {
-                return target.cast(targetType)
-                    .field(beanField)
-                    .put(value.cast(propertyType))
-                    .after(ExpressionDef.nullValue().returning());
-            }
+            return target.cast(ClassTypeDef.of(beanField.getOwningType()))
+                .field(beanField)
+                .put(value.cast(TypeDef.of(beanField.getType())))
+                .after(ExpressionDef.nullValue().returning());
+        }
+
+        @NonNull
+        public FieldElement getField() {
+            return beanField;
+        }
+    }
+
+    /**
+     * Field set dispatch target.
+     */
+    @Internal
+    public static final class FieldSetReflectionDispatchTarget extends AbstractDispatchTarget {
+        @NonNull
+        final FieldElement beanField;
+
+        public FieldSetReflectionDispatchTarget(FieldElement beanField) {
+            this.beanField = beanField;
+        }
+
+        @Override
+        public boolean supportsDispatchOne() {
+            return true;
+        }
+
+        @Override
+        public boolean supportsDispatchMulti() {
+            return false;
+        }
+
+        @Override
+        public MethodElement getMethodElement() {
+            return null;
+        }
+
+        @Override
+        public TypedElement getDeclaringType() {
+            return null;
+        }
+
+        @Override
+        public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
+                ExpressionDef.constant(ClassTypeDef.of(beanField.getOwningType())), // Target class
+                ExpressionDef.constant(beanField.getName()), // Field name
+                target, // Target instance
+                value // Field value
+            ).after(ExpressionDef.nullValue().returning());
         }
 
         @NonNull

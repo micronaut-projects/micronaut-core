@@ -12,6 +12,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.NextMajorVersion
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -30,6 +31,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.beans.outer.MuxedEvent2
 import io.micronaut.jackson.modules.BeanIntrospectionModule
 import io.micronaut.json.JsonMapper
 import io.micronaut.validation.visitor.ValidationVisitor
@@ -52,6 +54,47 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test import field introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.$io_micronaut_inject_visitor_beans_MuxedEvent1', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = io.micronaut.inject.visitor.beans.MuxedEvent1.class, accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class Test {
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanProperties().size() == 2
+        introspection.getProperty("content").get().get(new MuxedEvent1("abc", "xyz")) == "xyz"
+    }
+
+    @NextMajorVersion("This test should fail and require ReflectiveAccess on fields/class or there should be an option on the introspected to use reflective access by default by annotating the introspected type")
+    void "test import field introspection reflection"() {
+        when:
+        def introspection = buildBeanIntrospection('test.$io_micronaut_inject_visitor_beans_outer_MuxedEvent2', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = io.micronaut.inject.visitor.beans.outer.MuxedEvent2.class, accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class Test {
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getBeanProperties().size() == 2
+        introspection.getProperty("content").get().get(new MuxedEvent2("abc", "xyz")) == "xyz"
+    }
 
     void "test inner introspection"() {
         when:
