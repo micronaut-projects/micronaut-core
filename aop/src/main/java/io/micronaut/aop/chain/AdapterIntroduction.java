@@ -19,6 +19,7 @@ import io.micronaut.aop.Adapter;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
@@ -49,19 +50,22 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      * @param method The target method
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
-        Class<?> beanType = method.classValue(Adapter.class, ADAPTED_BEAN).orElse(null);
-
+        AnnotationValue<Adapter> adapterAnnotationValue = method.getAnnotation(Adapter.class);
+        if (adapterAnnotationValue == null) {
+            throw new IllegalStateException("Adapter method must have @Adapter annotation");
+        }
+        Class<?> beanType = adapterAnnotationValue.classValue(ADAPTED_BEAN).orElse(null);
         if (beanType == null) {
             throw new IllegalStateException("No bean type to adapt found in Adapter configuration for method: " + method);
         }
 
-        String beanMethod = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
+        String beanMethod = adapterAnnotationValue.stringValue(ADAPTED_METHOD).orElse(null);
         if (StringUtils.isEmpty(beanMethod)) {
             throw new IllegalStateException("No bean method to adapt found in Adapter configuration for method: " + method);
         }
 
-        String beanQualifier = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
-        Class<?>[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
+        String beanQualifier = adapterAnnotationValue.stringValue(ADAPTED_QUALIFIER).orElse(null);
+        Class<?>[] argumentTypes = adapterAnnotationValue.classValues(ADAPTED_ARGUMENT_TYPES);
         Class<?>[] methodArgumentTypes = method.getArgumentTypes();
         Class<?>[] arguments = argumentTypes.length == methodArgumentTypes.length ? argumentTypes : methodArgumentTypes;
         if (StringUtils.isNotEmpty(beanQualifier)) {

@@ -321,8 +321,10 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return when (typeArgument.variance) {
             Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> {
                 // example List<*>, IN, OUT
-                val type = typeArgument.type!!
-                val stripTypeArguments = !visitedTypes.add(type)
+                val stripTypeArguments = when (typeArgument.type) {
+                    null -> false
+                    else -> !visitedTypes.add(typeArgument.type!!)
+                }
                 val upperBounds =
                     resolveUpperBounds(
                         owner,

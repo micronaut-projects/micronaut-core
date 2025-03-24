@@ -2195,7 +2195,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 if (producer.isDisabledOptimistic() || !producer.isReferenceCandidateBean(beanType)) {
                     continue;
                 }
-                BeanDefinition<T> loadedBean = producer.getDefinitionIfEnabled(this, null, false, beanType, predicate);
+                BeanDefinition<T> loadedBean = producer.getDefinitionIfEnabled(this, null, beanType, predicate);
                 if (loadedBean == null) {
                     continue;
                 }
@@ -2670,9 +2670,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void loadEagerBeans(BeanDefinitionProducer producer, Collection<BeanDefinition<Object>> collector) {
-        BeanDefinition<Object> definition = producer.getDefinitionIfEnabled(this, null, true);
-        if (definition != null) {
-            collector.add(definition);
+        BeanDefinitionReference<Object> reference = producer.getReferenceIfEnabled(this, null);
+        if (reference != null) {
+            BeanDefinition<Object> beanDefinition = reference.load(this);
+            try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
+                if (beanDefinition.isEnabled(this, resolutionContext)) {
+                    collector.add(beanDefinition);
+                }
+            }
         }
     }
 
@@ -4335,12 +4340,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
         @Nullable
         <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context) {
-            return getDefinitionIfEnabled(context, null, false);
-        }
-
-        @Nullable
-        <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext, boolean newContext) {
-            return getDefinitionIfEnabled(context, resolutionContext, newContext, null, null);
+            return getDefinitionIfEnabled(context, null, null, null);
         }
 
         /**
@@ -4348,7 +4348,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
          *
          * @param context           The context
          * @param resolutionContext The resolution context (optional)
-         * @param newContext        If {@code true}, a new resolution context is created for checking {@link BeanDefinition#isEnabled}
          * @param beanType          The bean type this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
          * @param predicate         The predicate this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
          * @return The definition or {@code null} if it's disabled (or {@code beanType} or {@code predicate} did not match)
@@ -4356,7 +4355,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         @Nullable
         <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context,
                                                      @Nullable BeanResolutionContext resolutionContext,
-                                                     boolean newContext,
                                                      @Nullable Argument<T> beanType,
                                                      @Nullable Predicate<BeanDefinition<T>> predicate) {
             Object defObject = this.definition;
@@ -4376,15 +4374,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             if (predicate != null && !predicate.test(def)) {
                 return null;
             }
-            boolean definitionEnabled;
-            if (newContext) {
-                try (BeanResolutionContext ctx = context.newResolutionContext(def, resolutionContext)) {
-                    definitionEnabled = isDefinitionEnabled(context, ctx, def);
-                }
-            } else {
-                definitionEnabled = isDefinitionEnabled(context, resolutionContext, def);
-            }
-            if (definitionEnabled) {
+            if (isDefinitionEnabled(context, resolutionContext, def)) {
                 if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
                     return def;
                 } else {

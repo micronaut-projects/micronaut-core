@@ -151,6 +151,12 @@ internal open class KotlinClassElement(
             // We need to aggregate all the hierarchy properties because
             // getAllProperties doesn't return correct parent of the property
             properties.addAll(clazz.getDeclaredSyntheticBeanProperties())
+            clazz.interfaces.forEach {
+                if (it is KotlinClassElement) {
+                    properties.addAll(it.getDeclaredSyntheticBeanProperties())
+                }
+            }
+
             clazz = clazz.superType.orElse(null) as KotlinClassElement?
         }
         properties

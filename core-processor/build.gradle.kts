@@ -11,6 +11,7 @@ dependencies {
     }
     api(mnSourcegen.micronaut.sourcegen.bytecode.writer)
     implementation(projects.micronautCoreReactive)
+    implementation(mnSourcegen.asm)
 
     compileOnly(libs.managed.kotlin.stdlib.jdk8)
 }

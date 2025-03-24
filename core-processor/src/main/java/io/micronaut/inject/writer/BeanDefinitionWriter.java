@@ -129,7 +129,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -2391,7 +2390,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
-        return new ByteCodeWriter().write(classDefBuilder.build());
+        return ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext);
     }
 
     @Override
@@ -2422,7 +2421,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private void write(ClassWriterOutputVisitor visitor, ObjectDef objectDef) throws IOException {
         try (OutputStream out = visitor.visitClass(objectDef.getName(), getOriginatingElements())) {
-            out.write(new ByteCodeWriter().write(objectDef));
+            out.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
         }
         for (ObjectDef innerType : objectDef.getInnerTypes()) {
             write(visitor, innerType);
@@ -2636,7 +2635,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 annotationMetadata,
                 beanDefinitionName,
                 getBeanDefinitionName(),
-                originatingElements
+                originatingElements,
+                visitorContext
             );
         }
         return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);

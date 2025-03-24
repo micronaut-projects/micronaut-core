@@ -11,3 +11,7 @@ snippet::io.micronaut.docs.server.response.StatusController[tags="atstatus", ind
 or even respond with an `HttpStatus`
 
 snippet::io.micronaut.docs.server.response.StatusController[tags="httpstatus", indent=0]
+
+=== Custom HTTP Status Codes
+Micronaut supports arbitrary HTTP status codes not part of the predefined `HttpStatus` enum.
+You can use the API method https://docs.micronaut.io/latest/api/io/micronaut/http/HttpResponse.html#status(int,java.lang.String)[`HttpResponse#status(int,java.lang.String)`]
