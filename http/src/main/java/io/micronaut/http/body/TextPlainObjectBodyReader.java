@@ -82,10 +82,11 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     private T read0(Argument<T> type, ByteBuffer<?> byteBuffer, Charset charset) {
         String string = byteBuffer.toString(charset);
+        T conv = conversionService.convertRequired(string, type);
         if (byteBuffer instanceof ReferenceCounted rc) {
             rc.release();
         }
-        return conversionService.convertRequired(string, type);
+        return conv;
     }
 
     @Override
