@@ -25,6 +25,7 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/graal/ServiceLoaderInitialization.java",
         "**/DirectoryClassWriterOutputVisitor.java",
         "**/GroovyClassWriterOutputVisitor.java",
+        "**/MutableHttpRequestWrapper.java",
         "**/tck/**",
         "**/test/support/**"
     ]
