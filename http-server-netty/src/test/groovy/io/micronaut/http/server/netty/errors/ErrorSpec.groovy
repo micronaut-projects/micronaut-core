@@ -186,6 +186,19 @@ class ErrorSpec extends AbstractMicronautSpec {
         json._links.self.href == '/errors/server-error'
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11468")
+    void "test 405 error for wrong content type"() {
+        when:
+        httpClient.toBlocking().retrieve(
+                HttpRequest.POST('/errors/server-error', 'blah')
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+        )
+
+        then:
+        def e = thrown HttpClientResponseException
+        e.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+    }
+
     void "test content type for error handler"() {
         given:
         HttpResponse response = Flux.from(httpClient.exchange(
