@@ -139,6 +139,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private Collection<Class<?>> requiredComponents;
     @Nullable
     private Argument<?>[] requiredParametrizedArguments;
+    @Nullable
+    private Optional<Class<? extends Annotation>> scope;
 
     private Qualifier<T> declaredQualifier;
 
@@ -302,14 +304,20 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return precalculatedInfo.isSingleton;
     }
 
+    @SuppressWarnings({"OptionalAssignedToNull", "unchecked"})
     @Override
     public final Optional<Class<? extends Annotation>> getScope() {
-        return precalculatedInfo.scope.flatMap(scopeClassName -> {
-            if (Singleton.class.getName().equals(scopeClassName)) {
-                return SINGLETON_SCOPE;
-            }
-            return (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader());
-        });
+        Optional<Class<? extends Annotation>> scope = this.scope;
+        if (scope == null) {
+            scope = precalculatedInfo.scope.flatMap(scopeClassName -> {
+                if (Singleton.class.getName().equals(scopeClassName)) {
+                    return SINGLETON_SCOPE;
+                }
+                return (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader());
+            });
+            this.scope = scope;
+        }
+        return scope;
     }
 
     @Override
