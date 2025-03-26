@@ -135,7 +135,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             } catch (Throwable stopError) {
                                 LOG.error("Embedded Application shutting down", stopError);
                             }
-                            LOG.warn("Embedded Application: {}", e.getMessage());
+                            LOG.warn("Failed to register shutdown hook", e);
                         }
                     }
 
