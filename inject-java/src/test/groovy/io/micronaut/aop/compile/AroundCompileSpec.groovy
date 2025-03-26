@@ -451,6 +451,67 @@ class AnotherInterceptor implements Interceptor {
         context.close()
     }
 
+    void 'test around with inheritance and generics'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding1;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class MyBean implements Middle<String> {
+    void test() {
+    }
+}
+
+interface Middle<ParentIdT> extends Parent<ParentIdT> {
+    @Override
+    default String updateResource(String request, ParentIdT parentId) {
+        return Parent.super.updateResource(request,parentId);
+    }
+}
+interface Parent<ParentIdT> {
+    default String updateResource(
+            String request,
+            ParentIdT parentId) {
+        return "ok";
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding
+@interface TestAnn {
+}
+
+@Singleton
+@InterceptorBinding(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+''')
+        def instance = getBean(context, 'annbinding1.MyBean')
+        def interceptor = getBean(context, 'annbinding1.TestInterceptor')
+        instance.test()
+
+        expect:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+
     void 'test multiple interceptor binding'() {
         given:
         ApplicationContext context = buildContext('''
