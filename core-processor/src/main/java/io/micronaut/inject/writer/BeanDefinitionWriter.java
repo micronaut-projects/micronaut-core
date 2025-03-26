@@ -1831,7 +1831,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     List<ExpressionDef> values = IntStream.range(0, parameters.length)
                         .<ExpressionDef>mapToObj(index -> methodParameters.get(0).arrayElement(index).cast(TypeDef.erasure(parameters[index].getType())))
                         .toList();
-                    return MethodGenUtils.invokeBeanConstructor(constructorBuildMethodDefinition.constructor, true, values)
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(beanDefinitionName), constructorBuildMethodDefinition.constructor, true, values)
                         .returning();
                 })
         );

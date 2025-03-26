@@ -936,12 +936,12 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         return MethodDef.override(method)
             .build((aThis, methodParameters) -> {
                 if (method.getParameters().length == 0) {
-                    return MethodGenUtils.invokeBeanConstructor(constructor, true, null).returning();
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, true, null).returning();
                 } else {
                     List<ExpressionDef> values = IntStream.range(0, constructor.getSuspendParameters().length)
                             .<ExpressionDef>mapToObj(index -> methodParameters.get(0).arrayElement(index))
                             .toList();
-                    return MethodGenUtils.invokeBeanConstructor(constructor, true, values).returning();
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, true, values).returning();
                 }
             });
     }
@@ -1052,7 +1052,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
     /**
      * Copy constructor "with" method writer.
      */
-    private static final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
+    private final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
 
         private final ClassTypeDef beanType;
         private final List<BeanPropertyData> beanProperties;
@@ -1174,7 +1174,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     }
 
                     // NOTE: It doesn't make sense to check defaults for the copy constructor
-                    ExpressionDef newInstance = MethodGenUtils.invokeBeanConstructor(constructor, false, values);
+                    ExpressionDef newInstance = MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, false, values);
                     return withSetSettersAndFields(newInstance, prevBeanVar, constructorProps);
                 });
             } else {

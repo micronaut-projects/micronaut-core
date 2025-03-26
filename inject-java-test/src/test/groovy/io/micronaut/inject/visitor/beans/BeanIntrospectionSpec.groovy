@@ -96,6 +96,25 @@ class Test {
         introspection.getProperty("content").get().get(new MuxedEvent2("abc", "xyz")) == "xyz"
     }
 
+    void "test reflective access to package private constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.$io_micronaut_inject_visitor_beans_PackagePrivateConstructor', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = io.micronaut.inject.visitor.beans.PackagePrivateConstructor.class)
+class Test {
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.instantiate() instanceof PackagePrivateConstructor
+    }
+
     void "test inner introspection"() {
         when:
         def introspection = buildBeanIntrospection('test.Test$Foo', '''

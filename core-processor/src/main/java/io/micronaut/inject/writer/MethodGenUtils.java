@@ -85,11 +85,12 @@ public final class MethodGenUtils {
         return invokeKotlinDefaultMethod(declaringType, methodElement, target, values, values.stream().map(ExpressionDef::isNonNull).toList());
     }
 
-    public static ExpressionDef invokeBeanConstructor(MethodElement constructor,
+    public static ExpressionDef invokeBeanConstructor(ClassElement callingType,
+                                                      MethodElement constructor,
                                                       boolean allowKotlinDefaults,
                                                       @Nullable
                                                       List<? extends ExpressionDef> values) {
-        return invokeBeanConstructor(constructor, constructor.isReflectionRequired(), allowKotlinDefaults, values, values == null ? null : values.stream().map(ExpressionDef::isNonNull).toList());
+        return invokeBeanConstructor(constructor, constructor.isReflectionRequired(callingType), allowKotlinDefaults, values, values == null ? null : values.stream().map(ExpressionDef::isNonNull).toList());
     }
 
     public static ExpressionDef invokeBeanConstructor(MethodElement constructor,
