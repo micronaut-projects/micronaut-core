@@ -524,6 +524,37 @@ class Test {
         prop.stringValue("mixed.Ann").get() == '#{\'test\'}'
     }
 
+    void "test expressions in introspection record components"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+
+@Introspected
+record Test(@Ann("#{'test'}") String foo) {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate("value")
+        def prop = introspection.getRequiredProperty("foo", String)
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        prop.stringValue("mixed.Ann").get() == 'test'
+    }
+
     void "test expressions in introspection properties"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
