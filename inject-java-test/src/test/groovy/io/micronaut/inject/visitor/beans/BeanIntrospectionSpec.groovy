@@ -536,23 +536,24 @@ import java.util.Optional;
 import java.lang.annotation.*;
 
 @Introspected
-record Test(@Ann("#{'test'}") String foo) {
+record Test(@Ann("#{this.ipAddress}:#{this.port}") String ipAddress, int port) {
 }
 
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
+@Target(ElementType.METHOD)
 @interface Ann {
     String value();
 }
 ''')
         when:
-        def test = introspection.instantiate("value")
-        def prop = introspection.getRequiredProperty("foo", String)
+        def test = introspection.instantiate("value", 10)
+        def prop = introspection.getRequiredProperty("ipAddress", String)
 
         then: 'expressions can be retrieved'
         prop.get(test) == 'value'
         prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
-        prop.stringValue("mixed.Ann").get() == 'test'
+        prop.getAnnotationMetadata().withArguments(test).stringValue("mixed.Ann").get() == 'value:10'
     }
 
     void "test expressions in introspection properties"() {
