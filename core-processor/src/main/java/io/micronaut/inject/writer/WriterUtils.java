@@ -53,7 +53,7 @@ import static org.objectweb.asm.commons.GeneratorAdapter.EQ;
  */
 @Internal
 public final class WriterUtils {
-    private static final String METHOD_NAME_INSTANTIATE = "instantiate";
+    private static final String METHOD_NAME_INSTANTIATE = "instantiateReflectively";
 
     /**
      * The number of Kotlin defaults masks.
@@ -75,12 +75,13 @@ public final class WriterUtils {
         return arguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
     }
 
-    public static void invokeBeanConstructor(GeneratorAdapter writer,
+    public static void invokeBeanConstructor(ClassElement caller,
+                                             GeneratorAdapter writer,
                                              MethodElement constructor,
                                              boolean allowKotlinDefaults,
                                              @Nullable
                                              BiConsumer<Integer, ParameterElement> argumentsPusher) {
-        invokeBeanConstructor(writer, constructor, constructor.isReflectionRequired(), allowKotlinDefaults, argumentsPusher, null);
+        invokeBeanConstructor(writer, constructor, constructor.isReflectionRequired(caller), allowKotlinDefaults, argumentsPusher, null);
     }
 
     public static void invokeBeanConstructor(GeneratorAdapter writer,

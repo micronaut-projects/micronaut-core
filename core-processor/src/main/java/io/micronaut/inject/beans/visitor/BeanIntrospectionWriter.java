@@ -946,9 +946,9 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             desc);
 
         if (args.length == 0) {
-            invokeBeanConstructor(instantiateInternal, constructor, true, null);
+            invokeBeanConstructor(ClassElement.of(introspectionName), instantiateInternal, constructor, true, null);
         } else {
-            invokeBeanConstructor(instantiateInternal, constructor, true, (index, parameter) -> {
+            invokeBeanConstructor(ClassElement.of(introspectionName), instantiateInternal, constructor, true, (index, parameter) -> {
                 instantiateInternal.loadArg(0);
                 instantiateInternal.push(index);
                 instantiateInternal.arrayLoad(TYPE_OBJECT);
@@ -1153,7 +1153,7 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
 
                 // NOTE: It doesn't make sense to check defaults for the copy constructor
 
-                invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
+                invokeBeanConstructor(ClassElement.of(introspectionName), writer, constructor, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
                     TypedElement supplierType;
                     if (constructorArgument instanceof MethodElement readMethod) {
