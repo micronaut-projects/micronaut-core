@@ -47,7 +47,7 @@ public final class MethodGenUtils {
 
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredInternalMethod(
             InstantiationUtils.class,
-            "instantiate",
+            "instantiateReflectively",
             Class.class,
             Class[].class,
             Object[].class

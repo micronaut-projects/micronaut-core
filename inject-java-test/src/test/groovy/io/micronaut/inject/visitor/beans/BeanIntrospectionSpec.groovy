@@ -98,17 +98,7 @@ class Test {
 
     void "test reflective access to package private constructor"() {
         when:
-        def introspection = buildBeanIntrospection('test.$io_micronaut_inject_visitor_beans_PackagePrivateConstructor', '''
-package test;
-
-import io.micronaut.core.annotation.Introspected;
-
-@Introspected(classes = io.micronaut.inject.visitor.beans.PackagePrivateConstructor.class)
-class Test {
-}
-
-
-    ''' )
+        def introspection = BeanIntrospector.SHARED.getIntrospection(PackagePrivateConstructor)
 
         then:
         introspection != null
