@@ -77,4 +77,36 @@ class IntroductionTestInterceptor
         then:
         introduction.getParentMethod() == 'good'
     }
+
+    void 'test postpone bean definition generation implementing generated interface'() {
+        when:
+        def context = buildContext('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.visitors.InterfaceGen;
+import io.micronaut.visitors.IntroductionTestGen;
+import io.micronaut.aop.InterceptorBean;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
+import jakarta.inject.Singleton;
+
+
+@InterfaceGen
+class Foo {}
+
+@Singleton
+class MyBean implements GeneratedInterface  {
+    @Override
+    public Bar test(Bar bar) {
+        return bar;
+    }
+}
+''')
+        def definition = getBeanDefinition(context, 'test.MyBean')
+
+        then:
+        definition.executableMethods.size() == 1
+    }
 }
