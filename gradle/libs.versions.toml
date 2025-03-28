@@ -70,7 +70,7 @@ managed-groovy = "4.0.24"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.17.2"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
-managed-jackson-databind = "2.17.0"
+managed-jackson-databind = "2.17.2"
 managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.18.0"
