@@ -11,6 +11,7 @@ tasks.withType(Test).configureEach {
 }
 
 dependencies {
+    testImplementation(libs.managed.kotlin.reflect)
     kspTest(projects.injectKotlin)
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
