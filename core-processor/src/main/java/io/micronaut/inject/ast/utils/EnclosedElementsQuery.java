@@ -315,17 +315,25 @@ public abstract class EnclosedElementsQuery<C, N> {
             }
             T newElement = convertElement(result, element);
             String newElementName = newElement.getName();
-            boolean isInterfaceMethod = isInterface && newElement.isAbstract();
             for (Iterator<T> iterator = collectedElements.iterator(); iterator.hasNext(); ) {
                 T existingElement = iterator.next();
                 if (!existingElement.getName().equals(newElementName)) {
                     continue;
                 }
-                if (isInterfaceMethod) {
+                if (isInterface) {
                     if (existingElement == newElement) {
                         continue classElements;
                     }
-                    if (reduce.test(existingElement, newElement)) {
+                    if (!newElement.isAbstract()) {
+                        if (reduce.test(newElement, existingElement)) {
+                            iterator.remove();
+                            addedFromClassElements.add(newElement);
+                            continue classElements;
+                        }
+                        if (!existingElement.isAbstract() && reduce.test(existingElement, newElement)) {
+                            continue classElements;
+                        }
+                    } else if (reduce.test(existingElement, newElement)) {
                         continue classElements;
                     } else if (includesAbstract && reduce.test(newElement, existingElement)) {
                         iterator.remove();
