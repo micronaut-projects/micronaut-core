@@ -164,7 +164,7 @@ internal open class KotlinClassElement(
 
     private val declaredNativeProperties: List<PropertyElement> by lazy {
         declaration.getDeclaredProperties()
-            .filter { !it.isPrivate() }
+            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
             .map {
                 KotlinPropertyElement(
                     this,
@@ -173,7 +173,6 @@ internal open class KotlinClassElement(
                     visitorContext
                 )
             }
-            .filter { !it.hasAnnotation(JvmField::class.java) }
             .toList()
     }
 
@@ -322,6 +321,21 @@ internal open class KotlinClassElement(
                 }
             }
         }
+
+        private fun hasAnnotation(
+            element: KSAnnotated,
+            annotation: Class<out Annotation>
+        ) = element.annotations.any {
+            it.shortName.getShortName() == annotation.simpleName && it.annotationType.resolve().declaration
+                .qualifiedName?.asString() == annotation.name
+        }
+
+        private fun hasAnnotation(
+            element: KSAnnotated,
+            annotation: String
+        ) = element.annotations.any {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == annotation
+        }
     }
 
     override fun getName() = internalName
@@ -396,8 +410,15 @@ internal open class KotlinClassElement(
 
         val eq = ElementQuery.of(PropertyElement::class.java)
             .filter { el ->
-                !propertyElementQuery.excludes.contains(el.name)
-                        && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
+                val kotlinNativeElement = el.nativeType as KotlinNativeElement
+                val nativeEl = kotlinNativeElement.element
+                val excludedAnnotations = propertyElementQuery.excludedAnnotations
+                if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
+                    false
+                } else {
+                    !propertyElementQuery.excludes.contains(el.name)
+                            && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
+                }
             }
             .modifiers {
                 if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
@@ -410,15 +431,11 @@ internal open class KotlinClassElement(
                     !it.contains(ElementModifier.PRIVATE)
                 }
             }.annotated { prop ->
-                if (prop.hasAnnotation(JvmField::class.java)) {
-                    false
-                } else {
-                    val excludedAnnotations = propertyElementQuery.excludedAnnotations
-                    excludedAnnotations.isEmpty() || !excludedAnnotations.any {
-                        prop.hasAnnotation(
-                            it
-                        )
-                    }
+                val excludedAnnotations = propertyElementQuery.excludedAnnotations
+                excludedAnnotations.isEmpty() || !excludedAnnotations.any {
+                    prop.hasAnnotation(
+                        it
+                    )
                 }
             }
 
@@ -694,10 +711,7 @@ internal open class KotlinClassElement(
 
         override fun hasAnnotation(element: KSNode, annotation: Class<out Annotation>): Boolean {
             if (element is KSAnnotated) {
-                return element.annotations.any {
-                    it.shortName.getShortName() == annotation.simpleName && it.annotationType.resolve().declaration
-                        .qualifiedName?.asString() == annotation.name
-                }
+                return KotlinClassElement.hasAnnotation(element, annotation)
             }
             return false
         }
