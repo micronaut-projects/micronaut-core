@@ -19,7 +19,7 @@ import io.micronaut.core.util.NativeImageUtils;
 
 /**
  * Condition to hide parts of an application that only work when running on the JVM.
- * Internal implementation is identical to {@code if (!ImageInfo.inImageCode()).
+ * Internal implementation is identical to {@code if (!ImageInfo.inImageCode())}.
  * @author Sergio del Amo
  * @since 4.8.0
  */
