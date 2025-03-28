@@ -36,7 +36,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -1861,7 +1860,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     private record Key2<T>(T owningType, T e2) implements Iterable<T> {
-        @NotNull
+        @NonNull
         @Override
         public Iterator<T> iterator() {
             return List.of(owningType, e2).iterator();
@@ -1878,7 +1877,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     private record Key3<T>(T owningType, T e2, T e3) implements Iterable<T> {
-        @NotNull
+        @NonNull
         @Override
         public Iterator<T> iterator() {
             return List.of(owningType, e2, e3).iterator();
