@@ -1,7 +1,7 @@
 [versions]
 awaitility = "4.2.2"
 bcpkix = "1.70"
-blaze = "1.6.14"
+blaze = "1.6.15"
 brotli4j = "1.18.0"
 bytebuddy = "1.17.4"
 caffeine = "2.9.3"
