@@ -314,13 +314,14 @@ public abstract class EnclosedElementsQuery<C, N> {
                 continue;
             }
             T newElement = convertElement(result, element);
-
+            String newElementName = newElement.getName();
+            boolean isInterfaceMethod = isInterface && newElement.isAbstract();
             for (Iterator<T> iterator = collectedElements.iterator(); iterator.hasNext(); ) {
                 T existingElement = iterator.next();
-                if (!existingElement.getName().equals(newElement.getName())) {
+                if (!existingElement.getName().equals(newElementName)) {
                     continue;
                 }
-                if (isInterface) {
+                if (isInterfaceMethod) {
                     if (existingElement == newElement) {
                         continue classElements;
                     }

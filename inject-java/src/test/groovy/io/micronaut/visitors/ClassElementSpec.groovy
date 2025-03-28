@@ -47,6 +47,37 @@ import spock.util.environment.Jvm
 
 class ClassElementSpec extends AbstractTypeElementSpec {
 
+    void "test duplicate methods"() {
+        expect:
+        buildClassElement('''
+package annbinding1;
+
+import java.lang.annotation.*;
+
+class MyBean implements Middle<String> {
+    void test() {
+    }
+}
+
+interface Middle<ParentIdT> extends Parent<ParentIdT> {
+    @Override
+    default String updateResource(String request, ParentIdT parentId) {
+        return Parent.super.updateResource(request,parentId);
+    }
+}
+interface Parent<ParentIdT> {
+    default String updateResource(
+            String request,
+            ParentIdT parentId) {
+        return "ok";
+    }
+}
+''') { ClassElement classElement ->
+            assert classElement.getMethods().collect { it.name } == ["test", "updateResource"]
+            classElement
+        }
+    }
+
     void "test canonical name"() {
         expect:
         buildClassElement('''
