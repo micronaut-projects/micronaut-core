@@ -224,7 +224,6 @@ public final class CacheControl {
         }
     }
 
-
     record CacheControlResponseDirective(@NonNull ResponseDirective directive, @Nullable Long seconds) {
         CacheControlResponseDirective(@NonNull ResponseDirective directive) {
             this(directive, null);
