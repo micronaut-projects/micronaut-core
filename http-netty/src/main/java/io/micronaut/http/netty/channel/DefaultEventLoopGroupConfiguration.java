@@ -43,6 +43,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     private final String executor;
     private final Duration shutdownQuietPeriod;
     private final Duration shutdownTimeout;
+    private final boolean loomCarrier;
 
     /**
      * Default constructor.
@@ -70,7 +71,8 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
             @Bindable(defaultValue = StringUtils.FALSE) boolean preferNativeTransport,
             @Nullable String executor,
             @Nullable Duration shutdownQuietPeriod,
-            @Nullable Duration shutdownTimeout
+            @Nullable Duration shutdownTimeout,
+            @Bindable(defaultValue = StringUtils.FALSE) boolean loomCarrier
     ) {
         this.name = name;
         this.numThreads = numThreads;
@@ -82,6 +84,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
             .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD));
         this.shutdownTimeout = Optional.ofNullable(shutdownTimeout)
             .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT));
+        this.loomCarrier = loomCarrier;
     }
 
     @Deprecated
@@ -94,7 +97,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         Duration shutdownQuietPeriod,
         Duration shutdownTimeout
     ) {
-        this(name, numThreads, DEFAULT_THREAD_CORE_RATIO, ioRatio, preferNativeTransport, executor, shutdownQuietPeriod, shutdownTimeout);
+        this(name, numThreads, DEFAULT_THREAD_CORE_RATIO, ioRatio, preferNativeTransport, executor, shutdownQuietPeriod, shutdownTimeout, false);
     }
 
     /**
@@ -109,6 +112,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         this.executor = null;
         this.shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         this.shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
+        this.loomCarrier = false;
     }
 
     /**
@@ -159,5 +163,10 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     @Override
     public Duration getShutdownTimeout() {
         return shutdownTimeout;
+    }
+
+    @Override
+    public boolean isLoomCarrier() {
+        return loomCarrier;
     }
 }

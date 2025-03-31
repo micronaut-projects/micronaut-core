@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.Named;
 
 import java.time.Duration;
@@ -100,5 +101,10 @@ public interface EventLoopGroupConfiguration extends Named {
      */
     default Duration getShutdownTimeout() {
         return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
+    }
+
+    @Experimental
+    default boolean isLoomCarrier() {
+        return false;
     }
 }

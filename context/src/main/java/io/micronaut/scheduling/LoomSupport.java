@@ -17,6 +17,7 @@ package io.micronaut.scheduling;
 
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.invoke.MethodHandle;
@@ -25,6 +26,7 @@ import java.lang.invoke.MethodType;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.function.Consumer;
 
 /**
  * @since 4.0.0
@@ -99,15 +101,23 @@ public final class LoomSupport {
         }
     }
 
-    public static ThreadFactory newVirtualThreadFactory(String namePrefix) {
+    @Experimental
+    public static ThreadFactory newVirtualThreadFactory(String namePrefix, Consumer<Object> builderModifier) {
         checkSupported();
         try {
             Object builder = MH_OF_VIRTUAL.invoke();
             builder = MH_NAME.invoke(builder, namePrefix, 1L);
+            if (builderModifier != null) {
+                builderModifier.accept(builder);
+            }
             return (ThreadFactory) MH_FACTORY.invoke(builder);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static ThreadFactory newVirtualThreadFactory(String namePrefix) {
+        return newVirtualThreadFactory(namePrefix, null);
     }
 
     /**
