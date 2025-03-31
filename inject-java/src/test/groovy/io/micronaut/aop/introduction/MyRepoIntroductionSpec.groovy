@@ -182,4 +182,16 @@ class MyRepoIntroductionSpec extends Specification {
             TxInterceptor.EXECUTED_METHODS.clear()
     }
 
+    void "test delegating methods"() {
+        given:
+            def myRepoService = applicationContext.getBean(MyRepo6Service)
+        when:
+            myRepoService.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+            TxInterceptor.EXECUTED_METHODS.size() == 1
+            TxInterceptor.EXECUTED_METHODS.clear()
+    }
+
 }

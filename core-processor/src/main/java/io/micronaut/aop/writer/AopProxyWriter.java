@@ -655,7 +655,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
             if (!methodElementKey.equals(overriddenByKey)) {
                 proxyBuilder.addMethod(MethodDef.override(methodElement)
-                    .build((aThis, methodParameters) -> aThis.superRef().invoke(overriddenBy, methodParameters).returning())
+                    .build((aThis, methodParameters) -> aThis.invoke(overriddenBy, methodParameters).returning())
                 );
                 return;
             }
