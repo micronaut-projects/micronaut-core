@@ -23,18 +23,10 @@ import java.util.List;
 
 /**
  * HTTP Cache-Control header value.
+ * @param responseDirectives response Directives
  */
-public final class CacheControl {
+public record CacheControl(List<CacheControlResponseDirective> responseDirectives) {
     private static final String EQUAL = "=";
-    private final List<CacheControlResponseDirective> responseDirectives;
-
-    /**
-     *
-     * @param responseDirectives response Directives
-     */
-    CacheControl(List<CacheControlResponseDirective> responseDirectives) {
-        this.responseDirectives = responseDirectives;
-    }
 
     @Override
     public String toString() {
