@@ -222,7 +222,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
-        this.dispatchWriter = new DispatchWriter();
+        this.dispatchWriter = new DispatchWriter(introspectionName);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.originatingElements = OriginatingElements.of(beanClassElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
@@ -253,7 +253,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         this.beanType = ClassTypeDef.of(beanClassElement);
         this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionTypeDef = ClassTypeDef.of(introspectionName);
-        this.dispatchWriter = new DispatchWriter();
+        this.dispatchWriter = new DispatchWriter(introspectionName);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.originatingElements = OriginatingElements.of(originatingElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
@@ -936,12 +936,12 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         return MethodDef.override(method)
             .build((aThis, methodParameters) -> {
                 if (method.getParameters().length == 0) {
-                    return MethodGenUtils.invokeBeanConstructor(constructor, true, null).returning();
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, true, null).returning();
                 } else {
                     List<ExpressionDef> values = IntStream.range(0, constructor.getSuspendParameters().length)
                             .<ExpressionDef>mapToObj(index -> methodParameters.get(0).arrayElement(index))
                             .toList();
-                    return MethodGenUtils.invokeBeanConstructor(constructor, true, values).returning();
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, true, values).returning();
                 }
             });
     }
@@ -1052,7 +1052,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
     /**
      * Copy constructor "with" method writer.
      */
-    private static final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
+    private final class CopyConstructorDispatchTarget implements DispatchWriter.DispatchTarget {
 
         private final ClassTypeDef beanType;
         private final List<BeanPropertyData> beanProperties;
@@ -1120,6 +1120,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                         FieldElement field = fieldGetDispatchTarget.getField();
                         propertyType = field.getGenericType();
                         member = field;
+                    } else if (dispatchTarget instanceof DispatchWriter.FieldGetReflectionDispatchTarget fieldGetDispatchTarget) {
+                        FieldElement field = fieldGetDispatchTarget.getField();
+                        propertyType = field.getGenericType();
+                        member = field;
                     } else {
                         throw new IllegalStateException();
                     }
@@ -1170,7 +1174,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                     }
 
                     // NOTE: It doesn't make sense to check defaults for the copy constructor
-                    ExpressionDef newInstance = MethodGenUtils.invokeBeanConstructor(constructor, false, values);
+                    ExpressionDef newInstance = MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), constructor, false, values);
                     return withSetSettersAndFields(newInstance, prevBeanVar, constructorProps);
                 });
             } else {
@@ -1205,6 +1209,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                             } else if (readDispatch instanceof DispatchWriter.FieldGetDispatchTarget fieldGetDispatchTarget) {
                                 FieldElement fieldElement = fieldGetDispatchTarget.getField();
                                 oldValueExp = prevBeanVar.field(fieldElement);
+                            } else if (readDispatch instanceof DispatchWriter.FieldGetReflectionDispatchTarget fieldGetDispatchTarget) {
+                                FieldElement fieldElement = fieldGetDispatchTarget.getField();
+                                oldValueExp = prevBeanVar.field(fieldElement);
                             } else {
                                 throw new IllegalStateException();
                             }
@@ -1219,6 +1226,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                                         )
                                 );
                             } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget fieldSetDispatchTarget) {
+                                FieldElement fieldElement = fieldSetDispatchTarget.getField();
+                                statements.add(
+                                        newBeanVar.field(fieldElement).assign(oldValueExp)
+                                );
+                            } else if (writeDispatch instanceof DispatchWriter.FieldSetReflectionDispatchTarget fieldSetDispatchTarget) {
                                 FieldElement fieldElement = fieldSetDispatchTarget.getField();
                                 statements.add(
                                         newBeanVar.field(fieldElement).assign(oldValueExp)

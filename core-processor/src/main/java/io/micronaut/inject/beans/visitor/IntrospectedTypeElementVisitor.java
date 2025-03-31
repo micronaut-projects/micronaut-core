@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -194,6 +195,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
         } else if (element.hasDeclaredAnnotation(ANN_LOMBOK_BUILDER)) {
             AnnotationValue<Annotation> lombokBuilder = element.getAnnotation(ANN_LOMBOK_BUILDER);
+            String lombokBuilderAccessType = lombokBuilder.stringValue("access").orElse("");
+            if ("PRIVATE".equals(lombokBuilderAccessType)) {
+                return;
+            }
             String builderMethod = lombokBuilder.stringValue("builderMethodName").orElse("builder");
             MethodElement methodElement = element
                 .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()
@@ -248,10 +253,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         targetPackage
                     );
                 } else {
-                    context.fail("Builder return type is not public. The method must be static and accessible.", methodElement);
+                    throw new ProcessingException(methodElement, "Builder return type is not public. The method must be static and accessible.");
                 }
             } else {
-                context.fail("Method " + builderMethod + "() specified by builderMethod not found. The method must be static and accessible.", element);
+                throw new ProcessingException(element, "Method " + builderMethod + "() specified by builderMethod not found. The method must be static and accessible.");
             }
         } else if (builderClass != null) {
             ClassElement builderClassElement = context.getClassElement(builderClass.getName()).orElse(null);
@@ -272,10 +277,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     index,
                     targetPackage);
             } else {
-                context.fail("Builder class not found on compilation classpath: " + builderClass.getName(), element);
+                throw new ProcessingException(element, "Builder class not found on compilation classpath: " + builderClass.getName());
             }
         } else {
-            context.fail("When specifying the 'builder' member of @Introspected you must supply either a builderClass or builderMethod", element);
+            throw new ProcessingException(element, "When specifying the 'builder' member of @Introspected you must supply either a builderClass or builderMethod");
         }
     }
 

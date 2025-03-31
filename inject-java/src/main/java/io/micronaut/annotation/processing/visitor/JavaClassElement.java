@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
@@ -190,6 +191,32 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public boolean hasUnresolvedTypes(UnresolvedTypeKind... kind) {
+        List<? extends TypeMirror> interfaces = this.classElement.getInterfaces();
+        for (UnresolvedTypeKind unresolvedTypeKind : kind) {
+            switch (unresolvedTypeKind) {
+                case INTERFACE -> {
+                    for (TypeMirror anInterface : interfaces) {
+                        if (anInterface.getKind() == TypeKind.ERROR) {
+                            return true;
+                        }
+                    }
+                }
+                case SUPERCLASS -> {
+                    TypeMirror superclass = this.classElement.getSuperclass();
+                    if (superclass.getKind() == TypeKind.ERROR) {
+                        return true;
+                    }
+                }
+                default -> {
+                    // no-op
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public JavaNativeElement.@NonNull Class getNativeType() {
         return (JavaNativeElement.Class) super.getNativeType();
     }
@@ -271,7 +298,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            resolvedInterfaces = classElement.getInterfaces().stream().filter(this::onlyAvailable).map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            resolvedInterfaces = classElement.getInterfaces().stream()
+                .filter(this::onlyAvailable)
+                .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
         }
         return resolvedInterfaces;
     }

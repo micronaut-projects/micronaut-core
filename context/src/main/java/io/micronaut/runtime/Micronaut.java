@@ -113,18 +113,31 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
                     CountDownLatch countDownLatch = new CountDownLatch(1);
-                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("Embedded Application shutting down");
-                        }
-                        if (embeddedApplication.isRunning()) {
-                            embeddedApplication.stop();
-                            countDownLatch.countDown();
-                            if (finalKeepAlive) {
-                                mainThread.interrupt();
+                    if (embeddedApplication.isShutdownHookNeeded()) {
+                        try {
+                            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                                if (LOG.isInfoEnabled()) {
+                                    LOG.info("Embedded Application shutting down");
+                                }
+                                try (applicationContext) {
+                                /* stop the application without checking if it is running,
+                                   as it may have already opened some resources before starting */
+                                    embeddedApplication.stop();
+                                    countDownLatch.countDown();
+                                    if (finalKeepAlive) {
+                                        mainThread.interrupt();
+                                    }
+                                }
+                            }));
+                        } catch (IllegalStateException e) {
+                            try (applicationContext) {
+                                embeddedApplication.stop();
+                            } catch (Throwable stopError) {
+                                LOG.error("Embedded Application shutting down", stopError);
                             }
+                            LOG.warn("Failed to register shutdown hook", e);
                         }
-                    }));
+                    }
 
                     if (keepAlive) {
                         new Thread(() -> {

@@ -1297,6 +1297,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
         private int threads;
+        private double threadCoreRatio = DEFAULT_THREAD_CORE_RATIO;
         private Integer ioRatio;
         private String executor;
         private boolean preferNativeTransport = false;
@@ -1413,6 +1414,21 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public int getNumThreads() {
             return threads;
+        }
+
+        @Override
+        public double getThreadCoreRatio() {
+            return threadCoreRatio;
+        }
+
+        /**
+         * The number of threads per core to use if {@link #getNumThreads()} is set to 0.
+         *
+         * @param threadCoreRatio The thread-to-core ratio
+         * @since 4.8.0
+         */
+        public void setThreadCoreRatio(double threadCoreRatio) {
+            this.threadCoreRatio = threadCoreRatio;
         }
 
         @Override

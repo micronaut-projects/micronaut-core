@@ -668,24 +668,26 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
 
-            String interceptedProxyClassName = null;
-            String interceptedProxyBridgeMethodName = null;
+            ClassTypeDef interceptedProxyDef = null;
+            MethodDef interceptedProxyBridgeMethod = null;
 
             if (!isProxyTarget) {
                 // if the target is not being proxied then we need to generate a bridge method and executable method that knows about it
 
                 if (!methodElement.isAbstract() || methodElement.isDefault()) {
-                    interceptedProxyClassName = proxyFullName;
-                    interceptedProxyBridgeMethodName = "$$access$$" + methodName;
+                    interceptedProxyDef = ClassTypeDef.of(proxyFullName);
+                    interceptedProxyBridgeMethod = MethodDef.builder("$$access$$" + methodName)
+                        .addModifiers(Modifier.PUBLIC)
+                        .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
+                        .returns(TypeDef.erasure(returnType))
+                        .build((aThis, methodParameters) -> aThis.superRef((ClassTypeDef) TypeDef.erasure(methodElement.getOwningType()))
+                            .invoke(methodElement, methodParameters)
+                            .returning()
+                        );
 
                     // now build a bridge to invoke the original method
                     proxyBuilder.addMethod(
-                        MethodDef.builder(interceptedProxyBridgeMethodName)
-                            .addModifiers(Modifier.PUBLIC)
-                            .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
-                            .returns(TypeDef.erasure(returnType))
-                            .build((aThis, methodParameters) -> aThis.superRef((ClassTypeDef) TypeDef.erasure(methodElement.getOwningType()))
-                                .invoke(methodElement, methodParameters).returning())
+                        interceptedProxyBridgeMethod
                     );
                 }
             }
@@ -694,8 +696,8 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             int methodIndex = beanDefinitionWriter.visitExecutableMethod(
                 beanType,
                 methodElement,
-                interceptedProxyClassName,
-                interceptedProxyBridgeMethodName
+                interceptedProxyDef,
+                interceptedProxyBridgeMethod
             );
             int index = proxyMethodCount++;
 

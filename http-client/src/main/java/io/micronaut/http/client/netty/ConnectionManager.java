@@ -68,6 +68,7 @@ import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
+import io.netty.handler.codec.http2.Http2PingFrame;
 import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
@@ -839,7 +840,7 @@ public class ConnectionManager {
 
             @Override
             public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
-                if (msg instanceof Http2SettingsAckFrame) {
+                if (msg instanceof Http2SettingsAckFrame || msg instanceof Http2PingFrame) {
                     // this is fine
                     return;
                 }

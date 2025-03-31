@@ -19,13 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.ByteBodyHttpResponse;
-import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
@@ -66,12 +63,6 @@ public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<Char
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
-    }
-
-    @Override
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object) throws CodecException {
-        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
-        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
     }
 
     @Override

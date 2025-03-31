@@ -66,7 +66,12 @@ class DeadlockedThreadsHealthIndicator extends AbstractHealthIndicator {
     @Override
     protected Object getHealthInformation() {
             ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
-            long[] deadlockedThreads = threadMXBean.findDeadlockedThreads();
+            long[] deadlockedThreads = null;
+            if (threadMXBean.isSynchronizerUsageSupported()) {
+                deadlockedThreads = threadMXBean.findDeadlockedThreads();
+            } else if (threadMXBean.isObjectMonitorUsageSupported()) {
+                deadlockedThreads = threadMXBean.findMonitorDeadlockedThreads();
+            }
             if (deadlockedThreads == null) {
                 this.healthStatus = HealthStatus.UP;
                 return null;

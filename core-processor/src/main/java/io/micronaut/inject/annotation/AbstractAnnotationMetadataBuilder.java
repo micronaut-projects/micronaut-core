@@ -1583,6 +1583,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearMutated(@NonNull Object key) {
         MUTATED_ANNOTATION_METADATA.remove(key);
+        Set<Object> keys = new HashSet<>(MUTATED_ANNOTATION_METADATA.keySet());
+        for (Object cachedKey : keys) {
+            if (cachedKey instanceof Iterable<?> iterable) {
+                for (Object object : iterable) {
+                    if (key.equals(object)) {
+                        MUTATED_ANNOTATION_METADATA.remove(cachedKey);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1843,24 +1853,34 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Key used to reference mutated metadata.
      *
-     * @param e1  The element 1
+     * @param owningType  The element 1
      * @param e2  The element 2
      * @param <T> the element type
      */
     @Internal
-    private record Key2<T>(T e1, T e2) {
+    private record Key2<T>(T owningType, T e2) implements Iterable<T> {
+        @NonNull
+        @Override
+        public Iterator<T> iterator() {
+            return List.of(owningType, e2).iterator();
+        }
     }
 
     /**
      * Key used to reference mutated metadata.
      *
-     * @param e1  The element 1
+     * @param owningType  The element 1
      * @param e2  The element 2
      * @param e3  The element 3
      * @param <T> the element type
      */
     @Internal
-    private record Key3<T>(T e1, T e2, T e3) {
+    private record Key3<T>(T owningType, T e2, T e3) implements Iterable<T> {
+        @NonNull
+        @Override
+        public Iterator<T> iterator() {
+            return List.of(owningType, e2, e3).iterator();
+        }
     }
 
     private static final class DefaultCachedAnnotationMetadata implements CachedAnnotationMetadata {

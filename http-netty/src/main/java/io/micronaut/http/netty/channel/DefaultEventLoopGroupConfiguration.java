@@ -36,6 +36,7 @@ import java.util.Optional;
 public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfiguration {
 
     private final int numThreads;
+    private final double threadCoreRatio;
     private final Integer ioRatio;
     private final boolean preferNativeTransport;
     private final String name;
@@ -48,6 +49,8 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      *
      * @param name                  The name of the group
      * @param numThreads            The number of threads
+     * @param threadCoreRatio       The number of threads per core to use if
+     *                              {@link #getNumThreads()} is set to 0.
      * @param ioRatio               The IO ratio (optional)
      * @param preferNativeTransport Whether native transport is to be preferred
      * @param executor              A named executor service to use for event loop threads
@@ -62,6 +65,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     public DefaultEventLoopGroupConfiguration(
             @Parameter String name,
             @Bindable(defaultValue = "0") int numThreads,
+            @Bindable(defaultValue = DEFAULT_THREAD_CORE_RATIO + "") double threadCoreRatio,
             @Nullable Integer ioRatio,
             @Bindable(defaultValue = StringUtils.FALSE) boolean preferNativeTransport,
             @Nullable String executor,
@@ -70,6 +74,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     ) {
         this.name = name;
         this.numThreads = numThreads;
+        this.threadCoreRatio = threadCoreRatio;
         this.ioRatio = ioRatio;
         this.preferNativeTransport = preferNativeTransport;
         this.executor = executor;
@@ -79,12 +84,26 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
             .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT));
     }
 
+    @Deprecated
+    public DefaultEventLoopGroupConfiguration(
+        String name,
+        int numThreads,
+        Integer ioRatio,
+        boolean preferNativeTransport,
+        String executor,
+        Duration shutdownQuietPeriod,
+        Duration shutdownTimeout
+    ) {
+        this(name, numThreads, DEFAULT_THREAD_CORE_RATIO, ioRatio, preferNativeTransport, executor, shutdownQuietPeriod, shutdownTimeout);
+    }
+
     /**
      * Default constructor.
      */
     public DefaultEventLoopGroupConfiguration() {
         this.name = DEFAULT;
         this.numThreads = 0;
+        this.threadCoreRatio = DEFAULT_THREAD_CORE_RATIO;
         this.ioRatio = null;
         this.preferNativeTransport = false;
         this.executor = null;
@@ -98,6 +117,11 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     @Override
     public int getNumThreads() {
         return numThreads;
+    }
+
+    @Override
+    public double getThreadCoreRatio() {
+        return threadCoreRatio;
     }
 
     /**
