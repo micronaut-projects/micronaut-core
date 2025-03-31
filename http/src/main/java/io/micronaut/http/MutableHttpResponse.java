@@ -24,6 +24,7 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -104,7 +105,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      */
     @NonNull
     default MutableHttpResponse<B> cacheControl(@NonNull CacheControl cacheControl) {
-        return header(HttpHeaders.CACHE_CONTROL, cacheControl.toString());
+        return header(HttpHeaders.CACHE_CONTROL, Objects.requireNonNull(cacheControl, "Cache Control parameter cannot be null").toString());
     }
 
     /**
