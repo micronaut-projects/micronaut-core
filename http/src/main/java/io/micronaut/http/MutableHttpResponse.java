@@ -15,7 +15,9 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.cachecontrol.CacheControl;
 import io.micronaut.http.cookie.Cookie;
 
 import java.nio.charset.Charset;
@@ -92,6 +94,17 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     @Override
     default MutableHttpResponse<B> headers(Map<CharSequence, CharSequence> namesAndValues) {
         return (MutableHttpResponse<B>) MutableHttpMessage.super.headers(namesAndValues);
+    }
+
+    /**
+     * Sets the HTTP Cache-Control header.
+     * @param cacheControl Cache Control
+     * @return This response object
+     * @since 4.9.0
+     */
+    @NonNull
+    default MutableHttpResponse<B> cacheControl(@NonNull CacheControl cacheControl) {
+        return header(HttpHeaders.CACHE_CONTROL, cacheControl.toString());
     }
 
     /**
