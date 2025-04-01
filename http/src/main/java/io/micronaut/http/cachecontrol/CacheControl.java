@@ -49,7 +49,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
      * Cache-Control Builder.
      */
     public static class Builder {
-        List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
+        final List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
 
         /**
          *
