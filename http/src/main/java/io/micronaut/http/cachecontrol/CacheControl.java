@@ -25,7 +25,7 @@ import java.util.List;
  * HTTP Cache-Control header value.
  * @param responseDirectives response Directives
  */
-public record CacheControl(List<CacheControlResponseDirective> responseDirectives) {
+public record CacheControl(@NonNull List<CacheControlResponseDirective> responseDirectives) {
     private static final String EQUAL = "=";
 
     @Override
@@ -41,6 +41,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
      *
      * @return Cache-Control Builder.
      */
+    @NonNull
     public static Builder builder() {
         return new Builder();
     }
@@ -56,6 +57,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * Enables proxyRevalidate. If cache is stale, it must revalidate with the proxy before use but only for shared caches.
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder proxyRevalidate() {
             responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.PROXY_REVALIDATE));
             return this;
@@ -66,6 +68,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * Enables mustRevalidate. If cache is stale, it must revalidate with the server before use.
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder mustRevalidate() {
             responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.MUST_REVALIDATE));
             return this;
@@ -76,7 +79,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param sMaxAge How long (in seconds) the response is considered fresh for shared (e.g., CDN) caches.
          * @return The Cache-Control Builder.
          */
-        public Builder sMaxAge(Long sMaxAge) {
+        @NonNull
+        public Builder sMaxAge(@NonNull Long sMaxAge) {
             responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.S_MAXAGE, sMaxAge));
             return this;
         }
@@ -86,7 +90,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param sMaxAge How long (in seconds) the response is considered fresh for shared (e.g., CDN) caches.
          * @return The Cache-Control Builder.
          */
-        public Builder sMaxAge(Duration sMaxAge) {
+        @NonNull
+        public Builder sMaxAge(@NonNull Duration sMaxAge) {
             return sMaxAge(sMaxAge.getSeconds());
         }
 
@@ -95,7 +100,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param maxAge How long (in seconds) the response is considered fresh.
          * @return The Cache-Control Builder.
          */
-        public Builder maxAge(Long maxAge) {
+        @NonNull
+        public Builder maxAge(@NonNull Long maxAge) {
             responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.MAX_AGE, maxAge));
             return this;
         }
@@ -105,7 +111,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param maxAge How long the response is considered fresh.
          * @return The Cache-Control Builder.
          */
-        public Builder maxAge(Duration maxAge) {
+        @NonNull
+        public Builder maxAge(@NonNull Duration maxAge) {
             return maxAge(maxAge.getSeconds());
         }
 
@@ -114,6 +121,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * Sets Cache-Control as inmmutable. It indicates the response won't change, so no revalidation is needed.
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder inmutable() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.IMMUTABLE));
             return this;
@@ -123,6 +131,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * The public response directive indicates that the response can be stored in a shared cache.
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder publicDirective() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.PUBLIC));
             return this;
@@ -132,6 +141,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * The private response directive indicates that the response can be stored only in a private cache (e.g. local caches in browsers).
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder privateDirective() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.PRIVATE));
             return this;
@@ -141,6 +151,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          *
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder noStore() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.NO_STORE));
             return this;
@@ -150,6 +161,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          *
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder noCache() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.NO_CACHE));
             return this;
@@ -159,6 +171,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          *
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder mustUnderstand() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.MUST_UNDERSTAND));
             return this;
@@ -168,6 +181,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          *
          * @return The Cache-Control Builder.
          */
+        @NonNull
         public Builder noTransform() {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.NO_TRANSFORM));
             return this;
@@ -177,7 +191,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param staleWhileRevalidate Stale while revalidate duration
          * @return The Cache-Control Builder.
          */
-        public Builder staleWhileRevalidate(Duration staleWhileRevalidate) {
+        @NonNull
+        public Builder staleWhileRevalidate(@NonNull Duration staleWhileRevalidate) {
             return staleWhileRevalidate(staleWhileRevalidate.getSeconds());
         }
 
@@ -185,7 +200,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param seconds Stale while revalidate seconds
          * @return The Cache-Control Builder.
          */
-        public Builder staleWhileRevalidate(Long seconds) {
+        @NonNull
+        public Builder staleWhileRevalidate(@NonNull Long seconds) {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.STALE_WHILE_REVALIDATE, seconds));
             return this;
         }
@@ -194,7 +210,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param staleIfError Stale if error duration
          * @return The Cache-Control Builder.
          */
-        public Builder staleIfError(Duration staleIfError) {
+        @NonNull
+        public Builder staleIfError(@NonNull Duration staleIfError) {
             return staleIfError(staleIfError.getSeconds());
         }
 
@@ -202,7 +219,8 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          * @param seconds Stale if error seconds
          * @return The Cache-Control Builder.
          */
-        public Builder staleIfError(Long seconds) {
+        @NonNull
+        public Builder staleIfError(@NonNull Long seconds) {
             this.responseDirectives.add(new CacheControlResponseDirective(ResponseDirective.STALE_IF_ERROR, seconds));
             return this;
         }
@@ -211,6 +229,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
          *
          * @return A Cache-Control
          */
+        @NonNull
         public CacheControl build() {
             return new CacheControl(responseDirectives);
         }
