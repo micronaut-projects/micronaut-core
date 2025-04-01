@@ -48,7 +48,7 @@ public record CacheControl(List<CacheControlResponseDirective> responseDirective
     /**
      * Cache-Control Builder.
      */
-    public static class Builder {
+    public static final class Builder {
         final List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
 
         /**
