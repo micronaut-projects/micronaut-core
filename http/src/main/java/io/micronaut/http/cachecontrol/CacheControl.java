@@ -50,7 +50,7 @@ public record CacheControl(@NonNull List<CacheControlResponseDirective> response
      * Cache-Control Builder.
      */
     public static final class Builder {
-        final List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
+        private final List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
 
         private Builder() {
         }
