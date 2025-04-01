@@ -52,6 +52,9 @@ public record CacheControl(@NonNull List<CacheControlResponseDirective> response
     public static final class Builder {
         final List<CacheControlResponseDirective> responseDirectives = new ArrayList<>();
 
+        private Builder() {
+        }
+
         /**
          *
          * Enables proxyRevalidate. If cache is stale, it must revalidate with the proxy before use but only for shared caches.
