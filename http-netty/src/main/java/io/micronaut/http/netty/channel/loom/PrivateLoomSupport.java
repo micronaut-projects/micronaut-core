@@ -102,6 +102,10 @@ public final class PrivateLoomSupport {
         }
     }
 
+    public static boolean isSupported() {
+        return CARRIER_THREAD != null;
+    }
+
     static final class PrivateLoomCondition implements Condition {
         @Override
         public boolean matches(ConditionContext context) {

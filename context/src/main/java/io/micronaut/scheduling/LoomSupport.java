@@ -40,6 +40,7 @@ public final class LoomSupport {
     private static final MethodHandle MH_OF_VIRTUAL;
     private static final MethodHandle MH_NAME;
     private static final MethodHandle MH_FACTORY;
+    private static final MethodHandle MH_IS_VIRTUAL;
 
     static {
         boolean sup;
@@ -47,6 +48,7 @@ public final class LoomSupport {
         MethodHandle ofVirtual;
         MethodHandle name;
         MethodHandle factory;
+        MethodHandle isVirtual;
         try {
             newThreadPerTaskExecutor = MethodHandles.lookup()
                 .findStatic(Executors.class, "newThreadPerTaskExecutor", MethodType.methodType(ExecutorService.class, ThreadFactory.class));
@@ -58,6 +60,8 @@ public final class LoomSupport {
                 .findVirtual(builderCl, "name", MethodType.methodType(builderCl, String.class, long.class));
             factory = MethodHandles.lookup()
                 .findVirtual(builderCl, "factory", MethodType.methodType(ThreadFactory.class));
+            isVirtual = MethodHandles.lookup()
+                .findVirtual(Thread.class, "isVirtual", MethodType.methodType(boolean.class));
 
             // invoke, this will throw an UnsupportedOperationException if we don't have --enable-preview
             ofVirtual.invoke();
@@ -68,6 +72,7 @@ public final class LoomSupport {
             ofVirtual = null;
             name = null;
             factory = null;
+            isVirtual = null;
             sup = false;
             failure = e;
         }
@@ -77,6 +82,7 @@ public final class LoomSupport {
         MH_OF_VIRTUAL = ofVirtual;
         MH_NAME = name;
         MH_FACTORY = factory;
+        MH_IS_VIRTUAL = isVirtual;
     }
 
     private LoomSupport() {
@@ -118,6 +124,15 @@ public final class LoomSupport {
 
     public static ThreadFactory newVirtualThreadFactory(String namePrefix) {
         return newVirtualThreadFactory(namePrefix, null);
+    }
+
+    public static boolean isVirtual(Thread thread) {
+        checkSupported();
+        try {
+            return (boolean) MH_IS_VIRTUAL.invokeExact(thread);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

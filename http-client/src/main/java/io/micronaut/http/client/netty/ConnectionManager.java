@@ -31,6 +31,8 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
+import io.micronaut.scheduling.LoomSupport;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -869,6 +871,12 @@ public class ConnectionManager {
 
     @Nullable
     private EventExecutor findEventLoop(Thread thread) {
+        if (PrivateLoomSupport.isSupported() && LoomSupport.isVirtual(thread)) {
+            Thread carrier = PrivateLoomSupport.getCarrierThread();
+            if (carrier != null) {
+                thread = carrier;
+            }
+        }
         if (thread == Thread.currentThread()) {
             // shortcut to avoid the loop
             EventExecutor executor = ThreadExecutorMap.currentExecutor();
