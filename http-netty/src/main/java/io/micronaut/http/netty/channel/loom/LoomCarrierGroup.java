@@ -118,6 +118,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                     break;
                 }
                 anyWorkDone = true;
+                task.run();
                 if (deadline >= System.nanoTime()) {
                     break;
                 }
