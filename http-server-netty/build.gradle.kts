@@ -16,7 +16,6 @@ tasks {
         systemProperty("io.netty.leakDetection.level", "paranoid")
         systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
-        systemProperty("io.netty.allocator.type", "pooled") // todo: remove after https://github.com/netty/netty/pull/14946
         jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }

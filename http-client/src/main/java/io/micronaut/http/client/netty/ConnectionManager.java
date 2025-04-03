@@ -50,7 +50,8 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -105,6 +106,7 @@ import io.netty.resolver.DefaultNameResolver;
 import io.netty.resolver.InetSocketAddressResolver;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.resolver.RoundRobinInetAddressResolver;
+import io.netty.util.NettyRuntime;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
@@ -134,7 +136,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
@@ -265,35 +266,21 @@ public class ConnectionManager {
     }
 
     /**
-     * Creates the {@link NioEventLoopGroup} for this client.
+     * Creates the {@link EventLoopGroup} for this client.
      *
      * @param configuration The configuration
      * @param threadFactory The thread factory
      * @return The group
      */
-    private static NioEventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration, ThreadFactory threadFactory) {
-        OptionalInt numOfThreads = configuration.getNumOfThreads();
-        Optional<Class<? extends ThreadFactory>> threadFactoryType = configuration.getThreadFactory();
-        boolean hasThreads = numOfThreads.isPresent();
-        boolean hasFactory = threadFactoryType.isPresent();
-        NioEventLoopGroup group;
-        if (hasThreads && hasFactory) {
-            group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactoryType.get()));
-        } else if (hasThreads) {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt(), threadFactory);
-            } else {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt());
-            }
-        } else {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(NettyThreadFactory.getDefaultEventLoopThreads(), threadFactory);
-            } else {
-
-                group = new NioEventLoopGroup();
-            }
+    private static EventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration, ThreadFactory threadFactory) {
+        if (configuration.getThreadFactory().isPresent()) {
+            threadFactory = InstantiationUtils.instantiate(configuration.getThreadFactory().get());
         }
-        return group;
+        return new MultiThreadIoEventLoopGroup(
+            configuration.getNumOfThreads().orElseGet(NettyRuntime::availableProcessors),
+            threadFactory,
+            NioIoHandler.newFactory()
+        );
     }
 
     /**

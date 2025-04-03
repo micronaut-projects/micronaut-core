@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.propagation;
+package io.micronaut.aop.introduction;
 
-import io.micronaut.core.annotation.Experimental;
+@Tx
+@RepoDef
+public interface MyRepo6 extends DeleteByIdCrudRepo<Integer> {
 
-/**
- * Marker interface for an object that can be placed into a {@link PropagatedContext}.
- *
- * @author Denis Stepanov
- * @since 4.0.0
- */
-@Experimental
-public interface PropagatedContextElement {
+    @Override
+    void deleteById(Integer integer);
+
 }
