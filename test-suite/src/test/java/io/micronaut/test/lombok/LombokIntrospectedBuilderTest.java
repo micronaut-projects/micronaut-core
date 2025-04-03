@@ -19,8 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class LombokIntrospectedBuilderTest {
 
     @Test
-    void testImportedIntrospection() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-        getClass().getClassLoader().loadClass("io.micronaut.test.lombok.$io_micronaut_test_lombok_importtest_VersionManifest$VersionManifestEntry$Introspection").newInstance();
+    void testImportedIntrospection() {
         BeanIntrospection<VersionManifest.VersionManifestEntry> introspection = BeanIntrospection.getIntrospection(VersionManifest.VersionManifestEntry.class);
         VersionManifest.VersionManifestEntry entry = introspection.instantiate("test", 1, 2);
         assertNotNull(entry);
