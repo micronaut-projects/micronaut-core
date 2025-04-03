@@ -116,7 +116,7 @@ public final class WriterUtils {
             pushNewArrayIndexed(writer, Object.class, constructorArguments, (i, parameter) -> {
                 pushValue(writer, argumentsPusher, parameter, i);
                 if (parameter.isPrimitive()) {
-                    writer.unbox(getTypeReference(parameter));
+                    writer.box(getTypeReference(parameter));
                 }
             });
             writer.invokeStatic(
