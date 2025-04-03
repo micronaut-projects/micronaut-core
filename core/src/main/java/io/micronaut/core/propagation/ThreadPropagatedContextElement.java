@@ -19,10 +19,11 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 
 /**
- * Special version of {@link PropagatedContextElement} that is thread-aware and can update the thread context on the initial propagation entry
- * and restore it on the propagation exist.
+ * A {@link PropagatedContextElement} that bridges to code that uses thread local storage instead of
+ * {@link PropagatedContext}. The object returned by {@link #updateThreadContext()} will be given
+ * to {@link #restoreThreadContext(Object)} when the propagation scope is closed.
  *
- * @param <S> The restore state type
+ * @param <S> The type held by the wrapped thread-scoped variable.
  * @author Denis Stepanov
  * @since 4.0.0
  */
