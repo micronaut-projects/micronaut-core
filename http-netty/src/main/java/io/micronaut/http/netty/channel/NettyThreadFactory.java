@@ -92,8 +92,9 @@ public class NettyThreadFactory {
      *
      * @return The number of threads
      */
+    @Deprecated(forRemoval = true)
     public static int getDefaultEventLoopThreads() {
-        return EventLoopThreadsHolder.DEFAULT_EVENT_LOOP_THREADS;
+        return Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
     }
 
     /**
@@ -117,10 +118,6 @@ public class NettyThreadFactory {
         } else {
             return new DefaultThreadFactory(poolName, configuration.isDefaultThreadFactoryDaemon(), configuration.getDefaultThreadFactoryPriority());
         }
-    }
-
-    private static final class EventLoopThreadsHolder {
-        static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
     }
 
     private static final class NonBlockingFastThreadLocalThread extends FastThreadLocalThread implements NonBlocking {

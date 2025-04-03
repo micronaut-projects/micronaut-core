@@ -106,16 +106,16 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         EventLoopGroup eventLoopGroup;
         if (executor != null) {
             eventLoopGroup = beanLocator.findBean(Executor.class, Qualifiers.byName(executor))
-                .map(executorService -> eventLoopGroupFactory.createEventLoopGroup(
+                .map(executorService -> new MultiThreadIoEventLoopGroup(
                     numThreads(configuration),
                     executorService,
-                    configuration.getIoRatio().orElse(null)
+                    eventLoopGroupFactory.createIoHandlerFactory(configuration)
                 )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
         } else {
             ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
                     .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
             eventLoopGroup = new MultiThreadIoEventLoopGroup(
-                configuration.getNumThreads(),
+                numThreads(configuration),
                 threadFactory,
                 eventLoopGroupFactory.createIoHandlerFactory(configuration)
             );
@@ -138,7 +138,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
         EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
         EventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(
-            configuration.getNumThreads(),
+            numThreads(configuration),
             threadFactory,
             eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
