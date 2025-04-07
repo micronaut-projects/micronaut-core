@@ -92,8 +92,7 @@ public final class PrivateLoomSupport {
         }
     }
 
-    public static Thread getCarrierThread() {
-        Thread t = Thread.currentThread();
+    public static Thread getCarrierThread(Thread t) {
         try {
             return (Thread) CARRIER_THREAD.invoke(t);
         } catch (Throwable e) {

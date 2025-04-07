@@ -11,6 +11,7 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import spock.lang.Specification
 
+@spock.lang.Requires({ jvm.isJava21() })
 class LoomCarrierSpec extends Specification {
     def test() {
         given:
@@ -38,7 +39,7 @@ class LoomCarrierSpec extends Specification {
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get
         String foo() {
-            return Thread.currentThread().getName() + " on " + PrivateLoomSupport.getCarrierThread().getName()
+            return Thread.currentThread().getName() + " on " + PrivateLoomSupport.getCarrierThread(Thread.currentThread()).getName()
         }
     }
 }
