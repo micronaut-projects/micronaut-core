@@ -53,6 +53,7 @@ import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
 import io.micronaut.inject.writer.EvaluatedExpressionProcessor;
+import io.micronaut.inject.writer.GenUtils;
 import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -905,6 +906,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         if (indexByAnnotations.isEmpty()) {
             return null;
         }
+
         TypeDef returnType = TypeDef.of(GET_INDEXED_PROPERTIES.getReturnType());
         return MethodDef.builder(GET_INDEXED_PROPERTIES.getName())
             .returns(returnType)
@@ -920,7 +922,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                                     GET_BP_INDEXED_SUBSET_METHOD,
                                     introspectionTypeDef.getStaticField(annotationIndexFields.get(annotationName))
                                 )
-                        )), ExpressionDef.nullValue())
+                        )), GenUtils.listOf(List.of()))
                     .returning());
     }
 
