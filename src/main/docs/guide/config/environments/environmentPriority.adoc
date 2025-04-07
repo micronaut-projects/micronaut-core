@@ -1,0 +1,11 @@
+The Micronaut framework loads property sources based on the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value to use.
+
+The Micronaut framework uses the following hierarchy for environment processing (lowest to highest priority):
+
+* Deduced environments
+* Environments from the `micronaut.environments` system property
+* Environments from the `MICRONAUT_ENVIRONMENTS` environment variable
+* Environments specified explicitly through the application context builder
++
+NOTE: This also applies to `@MicronautTest(environments = ...)`
++

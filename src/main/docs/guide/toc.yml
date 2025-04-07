@@ -67,7 +67,12 @@ ioc:
   android: Android Support
 config:
   title: Application Configuration
-  environments: The Environment
+  environments:
+    title: The Environment
+    environmentPriority: Environment Priority
+    disablingEnvironmentDetection: Disabling Environment Detection
+    defaultEnvironment: Default Environment
+  banner: Micronaut Banner
   propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
   evaluatedExpressions: Expression Language
