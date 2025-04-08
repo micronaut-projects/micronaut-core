@@ -354,7 +354,16 @@ management:
     infoEndpoint: The Info Endpoint
     healthEndpoint:
       title: The Health Endpoint
-      deadlockedThreads: Deadlocked Threads
+      healthEndpointConfiguration: Health Endpoint Configuration
+      healthEndpointStatusCode: Health Status Codes
+      healthLogging: Health Logging
+      healthEndpointCustomization: Custom Health Indicator
+      healthMonitoringTask: Health Monitor Task
+      healthProvidedIndicators:
+        title: Provided Indicators
+        diskSpaceHealthIndicator: Disk Space Health Indicator
+        jdbcHealthIndicator: JDBC Health Indicator
+        deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint

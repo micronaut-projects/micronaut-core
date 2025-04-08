@@ -1,0 +1,19 @@
+A continuous health monitor that updates the api:health.CurrentHealthStatus[] in a background thread can be enabled when using api:runtime.server.EmbeddedServer[] with the following application configuration:
+
+[configuration]
+----
+micronaut:
+  application:
+    name: foo
+  health:
+    monitor:
+      enabled: true
+----
+- Both configuration properties are required to enable the monitor background task.
+
+Similarly to `DefaultHealthAggregator` it also emits log statements for health indicator status and details. To log this use the following logger configuration:
+
+[source,xml]
+----
+<logger name="io.micronaut.management.health.monitor.HealthMonitorTask" level="trace" />
+----

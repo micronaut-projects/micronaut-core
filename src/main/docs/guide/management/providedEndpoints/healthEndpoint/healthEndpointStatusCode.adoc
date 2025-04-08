@@ -1,0 +1,29 @@
+The `endpoints.health.status.http-mapping` setting controls which status codes to return for each health status. The defaults are described in the table below:
+
+|===
+|Status | HTTP Code
+
+|api:health.HealthStatus#UP[]
+|api:http.HttpStatus#OK[] (200)
+
+|api:health.HealthStatus#UNKNOWN[]
+|api:http.HttpStatus#OK[] (200)
+
+|api:health.HealthStatus#DOWN[]
+|api:http.HttpStatus#SERVICE_UNAVAILABLE[] (503)
+
+|===
+
+You can provide custom mappings in your configuration file (e.g `application.yml`):
+
+.Custom Health Status Codes
+[configuration]
+----
+endpoints:
+  health:
+    status:
+      http-mapping:
+        DOWN: 200
+----
+
+The above returns api:http.HttpStatus#OK[] (200) even when the api:health.HealthStatus[] is api:health.HealthStatus#DOWN[].
