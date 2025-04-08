@@ -1,0 +1,29 @@
+To configure the health endpoint, supply configuration through `endpoints.health`.
+
+.Health Endpoint Configuration Example
+[configuration]
+----
+endpoints:
+  health:
+    enabled: Boolean
+    sensitive: Boolean
+    details-visible: String
+    status:
+      http-mapping: Map<String, HttpStatus>
+----
+
+- `details-visible` is one of api:management.endpoint.health.DetailsVisibility[]
+
+The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated. If the details-visible parameter is configured as ANONYMOUS, while the sensitive flag is set to true, the resulting outcome will be 401 Unauthorized.
+
+For example, setting:
+
+.Using `details-visible`
+[configuration]
+----
+endpoints:
+  health:
+    details-visible: ANONYMOUS
+----
+
+exposes detailed information from the various health indicators about the health status of the application to anonymous unauthenticated users.

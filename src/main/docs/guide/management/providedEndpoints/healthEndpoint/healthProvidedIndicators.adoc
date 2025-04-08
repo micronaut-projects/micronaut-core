@@ -1,0 +1,1 @@
+All the Micronaut framework provided health indicators are exposed on `/health` and `/health/readiness` endpoints.
