@@ -18,8 +18,8 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.netty.body.BodySizeLimits;
+import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
@@ -45,6 +45,8 @@ import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.EnumMap;
@@ -251,6 +253,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 }
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
                 handleFakeRequest(cs, fhr);
+            } else if (evt instanceof IdleStateEvent idle) {
+                if (idle.state() == IdleState.ALL_IDLE) {
+                    ctx.close();
+                }
             }
             super.userEventTriggered(ctx, evt);
         }
