@@ -22,7 +22,6 @@ import io.micronaut.websocket.annotation.OnMessage
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
-import io.netty.channel.ChannelFuture
 import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelId
@@ -92,40 +91,27 @@ import java.util.zip.GZIPOutputStream
 @Execution(ExecutionMode.CONCURRENT)
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedTestConnectionBase... connections) {
-        httpClient.connectionManager = new ConnectionManager(httpClient.connectionManager) {
-            int i = 0
+        List<EmbeddedChannel> channels = new ArrayList<>()
+        for (EmbeddedTestConnectionBase connection : connections) {
+            connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client'), connection.clientInitializer) {
+                def loop
 
-            @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer, Thread requestingThread) {
-                try {
-                    channelInitializer.bootstrappedCustomizer = clientCustomizer
-                    def connection = connections[i++]
-                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
-                        def loop
-
-                        @Override
-                        EventLoop eventLoop() {
-                            if (loop == null) {
-                                loop = new DelegateEventLoop(super.eventLoop()) {
-                                    @Override
-                                    boolean inEventLoop() {
-                                        return connection.inEventLoop
-                                    }
-                                }
+                @Override
+                EventLoop eventLoop() {
+                    if (loop == null) {
+                        loop = new DelegateEventLoop(super.eventLoop()) {
+                            @Override
+                            boolean inEventLoop() {
+                                return connection.inEventLoop
                             }
-                            return loop
                         }
                     }
-                    def promise = connection.clientChannel.newPromise()
-                    promise.setSuccess()
-                    return promise
-                } catch (Throwable t) {
-                    // print it immediately to make sure it's not swallowed
-                    t.printStackTrace()
-                    throw t
+                    return loop
                 }
             }
+            channels.add(connection.clientChannel)
         }
+        httpClient.connectionManager = new EmbeddedConnectionManager(httpClient.connectionManager, channels);
     }
 
     def 'simple http2 get'() {

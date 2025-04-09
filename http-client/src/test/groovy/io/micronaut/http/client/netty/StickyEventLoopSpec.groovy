@@ -13,8 +13,10 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.netty.channel.EventLoopGroup
+import io.netty.channel.SingleThreadIoEventLoop
 import io.netty.util.concurrent.EventExecutor
 import org.junit.jupiter.api.Assertions
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -98,7 +100,7 @@ class StickyEventLoopSpec extends Specification {
         def group = ctx.getBean(EventLoopGroup, Qualifiers.byName("test-loop"))
         for (EventExecutor loop : group) {
             Mono.defer { Mono.from(client.retrieve("/sticky/simple")) }
-                    .doOnNext {Assertions.assertTrue(loop.inEventLoop(filter.thread)) }
+                    .doOnNext {Assertions.assertTrue(loop.inEventLoop(filter.thread), () -> filter.thread.name + " " + ((SingleThreadIoEventLoop) loop).threadProperties().name()) }
                     .subscribeOn(Schedulers.fromExecutor(loop))
                     .block()
         }
@@ -106,9 +108,12 @@ class StickyEventLoopSpec extends Specification {
 
     private static void createConcurrentConnections(int numClients, ApplicationContext ctx, HttpClient client) {
         ctx.getBean(MyController).latch = new CountDownLatch(numClients)
-        Flux.range(0, numClients)
-                .flatMap(i -> client.retrieve('/sticky/concurrent'), Integer.MAX_VALUE)
-                .blockLast()
+        def group = ctx.getBean(EventLoopGroup, Qualifiers.byName("test-loop"))
+        List<Publisher<?>> responses = []
+        for (int i = 0; i < numClients; i++) {
+            responses.add(Mono.defer { Mono.from(client.retrieve('/sticky/concurrent')) }.subscribeOn(Schedulers.fromExecutor(group.next())))
+        }
+        Flux.fromIterable(responses).flatMap { it }.blockLast()
     }
 
     @Controller("/sticky")

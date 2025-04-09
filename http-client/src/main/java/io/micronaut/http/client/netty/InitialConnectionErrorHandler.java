@@ -16,11 +16,13 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.EventLoop;
 import io.netty.util.AttributeKey;
 
 /**
@@ -45,8 +47,8 @@ abstract class InitialConnectionErrorHandler extends ChannelInboundHandlerAdapte
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        onNewConnectionFailure(ctx.channel().attr(FAILURE_KEY).get());
+        onNewConnectionFailure(ctx.channel().eventLoop(), ctx.channel().attr(FAILURE_KEY).get());
     }
 
-    protected abstract void onNewConnectionFailure(@Nullable Throwable cause) throws Exception;
+    protected abstract void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable cause) throws Exception;
 }
