@@ -29,8 +29,6 @@ import io.netty.util.internal.ThreadExecutorMap;
 import org.slf4j.Logger;
 
 import java.util.ArrayDeque;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,16 +116,28 @@ abstract class PoolResizer {
         var configLocality = connectionPoolConfiguration.getConnectionLocality();
         if (configLocality != HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
 
-            EventExecutor currentExecutor = ThreadExecutorMap.currentExecutor();
-            if (currentExecutor == null) {
-                for (LocalPoolPair pool : localPools) {
-                    if (pool.loop.inEventLoop()) {
-                        poolPair = pool;
-                        break;
+            if (true/*!PrivateLoomSupport.isSupported() || !LoomSupport.isVirtual(Thread.currentThread())*/) {
+                EventExecutor currentExecutor = ThreadExecutorMap.currentExecutor();
+                if (currentExecutor == null) {
+                    for (LocalPoolPair pool : localPools) {
+                        if (pool.loop.inEventLoop()) {
+                            poolPair = pool;
+                            break;
+                        }
                     }
+                } else {
+                    poolPair = localPoolsByLoop.get(currentExecutor);
                 }
             } else {
-                poolPair = localPoolsByLoop.get(currentExecutor);
+                /*Thread carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
+                if (carrier != null) {
+                    for (LocalPoolPair pool : localPools) {
+                        if (pool.loop.inEventLoop(carrier)) {
+                            poolPair = pool;
+                            break;
+                        }
+                    }
+                }*/
             }
             if (poolPair == null && configLocality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
                 throw new HttpClientException("Attempted to open a HTTP connection from thread " +
@@ -217,8 +227,8 @@ abstract class PoolResizer {
     final class LocalPoolPair {
         final int index;
         final EventExecutor loop;
-        final Http1LocalPool http1;
-        final Http2LocalPool http2;
+        final LocalPool<Http1PoolEntry> http1;
+        final LocalPool<Http2PoolEntry> http2;
         int localPendingConnections = 0;
         final AtomicBoolean dispatchPendingRequestsQueued = new AtomicBoolean(false);
 
@@ -228,8 +238,8 @@ abstract class PoolResizer {
         LocalPoolPair(EventExecutor loop, int index) {
             this.index = index;
             this.loop = loop;
-            http1 = new Http1LocalPool(loop);
-            http2 = new Http2LocalPool(loop);
+            http1 = new LocalPool<>();
+            http2 = new LocalPool<>();
         }
 
         void notifyGlobalPendingRequestQueued() {
@@ -244,13 +254,13 @@ abstract class PoolResizer {
 
         @Nullable
         PoolEntry findAvailablePoolEntry() {
-            Iterator<Http2PoolEntry> http2Itr = http2.available.iterator();
-            if (http2Itr.hasNext()) {
-                return http2Itr.next();
+            PoolEntry http2 = this.http2.peekAvailable();
+            if (http2 != null) {
+                return http2;
             }
-            Iterator<Http1PoolEntry> http1Itr = http1.available.iterator();
-            if (http1Itr.hasNext()) {
-                return http1Itr.next();
+            PoolEntry http1 = this.http1.peekAvailable();
+            if (http1 != null) {
+                return http1;
             }
             return null;
         }
@@ -350,28 +360,67 @@ abstract class PoolResizer {
         }
     }
 
-    private sealed class LocalPool<E extends PoolEntry> {
-        final EventExecutor loop;
+    private final class LocalPool<E extends PoolEntry> {
         final Set<E> connections = ConcurrentHashMap.newKeySet();
 
-        LocalPool(EventExecutor loop) {
-            this.loop = loop;
+        E firstAvailable;
+        E lastAvailable;
+
+        LocalPool() {
         }
-    }
 
-    private final class Http1LocalPool extends LocalPool<Http1PoolEntry> {
-        final Set<Http1PoolEntry> available = new HashSet<>();
-
-        Http1LocalPool(EventExecutor loop) {
-            super(loop);
+        @Nullable
+        PoolEntry peekAvailable() {
+            return firstAvailable;
         }
-    }
 
-    private final class Http2LocalPool extends LocalPool<Http2PoolEntry> {
-        final Set<Http2PoolEntry> available = new HashSet<>();
+        boolean addAvailable(E entry) {
+            E last = lastAvailable;
+            if (entry.nextAvailable != null || last == entry) {
+                return false;
+            }
+            if (last == null) {
+                firstAvailable = entry;
+            } else {
+                last.nextAvailable = entry;
+            }
+            entry.prevAvailable = last;
+            lastAvailable = entry;
+            return true;
+        }
 
-        Http2LocalPool(EventExecutor loop) {
-            super(loop);
+        boolean removeAvailable(E entry) {
+            PoolEntry next = entry.nextAvailable;
+            PoolEntry prev = entry.prevAvailable;
+            if (next == null) {
+                if (prev == null) {
+                    if (lastAvailable == entry) {
+                        lastAvailable = null;
+                        firstAvailable = null;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    assert lastAvailable == entry;
+                    //noinspection unchecked
+                    lastAvailable = (E) prev;
+                    prev.nextAvailable = null;
+                    return true;
+                }
+            } else {
+                if (prev == null) {
+                    assert firstAvailable == entry;
+                    //noinspection unchecked
+                    firstAvailable = (E) next;
+                    next.prevAvailable = null;
+                    return true;
+                } else {
+                    next.prevAvailable = prev;
+                    prev.nextAvailable = next;
+                    return true;
+                }
+            }
         }
     }
 
@@ -381,6 +430,9 @@ abstract class PoolResizer {
         final LocalPoolPair poolPair;
         final ResizerConnection connection;
         int debugId;
+
+        PoolEntry prevAvailable;
+        PoolEntry nextAvailable;
 
         private PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
             this.poolPair = localPoolsByLoop.get(eventLoop);
@@ -403,7 +455,7 @@ abstract class PoolResizer {
         }
 
         final void checkInEventLoop() {
-            assert poolPair.http1.loop.inEventLoop();
+            assert poolPair.loop.inEventLoop();
         }
 
         final void onOpenConnection() {
@@ -447,7 +499,7 @@ abstract class PoolResizer {
 
         void onConnectionInactive() {
             checkInEventLoop();
-            if (poolPair.http1.available.remove(this)) {
+            if (poolPair.http1.removeAvailable(this)) {
                 globalAvailable.decrement();
             }
             if (poolPair.http1.connections.remove(this)) {
@@ -457,7 +509,7 @@ abstract class PoolResizer {
 
         void markAvailable() {
             checkInEventLoop();
-            if (poolPair.http1.available.add(this)) {
+            if (poolPair.http1.addAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became available", this);
                 }
@@ -467,7 +519,7 @@ abstract class PoolResizer {
         }
 
         void markUnavailable() {
-            if (poolPair.http1.available.remove(this)) {
+            if (poolPair.http1.removeAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became unavailable", this);
                 }
@@ -478,7 +530,7 @@ abstract class PoolResizer {
         @Override
         void preDispatch(PendingRequest request) {
             checkInEventLoop();
-            if (!poolPair.http1.available.remove(this)) {
+            if (!poolPair.http1.removeAvailable(this)) {
                 throw new IllegalStateException("Entry wasn't available");
             }
             globalAvailable.decrement();
@@ -504,7 +556,7 @@ abstract class PoolResizer {
             checkInEventLoop();
             if (available > 0) {
                 available = 0;
-                poolPair.http2.available.remove(this);
+                poolPair.http2.removeAvailable(this);
                 globalAvailable.decrement();
             }
             if (poolPair.http2.connections.remove(this)) {
@@ -524,7 +576,7 @@ abstract class PoolResizer {
             boolean newlyAvailable = available == 0;
             available += n;
             if (newlyAvailable) {
-                poolPair.http2.available.add(this);
+                poolPair.http2.addAvailable(this);
                 globalAvailable.increment();
                 poolPair.dispatchPendingRequests();
             }
@@ -536,7 +588,7 @@ abstract class PoolResizer {
                 log.trace("{} became unavailable", this);
             }
             available = 0;
-            if (poolPair.http2.available.remove(this)) {
+            if (poolPair.http2.removeAvailable(this)) {
                 globalAvailable.decrement();
             }
         }
@@ -547,7 +599,7 @@ abstract class PoolResizer {
             assert available > 0;
             available--;
             if (available == 0) {
-                poolPair.http2.available.remove(this);
+                poolPair.http2.removeAvailable(this);
                 globalAvailable.decrement();
             }
         }
