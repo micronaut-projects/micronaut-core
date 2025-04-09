@@ -1489,9 +1489,11 @@ public class ConnectionManager {
 
             private void returnPendingRequest(PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
-                sink.dispatch();
                 hasLiveRequest = false;
-                poolEntry.markAvailable();
+                if (!windDownConnection) {
+                    poolEntry.markAvailable();
+                }
+                channel.eventLoop().execute(sink::redispatch);
             }
 
             @Override
@@ -1648,10 +1650,10 @@ public class ConnectionManager {
 
             private void returnPendingRequest(PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
-                sink.dispatch();
                 if (!windDownConnection) {
                     poolEntry.markAvailable();
                 }
+                channel.eventLoop().execute(sink::redispatch);
             }
 
             @Override
