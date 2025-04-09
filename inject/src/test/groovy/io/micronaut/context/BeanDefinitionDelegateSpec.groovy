@@ -1,6 +1,10 @@
 package io.micronaut.context
 
+import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
 import jakarta.inject.Singleton
@@ -23,6 +27,18 @@ class BeanDefinitionDelegateSpec extends Specification {
         beans[3].class == Ten
         beans[4].class == Fifty
         beans[5].class == Hundred
+
+        when:
+        ctx.getBean(DummyBean)
+
+        then:
+        ON_CREATION_CALLBACKS.size() == 6
+        ON_CREATION_CALLBACKS[0].class == NegativeOne
+        ON_CREATION_CALLBACKS[1].class == Zero
+        ON_CREATION_CALLBACKS[2].class == One
+        ON_CREATION_CALLBACKS[3].class == Ten
+        ON_CREATION_CALLBACKS[4].class == Fifty
+        ON_CREATION_CALLBACKS[5].class == Hundred
     }
 
     void "test the @Order annotation is ignored if the bean type implements Ordered"() {
@@ -39,11 +55,21 @@ class BeanDefinitionDelegateSpec extends Specification {
         beans[2].class == Negative10
     }
 
-    static interface OrderedBean {
+    @Bean
+    static class DummyBean {
+    }
+
+    static List<OrderedBean> ON_CREATION_CALLBACKS = new ArrayList<>(10);
+
+    static interface OrderedBean extends BeanCreatedEventListener<DummyBean> {
+        @Override
+        default DummyBean onCreated(@NonNull BeanCreatedEvent<DummyBean> event) {
+            ON_CREATION_CALLBACKS.add(this);
+            return event.getBean();
+        }
     }
 
     static interface ImplementsOrdered extends Ordered {
-
     }
 
     @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")

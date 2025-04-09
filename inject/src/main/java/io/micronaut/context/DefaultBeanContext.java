@@ -1264,7 +1264,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> T triggerPreDestroyListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
         if (beanPreDestroyEventListeners == null) {
-            beanPreDestroyEventListeners = loadListeners(BeanPreDestroyEventListener.class);
+            beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
         }
         if (!beanPreDestroyEventListeners.isEmpty()) {
             Class<T> beanType = getBeanType(beanDefinition);
@@ -1338,7 +1338,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> void triggerBeanDestroyedListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
         if (beanDestroyedEventListeners == null) {
-            beanDestroyedEventListeners = loadListeners(BeanDestroyedEventListener.class);
+            beanDestroyedEventListeners = loadBeanEventListeners(BeanDestroyedEventListener.class);
         }
         if (!beanDestroyedEventListeners.isEmpty()) {
             Class<T> beanType = getBeanType(beanDefinition);
@@ -1962,13 +1962,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * Initialize the event listeners.
      */
     protected void initializeEventListeners() {
-        this.beanCreationEventListeners = loadListeners(BeanCreatedEventListener.class);
+        this.beanCreationEventListeners = loadBeanEventListeners(BeanCreatedEventListener.class);
         this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new AnnotationProcessorListenersSupplier()));
-        this.beanInitializedEventListeners = loadListeners(BeanInitializedEventListener.class);
+        this.beanInitializedEventListeners = loadBeanEventListeners(BeanInitializedEventListener.class);
     }
 
     @NonNull
-    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadListeners(@NonNull Class<T> listenerType) {
+    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadBeanEventListeners(@NonNull Class<T> listenerType) {
         final Map<Class<?>, List<BeanDefinition<T>>> typeToListener = getTypeToListenerMap(listenerType);
         if (typeToListener.isEmpty()) {
             return new ArrayList<>(1);
@@ -4157,15 +4157,16 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         public Iterable<T> get(BeanResolutionContext beanResolutionContext) {
             if (listeners == null) {
                 List<T> listeners = new ArrayList<>(listenersDefinitions.size());
+                List<BeanRegistration<T>> registrations = new ArrayList<>(listenersDefinitions.size());
                 for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
-                    T listener;
+                    BeanRegistration<T> registration;
                     if (beanResolutionContext == null) {
                         try (BeanResolutionContext context = newResolutionContext(listenersDefinition, null)) {
                             try (BeanResolutionContext.Path ignored = context.getPath().pushEventListenerResolve(
                                 listenersDefinition,
                                 eventType
                             )) {
-                                listener = resolveBeanRegistration(context, listenersDefinition).bean;
+                                registration = resolveBeanRegistration(context, listenersDefinition);
                             }
                         }
                     } else {
@@ -4173,12 +4174,15 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                             listenersDefinition,
                             eventType
                         )) {
-                            listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
+                            registration = resolveBeanRegistration(beanResolutionContext, listenersDefinition);
                         }
                     }
-                    listeners.add(listener);
+                    registrations.add(registration);
                 }
-                OrderUtil.sort(listeners);
+                OrderUtil.sort(registrations);
+                for (BeanRegistration<T> registration : registrations) {
+                    listeners.add(registration.getBean());
+                }
                 this.listeners = listeners;
             }
             return listeners;
