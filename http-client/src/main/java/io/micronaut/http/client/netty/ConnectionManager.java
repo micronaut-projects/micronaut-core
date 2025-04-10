@@ -1177,9 +1177,9 @@ public class ConnectionManager {
             PendingRequest sink = new PendingRequest(blockHint);
             sink.dispatch();
             if (preferredScheduler != null) {
-                LocalPoolPair destPool = sink.destPool;
+                EventExecutor destPool = sink.likelyEventLoop();
                 if (destPool != null) {
-                    preferredScheduler.set(destPool.loop);
+                    preferredScheduler.set(destPool);
                 }
             }
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
