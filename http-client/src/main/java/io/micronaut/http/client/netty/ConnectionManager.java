@@ -133,11 +133,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -481,11 +483,26 @@ public class ConnectionManager {
      * Get a connection for non-websocket http client methods.
      *
      * @param requestKey The remote to connect to
-     * @param blockHint  Optional information about what threads are blocked for this connection request
+     * @param blockHint  Optional information about what threads are blocked for this connection
+     *                   request
      * @return A mono that will complete once the channel is ready for transmission
      */
     public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
-        return pools.computeIfAbsent(requestKey, this::createPool).acquire(blockHint);
+        return connect(requestKey, blockHint, null);
+    }
+
+    /**
+     * Get a connection for non-websocket http client methods.
+     *
+     * @param requestKey         The remote to connect to
+     * @param blockHint          Optional information about what threads are blocked for this
+     *                           connection request
+     * @param preferredScheduler Reference to set to the preferred scheduler (for timeouts) as soon
+     *                           as it becomes available
+     * @return A mono that will complete once the channel is ready for transmission
+     */
+    public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
+        return pools.computeIfAbsent(requestKey, this::createPool).acquire(blockHint, preferredScheduler);
     }
 
     /**
@@ -1156,9 +1173,15 @@ public class ConnectionManager {
             this.requestKey = requestKey;
         }
 
-        ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint) {
+        ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
             PendingRequest sink = new PendingRequest(blockHint);
             sink.dispatch();
+            if (preferredScheduler != null) {
+                LocalPoolPair destPool = sink.destPool;
+                if (destPool != null) {
+                    preferredScheduler.set(destPool.loop);
+                }
+            }
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
             //noinspection OptionalIsPresent
             if (acquireTimeout.isPresent()) {

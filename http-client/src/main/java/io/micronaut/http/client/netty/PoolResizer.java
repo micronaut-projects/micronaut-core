@@ -29,9 +29,11 @@ import io.netty.util.internal.ThreadExecutorMap;
 import org.slf4j.Logger;
 
 import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,8 +64,8 @@ abstract class PoolResizer {
     private final Map<EventExecutor, LocalPoolPair> localPoolsByLoop;
     final List<LocalPoolPair> localPools;
 
-    private final LongAdder globalAvailable = new LongAdder();
-    private final LongAdder globalPending = new LongAdder();
+    @Nullable
+    private final LongAdder globalPending;
     private final AtomicReference<GlobalStats> globalStats = new AtomicReference<>(GlobalStats.EMPTY);
     private final Queue<PendingRequest> globalPendingRequests = new LinkedBlockingQueue<>();
 
@@ -75,6 +77,11 @@ abstract class PoolResizer {
             localPoolsByLoop.put(loop, new LocalPoolPair(loop, localPoolsByLoop.size()));
         }
         this.localPools = List.copyOf(localPoolsByLoop.values());
+        if (connectionPoolConfiguration.getMaxPendingAcquires() != Integer.MAX_VALUE) {
+            globalPending = new LongAdder();
+        } else {
+            globalPending = null;
+        }
     }
 
     private void dispatchSafe(ResizerConnection connection, PendingRequest toDispatch) {
@@ -207,11 +214,49 @@ abstract class PoolResizer {
         }
 
         if (!limitsHit(globalStats.get())) {
-            for (LocalPoolPair pool : localPools) {
+            for (LocalPoolPair pool : RandomOffsetIterator.iterable(localPools)) {
                 if (pool.needPendingConnection) {
                     pool.loop.execute(pool::openLocalConnectionIfNecessary);
                 }
             }
+        }
+    }
+
+    private static final class RandomOffsetIterator<E> implements Iterator<E> {
+        final List<E> source;
+        final int start;
+        int i;
+
+        private RandomOffsetIterator(List<E> source) {
+            this.source = source;
+            this.start = ThreadLocalRandom.current().nextInt(source.size());
+            this.i = start;
+        }
+
+        static <E> Iterable<E> iterable(List<E> source) {
+            return () -> new RandomOffsetIterator<>(source);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return i != -1;
+        }
+
+        @Override
+        public E next() {
+            int pos = i;
+            if (pos == -1) {
+                throw new NoSuchElementException();
+            }
+            int next = pos + 1;
+            if (next == source.size()) {
+                next = 0;
+            }
+            if (next == start) {
+                next = -1;
+            }
+            i = next;
+            return source.get(pos);
         }
     }
 
@@ -301,10 +346,6 @@ abstract class PoolResizer {
             }
         }
 
-        private LocalPoolPair next() {
-            return localPools.get((index + 1) % localPools.size());
-        }
-
         void openConnectionStep2() {
             localPendingConnections++;
             needPendingConnection = localPendingRequests.size() < localPendingConnections;
@@ -358,12 +399,24 @@ abstract class PoolResizer {
             }
             return "Pool[" + s + "]";
         }
+
+        void check() {
+            // TODO
+            log.info("Connection count: {}", http1.connections.size());
+            int i = 0;
+            PoolEntry e = http1.firstAvailable;
+            while (e != null) {
+                i++;
+                e = e.nextAvailable;
+            }
+            log.info("Available count: {}", http1.connections.size());
+        }
     }
 
     private final class LocalPool<E extends PoolEntry> {
         final Set<E> connections = ConcurrentHashMap.newKeySet();
 
-        E firstAvailable;
+        volatile E firstAvailable;
         E lastAvailable;
 
         LocalPool() {
@@ -380,12 +433,14 @@ abstract class PoolResizer {
                 return false;
             }
             if (last == null) {
+                assert firstAvailable == null;
                 firstAvailable = entry;
             } else {
                 last.nextAvailable = entry;
             }
             entry.prevAvailable = last;
             lastAvailable = entry;
+            checkQueue();
             return true;
         }
 
@@ -395,31 +450,62 @@ abstract class PoolResizer {
             if (next == null) {
                 if (prev == null) {
                     if (lastAvailable == entry) {
+                        assert firstAvailable == entry;
                         lastAvailable = null;
                         firstAvailable = null;
+                        checkQueue();
                         return true;
                     } else {
                         return false;
                     }
                 } else {
+                    entry.prevAvailable = null;
                     assert lastAvailable == entry;
                     //noinspection unchecked
                     lastAvailable = (E) prev;
                     prev.nextAvailable = null;
+                    checkQueue();
                     return true;
                 }
             } else {
+                entry.nextAvailable = null;
                 if (prev == null) {
                     assert firstAvailable == entry;
                     //noinspection unchecked
                     firstAvailable = (E) next;
                     next.prevAvailable = null;
+                    checkQueue();
                     return true;
                 } else {
+                    entry.prevAvailable = null;
                     next.prevAvailable = prev;
                     prev.nextAvailable = next;
+                    checkQueue();
                     return true;
                 }
+            }
+        }
+
+        void checkQueue() {
+            if (true) return;
+            PoolEntry prev = null;
+            PoolEntry entry = firstAvailable;
+            if (entry == null) {
+                return;
+            }
+            while (true) {
+                PoolEntry next = entry.nextAvailable;
+                if (prev != entry.prevAvailable) {
+                    throw new IllegalStateException();
+                }
+                if (next == null) {
+                    if (lastAvailable != entry) {
+                        throw new IllegalStateException();
+                    }
+                    break;
+                }
+                prev = entry;
+                entry = next;
             }
         }
     }
@@ -477,7 +563,7 @@ abstract class PoolResizer {
                 }
             }
 
-            poolPair.openLocalConnectionIfNecessary();
+            //poolPair.openLocalConnectionIfNecessary();
             openGlobalConnectionIfNecessary();
         }
 
@@ -499,9 +585,7 @@ abstract class PoolResizer {
 
         void onConnectionInactive() {
             checkInEventLoop();
-            if (poolPair.http1.removeAvailable(this)) {
-                globalAvailable.decrement();
-            }
+            poolPair.http1.removeAvailable(this);
             if (poolPair.http1.connections.remove(this)) {
                 globalStats.updateAndGet(s -> s.addHttp1ConnectionCount(-1));
             }
@@ -513,7 +597,6 @@ abstract class PoolResizer {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became available", this);
                 }
-                globalAvailable.increment();
                 poolPair.dispatchPendingRequests();
             }
         }
@@ -523,7 +606,6 @@ abstract class PoolResizer {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became unavailable", this);
                 }
-                globalAvailable.decrement();
             }
         }
 
@@ -531,9 +613,8 @@ abstract class PoolResizer {
         void preDispatch(PendingRequest request) {
             checkInEventLoop();
             if (!poolPair.http1.removeAvailable(this)) {
-                throw new IllegalStateException("Entry wasn't available");
+                throw new IllegalStateException("Entry wasn't available " + poolPair.http1.firstAvailable + " " + poolPair.http1.lastAvailable + " " + this);
             }
-            globalAvailable.decrement();
         }
     }
 
@@ -557,7 +638,6 @@ abstract class PoolResizer {
             if (available > 0) {
                 available = 0;
                 poolPair.http2.removeAvailable(this);
-                globalAvailable.decrement();
             }
             if (poolPair.http2.connections.remove(this)) {
                 globalStats.updateAndGet(s -> s.addHttp2ConnectionCount(-1));
@@ -577,7 +657,6 @@ abstract class PoolResizer {
             available += n;
             if (newlyAvailable) {
                 poolPair.http2.addAvailable(this);
-                globalAvailable.increment();
                 poolPair.dispatchPendingRequests();
             }
         }
@@ -588,9 +667,7 @@ abstract class PoolResizer {
                 log.trace("{} became unavailable", this);
             }
             available = 0;
-            if (poolPair.http2.removeAvailable(this)) {
-                globalAvailable.decrement();
-            }
+            poolPair.http2.removeAvailable(this);
         }
 
         @Override
@@ -600,7 +677,6 @@ abstract class PoolResizer {
             available--;
             if (available == 0) {
                 poolPair.http2.removeAvailable(this);
-                globalAvailable.decrement();
             }
         }
     }
@@ -634,7 +710,7 @@ abstract class PoolResizer {
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
         private final LocalPoolPair preferredPool;
         private final boolean permitStealing;
-        private volatile LocalPoolPair destPool;
+        volatile LocalPoolPair destPool;
         private int debugId;
 
         PendingRequest(@Nullable BlockHint blockHint) {
@@ -657,9 +733,7 @@ abstract class PoolResizer {
         }
 
         void dispatch() {
-            if (connectionPoolConfiguration.getMaxPendingAcquires() != Integer.MAX_VALUE &&
-                globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
-
+            if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
 
                 tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
                 return;
@@ -667,7 +741,9 @@ abstract class PoolResizer {
             if (log.isTraceEnabled()) {
                 log.trace("{}: Starting dispatch, preferred pool {}", this, preferredPool);
             }
-            globalPending.increment();
+            if (globalPending != null) {
+                globalPending.increment();
+            }
 
             redispatch();
         }
@@ -695,9 +771,14 @@ abstract class PoolResizer {
                 dispatchTo(available);
                 return;
             }
-            if (permitStealing && globalAvailable.sum() > 0) {
-                dispatchElsewhere();
-                return;
+            if (permitStealing) {
+                for (LocalPoolPair pool : RandomOffsetIterator.iterable(localPools)) {
+                    if (pool != destPool && (pool.http1.firstAvailable != null || pool.http2.firstAvailable != null)) {
+                        destPool = pool;
+                        pool.loop.execute(this::dispatchLocal);
+                        return;
+                    }
+                }
             }
 
             // need to open a new connection.
@@ -774,7 +855,9 @@ abstract class PoolResizer {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                globalPending.decrement();
+                if (globalPending != null) {
+                    globalPending.decrement();
+                }
                 sink.completeExceptionally(t);
                 return true;
             } else {
@@ -784,7 +867,9 @@ abstract class PoolResizer {
 
         boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
-                globalPending.decrement();
+                if (globalPending != null) {
+                    globalPending.decrement();
+                }
                 if (sink.isCancelled()) {
                     return false;
                 }
@@ -798,46 +883,6 @@ abstract class PoolResizer {
         @Override
         public String toString() {
             return "PendingRequest[" + debugId() + "]";
-        }
-    }
-
-    private static final class RandomAccessArrayDeque<E> {
-        Object[] data = new Object[16];
-        int start = 0;
-        int endExclusive = 0;
-        int mask = data.length - 1;
-
-        @Nullable
-        E poll() {
-            if (endExclusive == start) {
-                return null;
-            } else {
-                Object datum = data[start];
-                data[start] = null;
-                start = (start + 1) & mask;
-                return (E) datum;
-            }
-        }
-
-        void add(E e) {
-            int newEndExclusive = (endExclusive + 1) & mask;
-            if (newEndExclusive == start) {
-                // grow
-                Object[] newData = new Object[data.length * 2];
-                System.arraycopy(data, start, newData, 0, data.length - start);
-                System.arraycopy(data, 0, newData, data.length - start, start);
-                endExclusive = data.length;
-                data = newData;
-                start = 0;
-                mask = newData.length - 1;
-                newEndExclusive = endExclusive + 1;
-            }
-            data[endExclusive] = e;
-            endExclusive = newEndExclusive;
-        }
-
-        public boolean isEmpty() {
-            return endExclusive == start;
         }
     }
 }
