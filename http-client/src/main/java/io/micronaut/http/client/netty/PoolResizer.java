@@ -116,7 +116,7 @@ abstract class PoolResizer {
         var configLocality = connectionPoolConfiguration.getConnectionLocality();
         if (configLocality != HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
 
-            if (true/*!PrivateLoomSupport.isSupported() || !LoomSupport.isVirtual(Thread.currentThread())*/) {
+            if (!PrivateLoomSupport.isSupported() || !LoomSupport.isVirtual(Thread.currentThread())) {
                 EventExecutor currentExecutor = ThreadExecutorMap.currentExecutor();
                 if (currentExecutor == null) {
                     for (LocalPoolPair pool : localPools) {
@@ -129,7 +129,7 @@ abstract class PoolResizer {
                     poolPair = localPoolsByLoop.get(currentExecutor);
                 }
             } else {
-                /*Thread carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
+                Thread carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
                 if (carrier != null) {
                     for (LocalPoolPair pool : localPools) {
                         if (pool.loop.inEventLoop(carrier)) {
@@ -137,7 +137,7 @@ abstract class PoolResizer {
                             break;
                         }
                     }
-                }*/
+                }
             }
             if (poolPair == null && configLocality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
                 throw new HttpClientException("Attempted to open a HTTP connection from thread " +
