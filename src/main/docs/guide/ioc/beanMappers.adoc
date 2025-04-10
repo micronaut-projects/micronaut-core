@@ -46,28 +46,4 @@ You can retrieve from the context or inject a bean of type `ProductMappers`. The
 
 snippet::io.micronaut.docs.ioc.mappers.MappersSpec[tags="mappers", indent="0"]
 
-=== Merging example
 
-Given the following types:
-
-snippet::io.micronaut.docs.ioc.mappers.ChristmasTypes[tags="beans", indent=0]
-
-You can write an interface and method to merge the types by simply specifying two or more
-arguments to the method and annotating the method with ann:context.annotation.Mapper[@Mapper].
-Optionally, define custom mapping rules using ann:context.annotation.Mapper.Mapping[@Mapping].
-
-snippet::io.micronaut.docs.ioc.mappers.ChristmasMappers[tags="imports, mapper"]
-
-You can then inject the type `ChristmasMappers` and easily merge the types.
-
-snippet::io.micronaut.docs.ioc.mappers.MappersSpec[tags="merge", indent=0]
-
-=== Additional Mapping Examples
-
-And much more is possible! See more mapping examples in the following snippet.
-
-snippet::io.micronaut.docs.ioc.mappers.AdditionalMappers[tags="mapper", indent=0]
-
-<1> Merge three or more types.
-<2> Create mappings that specify `Map` as a parameter and define mappings for this parameter.
-<3> Define a custom merge strategy as a singleton and use it for mapping.

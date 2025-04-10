@@ -58,7 +58,11 @@ ioc:
     beanWrapperApi: The BeanWrapper API
     jacksonAndBeanIntrospection: Jackson and Bean Introspection
     kotlinAndBeanIntrospection: Kotlin and Bean Introspection
-  beanMappers: Bean Mappers
+  beanMappers:
+    title: Bean Mappers
+    beanMappersMerging:
+      title: Bean Mappers Merging
+      beanMappersMergingStrategy: Merging Strategy
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
