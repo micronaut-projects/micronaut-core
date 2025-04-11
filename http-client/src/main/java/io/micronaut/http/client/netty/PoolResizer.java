@@ -757,6 +757,7 @@ abstract class PoolResizer {
             poolPair.http1.removeAvailable(this);
             if (poolPair.http1.connections.remove(this)) {
                 globalStats.updateAndGet(s -> s.addHttp1ConnectionCount(-1));
+                openGlobalConnectionIfNecessary();
             }
         }
 
@@ -810,6 +811,7 @@ abstract class PoolResizer {
             }
             if (poolPair.http2.connections.remove(this)) {
                 globalStats.updateAndGet(s -> s.addHttp2ConnectionCount(-1));
+                openGlobalConnectionIfNecessary();
             }
         }
 
@@ -946,7 +948,6 @@ abstract class PoolResizer {
          */
         void dispatch() {
             if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
-
                 tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
                 return;
             }

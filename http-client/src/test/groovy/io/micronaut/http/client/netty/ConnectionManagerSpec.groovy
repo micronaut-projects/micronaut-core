@@ -22,6 +22,7 @@ import io.micronaut.websocket.annotation.OnMessage
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
+import io.netty.channel.ChannelFuture
 import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelId
@@ -69,7 +70,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
-import io.netty.util.concurrent.GenericFutureListener
 import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
@@ -77,6 +77,7 @@ import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Execution
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -92,6 +93,7 @@ import java.util.zip.GZIPOutputStream
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedTestConnectionBase... connections) {
         List<EmbeddedChannel> channels = new ArrayList<>()
+        List<ChannelFuture> openFutures = new ArrayList<>()
         for (EmbeddedTestConnectionBase connection : connections) {
             connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client'), connection.clientInitializer) {
                 def loop
@@ -110,8 +112,14 @@ class ConnectionManagerSpec extends Specification {
                 }
             }
             channels.add(connection.clientChannel)
+            ChannelPromise openFuture = connection.clientChannel.newPromise()
+            connection.openFuture.whenComplete((v, t) -> {
+                if (t == null) openFuture.setSuccess()
+                else openFuture.setFailure(t)
+            })
+            openFutures.add(openFuture)
         }
-        httpClient.connectionManager = new EmbeddedConnectionManager(httpClient.connectionManager, channels);
+        httpClient.connectionManager = new EmbeddedConnectionManager(httpClient.connectionManager, channels, openFutures);
     }
 
     def 'simple http2 get'() {
@@ -780,27 +788,7 @@ class ConnectionManagerSpec extends Specification {
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
 
-        ChannelPromise delayPromise
-        def normalInit = conn.clientInitializer
-        // hack: delay the channelActive call until we complete delayPromise
-        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
-            @Override
-            protected void initChannel(EmbeddedChannel ch) throws Exception {
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    void channelActive(ChannelHandlerContext chtx) throws Exception {
-                        delayPromise = chtx.newPromise()
-                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
-                            @Override
-                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
-                                chtx.fireChannelActive()
-                            }
-                        })
-                    }
-                })
-                ch.pipeline().addLast(normalInit)
-            }
-        }
+        conn.openFuture = new CompletableFuture<>()
 
         patch(client, conn)
 
@@ -808,7 +796,7 @@ class ConnectionManagerSpec extends Specification {
         conn.advance()
         subscription.dispose()
         // this completes the handshake
-        delayPromise.setSuccess()
+        conn.openFuture.complete(null)
         conn.advance()
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
@@ -829,27 +817,7 @@ class ConnectionManagerSpec extends Specification {
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
 
-        ChannelPromise delayPromise
-        def normalInit = conn.clientInitializer
-        // hack: delay the channelActive call until we complete delayPromise
-        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
-            @Override
-            protected void initChannel(EmbeddedChannel ch) throws Exception {
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    void channelActive(ChannelHandlerContext chtx) throws Exception {
-                        delayPromise = chtx.newPromise()
-                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
-                            @Override
-                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
-                                chtx.fireChannelActive()
-                            }
-                        })
-                    }
-                })
-                ch.pipeline().addLast(normalInit)
-            }
-        }
+        conn.openFuture = new CompletableFuture<>() // delay open
 
         patch(client, conn)
 
@@ -1057,6 +1025,7 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    @Ignore("EmbeddedChannel.close cancels the scheduled task that runs the timeout")
     def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
@@ -1271,6 +1240,7 @@ class ConnectionManagerSpec extends Specification {
 
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
+        CompletableFuture<?> openFuture = CompletableFuture.completedFuture(null)
         EmbeddedChannel clientChannel
         ChannelInitializer<EmbeddedChannel> clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
             @Override
