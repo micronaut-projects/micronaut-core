@@ -10,23 +10,24 @@ import java.util.List;
 
 final class EmbeddedConnectionManager extends ConnectionManager {
     final List<EmbeddedChannel> channels;
+    final List<ChannelFuture> openFutures;
 
     private int i;
 
-    EmbeddedConnectionManager(ConnectionManager from, List<EmbeddedChannel> channels) {
+    EmbeddedConnectionManager(ConnectionManager from, List<EmbeddedChannel> channels, List<ChannelFuture> openFutures) {
         super(from);
         this.channels = channels;
+        this.openFutures = openFutures;
     }
 
     @Override
     ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull EventLoopGroup eventLoop) {
         try {
             channelInitializer.bootstrappedCustomizer = clientCustomizer;
-            var connection = channels.get(i++);
-            connection.pipeline().addLast(channelInitializer);
-            var promise = connection.newPromise();
-            promise.setSuccess();
-            return promise;
+            int index = i++;
+            var connection = channels.get(index);
+            return openFutures.get(index)
+                .addListener(future -> connection.pipeline().addLast(channelInitializer));
         } catch (Throwable t) {
             // print it immediately to make sure it's not swallowed
             t.printStackTrace();
