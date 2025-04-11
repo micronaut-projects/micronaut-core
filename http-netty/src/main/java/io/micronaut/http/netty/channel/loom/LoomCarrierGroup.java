@@ -75,7 +75,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         Runner(Factory factory, IoHandlerFactory ioHandlerFactory) {
             this.factory = factory;
-            this.ioHandlerFactory = ioHandlerFactory;
+            this.ioHandlerFactory = ioExecutor -> new DelegateIoHandler(ioHandlerFactory.newHandler(ioExecutor)) {
+                @Override
+                public void wakeup() {
+                    // we don't need to wake up if we're running on a vthread carried by this event loop.
+                    Thread thread = Thread.currentThread();
+                    if (LoomSupport.isVirtual(thread) && ioExecutor.isExecutorThread(PrivateLoomSupport.getCarrierThread(thread))) {
+                        return;
+                    }
+
+                    super.wakeup();
+                }
+            };
         }
 
         @Override
