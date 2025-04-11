@@ -22,6 +22,8 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
+import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
 import io.netty.util.concurrent.EventExecutor;
