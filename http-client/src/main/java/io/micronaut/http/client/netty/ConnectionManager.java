@@ -441,7 +441,7 @@ public class ConnectionManager {
      *
      * @param requestKey         The host to connect to
      * @param channelInitializer The initializer to use
-     * @param requestingThread   A hint which thread may use this connection (not 100% reliable)
+     * @param eventLoop          Event loop this connection should be created on
      * @return Future that terminates when the TCP connection is established.
      */
     ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull EventLoopGroup eventLoop) {
@@ -848,6 +848,12 @@ public class ConnectionManager {
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
+    /**
+     * Create a new connection pool. Overridden by tests.
+     *
+     * @param requestKey The request key (host + port)
+     * @return The pool
+     */
     Pool createPool(DefaultHttpClient.RequestKey requestKey) {
         return new Pool(requestKey, group);
     }

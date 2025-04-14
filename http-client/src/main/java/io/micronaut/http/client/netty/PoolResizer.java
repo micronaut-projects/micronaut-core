@@ -60,6 +60,7 @@ abstract class PoolResizer {
     /**
      * Ordered version of {@link #localPoolsByLoop} for faster access.
      */
+    @SuppressWarnings("checkstyle:DeclarationOrder")
     final List<LocalPoolPair> localPools;
 
     /**
