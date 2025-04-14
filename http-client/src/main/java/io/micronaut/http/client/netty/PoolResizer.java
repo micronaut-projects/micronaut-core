@@ -107,13 +107,9 @@ abstract class PoolResizer {
         try {
             connection.dispatch(toDispatch);
         } catch (Exception e) {
-            try {
-                if (!toDispatch.tryCompleteExceptionally(e)) {
-                    // this is probably fine, log it anyway
-                    log.debug("Failure during connection dispatch operation, but dispatch request was already complete.", e);
-                }
-            } catch (Exception f) {
-                log.error("Internal error", f);
+            if (!toDispatch.tryCompleteExceptionally(e)) {
+                // this is probably fine, log it anyway
+                log.debug("Failure during connection dispatch operation, but dispatch request was already complete.", e);
             }
         }
     }
