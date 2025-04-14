@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -50,13 +51,16 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
      * @throws CodecException If an error occurs encoding
      */
     @NonNull
-    ByteBodyHttpResponse<?> write(
+    default ByteBodyHttpResponse<?> write(
         @NonNull ByteBodyFactory bodyFactory,
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> httpResponse,
         @NonNull Argument<T> type,
         @NonNull MediaType mediaType,
-        T object) throws CodecException;
+        T object) throws CodecException {
+        httpResponse.getHeaders().contentTypeIfMissing(mediaType);
+        return ByteBodyHttpResponseWrapper.wrap(httpResponse, writePiece(bodyFactory, request, httpResponse, type, mediaType, object));
+    }
 
     /**
      * Write a <i>piece</i> of a larger response, e.g. when writing a Publisher or a part of a

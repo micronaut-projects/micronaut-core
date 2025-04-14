@@ -144,6 +144,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            transitionToState(ctx, this, AfterContent.INSTANCE);
             listener.fail(ctx, cause);
         }
     }

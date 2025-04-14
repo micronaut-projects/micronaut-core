@@ -102,6 +102,17 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     *
+     * @param kind The kind of error
+     * @return Whether errors are present in the type element.
+     * @since 4.7.18
+     */
+    @Experimental
+    default boolean hasUnresolvedTypes(UnresolvedTypeKind... kind) {
+        return false;
+    }
+
+    /**
      * @return Whether this is a generic placeholder.
      * @see GenericPlaceholderElement
      * @since 3.1.0

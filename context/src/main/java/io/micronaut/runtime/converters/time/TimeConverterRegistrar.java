@@ -89,7 +89,7 @@ import static java.time.temporal.ChronoField.YEAR;
 @Internal
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
-    private static final Pattern PERIOD_MATCHER = Pattern.compile("^(-?\\d+)([unywmd])(s?)$");
+    private static final Pattern PERIOD_MATCHER = Pattern.compile("^(-?\\d+)([unywmMdD])(s?)$");
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");
     private static final int MILLIS = 3;
 
@@ -141,13 +141,6 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             (integer, targetType, context) -> durationConverter.apply(integer.toString(), context)
         );
 
-        // CharSequence -> TemporalAmount
-        conversionService.addConverter(
-            CharSequence.class,
-            TemporalAmount.class,
-            (object, targetType, context) -> durationConverter.apply(object, context).map(TemporalAmount.class::cast)
-        );
-
         final BiFunction<CharSequence, ConversionContext, Optional<Period>> periodConverter = periodConverter();
 
         // CharSequence -> Period
@@ -168,7 +161,17 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         conversionService.addConverter(
             CharSequence.class,
             TemporalAmount.class,
-            (object, targetType, context) -> periodConverter.apply(object, context).map(TemporalAmount.class::cast)
+            (object, targetType, context) -> {
+                var str = object.toString();
+                if (str.contains("y")
+                    || str.contains("M")
+                    || str.contains("w")
+                    || str.contains("D")
+                ) {
+                    return periodConverter.apply(object, context).map(TemporalAmount.class::cast);
+                }
+                return durationConverter.apply(object, context).map(TemporalAmount.class::cast);
+            }
         );
 
         addTemporalStringConverters(conversionService, Instant.class, DateTimeFormatter.ISO_INSTANT, Instant::from);
@@ -395,13 +398,13 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                             case 'y' -> {
                                 return Optional.of(Period.ofYears(Integer.parseInt(amount)));
                             }
-                            case 'm' -> {
+                            case 'm', 'M' -> {
                                 return Optional.of(Period.ofMonths(Integer.parseInt(amount)));
                             }
                             case 'w' -> {
                                 return Optional.of(Period.ofWeeks(Integer.parseInt(amount)));
                             }
-                            case 'd' -> {
+                            case 'd', 'D' -> {
                                 return Optional.of(Period.ofDays(Integer.parseInt(amount)));
                             }
                             default -> {

@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -883,7 +884,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return changes;
     }
 
-    private void diffMap(Map<String, DefaultPropertyEntry> map, Map<String, DefaultPropertyEntry> newMap, Map<String, Object> changes) {
+    private void diffMap(
+        Map<String, DefaultPropertyEntry> map,
+        Map<String, DefaultPropertyEntry> newMap,
+        Map<String, Object> changes) {
+        Map<String, DefaultPropertyEntry> remainingMap = new LinkedHashMap<>(map);
         for (Map.Entry<String, DefaultPropertyEntry> entry : newMap.entrySet()) {
             String key = entry.getKey();
             Object newValue = entry.getValue().value();
@@ -900,8 +905,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
                     changes.put(key, oldValue);
                 }
+                remainingMap.remove(key);
             }
         }
+        remainingMap.forEach((key, value) -> {
+            changes.put(key, value.value());
+        });
     }
 
     private static boolean hasChanged(Object newValue, Object oldValue) {

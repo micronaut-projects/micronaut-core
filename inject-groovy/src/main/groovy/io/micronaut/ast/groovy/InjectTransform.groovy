@@ -84,7 +84,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     def writer = new BeanConfigurationWriter(
                             classNode.packageName,
                             groovyPackageElement,
-                            groovyPackageElement.getAnnotationMetadata()
+                            groovyPackageElement.getAnnotationMetadata(),
+                            visitorContext
                     )
                     try {
                         writer.accept(outputVisitor)

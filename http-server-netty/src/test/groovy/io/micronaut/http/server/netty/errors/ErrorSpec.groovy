@@ -27,6 +27,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
@@ -185,6 +186,19 @@ class ErrorSpec extends AbstractMicronautSpec {
         json._links.self.href == '/errors/server-error'
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11468")
+    void "test 405 error for wrong content type"() {
+        when:
+        httpClient.toBlocking().retrieve(
+                HttpRequest.POST('/errors/server-error', 'blah')
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+        )
+
+        then:
+        def e = thrown HttpClientResponseException
+        e.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+    }
+
     void "test content type for error handler"() {
         given:
         HttpResponse response = Flux.from(httpClient.exchange(
@@ -339,6 +353,16 @@ X-Long-Header: $longString\r
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11607")
+    def 'text-plain with invalid json body'() {
+        when:
+        httpClient.toBlocking().retrieve(HttpRequest.POST("/errors/plain-json", '{"en": "BAR"}').contentType(MediaType.TEXT_PLAIN))
+
+        then:
+        def e = thrown HttpClientResponseException
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     @Requires(property = 'spec.name', value = SPEC)
@@ -505,6 +529,22 @@ X-Long-Header: $longString\r
         @Override
         String handle(HttpRequest request, LoopingException exception) {
             throw new LoopingException()
+        }
+    }
+
+    @Requires(property = 'spec.name', value = SPEC)
+    @Controller('/errors/plain-json')
+    static class PlainJsonError {
+
+        @Post(processes = MediaType.TEXT_PLAIN)
+        String ok(@Body MyRecord rec) {
+            rec.toString()
+        }
+
+        record MyRecord(MyEnum en) {}
+
+        enum MyEnum {
+            FOO
         }
     }
 }

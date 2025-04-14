@@ -17,11 +17,13 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
 import io.netty.util.ResourceLeakDetector;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -84,6 +86,17 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
+    public IoHandlerFactory createIoHandlerFactory() {
+        return nativeFactory.createIoHandlerFactory();
+    }
+
+    @Override
+    public IoHandlerFactory createIoHandlerFactory(@NonNull EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).createIoHandlerFactory(configuration);
+    }
+
+    @Override
+    @Deprecated
     public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration, ThreadFactory threadFactory) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
@@ -92,11 +105,13 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
+    @Deprecated
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return nativeFactory.createEventLoopGroup(threads, executor, ioRatio);
     }
 
     @Override
+    @Deprecated
     public EventLoopGroup createEventLoopGroup(int threads, @Nullable ThreadFactory threadFactory, @Nullable Integer ioRatio) {
         return nativeFactory.createEventLoopGroup(threads, threadFactory, ioRatio);
     }

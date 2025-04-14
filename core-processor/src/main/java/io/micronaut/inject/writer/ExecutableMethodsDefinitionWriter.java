@@ -29,7 +29,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -106,19 +106,21 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     private ClassDef.ClassDefBuilder classDefBuilder;
 
     private final OriginatingElements originatingElements;
+    private final VisitorContext visitorContext;
 
     public ExecutableMethodsDefinitionWriter(EvaluatedExpressionProcessor evaluatedExpressionProcessor,
                                              AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
-                                             OriginatingElements originatingElements) {
+                                             OriginatingElements originatingElements, VisitorContext visitorContext) {
         this.originatingElements = originatingElements;
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
         this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
+        this.visitorContext = visitorContext;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
-        this.methodDispatchWriter = new DispatchWriter();
+        this.methodDispatchWriter = new DispatchWriter(className);
     }
 
     /**
@@ -195,14 +197,14 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
-     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @param interceptedProxyType             The intercepted proxy type
+     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method
      * @return The method index
      */
     public int visitExecutableMethod(TypedElement declaringType,
                                      MethodElement methodElement,
-                                     String interceptedProxyClassName,
-                                     String interceptedProxyBridgeMethodName) {
+                                     ClassTypeDef interceptedProxyType,
+                                     MethodDef interceptedProxyBridgeMethod) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
@@ -217,17 +219,17 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             return index;
         }
         addedMethods.add(methodKey);
-        if (interceptedProxyClassName == null) {
+        if (interceptedProxyType == null) {
             return methodDispatchWriter.addMethod(declaringType, methodElement);
         } else {
-            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
         }
     }
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElements.getOriginatingElements())) {
-            outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
         }
     }
 

@@ -50,6 +50,7 @@ import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.DefaultHttp2PingFrame
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
@@ -1243,6 +1244,38 @@ class ConnectionManagerSpec extends Specification {
         'micronaut.http.client.http2.ping-interval-read'  | true
         'micronaut.http.client.http2.ping-interval-write' | true
         'micronaut.http.client.http2.ping-interval-idle'  | true
+    }
+
+    def 'http2 server ping'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        def future = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(future)
+
+        assertPoolConnections(client, 1)
+
+        conn.serverChannel.writeAndFlush(new DefaultHttp2PingFrame(123))
+        conn.advance()
+
+        expect:
+        def pong = conn.serverChannel.readInbound()
+        pong instanceof Http2PingFrame
+        pong.ack
+        pong.content == 123
+
+        cleanup:
+        client.close()
+        ctx.close()
     }
 
     void assertPoolConnections(DefaultHttpClient client, int count) {

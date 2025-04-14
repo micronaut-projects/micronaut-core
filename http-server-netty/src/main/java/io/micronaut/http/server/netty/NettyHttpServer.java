@@ -28,9 +28,11 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
@@ -62,11 +64,12 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -166,6 +169,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
         ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
             .getEventPublisher(HttpRequestTerminatedEvent.class);
+        ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher = nettyEmbeddedServices
+            .getEventPublisher(HttpRequestReceivedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
             nettyEmbeddedServices.getExecutorSelector()
                 .select(TaskExecutors.BLOCKING).orElse(null)
@@ -175,6 +180,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             nettyEmbeddedServices,
             ioExecutor,
             httpRequestTerminatedEventPublisher,
+            httpRequestReceivedEventPublisher,
             applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
@@ -594,7 +600,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (listenerBootstrap.config().group() instanceof NioEventLoopGroup) {
+                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
                                     // jdk UnixDomainSocketAddress
                                     future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
                                 } else {
@@ -766,7 +772,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     .flatMap(name -> applicationContext.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
             if (executorService != null) {
                 return nettyEmbeddedServices.createEventLoopGroup(
-                        config.getNumThreads(),
+                        DefaultEventLoopGroupRegistry.numThreads(config),
                         executorService,
                         config.getIoRatio().orElse(null)
                 );
@@ -960,7 +966,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private static class DomainSocketHolder {
+    private static final class DomainSocketHolder {
         @NonNull
         private static SocketAddress makeDomainSocketAddress(String path) {
             try {

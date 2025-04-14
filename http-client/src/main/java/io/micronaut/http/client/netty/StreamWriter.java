@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.stream.LazyUpstream;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -61,7 +62,12 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements ByteBuf
         if (ctx == null) {
             throw new IllegalStateException("Not added to a channel yet");
         }
+        LazyUpstream lazyUpstream = new LazyUpstream();
+        // primary() can call other methods here immediately, so we need a replacement upstream
+        // until it returns
+        upstream = lazyUpstream;
         upstream = body.primary(this);
+        lazyUpstream.forward(upstream);
         try {
             upstream.start();
         } catch (Exception e) {

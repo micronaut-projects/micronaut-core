@@ -2,7 +2,6 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Filter
@@ -11,25 +10,28 @@ import io.micronaut.http.filter.HttpFilter
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.micronaut.http.server.netty.NettyHttpServer
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
+import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
-import io.netty.channel.ChannelHandlerContext
-import io.netty.channel.SimpleChannelInboundHandler
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultHttpHeaders
-import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
+import io.netty.handler.codec.http.websocketx.WebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketVersion
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import reactor.core.publisher.Sinks
 import spock.lang.Issue
 import spock.lang.Specification
+
+import java.util.concurrent.CompletableFuture
 
 class WebSocketSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7920')
@@ -97,6 +99,52 @@ class WebSocketSpec extends Specification {
         Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
             delay = Sinks.empty()
             return Flux.concat(delay.asMono(), Flux.defer(() -> chain.proceed(request)))
+        }
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/11506')
+    def 'netty WebSocketFrame'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'spec.name': 'WebSocketSpec2',
+        ])
+        def embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = ctx.createBean(WebSocketClient, embeddedServer.URI)
+
+        when:
+        def sock = Mono.from(client.connect(ClientSocket, "/ServerSocket")).block()
+        sock.send("foo")
+        then:
+        sock.reply.get() == "reply: foo"
+
+        cleanup:
+        sock.close()
+        client.close()
+        embeddedServer.close()
+        ctx.close()
+    }
+
+    @ServerWebSocket('/ServerSocket')
+    @Requires(property = 'spec.name', value = 'WebSocketSpec2')
+    static class ServerSocket {
+        @OnMessage
+        def onMessage(WebSocketFrame message, WebSocketSession session) {
+            def text = ((TextWebSocketFrame) message).text()
+            message.release()
+            return session.send('reply: ' + text)
+        }
+    }
+
+    @ClientWebSocket
+    static abstract class ClientSocket implements AutoCloseable {
+        def reply = new CompletableFuture<String>()
+
+        abstract void send(String message);
+
+        @OnMessage
+        public void onMessage(String message) {
+            reply.complete(message)
         }
     }
 }

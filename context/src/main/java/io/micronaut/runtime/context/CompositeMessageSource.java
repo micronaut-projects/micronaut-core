@@ -20,12 +20,10 @@ import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArgumentUtils;
+import jakarta.inject.Inject;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Composite message source that is the primary message source.
@@ -36,19 +34,27 @@ import java.util.Optional;
 @Primary
 public final class CompositeMessageSource extends AbstractMessageSource {
 
-    private final Collection<MessageSource> messageSources;
+    private final List<MessageSource> messageSources;
+
+    /**
+     * The other messages sources.
+     *
+     * @param messageSources The message sources.
+     * @deprecated Use {@link CompositeMessageSource(List)} instead.
+     */
+    @Deprecated
+    public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
+        this(messageSources == null ? Collections.emptyList() : new ArrayList<>(messageSources));
+    }
 
     /**
      * The other messages sources.
      *
      * @param messageSources The message sources.
      */
-    public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
-        if (messageSources != null) {
-            this.messageSources = OrderUtil.sortOrderedCollection(messageSources);
-        } else {
-            this.messageSources = Collections.emptyList();
-        }
+    @Inject
+    public CompositeMessageSource(@Nullable List<MessageSource> messageSources) {
+        this.messageSources = messageSources != null ? messageSources : Collections.emptyList();
     }
 
     @NonNull

@@ -10,5 +10,10 @@ if (sonatypePluginConfigured) {
     ossIndexAudit {
         username = ossIndexUsername
         password = ossIndexPassword
+        excludeVulnerabilityIds = ["CVE-2025-24970"]
+        // the vulnerability description says Netty 4.1.118 patches it. However, Netty 4.1.118 is still reported as vulnerable.
+        // https://ossindex.sonatype.org/vulnerability/CVE-2025-24970?component-type=maven&component-name=io.netty/netty-handler
+        // > Version 4.1.118.Final contains a patch
+        // SslHandler doesn't correctly validate packets which can lead to native crash when using native SSLEngine https://netty.io/news/2025/02/10/4-1-118-Final.html
     }
 }

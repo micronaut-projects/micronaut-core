@@ -29,9 +29,9 @@ import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.MethodDef;
@@ -56,7 +56,6 @@ import java.util.Set;
 @Internal
 public final class EvaluatedExpressionWriter implements ClassOutputWriter {
 
-    private static final ByteCodeWriter BYTE_CODE_WRITER = new ByteCodeWriter();
     private static final Method DO_EVALUATE_METHOD
         = ReflectionUtils.getRequiredMethod(AbstractEvaluatedExpression.class, "doEvaluate", ExpressionEvaluationContext.class);
 
@@ -83,8 +82,9 @@ public final class EvaluatedExpressionWriter implements ClassOutputWriter {
         try (OutputStream outputStream = outputVisitor.visitClass(expressionClassName, originatingElement)) {
             ClassDef objectDef = generateClassDef(expressionClassName);
             outputStream.write(
-                BYTE_CODE_WRITER.write(
-                    objectDef
+                ByteCodeWriterUtils.writeByteCode(
+                    objectDef,
+                    visitorContext
                 )
             );
             WRITTEN_CLASSES.add(expressionClassName);

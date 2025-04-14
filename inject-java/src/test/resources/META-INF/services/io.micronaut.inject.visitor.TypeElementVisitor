@@ -1,3 +1,4 @@
+io.micronaut.visitors.InterfaceGenVisitor
 io.micronaut.visitors.ControllerGetVisitor
 io.micronaut.visitors.IntroductionVisitor
 io.micronaut.visitors.AllElementsVisitor
@@ -20,3 +21,5 @@ io.micronaut.annotation.AnnotateClassSpec$AnnotateClassVisitor
 io.micronaut.annotation.AnnotateTypeArgSpec$AnnotateTypeArgVisitor
 io.micronaut.aop.introduction.beans.MyRepoVisitor2
 io.micronaut.visitors.WitherVisitor
+io.micronaut.visitors.IntroductionTestVisitor
+io.micronaut.visitors.BuilderVisitor

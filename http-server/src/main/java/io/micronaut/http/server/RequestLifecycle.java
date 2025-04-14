@@ -484,12 +484,13 @@ public class RequestLifecycle {
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
             if (!requestMethodName.equals(routeMethod)) {
                 allowedMethods.add(routeMethod);
-            }
-            if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
-                acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
-            }
-            if (hasAcceptHeader && !anyRoute.getRouteInfo().doesProduce(acceptedTypes)) {
-                produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+            } else {
+                if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
+                    acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
+                }
+                if (hasAcceptHeader && !anyRoute.getRouteInfo().doesProduce(acceptedTypes)) {
+                    produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+                }
             }
             declaringType = anyRoute.getDeclaringType();
         }

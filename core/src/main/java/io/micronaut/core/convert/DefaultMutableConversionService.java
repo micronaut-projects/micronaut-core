@@ -326,11 +326,11 @@ public class DefaultMutableConversionService implements MutableConversionService
 
                     @Override
                     public Optional<T> convert(String value, Class<T> targetType, ConversionContext context) {
-                        return typeConverter.convert((S) ((CharSequence) value).toString(), (Class<T>) CharSequence.class, context);
+                        return typeConverter.convert((S) value.toString(), (Class<T>) CharSequence.class, context);
                     }
                 };
             } else {
-                converter = (value, theTarget, context) -> typeConverter.convert((S) ((CharSequence) value).toString(), theTarget, context);
+                converter = (value, theTarget, context) -> typeConverter.convert((S) value.toString(), theTarget, context);
             }
             addConverterToMap(typeConverters, String.class, targetType, converter);
         } else if (sourceType == String.class) {

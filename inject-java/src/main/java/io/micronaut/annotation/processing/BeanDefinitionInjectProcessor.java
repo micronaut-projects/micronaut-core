@@ -24,6 +24,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
@@ -174,6 +176,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 for (String className : beanDefinitions) {
                     if (processed.add(className)) {
                         final TypeElement typeElement = elementUtils.getTypeElement(className);
+                        PostponeToNextRoundException nextRoundException = postponed.get(className);
+                        if (nextRoundException != null) {
+                            Object errorElement = nextRoundException.getErrorElement();
+                            if (errorElement != null) {
+                                AbstractAnnotationMetadataBuilder.clearMutated(errorElement);
+                            }
+                        }
                         try {
                             Name classElementQualifiedName = typeElement.getQualifiedName();
                             if ("java.lang.Record".equals(classElementQualifiedName.toString())) {
@@ -183,6 +192,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 .newClassElement(typeElement, annotationMetadataFactory);
                             if (classElement.hasAnnotation(Vetoed.class) || classElement.getPackage().hasAnnotation(Vetoed.class)) {
                                 continue;
+                            }
+
+                            if (!postponed.containsKey(classElement.getName()) && // don't throw again if it was already postponed
+                                classElement.hasUnresolvedTypes(UnresolvedTypeKind.INTERFACE, UnresolvedTypeKind.SUPERCLASS)) {
+                                throw new PostponeToNextRoundException(
+                                    classElement.getNativeType().element(),
+                                    classElement.getName()
+                                );
                             }
                             BeanDefinitionCreator beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, javaVisitorContext);
                             for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
