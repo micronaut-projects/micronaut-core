@@ -1380,12 +1380,6 @@ public class ConnectionManager {
 
             @Override
             public final void dispatch(PendingRequest sink) {
-                BlockHint blockHint = sink.blockHint;
-                if (blockHint != null && blockHint.blocks(channel.eventLoop())) {
-                    sink.tryCompleteExceptionally(BlockHint.createException());
-                    // TODO: mark available
-                    return;
-                }
                 if (channel.eventLoop().inEventLoop()) {
                     resetReadTimeout();
                     dispatch0(sink);

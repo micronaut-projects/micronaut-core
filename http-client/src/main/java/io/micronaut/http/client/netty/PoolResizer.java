@@ -1071,6 +1071,11 @@ abstract class PoolResizer {
                 assert destPool.loop.inEventLoop();
                 assert destPool == entry.poolPair;
             }
+            BlockHint blockHint = this.blockHint;
+            if (blockHint != null && blockHint.blocks(entry.poolPair.loop)) {
+                tryCompleteExceptionally(BlockHint.createException());
+                return;
+            }
             entry.preDispatch(this);
             dispatchSafe(entry.connection, this);
         }
