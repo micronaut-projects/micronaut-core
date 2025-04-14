@@ -915,7 +915,7 @@ public abstract class HttpClientConfiguration {
         private int maxPendingConnections = 4;
 
         private int maxConcurrentRequestsPerHttp2Connection = Integer.MAX_VALUE;
-        private int maxConcurrentHttp1Connections = Integer.MAX_VALUE;
+        private int maxConcurrentHttp1Connections = 1000;
         private int maxConcurrentHttp2Connections = 1;
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
