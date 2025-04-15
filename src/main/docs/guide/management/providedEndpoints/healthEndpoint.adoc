@@ -1,5 +1,9 @@
 The health endpoint returns information about the "health" of the application, which is determined by any number of "health indicators".
 
-To execute the health endpoint, send a GET request to /health. Additionally, the health endpoint exposes /health/liveness and /health/readiness health indicators.
+Send a GET request to `/health` to execute the health endpoint. Additionally, the health endpoint exposes `/health/liveness` and `/health/readiness` health indicators.
+
+A positive liveness check (`/health/liveness`) means the application is running and not stuck. If it fails, the application might need to be restarted.
+
+A positive readiness check (`/health/readiness`) means the application is fully initialized and ready to handle requests.
 
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-health-endpoint.html[Exposing a Health Endpoint for your Micronaut Application] to learn more.
