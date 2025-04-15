@@ -10,5 +10,9 @@ micronautBom {
             "benchmarks",
             "inject-test-utils"
     )
+    suppressions {
+        // io_uring was graduated to the main netty repo, so we don't track the incubator version anymore.
+        acceptedVersionRegressions.add("netty-iouring")
+    }
     propertyName = "core"
 }

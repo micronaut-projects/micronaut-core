@@ -49,6 +49,7 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -278,10 +279,11 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config) {
-        return eventLoopGroupFactory.createEventLoopGroup(
-                config,
-                this.nettyThreadFactory
+    public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration) {
+        return new MultiThreadIoEventLoopGroup(
+            configuration.getNumThreads(),
+            nettyThreadFactory,
+            eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
     }
 

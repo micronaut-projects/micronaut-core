@@ -64,11 +64,12 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -599,7 +600,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (listenerBootstrap.config().group() instanceof NioEventLoopGroup) {
+                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
                                     // jdk UnixDomainSocketAddress
                                     future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
                                 } else {
