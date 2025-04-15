@@ -2917,7 +2917,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         boolean zeroArgs = paramType == null;
 
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
-        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace('.', '_').replace('-', '_'));
+        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace("[*]", "__all__").replace('.', '_').replace('-', '_'));
         return getGetValueForPathCall(injectMethodSignature, paramType, propertyName, propertyPath, zeroArgs, generics)
             .newLocal(localName, optionalVar -> {
                 return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)
