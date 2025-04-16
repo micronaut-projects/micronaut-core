@@ -62,6 +62,7 @@ abstract class PoolResizer {
     /**
      * Ordered version of {@link #localPoolsByLoop} for faster access.
      */
+    @SuppressWarnings("checkstyle:DeclarationOrder")
     final List<LocalPoolPair> localPools;
 
     /**
@@ -108,13 +109,9 @@ abstract class PoolResizer {
         try {
             connection.dispatch(toDispatch);
         } catch (Exception e) {
-            try {
-                if (!toDispatch.tryCompleteExceptionally(e)) {
-                    // this is probably fine, log it anyway
-                    log.debug("Failure during connection dispatch operation, but dispatch request was already complete.", e);
-                }
-            } catch (Exception f) {
-                log.error("Internal error", f);
+            if (!toDispatch.tryCompleteExceptionally(e)) {
+                // this is probably fine, log it anyway
+                log.debug("Failure during connection dispatch operation, but dispatch request was already complete.", e);
             }
         }
     }
@@ -1084,6 +1081,11 @@ abstract class PoolResizer {
             } else {
                 assert destPool.loop.inEventLoop();
                 assert destPool == entry.poolPair;
+            }
+            BlockHint blockHint = this.blockHint;
+            if (blockHint != null && blockHint.blocks(entry.poolPair.loop)) {
+                tryCompleteExceptionally(BlockHint.createException());
+                return;
             }
             entry.preDispatch(this);
             dispatchSafe(entry.connection, this);

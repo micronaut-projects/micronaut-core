@@ -87,6 +87,11 @@ public class FixedLoadBalancer implements LoadBalancer  {
         return uri;
     }
 
+    /**
+     * The fixed {@link ServiceInstance} returned by {@link #select}. Internal use only.
+     *
+     * @return The service instance
+     */
     @Internal
     public ServiceInstance getServiceInstance() {
         return serviceInstance;
