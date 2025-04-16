@@ -67,8 +67,7 @@ class MeteringBucket {
 
         then:
         beans.size() == 2
-        beans[0].bucketConfig.build().name == "bar"
-        beans[1].bucketConfig.build().name == "xyz"
+        beans.collect { it -> it.bucketConfig.build().name }.sort() == ["bar", "xyz"]
     }
 
     void "test configuration properties implementing interface"() {
