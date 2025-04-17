@@ -27,6 +27,7 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import jakarta.inject.Singleton;
 
+import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -35,6 +36,7 @@ import java.util.concurrent.Executor;
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
+    private static final int MAX_IMMEDIATE_RUN_DEPTH = 2;
 
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
@@ -71,7 +73,9 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         final IoHandlerFactory ioHandlerFactory;
         final CompletableFuture<IoEventLoop> completer = new CompletableFuture<>();
         ManualIoEventLoop delegate;
-        final Queue<Runnable> loomQueue = new MpscUnboundedArrayQueue<>(4096);
+        final Queue<Runnable> globalLoomQueue = new MpscUnboundedArrayQueue<>(4096);
+        final Queue<Runnable> localLoomQueue = new ArrayDeque<>();
+        int loomDepth = 0;
 
         Runner(Factory factory, IoHandlerFactory ioHandlerFactory) {
             this.factory = factory;
@@ -98,21 +102,24 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             while (!delegate.isShuttingDown()) {
                 boolean workDone = delegate.runNow() != 0;
-                workDone |= runSomeLoomTasks(1_000_000_000L);
+                long deadline = System.nanoTime() + 1_000_000_000L;
+                workDone |= runSomeLoomTasks(localLoomQueue, deadline);
+                workDone |= runSomeLoomTasks(globalLoomQueue, deadline);
                 if (!workDone) {
                     delegate.run(1_000_000_000L);
                 }
             }
             while (!delegate.isTerminated()) {
                 delegate.runNow();
-                drainLoomQueue();
+                drainLoomQueue(localLoomQueue);
+                drainLoomQueue(globalLoomQueue);
             }
             // TODO: finish draining loom queue
         }
 
-        private void drainLoomQueue() {
+        private void drainLoomQueue(Queue<Runnable> queue) {
             while (true) {
-                Runnable task = loomQueue.poll();
+                Runnable task = queue.poll();
                 if (task == null) {
                     break;
                 }
@@ -120,20 +127,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             }
         }
 
-        private boolean runSomeLoomTasks(long maxDuration) {
-            long deadline = System.nanoTime() + maxDuration;
+        private boolean runSomeLoomTasks(Queue<Runnable> queue, long deadline) {
+            loomDepth = 1;
             boolean anyWorkDone = false;
-            while (true) {
-                Runnable task = loomQueue.poll();
+            while (deadline < System.nanoTime()) {
+                Runnable task = queue.poll();
                 if (task == null) {
                     break;
                 }
                 anyWorkDone = true;
                 task.run();
-                if (deadline >= System.nanoTime()) {
-                    break;
-                }
             }
+            loomDepth = 0;
             return anyWorkDone;
         }
 
@@ -145,9 +150,16 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             }
 
             if (delegate.inEventLoop()) {
-                command.run();
+                int loomDepth = this.loomDepth;
+                if (loomDepth >= MAX_IMMEDIATE_RUN_DEPTH) {
+                    localLoomQueue.add(command);
+                } else {
+                    this.loomDepth = loomDepth + 1;
+                    command.run();
+                    this.loomDepth = loomDepth;
+                }
             } else {
-                loomQueue.offer(command);
+                globalLoomQueue.add(command);
                 delegate.wakeup();
             }
         }
