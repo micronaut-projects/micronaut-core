@@ -1,5 +1,5 @@
 [versions]
-awaitility = "4.2.2"
+awaitility = "4.3.0"
 bcpkix = "1.70"
 blaze = "1.6.15"
 brotli4j = "1.18.0"
