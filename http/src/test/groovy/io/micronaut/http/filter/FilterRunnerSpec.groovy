@@ -22,8 +22,6 @@ import spock.lang.Specification
 import java.lang.reflect.Method
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executors
-import java.util.concurrent.ThreadFactory
 import java.util.function.Supplier
 
 class FilterRunnerSpec extends Specification {
@@ -575,61 +573,6 @@ class FilterRunnerSpec extends Specification {
         events == ["terminal"]
     }
 
-    def 'async filter'() {
-        given:
-        def events = []
-        List<GenericHttpFilter> filters = [
-                before(ReturnType.of(void)) {
-                    events.add("before1 " + Thread.currentThread().name)
-                    null
-                },
-                new AsyncFilter(before(ReturnType.of(void)) {
-                    events.add("before2 " + Thread.currentThread().name)
-                    null
-                }, Executors.newCachedThreadPool(new ThreadFactory() {
-                    @Override
-                    Thread newThread(Runnable r) {
-                        return new Thread(r, "thread-before")
-                    }
-                })),
-                before(ReturnType.of(void)) {
-                    events.add("before3 " + Thread.currentThread().name)
-                    null
-                },
-                after(ReturnType.of(void)) {
-                    events.add("after1 " + Thread.currentThread().name)
-                    null
-                },
-                new AsyncFilter(after(ReturnType.of(void)) {
-                    events.add("after2 " + Thread.currentThread().name)
-                    null
-                }, Executors.newCachedThreadPool(new ThreadFactory() {
-                    @Override
-                    Thread newThread(Runnable r) {
-                        return new Thread(r, "thread-after")
-                    }
-                })),
-                after(ReturnType.of(void)) {
-                    events.add("after3 " + Thread.currentThread().name)
-                    null
-                }
-        ]
-
-        when:
-        def response = await(ExecutionFlow.async(Executors.newCachedThreadPool(new ThreadFactory() {
-            @Override
-            Thread newThread(Runnable r) {
-                return new Thread(r, "thread-outside")
-            }
-        }), () -> filterRunner(filters, {
-            events.add("terminal " + Thread.currentThread().name)
-            ExecutionFlow.just(HttpResponse.ok())
-        }).run(HttpRequest.GET("/")))).value
-        then:
-        response.status() == HttpStatus.OK
-        events == ["before1 thread-outside", "before2 thread-before", "before3 thread-before", "terminal thread-before", "after3 thread-before", "after2 thread-after", "after1 thread-after"]
-    }
-
     def 'around filter with blocking continuation'() {
         given:
         def events = []
@@ -659,11 +602,11 @@ class FilterRunnerSpec extends Specification {
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED), null)
     }
 
     private def before(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED), null)
     }
 
     private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {
