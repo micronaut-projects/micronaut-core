@@ -36,8 +36,6 @@ import java.util.concurrent.Executor;
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
-    private static final int MAX_IMMEDIATE_RUN_DEPTH = 2;
-
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
     }
@@ -75,7 +73,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         ManualIoEventLoop delegate;
         final Queue<Runnable> globalLoomQueue = new MpscUnboundedArrayQueue<>(4096);
         final Queue<Runnable> localLoomQueue = new ArrayDeque<>();
-        int loomDepth = 0;
+        boolean loomNested;
 
         Runner(Factory factory, IoHandlerFactory ioHandlerFactory) {
             this.factory = factory;
@@ -102,11 +100,11 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             while (!delegate.isShuttingDown()) {
                 boolean workDone = delegate.runNow() != 0;
-                long deadline = System.nanoTime() + 1_000_000_000L;
-                workDone |= runSomeLoomTasks(localLoomQueue, deadline);
+                long deadline = System.nanoTime() + 20_000_000_000L;
                 workDone |= runSomeLoomTasks(globalLoomQueue, deadline);
+                workDone |= runSomeLoomTasks(localLoomQueue, deadline);
                 if (!workDone) {
-                    delegate.run(1_000_000_000L);
+                    delegate.run(20_000_000_000L);
                 }
             }
             while (!delegate.isTerminated()) {
@@ -128,9 +126,9 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private boolean runSomeLoomTasks(Queue<Runnable> queue, long deadline) {
-            loomDepth = 1;
+            loomNested = true;
             boolean anyWorkDone = false;
-            while (deadline < System.nanoTime()) {
+            while (System.nanoTime() < deadline) {
                 Runnable task = queue.poll();
                 if (task == null) {
                     break;
@@ -138,7 +136,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 anyWorkDone = true;
                 task.run();
             }
-            loomDepth = 0;
+            loomNested = false;
             return anyWorkDone;
         }
 
@@ -150,13 +148,15 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             }
 
             if (delegate.inEventLoop()) {
-                int loomDepth = this.loomDepth;
-                if (loomDepth >= MAX_IMMEDIATE_RUN_DEPTH) {
+                if (loomNested) {
                     localLoomQueue.add(command);
                 } else {
-                    this.loomDepth = loomDepth + 1;
-                    command.run();
-                    this.loomDepth = loomDepth;
+                    loomNested = true;
+                    do {
+                        command.run();
+                        command = localLoomQueue.poll();
+                    } while (command != null);
+                    loomNested = false;
                 }
             } else {
                 globalLoomQueue.add(command);
