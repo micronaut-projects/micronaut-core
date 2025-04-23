@@ -171,9 +171,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
+        List<String> reverseConfigLocations = new ArrayList<>(configLocations);
         // Search config locations in reverse order
-        Collections.reverse(configLocations);
-        this.configLocations = configLocations;
+        Collections.reverse(reverseConfigLocations);
+        this.configLocations = reverseConfigLocations;
     }
 
     @Override

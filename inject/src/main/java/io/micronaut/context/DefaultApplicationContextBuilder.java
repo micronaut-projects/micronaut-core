@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
@@ -155,7 +154,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public @Nullable  List<String> getOverrideConfigLocations() {
-        return overrideConfigLocations == null ? null : Arrays.stream(overrideConfigLocations).collect(Collectors.toList());
+        return overrideConfigLocations == null ? null : Arrays.asList(overrideConfigLocations);
     }
 
     @Override
