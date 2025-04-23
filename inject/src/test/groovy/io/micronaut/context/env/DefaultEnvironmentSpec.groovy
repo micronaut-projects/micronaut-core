@@ -67,6 +67,7 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
+    @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -513,6 +514,24 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.getRequiredProperty("custom-config-file", String.class) == "abc"
         cleanup:
             applicationContext.stop()
+    }
+
+    @RestoreSystemProperties
+    void "test custom config locations used in bootstrap environment"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:./custom-config/")
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("custom-bootstrap-value", String.class) == "test"
+
+        cleanup:
+        applicationContext.stop()
     }
 
     void "test custom config locations respect environment order"() {
