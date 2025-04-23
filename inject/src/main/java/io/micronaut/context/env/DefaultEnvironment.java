@@ -169,12 +169,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (!environments.isEmpty()) {
             log.info("Established active environments: {}", environments);
         }
-        List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
-                new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
-        List<String> reverseConfigLocations = new ArrayList<>(configLocations);
+        List<String> configLocations = configuration.getOverrideConfigLocations() == null
+            ? new ArrayList<>(DEFAULT_CONFIG_LOCATIONS)
+            : new ArrayList<>(configuration.getOverrideConfigLocations());
         // Search config locations in reverse order
-        Collections.reverse(reverseConfigLocations);
-        this.configLocations = reverseConfigLocations;
+        Collections.reverse(configLocations);
+        this.configLocations = configLocations;
     }
 
     @Override
