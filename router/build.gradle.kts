@@ -14,6 +14,9 @@ dependencies {
     testImplementation(projects.micronautInjectJava)
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautInjectGroovyTest)
+    testImplementation(libs.jazzer.junit)
+    testImplementation(libs.jazzer.api)
+    testImplementation(libs.icu4j)
 }
 
 
