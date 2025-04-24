@@ -12,9 +12,14 @@ class DefaultBeanContextTest extends Specification {
     void testMultipleSecondaryBeans() {
         try (DefaultBeanContext beanContext = new DefaultBeanContext()) {
             beanContext.configure();
-            Assertions.assertThrows(
+            NonUniqueBeanException e = Assertions.assertThrows(
                 NonUniqueBeanException.class,
                 () -> beanContext.getBean(Foo.class)
+            );
+            Assertions.assertTrue(
+                "Multiple possible bean candidates found: [Foo1, Foo2]".equals(e.getMessage()) ||
+                    "Multiple possible bean candidates found: [Foo2, Foo1]".equals(e.getMessage()),
+                "Exception message was incorrect. Expected \"Multiple possible bean candidates found: [Foo1, Foo2]\"; got " + e.getMessage()
             );
         }
     }
