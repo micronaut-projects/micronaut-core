@@ -368,31 +368,81 @@ final class BeanIntrospectionWriter extends AbstractClassFileWriter {
             }
         }
         if (!beanProperties.isEmpty()) {
-            Type beanPropertiesRefs = Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef[].class);
-
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs.getDescriptor(), null, null);
-
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanPropertyRef.class, beanProperties, beanPropertyData -> {
+            Type refType = Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
+            List<Method> methods = new ArrayList<>();
+            for (BeanPropertyData propertyData : beanProperties) {
+                Type methodType = Type.getMethodType(refType);
+                String methodName = "$property$" + propertyData.name + "$metadata";
+                GeneratorAdapter methodMetadata = new GeneratorAdapter(
+                    classWriter.visitMethod(
+                        ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                        methodName,
+                        methodType.getDescriptor(),
+                        null,
+                        null
+                    ), ACC_PUBLIC, methodName, methodType.getDescriptor());
                 pushBeanPropertyReference(
                     classWriter,
-                    staticInit,
-                    beanPropertyData
+                    methodMetadata,
+                    propertyData
                 );
-            });
-            staticInit.putStatic(introspectionType, FIELD_BEAN_PROPERTIES_REFERENCES, beanPropertiesRefs);
+                methodMetadata.returnValue();
+                methodMetadata.visitMaxs(2, 1);
+                methodMetadata.endMethod();
+                methods.add(new Method(methodName, refType, new Type[0]));
+            }
+
+            Type fieldType = Type.getType(AbstractInitializableBeanIntrospection.BeanPropertyRef[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_PROPERTIES_REFERENCES, fieldType.getDescriptor(), null, null);
+
+            pushNewArray(
+                staticInit,
+                AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+                methods,
+                method -> staticInit.invokeStatic(introspectionType, method)
+            );
+            staticInit.putStatic(introspectionType, FIELD_BEAN_PROPERTIES_REFERENCES, fieldType);
         }
         if (!beanMethods.isEmpty()) {
-            Type beanMethodsRefs = Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class);
-
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractInitializableBeanIntrospection.BeanMethodRef.class, beanMethods, beanMethodData -> {
+            Type refType = Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef.class);
+            List<Method> methods = new ArrayList<>();
+            Set<String> usedNames = new HashSet<>();
+            for (BeanMethodData beanMethod : beanMethods) {
+                String methodId = beanMethod.methodElement().getName();
+                int index = 2;
+                while (!usedNames.add(methodId)) {
+                    methodId += index++;
+                }
+                Type methodType = Type.getMethodType(refType);
+                String methodName = "$method$" + methodId + "$metadata";
+                GeneratorAdapter methodMetadata = new GeneratorAdapter(
+                    classWriter.visitMethod(
+                        ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                        methodName,
+                        methodType.getDescriptor(),
+                        null,
+                        null
+                    ), ACC_PUBLIC, methodName, methodType.getDescriptor());
                 pushBeanMethodReference(
                     classWriter,
-                    staticInit,
-                    beanMethodData
+                    methodMetadata,
+                    beanMethod
                 );
-            });
-            staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
+                methodMetadata.returnValue();
+                methodMetadata.visitMaxs(2, 1);
+                methodMetadata.endMethod();
+                methods.add(new Method(methodName, refType, new Type[0]));
+            }
+
+            Type fieldType = Type.getType(AbstractInitializableBeanIntrospection.BeanMethodRef[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_BEAN_METHODS_REFERENCES, fieldType.getDescriptor(), null, null);
+            pushNewArray(
+                staticInit,
+                AbstractInitializableBeanIntrospection.BeanMethodRef.class,
+                methods,
+                method -> staticInit.invokeStatic(introspectionType, method)
+            );
+            staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, fieldType);
         }
         if (isEnum) {
             Type type = Type.getType(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class);

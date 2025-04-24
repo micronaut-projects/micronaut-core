@@ -107,6 +107,9 @@ public final class ConfigurationUtils {
 
     @NonNull
     private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, String prefix) {
+        if (prefix == null) {
+            prefix = StringUtils.EMPTY_STRING;
+        }
         Objects.requireNonNull(prefix);
         if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
             if (!prefix.endsWith(EACH_PROPERTY_LIST_SUFFIX)) {
