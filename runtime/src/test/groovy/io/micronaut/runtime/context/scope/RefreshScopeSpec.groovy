@@ -120,6 +120,7 @@ class RefreshScopeSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         System.setProperty("foos.test.bar", "test")
+        System.setProperty("foo-list[0].bar", "test")
         ApplicationContext beanContext = ApplicationContext.builder().start()
 
         // override IO executor with synchronous impl
@@ -138,11 +139,13 @@ class RefreshScopeSpec extends Specification {
         bean.testValue() == 'test'
         bean.testConfigProps() == 'test'
         bean.testEachProps() == 'test'
+        bean.testListEachProps() == 'test'
 
 
         when:
         System.setProperty("foo.bar", "bar")
         System.setProperty("foos.test.bar", "bar")
+        System.setProperty("foo-list[0].bar", "bar")
         Environment environment = beanContext.getEnvironment()
         Map<String, Object> previousValues = environment.refreshAndDiff()
         beanContext.publishEvent(new RefreshEvent(previousValues))
@@ -151,6 +154,7 @@ class RefreshScopeSpec extends Specification {
         bean.testValue() == 'bar'
         bean.testConfigProps() == 'bar'
         bean.testEachProps() == 'bar'
+        bean.testListEachProps() == 'bar'
 
         cleanup:
         beanContext?.stop()
@@ -236,13 +240,15 @@ class RefreshScopeSpec extends Specification {
 
         final MyConfig config
         final List<EachConfig> configs
+        final List<EachConfig> moreConfigs
 
         @Value('${foo.bar}')
         String foo
 
-        RefreshBean(MyConfig config, List<EachConfig> configs) {
+        RefreshBean(MyConfig config, List<EachConfig> configs, List<EachListConfig> moreConfigs) {
             this.config = config
             this.configs = configs
+            this.moreConfigs = moreConfigs
         }
 
         String testValue() {
@@ -255,6 +261,10 @@ class RefreshScopeSpec extends Specification {
 
         String testEachProps() {
             return configs[0].bar
+        }
+
+        String testListEachProps() {
+            return moreConfigs[0].bar
         }
     }
 
@@ -301,6 +311,11 @@ class RefreshScopeSpec extends Specification {
 
     @EachProperty('foos')
     static class EachConfig {
+        String bar
+    }
+
+    @EachProperty(value = 'foo-list', list = true)
+    static class EachListConfig {
         String bar
     }
 }

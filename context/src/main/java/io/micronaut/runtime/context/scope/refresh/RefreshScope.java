@@ -179,6 +179,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
                 String configPrefix = value.get();
                 if (configPrefix.endsWith(".*")) {
                     configPrefix = configPrefix.substring(0, configPrefix.length() - 2);
+                } else if (configPrefix.endsWith("[*]")) {
+                    configPrefix = configPrefix.substring(0, configPrefix.length() - 3);
                 }
                 String finalConfigPrefix = configPrefix;
                 if (keySet.stream().anyMatch(key -> key.startsWith(finalConfigPrefix))) {
