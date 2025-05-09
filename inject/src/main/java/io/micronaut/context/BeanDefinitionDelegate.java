@@ -139,16 +139,29 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public T inject(BeanContext context, T bean) {
-        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
-            return injectableBeanDefinition.inject(context, bean);
+        if (definition instanceof InjectableBeanDefinition<T>) {
+            try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
+                return inject(resolutionContext, context, bean);
+            }
         }
         return bean;
     }
 
     @Override
     public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        ConfigurationPath oldPath = null;
+        if (configurationPath != null && resolutionContext != null) {
+            oldPath = resolutionContext.getConfigurationPath();
+            resolutionContext.setConfigurationPath(configurationPath);
+        }
         if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
-            return injectableBeanDefinition.inject(resolutionContext, context, bean);
+            try {
+                return injectableBeanDefinition.inject(resolutionContext, context, bean);
+            } finally {
+                if (resolutionContext != null) {
+                    resolutionContext.setConfigurationPath(oldPath);
+                }
+            }
         }
         return bean;
     }

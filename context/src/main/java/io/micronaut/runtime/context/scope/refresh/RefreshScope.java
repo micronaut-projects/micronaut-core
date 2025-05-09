@@ -171,13 +171,17 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshSubsetOfConfigurationProperties(Set<String> keySet) {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
         for (BeanRegistration<?> registration : registrations) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             Optional<String> value = definition.stringValue(ConfigurationReader.class, "prefix");
             if (value.isPresent()) {
                 String configPrefix = value.get();
-                if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
+                if (configPrefix.endsWith(".*")) {
+                    configPrefix = configPrefix.substring(0, configPrefix.length() - 2);
+                }
+                String finalConfigPrefix = configPrefix;
+                if (keySet.stream().anyMatch(key -> key.startsWith(finalConfigPrefix))) {
                     beanContext.refreshBean(registration);
                 }
             }
@@ -186,7 +190,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshAllConfigurationProperties() {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
         for (BeanRegistration<?> registration : registrations) {
             beanContext.refreshBean(registration);
         }
