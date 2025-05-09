@@ -137,6 +137,8 @@ class RefreshScopeSpec extends Specification {
         bean.hashCode() == bean.hashCode()
         bean.testValue() == 'test'
         bean.testConfigProps() == 'test'
+        bean.testEachProps() == 'test'
+
 
         when:
         System.setProperty("foo.bar", "bar")
