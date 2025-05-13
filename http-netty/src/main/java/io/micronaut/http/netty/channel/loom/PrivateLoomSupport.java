@@ -24,11 +24,18 @@ import io.netty.util.internal.PlatformDependent;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.InaccessibleObjectException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
+/**
+ * Access helpers to private virtual thread APIs.
+ *
+ * @since 4.9.0
+ * @author Jonas Konrad
+ */
 @Internal
 @Experimental
 public final class PrivateLoomSupport {
@@ -59,7 +66,7 @@ public final class PrivateLoomSupport {
             Field carrierThreadField = Class.forName("java.lang.VirtualThread")
                 .getDeclaredField("carrierThread");
             carrierThreadField.setAccessible(true);
-            carrierThread = lookup.unreflectGetter(carrierThreadField);
+            carrierThread = lookup.unreflectGetter(carrierThreadField).asType(MethodType.methodType(Thread.class, Thread.class));
 
             failure = null;
         } catch (ReflectiveOperationException | InaccessibleObjectException roe) {
@@ -94,7 +101,7 @@ public final class PrivateLoomSupport {
 
     public static Thread getCarrierThread(Thread t) {
         try {
-            return (Thread) CARRIER_THREAD.invoke(t);
+            return (Thread) CARRIER_THREAD.invokeExact(t);
         } catch (Throwable e) {
             PlatformDependent.throwException(e);
             throw new AssertionError();
@@ -109,7 +116,7 @@ public final class PrivateLoomSupport {
         @Override
         public boolean matches(ConditionContext context) {
             if (SCHEDULER == null) {
-                context.fail("Failed to access loom internals: " + FAILURE);
+                context.fail("Failed to access loom internals. Please make sure to add the `--add-opens=java.base/java.lang=ALL-UNNAMED` JVM argument. (" + FAILURE + ")");
                 return false;
             } else {
                 return true;

@@ -39,7 +39,9 @@ public final class LoomSupport {
     private static final MethodHandle MH_NEW_THREAD_PER_TASK_EXECUTOR;
     private static final MethodHandle MH_OF_VIRTUAL;
     private static final MethodHandle MH_NAME;
+    private static final MethodHandle MH_NAME_COUNT;
     private static final MethodHandle MH_FACTORY;
+    private static final MethodHandle MH_UNSTARTED;
     private static final MethodHandle MH_IS_VIRTUAL;
 
     static {
@@ -47,7 +49,9 @@ public final class LoomSupport {
         MethodHandle newThreadPerTaskExecutor;
         MethodHandle ofVirtual;
         MethodHandle name;
+        MethodHandle nameCount;
         MethodHandle factory;
+        MethodHandle unstarted;
         MethodHandle isVirtual;
         try {
             newThreadPerTaskExecutor = MethodHandles.lookup()
@@ -57,9 +61,13 @@ public final class LoomSupport {
             ofVirtual = MethodHandles.lookup()
                 .findStatic(Thread.class, "ofVirtual", MethodType.methodType(ofVirtualCl));
             name = MethodHandles.lookup()
+                .findVirtual(builderCl, "name", MethodType.methodType(builderCl, String.class));
+            nameCount = MethodHandles.lookup()
                 .findVirtual(builderCl, "name", MethodType.methodType(builderCl, String.class, long.class));
             factory = MethodHandles.lookup()
                 .findVirtual(builderCl, "factory", MethodType.methodType(ThreadFactory.class));
+            unstarted = MethodHandles.lookup()
+                .findVirtual(builderCl, "unstarted", MethodType.methodType(Thread.class, Runnable.class));
             isVirtual = MethodHandles.lookup()
                 .findVirtual(Thread.class, "isVirtual", MethodType.methodType(boolean.class));
 
@@ -71,7 +79,9 @@ public final class LoomSupport {
             newThreadPerTaskExecutor = null;
             ofVirtual = null;
             name = null;
+            nameCount = null;
             factory = null;
+            unstarted = null;
             isVirtual = null;
             sup = false;
             failure = e;
@@ -81,7 +91,9 @@ public final class LoomSupport {
         MH_NEW_THREAD_PER_TASK_EXECUTOR = newThreadPerTaskExecutor;
         MH_OF_VIRTUAL = ofVirtual;
         MH_NAME = name;
+        MH_NAME_COUNT = nameCount;
         MH_FACTORY = factory;
+        MH_UNSTARTED = unstarted;
         MH_IS_VIRTUAL = isVirtual;
     }
 
@@ -112,11 +124,26 @@ public final class LoomSupport {
         checkSupported();
         try {
             Object builder = MH_OF_VIRTUAL.invoke();
-            builder = MH_NAME.invoke(builder, namePrefix, 1L);
+            builder = MH_NAME_COUNT.invoke(builder, namePrefix, 1L);
             if (builderModifier != null) {
                 builderModifier.accept(builder);
             }
             return (ThreadFactory) MH_FACTORY.invoke(builder);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Experimental
+    public static Thread unstarted(String name, Consumer<Object> builderModifier, Runnable task) {
+        checkSupported();
+        try {
+            Object builder = MH_OF_VIRTUAL.invoke();
+            builder = MH_NAME.invoke(builder, name);
+            if (builderModifier != null) {
+                builderModifier.accept(builder);
+            }
+            return (Thread) MH_UNSTARTED.invoke(builder, task);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

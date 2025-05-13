@@ -18,37 +18,96 @@ package io.micronaut.http.netty.channel.loom;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoop;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.ManualIoEventLoop;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.util.internal.ThreadExecutorMap;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import jakarta.inject.Singleton;
+import jdk.jfr.Enabled;
+import jdk.jfr.Event;
+import jdk.jfr.StackTrace;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Netty {@link EventLoopGroup} that can also carry virtual threads.
+ *
+ * @since 4.9.0
+ * @author Jonas Konrad
+ */
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
+
+    /**
+     * Time slice size in latency mode.
+     */
+    private static final long TIME_SLICE_LATENCY = 500_000L;
+    /**
+     * Time slice size in throughput mode.
+     */
+    private static final long TIME_SLICE_THROUGHPUT = 5_000_000L;
+    /**
+     * Number of nanoseconds between switching between continuation FILO and FIFO modes.
+     */
+    private static final long FIFO_SWITCH_TIME = 1_000_000L;
+    /**
+     * Oldest enqueued continuation must be this old before execution can switch to FIFO mode.
+     */
+    private static final long TASK_FIFO_THRESHOLD = 5_000_000L;
+    /**
+     * Maximum blocking wait time.
+     */
+    private static final long BLOCK_TIME = 1_000_000_000L;
+    /**
+     * Maximum number of queued tasks before entering throughput mode.
+     */
+    private static final int THROUGHPUT_MODE_THRESHOLD = 10;
+
+    private List<Runner> runners;
+
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
     }
 
     @Override
     protected IoEventLoop newChild(Executor executor, IoHandlerFactory ioHandlerFactory, Object... args) {
-        Runner runner = new Runner((Factory) args[0], ioHandlerFactory);
-        executor.execute(runner);
-        try {
-            return runner.completer.get(); // TODO https://github.com/netty/netty/pull/14976
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
+        if (runners == null) {
+            // newChild is called from the super constructor, so we must initialize the fields here
+            runners = new ArrayList<>();
         }
+        Runner runner = new Runner(runners.size(), (Factory) args[0], ioHandlerFactory);
+        this.runners.add(runner);
+        executor.execute(runner);
+        return runner.delegate;
+    }
+
+    @Override
+    public IoEventLoop next() {
+        // this override just adds a JFR event
+
+        SelectLoopEvent event = new SelectLoopEvent();
+        IoEventLoop loop = super.next();
+        if (event.isEnabled()) {
+            Thread thread = ((ManualIoEventLoop) loop).owningThread.get();
+            if (thread != null) {
+                event.name = thread.getName();
+            }
+            event.commit();
+        }
+        return loop;
     }
 
     @Singleton
@@ -66,23 +125,83 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
-    private static final class Runner implements Runnable, Executor {
+    private final class Runner implements Runnable, Executor, ThreadFactory {
+        final int id;
         final Factory factory;
         final IoHandlerFactory ioHandlerFactory;
-        final CompletableFuture<IoEventLoop> completer = new CompletableFuture<>();
-        ManualIoEventLoop delegate;
-        final Queue<Runnable> globalLoomQueue = new MpscUnboundedArrayQueue<>(4096);
-        final Queue<Runnable> localLoomQueue = new ArrayDeque<>();
-        boolean loomNested;
+        final ManualIoEventLoop delegate;
 
-        Runner(Factory factory, IoHandlerFactory ioHandlerFactory) {
+        /**
+         * Queue for continuations submitted outside the event loop.
+         */
+        final Queue<Runnable> globalLoomQueue = new MpscUnboundedArrayQueue<>(4096);
+        /**
+         * Queue for continuations submitted on the event loop.
+         */
+        final Deque<ScheduledTask> localLoomQueue = new ArrayDeque<>();
+        /**
+         * Set to {@code true} during continuation execution to prevent recursion.
+         */
+        boolean loomNested;
+        /**
+         * Set to {@code true} when a task is submitted to the event loop to signal that we should
+         * stop execution of continuations to get straight to running the submitted task. This can
+         * improve latency, because event loop tasks are often responsible for writes, but it may
+         * harm throughput.
+         */
+        boolean expediteWrite = false;
+        /**
+         * Thread counter for the thread name.
+         */
+        int threadId = 0;
+        /**
+         * If {@code true}, continuations from {@link #localLoomQueue} are executed in FIFO mode,
+         * otherwise FILO mode is used.
+         */
+        boolean continuationsFifo = false;
+        /**
+         * Summed execution time of continuations since {@link #continuationsFifo} was last
+         * flipped.
+         */
+        long continuationTime = 0L;
+        /**
+         * This is set to {@code true} when there is a backlog of
+         * {@value THROUGHPUT_MODE_THRESHOLD} queued tasks. This improves throughput at cost of
+         * latency.
+         */
+        boolean throughputMode = false;
+        /**
+         * Set to {@code true} during a blocking call to {@link ManualIoEventLoop#run(long, long)}.
+         * This enables immediate execution of submitted continuations to further improve latency
+         * when there are few concurrent requests.
+         */
+        boolean idle = false;
+
+        /**
+         * Number of active continuations (scheduled or running). This counter is only updated from
+         * the event loop thread. Only the sum with {@link #activeThreadsExternal} is meaningful.
+         */
+        volatile int activeThreadsLocal = 0;
+        /**
+         * Number of active continuations (scheduled or running). This counter is only updated from
+         * external threads. Only the sum with {@link #activeThreadsLocal} is meaningful.
+         */
+        final AtomicInteger activeThreadsExternal = new AtomicInteger();
+
+        Runner(int id, Factory factory, IoHandlerFactory ioHandlerFactory) {
+            this.id = id;
             this.factory = factory;
+            this.delegate = new ManualIoEventLoop(null, ioHandlerFactory);
             this.ioHandlerFactory = ioExecutor -> new DelegateIoHandler(ioHandlerFactory.newHandler(ioExecutor)) {
                 @Override
                 public void wakeup() {
                     // we don't need to wake up if we're running on a vthread carried by this event loop.
                     Thread thread = Thread.currentThread();
                     if (LoomSupport.isVirtual(thread) && ioExecutor.isExecutorThread(PrivateLoomSupport.getCarrierThread(thread))) {
+                        if (!throughputMode) {
+                            expediteWrite = true;
+                            Thread.yield();
+                        }
                         return;
                     }
 
@@ -91,53 +210,152 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             };
         }
 
+        /**
+         * Number of active (scheduled or running) virtual threads.
+         *
+         * @return The number of active virtual threads
+         */
+        int activeThreads() {
+            return activeThreadsLocal + activeThreadsExternal.get();
+        }
+
+        @Override
+        public Thread newThread(Runnable r) {
+            return LoomSupport.unstarted("loom-on-netty-" + id + "-" + threadId++, b -> {
+                Runner dst = Runner.this;
+                int active = activeThreads();
+                if (active > 1) {
+                    // spill to a less busy event loop
+                    for (Runner runner : runners) {
+                        int a = runner.activeThreads();
+                        if (a < active) {
+                            dst = runner;
+                            active = a;
+                        }
+                    }
+                }
+                PrivateLoomSupport.setScheduler(b, dst);
+            }, r);
+        }
+
         @Override
         public void run() {
-            Thread carrier = Thread.currentThread();
-            delegate = new ManualIoEventLoop(carrier, ioHandlerFactory);
-            completer.complete(delegate);
-            factory.holder.targetScheduler.set(LoomSupport.newVirtualThreadFactory("loom-on-netty-", b -> PrivateLoomSupport.setScheduler(b, this)));
+            delegate.setOwningThread(Thread.currentThread());
+            factory.holder.targetScheduler.set(this);
+            ThreadExecutorMap.setCurrentExecutor(delegate);
 
+            // this flag controls blocking behavior for the next iteration. We block if there were
+            // no continuations or IO run.
+            boolean block = false;
             while (!delegate.isShuttingDown()) {
-                boolean workDone = delegate.runNow() != 0;
-                long deadline = System.nanoTime() + 20_000_000_000L;
-                workDone |= runSomeLoomTasks(globalLoomQueue, deadline);
-                workDone |= runSomeLoomTasks(localLoomQueue, deadline);
-                if (!workDone) {
-                    delegate.run(20_000_000_000L);
+                // Phase 1/2: run IO (blocking/non-blocking) and event loop tasks
+                long waitNanos;
+                if (block) {
+                    waitNanos = BLOCK_TIME;
+                    idle = true;
+                    tick(1);
+                } else {
+                    waitNanos = -1;
+                    tick(2);
                 }
+                block = delegate.run(waitNanos, timeSlice()) == 0;
+                idle = false;
+                expediteWrite = false;
+
+                // Phase 3: Run continuations
+                tick(3);
+                globalToLocal();
+                throughputMode = localLoomQueue.size() > THROUGHPUT_MODE_THRESHOLD;
+                block &= !runContinuations(null, System.nanoTime() + timeSlice());
+                block &= !expediteWrite;
+
+                // Phase 4: Run event loop tasks, e.g. write ops submitted by the virtual threads
+                tick(4);
+                block &= delegate.runAllTasks(timeSlice()) == 0; // todo: https://github.com/netty/netty/pull/15124
             }
-            while (!delegate.isTerminated()) {
-                delegate.runNow();
-                drainLoomQueue(localLoomQueue);
-                drainLoomQueue(globalLoomQueue);
-            }
+            exit();
+        }
+
+        private void exit() {
+            do {
+                delegate.runNow(-1);
+                globalToLocal();
+                while (true) {
+                    ScheduledTask task = localLoomQueue.poll();
+                    if (task == null) {
+                        break;
+                    }
+                    PrivateLoomSupport.getDefaultScheduler().execute(task.task);
+                }
+            } while (!delegate.isTerminated());
             // TODO: finish draining loom queue
         }
 
-        private void drainLoomQueue(Queue<Runnable> queue) {
+        /**
+         * Move tasks from the {@link #globalLoomQueue} to the {@link #localLoomQueue}.
+         */
+        private void globalToLocal() {
             while (true) {
-                Runnable task = queue.poll();
+                Runnable task = globalLoomQueue.poll();
                 if (task == null) {
                     break;
                 }
-                PrivateLoomSupport.getDefaultScheduler().execute(task);
+                // It would be nice to use the real scheduled time here, but then we'd have to
+                // place the task somewhere in the middle of the queue rather than just at the
+                // start.
+                localLoomQueue.addFirst(new ScheduledTask(System.nanoTime(), task));
             }
         }
 
-        private boolean runSomeLoomTasks(Queue<Runnable> queue, long deadline) {
+        private long timeSlice() {
+            return throughputMode ? TIME_SLICE_THROUGHPUT : TIME_SLICE_LATENCY;
+        }
+
+        private boolean runContinuations(@Nullable Runnable immediateTask, long deadline) {
+            assert !loomNested;
+            assert !expediteWrite;
+
+            boolean ranAny = false;
             loomNested = true;
-            boolean anyWorkDone = false;
-            while (System.nanoTime() < deadline) {
-                Runnable task = queue.poll();
-                if (task == null) {
-                    break;
+            long now;
+            do {
+                now = System.nanoTime();
+                // select a task
+                Runnable task;
+                if (immediateTask == null) {
+                    if (localLoomQueue.isEmpty()) {
+                        break;
+                    }
+                    if (continuationsFifo) {
+                        task = localLoomQueue.pollLast().task();
+                    } else {
+                        task = localLoomQueue.pollFirst().task();
+                    }
+                } else {
+                    task = immediateTask;
+                    immediateTask = null;
                 }
-                anyWorkDone = true;
+                ranAny = true;
                 task.run();
-            }
+                //noinspection NonAtomicOperationOnVolatileField
+                activeThreadsLocal--;
+                long end = System.nanoTime();
+                continuationTime += end - now;
+                now = end;
+
+                // decide whether to switch between fifo and filo modes
+                if (continuationTime > FIFO_SWITCH_TIME) {
+                    if (continuationsFifo) {
+                        continuationsFifo = false;
+                    } else {
+                        ScheduledTask last = localLoomQueue.peekLast();
+                        continuationsFifo = last != null && last.scheduleTime > now + TASK_FIFO_THRESHOLD;
+                    }
+                    continuationTime = 0;
+                }
+            } while (now < deadline && !expediteWrite);
             loomNested = false;
-            return anyWorkDone;
+            return ranAny;
         }
 
         @Override
@@ -147,21 +365,104 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 return;
             }
 
+            // JFR
+            ContinuationScheduled scheduled;
+            if (ContinuationScheduled.INSTANCE.isEnabled()) {
+                scheduled = new ContinuationScheduled();
+                long hash = System.identityHashCode(command);
+                scheduled.hashCode = hash;
+
+                Runnable r = command;
+                command = () -> {
+                    ContinuationStarted started = new ContinuationStarted();
+                    started.begin();
+
+                    r.run();
+
+                    started.end();
+                    started.hashCode = hash;
+                    started.taskQueueDepth = delegate.taskQueue.size();
+                    started.commit();
+                };
+            } else {
+                scheduled = null;
+            }
+
             if (delegate.inEventLoop()) {
-                if (loomNested) {
-                    localLoomQueue.add(command);
+                //noinspection NonAtomicOperationOnVolatileField
+                activeThreadsLocal++;
+                long time = System.nanoTime();
+                if (idle && !loomNested && !expediteWrite) {
+                    if (scheduled != null) {
+                        scheduled.scheduleMode = 2;
+                        scheduled.queueDepth = -1;
+                        scheduled.commit();
+                    }
+                    runContinuations(command, time + TIME_SLICE_LATENCY);
                 } else {
-                    loomNested = true;
-                    do {
-                        command.run();
-                        command = localLoomQueue.poll();
-                    } while (command != null);
-                    loomNested = false;
+                    if (scheduled != null) {
+                        scheduled.scheduleMode = 1;
+                        scheduled.queueDepth = localLoomQueue.size();
+                        scheduled.commit();
+                    }
+                    localLoomQueue.addFirst(new ScheduledTask(time, command));
                 }
             } else {
+                activeThreadsExternal.incrementAndGet();
+                if (scheduled != null) {
+                    scheduled.scheduleMode = 3;
+                    scheduled.queueDepth = globalLoomQueue.size();
+                    scheduled.commit();
+                }
                 globalLoomQueue.add(command);
                 delegate.wakeup();
             }
         }
+
+        private void tick(int type) {
+            if (LoopTick.INSTANCE.isEnabled()) {
+                LoopTick tick = new LoopTick();
+                tick.type = type;
+                tick.activeThreads = activeThreads();
+                tick.commit();
+            }
+        }
+    }
+
+    private record ScheduledTask(
+        long scheduleTime,
+        Runnable task
+    ) {
+    }
+
+    @StackTrace(false)
+    @Enabled(false)
+    static class ContinuationScheduled extends Event {
+        static final ContinuationScheduled INSTANCE = new ContinuationScheduled();
+
+        long hashCode;
+        int scheduleMode;
+        int queueDepth;
+    }
+
+    @StackTrace(false)
+    @Enabled(false)
+    static class ContinuationStarted extends Event {
+        long hashCode;
+        int taskQueueDepth;
+    }
+
+    @StackTrace(false)
+    @Enabled(false)
+    static class LoopTick extends Event {
+        static final LoopTick INSTANCE = new LoopTick();
+
+        int type;
+        int activeThreads;
+    }
+
+    @Enabled(false)
+    static class SelectLoopEvent extends Event {
+        String name;
     }
 }
