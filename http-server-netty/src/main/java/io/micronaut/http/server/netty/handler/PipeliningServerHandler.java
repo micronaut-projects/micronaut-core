@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -759,7 +760,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
-            if (Http1RequestEvent.isTurnedOn()) {
+            if (NativeImageUtils.JFR_AVAILABLE && Http1RequestEvent.isTurnedOn()) {
                 this.jfrEvent = new Http1RequestEvent();
                 jfrEvent.begin();
             } else {

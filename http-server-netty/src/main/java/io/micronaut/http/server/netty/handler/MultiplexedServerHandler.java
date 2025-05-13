@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -94,7 +95,7 @@ abstract class MultiplexedServerHandler {
         private Compressor.Session compressionSession;
 
         MultiplexedStream(int streamId) {
-            if (Http2RequestEvent.isTurnedOn()) {
+            if (NativeImageUtils.JFR_AVAILABLE && Http2RequestEvent.isTurnedOn()) {
                 jfrEvent = new Http2RequestEvent();
                 jfrEvent.streamId = streamId;
             } else {

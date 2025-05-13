@@ -48,6 +48,12 @@ public final class NativeImageUtils {
      */
     public static final String PROPERTY_IMAGE_CODE_VALUE_RUNTIME = "runtime";
 
+    /**
+     * Native image produces an error at runtime if a JFR event class is initialized, even if that
+     * event is not enabled. This flag guards class initialization of any JFR events.
+     */
+    public static final boolean JFR_AVAILABLE = !inImageCode();
+
     private NativeImageUtils() {
     }
 
