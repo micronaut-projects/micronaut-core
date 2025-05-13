@@ -346,6 +346,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private boolean closeInput = false;
 
         Http2Stream(io.netty.handler.codec.http2.Http2Stream stream) {
+            super(stream.id());
             this.stream = stream;
         }
 
