@@ -166,6 +166,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
+    private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
     private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
     private int maxParams = DEFAULT_MAX_PARAMS;
@@ -583,7 +584,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      *
      * @param validateUrl The validate URL value
      * @since 4.3.0
+     * @deprecated URLs are always validated again as of 4.9. This setting does nothing
      */
+    @Deprecated(forRemoval = true, since = "4.9.0")
     public void setValidateUrl(boolean validateUrl) {
         this.validateUrl = validateUrl;
     }
@@ -591,9 +594,37 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return True if the url should be validated
      * @since 4.3.0
+     * @deprecated URLs are always validated again as of 4.9. This setting does nothing
      */
+    @Deprecated(forRemoval = true, since = "4.9.0")
     public boolean isValidateUrl() {
         return validateUrl;
+    }
+
+    /**
+     * Browsers can send characters (such as {@code |}) which are not permitted under RFC 3986 as
+     * part of the request path. These characters are normally rejected by the server. If this
+     * setting is enabled, the server will escape these characters before parsing them using
+     * {@link java.net.URI} so that they are not rejected. Default off.
+     *
+     * @return Whether to escape forbidden URL characters prior to parsing
+     * @since 4.9.0
+     */
+    public boolean isEscapeHtmlUrl() {
+        return escapeHtmlUrl;
+    }
+
+    /**
+     * Browsers can send characters (such as {@code |}) which are not permitted under RFC 3986 as
+     * part of the request path. These characters are normally rejected by the server. If this
+     * setting is enabled, the server will escape these characters before parsing them using
+     * {@link java.net.URI} so that they are not rejected. Default off.
+     *
+     * @param escapeHtmlUrl Whether to escape forbidden URL characters prior to parsing
+     * @since 4.9.0
+     */
+    public void setEscapeHtmlUrl(boolean escapeHtmlUrl) {
+        this.escapeHtmlUrl = escapeHtmlUrl;
     }
 
     /**

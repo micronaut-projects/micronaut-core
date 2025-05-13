@@ -29,6 +29,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
@@ -168,30 +169,31 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        NettyHttpRequest<Object> mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        NettyHttpRequest<Object> mnRequest;
+        try {
+            mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        } catch (IllegalArgumentException e) {
+            body.close();
+
+            // invalid URI
+            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
+                AvailableNettyByteBody.empty(),
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+            outboundAccess.attachment(errorRequest);
+            if (receivedPublisher != ApplicationEventPublisher.NO_OP) {
+                receivedPublisher.publishEvent(new HttpRequestReceivedEvent(errorRequest));
+            }
+            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
+            }
+            return;
+        }
         if (receivedPublisher != ApplicationEventPublisher.NO_OP) {
             receivedPublisher.publishEvent(new HttpRequestReceivedEvent(mnRequest));
-        }
-        if (serverConfiguration.isValidateUrl()) {
-            try {
-                mnRequest.getUri();
-            } catch (IllegalArgumentException e) {
-                body.close();
-
-                // invalid URI
-                NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
-                    new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                    AvailableNettyByteBody.empty(),
-                    ctx,
-                    conversionService,
-                    serverConfiguration
-                );
-                outboundAccess.attachment(errorRequest);
-                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
-                    new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
-                }
-                return;
-            }
         }
         if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging

@@ -10,7 +10,7 @@ compile-testing = "0.21.0"
 
 geb = "7.0"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.6"
+graal-svm = "23.1.7"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -38,17 +38,17 @@ logback = "1.5.18"
 lombok = "1.18.38"
 logbook-netty = "3.10.0"
 log4j = "2.24.3"
-micronaut-aws = "4.8.0"
-micronaut-build-plugins="7.3.2"
-micronaut-groovy = "4.5.0"
+micronaut-aws = "4.10.0"
+micronaut-build-plugins="7.4.0"
+micronaut-groovy = "4.6.0"
 micronaut-session = "4.5.0"
 micronaut-sql = "5.3.0"
 micronaut-test = "4.6.2"
 micronaut-validation = "4.8.1"
-micronaut-rxjava2 = "2.6.0"
-micronaut-rxjava3 = "3.6.0"
+micronaut-rxjava2 = "2.7.0"
+micronaut-rxjava3 = "3.7.0"
 micronaut-reactor = "3.7.0"
-micronaut-kotlin = "4.5.0"
+micronaut-kotlin = "4.6.0"
 native-gradle-plugin = "0.10.5"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
@@ -64,6 +64,7 @@ vertx = "4.5.14"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
 micronaut-sourcegen = "1.6.2"
+icu4j = "76.1"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -76,13 +77,13 @@ managed-jackson = "2.18.3"
 managed-jackson-databind = "2.18.2"
 managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
-managed-methvin-directory-watcher = "0.18.0"
+managed-methvin-directory-watcher = "0.19.0"
 managed-netty = "4.2.0.Final"
 managed-netty-http3 = "0.0.29.Final"
 managed-netty-tcnative = "2.0.70.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.7.4"
+managed-reactor = "3.7.5"
 managed-snakeyaml = "2.3"
 managed-java-parser-core = "3.26.4"
 managed-ksp = "1.9.25-1.0.20"
@@ -200,6 +201,8 @@ hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate"
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 htmlsanitycheck = { module = "org.aim42:htmlSanityCheck", version.ref = "htmlsanitycheck"}
+
+icu4j = { module = "com.ibm.icu:icu4j", version.ref = "icu4j" }
 
 jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
