@@ -16,6 +16,8 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -31,15 +33,30 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
     private final BeanIdentifier beanIdentifier;
 
+    private final @NonNull Argument<T> beanType;
+
+    public BeanCreatedEvent(BeanContext beanContext,
+                            BeanDefinition<T> beanDefinition,
+                            BeanIdentifier beanIdentifier,
+                            T bean) {
+        this(beanContext, beanDefinition, beanIdentifier, beanDefinition.asArgument(), bean);
+    }
+
     /**
      * @param beanContext    The bean context
      * @param beanDefinition The bean definition
      * @param beanIdentifier The bean identifier
+     * @param beanType       The {@link Argument} used to create the bean
      * @param bean           The bean
      */
-    public BeanCreatedEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, BeanIdentifier beanIdentifier, T bean) {
+    public BeanCreatedEvent(BeanContext beanContext,
+                            BeanDefinition<T> beanDefinition,
+                            BeanIdentifier beanIdentifier,
+                            @NonNull Argument<T> beanType,
+                            T bean) {
         super(beanContext, beanDefinition, bean);
         this.beanIdentifier = beanIdentifier;
+        this.beanType = beanType;
     }
 
     /**
@@ -47,5 +64,14 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
      */
     public BeanIdentifier getBeanIdentifier() {
         return beanIdentifier;
+    }
+
+    /**
+     * @return The argument used to create the bean
+     * @since 4.9.0
+     */
+    @NonNull
+    public Argument<T> getBeanType() {
+        return beanType;
     }
 }
