@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,18 +45,23 @@ public class EnvironmentEndpoint {
     /**
      * Endpoint name.
      */
+    public static final String ACTIVE_ENVIRONMENTS_KEY = "activeEnvironments";
+    public static final String PACKAGES_KEY = "packages";
+    public static final String PROPERTY_SOURCES_KEY = "propertySources";
+
     public static final String NAME = "env";
 
     private static final String MASK_VALUE = "*****";
 
     private final Environment environment;
     private final EnvironmentEndpointFilter environmentFilter;
+    private final EnvironmentEndpointConfiguration configuration;
 
     /**
      * @param environment The {@link Environment}
      */
     public EnvironmentEndpoint(Environment environment) {
-        this(environment, null);
+        this(environment, null, new EnvironmentEndpointConfiguration());
     }
 
     /**
@@ -63,9 +69,10 @@ public class EnvironmentEndpoint {
      * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
      */
     @Inject
-    public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter) {
+    public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter, EnvironmentEndpointConfiguration configuration) {
         this.environment = environment;
         this.environmentFilter = environmentFilter;
+        this.configuration = configuration;
     }
 
     /**
@@ -75,17 +82,25 @@ public class EnvironmentEndpoint {
     @Read
     public Map<String, Object> getEnvironmentInfo() {
         EnvironmentFilterSpecification filter = createFilterSpecification();
-
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("activeEnvironments", environment.getActiveNames());
-        result.put("packages", environment.getPackages());
-        Collection<Map<String, Object>> propertySources = new ArrayList<>();
-        environment.getPropertySources()
-            .stream()
-            .sorted(Comparator.comparing(PropertySource::getOrder))
-            .map(ps -> buildPropertySourceInfo(ps, filter))
-            .forEach(propertySources::add);
-        result.put("propertySources", propertySources);
+        List<String> activeKeys = configuration.getActiveKeys();
+
+        if (activeKeys.contains(ACTIVE_ENVIRONMENTS_KEY)) {
+            result.put(ACTIVE_ENVIRONMENTS_KEY, environment.getActiveNames());
+        }
+        if (activeKeys.contains(PACKAGES_KEY)) {
+            result.put(PACKAGES_KEY, environment.getPackages());
+        }
+
+        if (activeKeys.contains(PROPERTY_SOURCES_KEY)) {
+            Collection<Map<String, Object>> propertySources = new ArrayList<>();
+            environment.getPropertySources()
+                .stream()
+                .sorted(Comparator.comparing(PropertySource::getOrder))
+                .map(ps -> buildPropertySourceInfo(ps, filter))
+                .forEach(propertySources::add);
+            result.put(PROPERTY_SOURCES_KEY, propertySources);
+        }
         return result;
     }
 
