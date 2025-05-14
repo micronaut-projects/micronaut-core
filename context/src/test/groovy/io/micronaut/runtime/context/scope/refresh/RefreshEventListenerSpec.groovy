@@ -36,14 +36,17 @@ class RefreshEventListenerSpec extends Specification {
         result.isEmpty()
 
         when:
-        config.put("secret.value", "bar".getBytes(StandardCharsets.UTF_8))
+        var barBytes = "bar".getBytes(StandardCharsets.UTF_8)
+        config.put("secret.value", barBytes)
         result = env.refreshAndDiff()
 
         then:
         !result.isEmpty()
         result.size() == 2
         result.containsKey("secret.value")
+        result['secret.value'] == barBytes
         result.containsKey("other.config")
+        result['other.config'] == '${secret.value}'
 
     }
     void 'test refresh event listener'() {

@@ -884,7 +884,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 } else if (hasOld && !hasNew) {
                     changes.put(key, oldValue);
                 } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
-                    changes.put(key, oldValue);
+                    changes.put(key, newValue);
                 }
                 remainingMap.remove(key);
             }
