@@ -37,7 +37,8 @@ class SimpleRetryInstanceSpec extends Specification {
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
                 new DefaultRetryPredicate(Collections.singletonList(DiscoveryException.class), Collections.emptyList()),
-                RuntimeException.class
+                RuntimeException.class,
+                0
         )
         RuntimeException r = new RuntimeException("bad")
 
@@ -55,7 +56,8 @@ class SimpleRetryInstanceSpec extends Specification {
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
                 new DefaultRetryPredicate(Collections.emptyList(), Collections.singletonList(DiscoveryException.class)),
-                RuntimeException.class
+                RuntimeException.class,
+                0
         )
         RuntimeException r = new RuntimeException("bad")
 
@@ -68,7 +70,7 @@ class SimpleRetryInstanceSpec extends Specification {
     void "test retry context next delay is exponential"() {
 
         given:
-        SimpleRetry retryContext = new SimpleRetry(3, 2, Duration.of(1, ChronoUnit.SECONDS))
+        SimpleRetry retryContext = new SimpleRetry(3, 2, Duration.of(1, ChronoUnit.SECONDS), 0)
         RuntimeException r = new RuntimeException("bad")
 
         when:
@@ -104,7 +106,8 @@ class SimpleRetryInstanceSpec extends Specification {
                 2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 Duration.of(3, ChronoUnit.SECONDS),
-                RuntimeException.class
+                RuntimeException.class,
+                0
         )
         RuntimeException r = new RuntimeException("bad")
 

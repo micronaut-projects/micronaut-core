@@ -162,6 +162,11 @@ class CircuitBreakerRetry implements MutableRetryState {
         return childState.getCapturedException();
     }
 
+    @Override
+    public OptionalDouble getJitter() {
+        return childState.getJitter();
+    }
+
     /**
      * @return The current state
      */
