@@ -96,5 +96,5 @@ public @interface Retryable {
      * @return The jitter factor used to apply random deviation to retry delays
      */
     @Digits(integer = 1, fraction = 2)
-    String jitter() default "0.25";
+    String jitter() default "0.0";
 }

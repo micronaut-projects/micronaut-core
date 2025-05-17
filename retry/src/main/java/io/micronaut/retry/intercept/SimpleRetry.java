@@ -188,7 +188,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
         double multiplier = getMultiplier().orElse(1.0);
         long delay = (long) ((getDelay().toMillis()) * pow(multiplier, attemptNumber.get() - 1));
         double jitter = getJitter().orElse(0);
-        if(jitter > 0) {
+        if (jitter > 0) {
             delay = Math.max(0, (long) (delay * (1.0 + ThreadLocalRandom.current().nextDouble(-jitter, jitter))));
         }
         overallDelay.addAndGet(delay);
