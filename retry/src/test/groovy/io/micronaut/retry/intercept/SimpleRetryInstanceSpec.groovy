@@ -134,4 +134,109 @@ class SimpleRetryInstanceSpec extends Specification {
         retryContext.nextDelay() == 4000
 
     }
+
+    void "test retry context next delay with negative jitter"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                1,
+                1,
+                Duration.of(1, ChronoUnit.SECONDS),
+                -0.25
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        retryContext.nextDelay() == 1000
+    }
+
+    void "test retry context next delay with zero jitter"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                1,
+                1,
+                Duration.of(1, ChronoUnit.SECONDS),
+                0
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        retryContext.nextDelay() == 1000
+    }
+
+    void "test retry context next delay with positive jitter"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                1,
+                1,
+                Duration.of(1, ChronoUnit.SECONDS),
+                0.25
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        long delay = retryContext.nextDelay()
+        delay >= 750 && delay <= 1250
+    }
+
+    void "test retry context next delay with jitter greater than 1.0"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                1,
+                1,
+                Duration.of(1, ChronoUnit.SECONDS),
+                1.25
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        long delay = retryContext.nextDelay()
+        delay >= 0 && delay <= 2250
+    }
+
+    void "test retry context next delay is exponential with jitter"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                3,
+                2,
+                Duration.of(1, ChronoUnit.SECONDS),
+                0.25
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        retryContext.currentAttempt() == 1
+        long delay1 = retryContext.nextDelay()
+        delay1 >= 750 && delay1 <= 1250
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        retryContext.currentAttempt() == 2
+        long delay2 = retryContext.nextDelay()
+        delay2 >= 1500 && delay2 <= 2500
+
+        when:
+        retryContext.canRetry(r)
+
+        then:
+        retryContext.currentAttempt() == 3
+        long delay3 = retryContext.nextDelay()
+        delay3 >= 3000 && delay3 <= 5000
+    }
 }
