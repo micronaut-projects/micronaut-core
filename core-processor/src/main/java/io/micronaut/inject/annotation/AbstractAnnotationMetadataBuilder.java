@@ -1848,6 +1848,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
          */
         void update(@NonNull AnnotationMetadata annotationMetadata);
 
+        /**
+         * @return Was the metadata cleared by a previous processor.
+         */
+        boolean wasCleared();
+
+        /**
+         * Mark as cleared.
+         */
+        void markCleared();
+
     }
 
     /**
@@ -1887,6 +1897,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @Nullable
         private AnnotationMetadata annotationMetadata;
         private boolean isMutated;
+        private boolean cleared;
 
         public DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata) {
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
@@ -1915,6 +1926,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             this.annotationMetadata = annotationMetadata;
             isMutated = true;
+        }
+
+        @Override
+        public boolean wasCleared() {
+            return cleared;
+        }
+
+        @Override
+        public void markCleared() {
+            this.cleared = true;
         }
     }
 
