@@ -71,7 +71,9 @@ public interface RetryState {
     /**
      * @return The jitter factor used to apply random deviation to retry delays
      */
-    OptionalDouble getJitter();
+    default OptionalDouble getJitter() {
+        return OptionalDouble.empty();
+    }
 
     /**
      * @return The retry predicate checking for includes/excludes throwable classes
