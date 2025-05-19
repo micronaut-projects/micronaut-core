@@ -245,6 +245,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             for (Object nativeType : postponedTypes.values()) {
                 AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+                if (nativeType instanceof Element element) {
+                    AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                    cachedAnnotationMetadata.markCleared();
+                }
             }
             postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
             postponedTypes.clear();

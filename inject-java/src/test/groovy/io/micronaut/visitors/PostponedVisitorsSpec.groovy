@@ -2,6 +2,7 @@ package io.micronaut.visitors
 
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.PendingFeature
 
@@ -73,9 +74,11 @@ class IntroductionTestInterceptor
 }
 ''')
         def introduction = getBean(context, 'test.MyIntroduction')
+        def definition = getBeanDefinition(context, 'test.MyIntroduction')
 
         then:
         introduction.getParentMethod() == 'good'
+        definition.getRequiredMethod("getParentMethod").hasAnnotation("SomeAnnotation")
     }
 
     void 'test postpone bean definition generation implementing generated interface'() {

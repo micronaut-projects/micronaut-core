@@ -179,8 +179,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         PostponeToNextRoundException nextRoundException = postponed.get(className);
                         if (nextRoundException != null) {
                             Object errorElement = nextRoundException.getErrorElement();
-                            if (errorElement != null) {
-                                AbstractAnnotationMetadataBuilder.clearMutated(errorElement);
+                            if (errorElement instanceof Element element) {
+                                AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                                if (!cachedAnnotationMetadata.wasCleared()) {
+                                    AbstractAnnotationMetadataBuilder.clearMutated(errorElement);
+                                }
                             }
                         }
                         try {
