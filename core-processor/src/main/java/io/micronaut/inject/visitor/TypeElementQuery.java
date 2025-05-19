@@ -29,6 +29,24 @@ public interface TypeElementQuery {
     TypeElementQuery DEFAULT = DefaultTypeElementQuery.DEFAULT;
 
     /**
+     * Only visit the class and the methods.
+     *
+     * @return this query
+     */
+    static TypeElementQuery onlyMethods() {
+        return DEFAULT.excludeAll().includeMethods();
+    }
+
+    /**
+     * Only visit the class.
+     *
+     * @return this query
+     */
+    static TypeElementQuery onlyClass() {
+        return DEFAULT.excludeAll();
+    }
+
+    /**
      * Include the methods.
      *
      * @return this query

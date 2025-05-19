@@ -23,6 +23,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.websocket.annotation.WebSocketComponent;
@@ -69,6 +70,11 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
         return CollectionUtils.setOf(
                 WebSocketComponent.class.getName()
         );
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyMethods();
     }
 
     @Override
