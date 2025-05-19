@@ -81,7 +81,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public TypeElementQuery query() {
-        return TypeElementQuery.onlyMethods();
+        return TypeElementQuery.onlyClass();
     }
 
     @Override
