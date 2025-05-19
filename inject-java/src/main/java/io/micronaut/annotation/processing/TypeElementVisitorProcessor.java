@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -324,21 +325,49 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
-        visitor.getVisitor().visitClass(classElement, javaVisitorContext);
+        TypeElementQuery query = visitor.getVisitor().query();
 
-        for (ConstructorElement constructorElement : classElement.getSourceEnclosedElements(ElementQuery.CONSTRUCTORS)) {
-            visitConstructor(visitor, constructorElement);
-        }
-        for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
-            if (memberElement instanceof EnumConstantElement enumConstantElement) {
-                visitEnumConstant(visitor, enumConstantElement);
-            } else if (memberElement instanceof FieldElement fieldElement) {
-                visitField(visitor, fieldElement);
-            } else if (memberElement instanceof MethodElement methodElement) {
-                visitMethod(visitor, methodElement);
-            } else {
-                throw new IllegalStateException("Unknown element: " + memberElement);
+        try {
+            javaVisitorContext.setSkipUnresolvedInterfaces(query.skipsUnresolvedInterfaces());
+
+            visitor.getVisitor().visitClass(classElement, javaVisitorContext);
+
+            if (query.includesConstructors()) {
+                for (ConstructorElement constructorElement : classElement.getSourceEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                    visitConstructor(visitor, constructorElement);
+                }
             }
+            boolean includesFields = query.includesFields() || query.includesEnumConstants();
+            boolean includesMethods = query.includesMethods();
+            List<? extends MemberElement> elements;
+            if (includesMethods && includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS);
+            } else if (includesMethods) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS);
+            } else if (includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELDS);
+            } else {
+                elements = List.of();
+            }
+            for (MemberElement memberElement : elements) {
+                if (memberElement instanceof EnumConstantElement enumConstantElement) {
+                    if (query.includesEnumConstants()) {
+                        visitEnumConstant(visitor, enumConstantElement);
+                    }
+                } else if (memberElement instanceof FieldElement fieldElement) {
+                    if (query.includesFields()) {
+                        visitField(visitor, fieldElement);
+                    }
+                } else if (memberElement instanceof MethodElement methodElement) {
+                    if (includesMethods) {
+                        visitMethod(visitor, methodElement);
+                    }
+                } else {
+                    throw new IllegalStateException("Unknown element: " + memberElement);
+                }
+            }
+        } finally {
+            javaVisitorContext.setSkipUnresolvedInterfaces(false);
         }
     }
 

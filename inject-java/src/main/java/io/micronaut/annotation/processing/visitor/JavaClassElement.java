@@ -107,6 +107,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private ClassElement resolvedSuperType;
     @Nullable
     private List<ClassElement> resolvedInterfaces;
+    private boolean hasErrorousInterface;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery(false);
     private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
@@ -298,9 +299,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
+            if (visitorContext.isSkipUnresolvedInterfaces()) {
+                resolvedInterfaces = classElement.getInterfaces().stream()
+                    .filter(this::onlyAvailable)
+                    .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+                hasErrorousInterface = classElement.getInterfaces().size() != resolvedInterfaces.size();
+            } else {
+                resolvedInterfaces = classElement.getInterfaces().stream()
+                    .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+                hasErrorousInterface = false;
+            }
+        } else if (hasErrorousInterface && !visitorContext.isSkipUnresolvedInterfaces()) {
             resolvedInterfaces = classElement.getInterfaces().stream()
-                .filter(this::onlyAvailable)
                 .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            hasErrorousInterface = false;
         }
         return resolvedInterfaces;
     }

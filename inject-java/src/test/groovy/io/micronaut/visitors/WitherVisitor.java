@@ -2,10 +2,16 @@ package io.micronaut.visitors;
 
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 public class WitherVisitor implements TypeElementVisitor<Wither, Object> {
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementVisitor.super.query().skipUnresolvedInterfaces();
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
