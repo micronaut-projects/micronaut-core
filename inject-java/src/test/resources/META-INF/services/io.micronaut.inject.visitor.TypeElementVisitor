@@ -23,4 +23,6 @@ io.micronaut.aop.introduction.beans.MyRepoVisitor2
 io.micronaut.visitors.WitherVisitor
 io.micronaut.visitors.IntroductionTestGenVisitor
 io.micronaut.visitors.IntroductionTestVisitor
+io.micronaut.visitors.CollectingVisitor
+io.micronaut.visitors.GeneratorVisitor
 io.micronaut.visitors.BuilderVisitor

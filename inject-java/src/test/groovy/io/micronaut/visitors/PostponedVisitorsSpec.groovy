@@ -17,8 +17,6 @@ import org.intellij.lang.annotations.Language
 import spock.lang.PendingFeature
 
 class PostponedVisitorsSpec extends AbstractTypeElementSpec {
-    private CollectingVisitor collectingVisitor
-
     void 'test postpone introspection generation implementing generated interface'() {
         when:
             def definition = buildBeanIntrospection('test.Walrus', '''
@@ -131,7 +129,7 @@ package example;
 
 import jakarta.inject.Singleton;
 
-@Singleton
+@io.micronaut.visitors.GeneratorTrigger
 class Trigger {}
 
 // Parent is generated, we want to retrieve inherited annotations correctly
@@ -146,82 +144,10 @@ class Child implements Parent {
 }
 ''')
         then:
-        collectingVisitor.numVisited == 1
-        collectingVisitor.numMethodVisited == 1
-        collectingVisitor.getPath == "/get"
-        collectingVisitor.hasIntrospected
+        CollectingVisitor.numVisited == 1
+        CollectingVisitor.numMethodVisited == 1
+        CollectingVisitor.getPath == "/get"
+        CollectingVisitor.hasIntrospected
     }
 
-    @Override
-    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
-        collectingVisitor = new CollectingVisitor()
-        return List.of(new GeneratorVisitor(), collectingVisitor)
-    }
-
-    static class GeneratorVisitor implements TypeElementVisitor<Object, Object> {
-
-        private static final @Language("java") String SOURCE = """
-package example;
-
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-
-@Introspected
-public interface Parent {
-
-    @Get("/get")
-    String hello();
-
-}
-"""
-
-        @Override
-        void visitClass(ClassElement element, VisitorContext context) {
-            if (element.getName() != "example.Trigger") {
-                return
-            }
-
-            context.visitGeneratedSourceFile("example", "Parent", element)
-                    .ifPresent(generatedFile -> {
-                        try {
-                            generatedFile.write(writer -> writer.write(SOURCE))
-                        } catch (IOException e) {
-                            throw new RuntimeException(e)
-                        }
-                    })
-        }
-    }
-
-    static class CollectingVisitor implements TypeElementVisitor<Object, Object> {
-
-        int numVisited = 0
-        int numMethodVisited = 0
-        boolean hasIntrospected
-        String getPath
-
-        @Override
-        void visitClass(ClassElement element, VisitorContext context) {
-            if (element.getName() != "example.Child") {
-                return
-            }
-
-            if (element.hasUnresolvedTypes(UnresolvedTypeKind.INTERFACE)) {
-                throw new ElementPostponedToNextRoundException(element)
-            }
-
-            ++numVisited
-            hasIntrospected = element.hasStereotype(Introspected)
-        }
-
-        @Override
-        void visitMethod(MethodElement element, VisitorContext context) {
-            if (element.getOwningType().getName() != "example.Child") {
-                return
-            }
-
-            ++numMethodVisited
-            getPath = element.stringValue(Get).orElse(null)
-        }
-    }
 }
