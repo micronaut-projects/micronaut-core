@@ -859,7 +859,7 @@ internal open class KotlinClassElement(
 
                 ClassElement::class.java -> {
                     classNode.declarations.filter {
-                        it is KSClassDeclaration
+                        it is KSClassDeclaration && it.classKind != ClassKind.ENUM_ENTRY
                     }.toList()
                 }
 

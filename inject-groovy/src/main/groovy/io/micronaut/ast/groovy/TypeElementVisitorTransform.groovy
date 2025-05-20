@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
@@ -43,7 +44,6 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
-
 /**
  * Executes type element visitors.
  *
@@ -132,27 +132,49 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         }
 
         void visitClass(ClassNode node) {
-            if ((targetClassElement as GroovyClassElement).getNativeType().annotatedNode() != node) {
+            def classElement = targetClassElement as GroovyClassElement
+            if (classElement.getNativeType().annotatedNode() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
             }
             if (visitor.matchesClass(targetClassElement)) {
                 visitor.getVisitor().visitClass(targetClassElement, visitorContext)
             }
-            def classElement = targetClassElement as GroovyClassElement
-            def properties = classElement.getSyntheticBeanProperties()
-            for (PropertyElement pn : (properties)) {
-                visitNativeProperty(pn)
+            def query = visitor.getVisitor().query()
+            boolean includesFields = query.includesFields() || query.includesEnumConstants()
+            boolean includesMethods = query.includesMethods()
+            if (includesFields || includesFields) {
+                for (PropertyElement pn : classElement.getSyntheticBeanProperties()) {
+                    visitNativeProperty(pn, query)
+                }
             }
-            for (ConstructorNode cn : node.getDeclaredConstructors()) {
-                visitConstructor(cn)
+            if (query.includesConstructors()) {
+                for (ConstructorNode cn : node.getDeclaredConstructors()) {
+                    visitConstructor(cn)
+                }
             }
-            for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
+            List<? extends MemberElement> elements
+            if (includesMethods && includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
+            } else if (includesMethods) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS)
+            } else if (includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELDS)
+            } else {
+                elements = List.of()
+            }
+            for (MemberElement memberElement : elements) {
                 if (memberElement instanceof EnumConstantElement) {
-                    visitEnumConstant(memberElement)
+                    if (query.includeEnumConstants()) {
+                        visitEnumConstant(memberElement)
+                    }
                 } else if (memberElement instanceof FieldElement) {
-                    visitField(memberElement)
+                    if (query.includesFields()) {
+                        visitField(memberElement)
+                    }
                 } else if (memberElement instanceof MethodElement) {
-                    visitMethod(memberElement)
+                    if (query.includesMethods()) {
+                        visitMethod(memberElement)
+                    }
                 } else {
                     throw new IllegalStateException("Unknown element: " + memberElement)
                 }
@@ -185,12 +207,16 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
         }
 
-        private void visitNativeProperty(PropertyElement propertyNode) {
+        private void visitNativeProperty(PropertyElement propertyNode, TypeElementQuery query) {
             if (visitor.matchesElement(propertyNode)) {
-                propertyNode.field.ifPresent(f -> visitor.getVisitor().visitField(f, visitorContext))
-                // visit synthetic getter/setter methods
-                propertyNode.writeMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
-                propertyNode.readMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
+                if (query.includesFields()) {
+                    propertyNode.field.ifPresent(f -> visitor.getVisitor().visitField(f, visitorContext))
+                }
+                if (query.includesMethods()) {
+                    // visit synthetic getter/setter methods
+                    propertyNode.writeMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
+                    propertyNode.readMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
+                }
             }
         }
     }
