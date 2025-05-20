@@ -36,6 +36,7 @@ import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -91,9 +92,10 @@ class ServerSentEventSpec extends Specification {
         ex.message == "Client '/sse': Internal Server Error"
     }
 
+    @Unroll
     void "test Content-Type header is correct"() {
         def httpRequest = HttpRequest
-                .GET(server.getURI().toString() + "/sse/object")
+                .GET(server.getURI().toString() + "/sse" + path)
                 .accept(MediaType.TEXT_EVENT_STREAM)
 
         when:
@@ -102,6 +104,9 @@ class ServerSentEventSpec extends Specification {
         then:
         response.status() == HttpStatus.OK
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.TEXT_EVENT_STREAM
+
+        where:
+        path << ['/object', '/string', '/rich']
     }
 
     @Client('/sse')
