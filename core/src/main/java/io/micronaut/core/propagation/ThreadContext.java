@@ -17,6 +17,7 @@ package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Internal;
 import io.netty.util.concurrent.FastThreadLocal;
+import io.netty.util.concurrent.FastThreadLocalThread;
 
 /**
  * This class holds the {@link ThreadLocal} for the propagated context, or the
@@ -30,29 +31,29 @@ import io.netty.util.concurrent.FastThreadLocal;
 @SuppressWarnings("unchecked")
 final class ThreadContext {
     private static final Object FAST;
-    private static final ThreadLocal<PropagatedContextImpl> SLOW;
+    private static final ThreadLocal<PropagatedContextImpl> SLOW = new ThreadLocal<>() {
+        @Override
+        public String toString() {
+            return "Micronaut Propagation Context";
+        }
+    };
 
     static {
         Object fast;
-        ThreadLocal<PropagatedContextImpl> slow;
         try {
             fast = new FastThreadLocal<PropagatedContextImpl>();
-            slow = null;
         } catch (NoClassDefFoundError e) {
             fast = null;
-            slow = new ThreadLocal<>() {
-                @Override
-                public String toString() {
-                    return "Micronaut Propagation Context";
-                }
-            };
         }
         FAST = fast;
-        SLOW = slow;
+    }
+
+    private static boolean useSlow() {
+        return FAST == null || !(Thread.currentThread() instanceof FastThreadLocalThread);
     }
 
     static void remove() {
-        if (FAST == null) {
+        if (useSlow()) {
             SLOW.remove();
         } else {
             ((FastThreadLocal<PropagatedContextImpl>) FAST).remove();
@@ -60,7 +61,7 @@ final class ThreadContext {
     }
 
     static PropagatedContextImpl get() {
-        if (FAST == null) {
+        if (useSlow()) {
             return SLOW.get();
         } else {
             return ((FastThreadLocal<PropagatedContextImpl>) FAST).get();
@@ -68,7 +69,7 @@ final class ThreadContext {
     }
 
     static void set(PropagatedContextImpl value) {
-        if (FAST == null) {
+        if (useSlow()) {
             SLOW.set(value);
         } else {
             ((FastThreadLocal<PropagatedContextImpl>) FAST).set(value);

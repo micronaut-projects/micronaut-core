@@ -183,7 +183,7 @@ abstract class PoolResizer {
                 Thread carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
                 if (carrier != null) {
                     for (LocalPoolPair pool : localPools) {
-                        if (pool.loop.inEventLoop(carrier)) {
+                        if (pool.carrier == carrier) {
                             poolPair = pool;
                             break;
                         }
@@ -357,6 +357,7 @@ abstract class PoolResizer {
      */
     final class LocalPoolPair {
         final EventExecutor loop;
+        Thread carrier;
         final LocalPool<Http1PoolEntry> http1;
         final LocalPool<Http2PoolEntry> http2;
         /**
@@ -381,6 +382,13 @@ abstract class PoolResizer {
             this.loop = loop;
             http1 = new LocalPool<>();
             http2 = new LocalPool<>();
+            loop.execute(() -> {
+                if (PrivateLoomSupport.isSupported() && LoomSupport.isVirtual(Thread.currentThread())) {
+                    carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
+                } else {
+                    carrier = Thread.currentThread();
+                }
+            });
         }
 
         /**

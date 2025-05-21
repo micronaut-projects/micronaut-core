@@ -27,6 +27,7 @@ import jakarta.inject.Inject;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances.
@@ -65,7 +66,8 @@ public class ExecutorFactory {
             if (name == null) {
                 name = "virtual";
             }
-            return LoomSupport.newVirtualThreadFactory(name + "-executor");
+            String prefix = name + "-executor-";
+            return r -> LoomSupport.unstarted(prefix + ThreadLocalRandom.current().nextInt(), null, r);
         }
         if (name != null) {
             return new NamedThreadFactory(name + "-executor");
@@ -93,7 +95,7 @@ public class ExecutorFactory {
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
             case THREAD_PER_TASK:
-                return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                return new FastThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
 
             default:
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);

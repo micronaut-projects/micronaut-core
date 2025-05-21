@@ -25,9 +25,15 @@ class LoomCarrierSpec extends Specification {
         def client = ctx.createBean(HttpClient, server.URI).toBlocking()
 
         when:
-        def s = client.retrieve("/loom-carrier")
+        def s = client.retrieve("/loom-carrier", MyRecord)
         then:
-        s == "loom-on-netty-1 on default-nioEventLoopGroup-3-1"
+        s.current.startsWith("virtual-executor-")
+        s.carrier == "default-nioEventLoopGroup-3-1"
+        when:
+        s = client.retrieve("/loom-carrier", MyRecord)
+        then:
+        s.current.startsWith("virtual-executor-")
+        s.carrier == "default-nioEventLoopGroup-3-1"
 
         cleanup:
         ctx.close()
@@ -38,8 +44,17 @@ class LoomCarrierSpec extends Specification {
     static class MyCtrl {
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get
-        String foo() {
-            return Thread.currentThread().getName() + " on " + PrivateLoomSupport.getCarrierThread(Thread.currentThread()).getName()
+        MyRecord foo() {
+            return new MyRecord(
+                    Thread.currentThread().getName(),
+                    PrivateLoomSupport.getCarrierThread(Thread.currentThread()).getName()
+            )
         }
+    }
+
+    record MyRecord(
+            String current,
+            String carrier
+    ) {
     }
 }

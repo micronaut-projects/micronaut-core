@@ -154,7 +154,10 @@ public final class LoomSupport {
     }
 
     public static boolean isVirtual(Thread thread) {
-        checkSupported();
+        if (!isSupported()) {
+            // reasonable default.
+            return false;
+        }
         try {
             return (boolean) MH_IS_VIRTUAL.invokeExact(thread);
         } catch (Throwable e) {

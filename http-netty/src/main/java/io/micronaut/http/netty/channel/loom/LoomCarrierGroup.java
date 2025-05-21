@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoop;
+import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.ManualIoEventLoop;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
@@ -40,6 +41,7 @@ import java.util.Queue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * Netty {@link EventLoopGroup} that can also carry virtual threads.
@@ -114,10 +116,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
     @Requires(condition = LoomSupport.LoomCondition.class)
     @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
     public static final class Factory {
-        final EventLoopLoomFactory holder;
-
-        Factory(EventLoopLoomFactory holder) {
-            this.holder = holder;
+        Factory() {
         }
 
         public EventLoopGroup create(int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
@@ -128,9 +127,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
     private final class Runner implements Runnable, Executor, ThreadFactory {
         final int id;
         final Factory factory;
-        final IoHandlerFactory ioHandlerFactory;
         final ManualIoEventLoop delegate;
+        IoHandler backingHandler;
+        Thread carrier;
 
+        /**
+         * The continuation of the virtual thread responsible for running the event loop.
+         */
+        Runnable ioContinuation;
+        /**
+         * {@code true} when the {@link #ioContinuation} has been scheduled but has not run yet.
+         */
+        volatile boolean ioContinuationScheduled;
         /**
          * Queue for continuations submitted outside the event loop.
          */
@@ -142,14 +150,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         /**
          * Set to {@code true} during continuation execution to prevent recursion.
          */
-        boolean loomNested;
+        volatile boolean loomNested;
         /**
          * Set to {@code true} when a task is submitted to the event loop to signal that we should
          * stop execution of continuations to get straight to running the submitted task. This can
          * improve latency, because event loop tasks are often responsible for writes, but it may
          * harm throughput.
          */
-        boolean expediteWrite = false;
+        volatile boolean expediteWrite = false;
+        /**
+         * Whether we should block for the next {@link ManualIoEventLoop#run(long, long)} call.
+         */
+        volatile boolean block;
         /**
          * Thread counter for the thread name.
          */
@@ -191,23 +203,30 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         Runner(int id, Factory factory, IoHandlerFactory ioHandlerFactory) {
             this.id = id;
             this.factory = factory;
-            this.delegate = new ManualIoEventLoop(null, ioHandlerFactory);
-            this.ioHandlerFactory = ioExecutor -> new DelegateIoHandler(ioHandlerFactory.newHandler(ioExecutor)) {
-                @Override
-                public void wakeup() {
-                    // we don't need to wake up if we're running on a vthread carried by this event loop.
-                    Thread thread = Thread.currentThread();
-                    if (LoomSupport.isVirtual(thread) && ioExecutor.isExecutorThread(PrivateLoomSupport.getCarrierThread(thread))) {
-                        if (!throughputMode) {
-                            expediteWrite = true;
-                            Thread.yield();
-                        }
-                        return;
-                    }
+            IoHandlerFactory proxied = ioExecutor -> {
+                backingHandler = ioHandlerFactory.newHandler(ioExecutor);
+                return new DelegateIoHandler(backingHandler) {
+                    @Override
+                    public void wakeup() {
+                        // this is called on EventLoop.execute
 
-                    super.wakeup();
-                }
+                        if (block) {
+                            block = false;
+                            super.wakeup();
+                        }
+
+                        // we don't need to wake up if we're running on a vthread carried by this event loop.
+                        Thread thread = Thread.currentThread();
+                        if (LoomSupport.isVirtual(thread) && PrivateLoomSupport.getCarrierThread(thread) == carrier) {
+                            if (!throughputMode) {
+                                expediteWrite = true;
+                                Thread.yield();
+                            }
+                        }
+                    }
+                };
             };
+            this.delegate = new ManualIoEventLoop(null, proxied);
         }
 
         /**
@@ -240,13 +259,40 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         @Override
         public void run() {
+            carrier = Thread.currentThread();
+
+            LoomSupport.unstarted(
+                "loom-on-netty-" + id + "-io",
+                b -> PrivateLoomSupport.setScheduler(b, this),
+                this::runIo
+            ).start();
+            assert ioContinuationScheduled;
+
+            while (!delegate.isTerminated()) {
+                boolean ioContinuationScheduled = this.ioContinuationScheduled;
+                if (!ioContinuationScheduled) {
+                    LockSupport.park();
+                    ioContinuationScheduled = this.ioContinuationScheduled;
+                }
+                if (ioContinuationScheduled) {
+                    this.ioContinuationScheduled = false;
+                    ioContinuation.run();
+                }
+
+                // Phase 3: Run continuations
+                tick(3);
+                globalToLocal();
+                throughputMode = localLoomQueue.size() > THROUGHPUT_MODE_THRESHOLD;
+                if (runContinuations(null, System.nanoTime() + timeSlice()) || expediteWrite) {
+                    block = false;
+                }
+            }
+        }
+
+        private void runIo() {
             delegate.setOwningThread(Thread.currentThread());
-            factory.holder.targetScheduler.set(this);
             ThreadExecutorMap.setCurrentExecutor(delegate);
 
-            // this flag controls blocking behavior for the next iteration. We block if there were
-            // no continuations or IO run.
-            boolean block = false;
             while (!delegate.isShuttingDown()) {
                 // Phase 1/2: run IO (blocking/non-blocking) and event loop tasks
                 long waitNanos;
@@ -262,33 +308,19 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 idle = false;
                 expediteWrite = false;
 
-                // Phase 3: Run continuations
-                tick(3);
-                globalToLocal();
-                throughputMode = localLoomQueue.size() > THROUGHPUT_MODE_THRESHOLD;
-                block &= !runContinuations(null, System.nanoTime() + timeSlice());
-                block &= !expediteWrite;
+                Thread.yield();
 
                 // Phase 4: Run event loop tasks, e.g. write ops submitted by the virtual threads
                 tick(4);
-                block &= delegate.runAllTasks(timeSlice()) == 0; // todo: https://github.com/netty/netty/pull/15124
-            }
-            exit();
-        }
-
-        private void exit() {
-            do {
-                delegate.runNow(-1);
-                globalToLocal();
-                while (true) {
-                    ScheduledTask task = localLoomQueue.poll();
-                    if (task == null) {
-                        break;
-                    }
-                    PrivateLoomSupport.getDefaultScheduler().execute(task.task);
+                if (delegate.runAllTasks(timeSlice()) != 0) { // todo: https://github.com/netty/netty/pull/15124
+                    block = false;
                 }
-            } while (!delegate.isTerminated());
-            // TODO: finish draining loom queue
+            }
+
+            while (!delegate.isTerminated()) {
+                delegate.runNow(-1);
+                Thread.yield();
+            }
         }
 
         /**
@@ -313,7 +345,6 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         private boolean runContinuations(@Nullable Runnable immediateTask, long deadline) {
             assert !loomNested;
-            assert !expediteWrite;
 
             boolean ranAny = false;
             loomNested = true;
@@ -365,6 +396,21 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 return;
             }
 
+            // special handling for the continuation of the IO thread.
+            Runnable ioContinuation = this.ioContinuation;
+            if (ioContinuation == null) {
+                ioContinuation = command;
+                this.ioContinuation = command;
+            }
+            if (ioContinuation == command) {
+                Thread t = Thread.currentThread();
+                ioContinuationScheduled = true;
+                if (t != carrier && (!LoomSupport.isVirtual(t) || PrivateLoomSupport.getCarrierThread(t) != carrier)) {
+                    LockSupport.unpark(carrier);
+                }
+                return;
+            }
+
             // JFR
             ContinuationScheduled scheduled;
             if (ContinuationScheduled.INSTANCE.isEnabled()) {
@@ -388,7 +434,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 scheduled = null;
             }
 
-            if (delegate.inEventLoop()) {
+            if (Thread.currentThread() == carrier) {
                 //noinspection NonAtomicOperationOnVolatileField
                 activeThreadsLocal++;
                 long time = System.nanoTime();
@@ -415,13 +461,21 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                     scheduled.commit();
                 }
                 globalLoomQueue.add(command);
-                delegate.wakeup();
+
+                if (LoomSupport.isVirtual(Thread.currentThread()) && PrivateLoomSupport.getCarrierThread(Thread.currentThread()) == carrier) {
+                    if (!throughputMode && !expediteWrite) {
+                        Thread.yield();
+                    }
+                } else {
+                    backingHandler.wakeup();
+                }
             }
         }
 
         private void tick(int type) {
             if (LoopTick.INSTANCE.isEnabled()) {
                 LoopTick tick = new LoopTick();
+                tick.loopIndex = id;
                 tick.type = type;
                 tick.activeThreads = activeThreads();
                 tick.commit();
@@ -457,6 +511,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
     static class LoopTick extends Event {
         static final LoopTick INSTANCE = new LoopTick();
 
+        int loopIndex;
         int type;
         int activeThreads;
     }
