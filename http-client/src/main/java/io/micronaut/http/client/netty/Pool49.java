@@ -46,12 +46,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * This class handles the concurrent aspects of pooling for {@link ConnectionManager}.
  */
 @Internal
-abstract class PoolResizer {
+final class Pool49 implements Pool {
+    private final Listener listener;
     private final Logger log;
     private final HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration;
 
@@ -62,8 +64,7 @@ abstract class PoolResizer {
     /**
      * Ordered version of {@link #localPoolsByLoop} for faster access.
      */
-    @SuppressWarnings("checkstyle:DeclarationOrder")
-    final List<LocalPoolPair> localPools;
+    private final List<LocalPoolPair> localPools;
 
     /**
      * Number of pending requests. This is used to enforce
@@ -84,9 +85,14 @@ abstract class PoolResizer {
      */
     private final Queue<PendingRequest> globalPendingRequests = new LinkedBlockingQueue<>();
 
-    PoolResizer(Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, Iterable<? extends EventExecutor> group) {
+    // for testing
+    @SuppressWarnings("checkstyle:DeclarationOrder")
+    Function<List<LocalPoolPair>, LocalPoolPair> pickPreferredPoolOverride;
+
+    Pool49(Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, Iterable<? extends EventExecutor> group) {
         this.log = log;
         this.connectionPoolConfiguration = connectionPoolConfiguration;
+        this.listener = listener;
         this.localPoolsByLoop = new LinkedHashMap<>();
         for (EventExecutor loop : group) {
             localPoolsByLoop.put(loop, new LocalPoolPair(loop));
@@ -117,25 +123,33 @@ abstract class PoolResizer {
     }
 
     /**
-     * Open a new connection on the given event loop.
-     *
-     * @param eventLoop The event loop this connection should use
-     */
-    abstract void openNewConnection(@NonNull EventLoop eventLoop) throws Exception;
-
-    /**
-     * Called when an {@link #openNewConnection(EventLoop)} operation fails asynchronously.
+     * Called when an {@link Listener#openNewConnection(EventLoop)} operation fails asynchronously.
      *
      * @param eventLoop The event loop where the connection attempt was made
      * @param error The optional error
      */
-    // can be overridden, so `throws Exception` ensures we handle any errors
-    void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
+    @Override
+    public void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
         // todo: implement a circuit breaker here? right now, we just fail one connection in the
         //  subclass implementation, but maybe we should do more.
         LocalPoolPair poolPair = localPoolsByLoop.get(eventLoop);
         assert poolPair != null;
-        poolPair.onNewConnectionFailure(error);
+        poolPair.onNewConnectionFailure(listener.wrapError(error));
+    }
+
+    @Override
+    public Pool.PendingRequest createPendingRequest(@Nullable BlockHint blockHint) {
+        return new PendingRequest(blockHint);
+    }
+
+    @Override
+    public Pool.Http1PoolEntry createHttp1PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        return new Http1PoolEntry(eventLoop, connection);
+    }
+
+    @Override
+    public Pool.Http2PoolEntry createHttp2PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        return new Http2PoolEntry(eventLoop, connection);
     }
 
     /**
@@ -143,7 +157,8 @@ abstract class PoolResizer {
      *
      * @param c The consumer to run for each open connection
      */
-    final void forEachConnection(Consumer<ResizerConnection> c) {
+    @Override
+    public void forEachConnection(Consumer<ResizerConnection> c) {
         for (LocalPoolPair localPool : localPools) {
             localPool.http1.connections.forEach(e -> c.accept(e.connection));
             localPool.http2.connections.forEach(e -> c.accept(e.connection));
@@ -163,6 +178,10 @@ abstract class PoolResizer {
      */
     @Nullable
     LocalPoolPair pickPreferredPool() throws HttpClientException {
+        if (pickPreferredPoolOverride != null) {
+            return pickPreferredPoolOverride.apply(localPools);
+        }
+
         LocalPoolPair poolPair = null;
         var configLocality = connectionPoolConfiguration.getConnectionLocality();
         if (configLocality != HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
@@ -337,19 +356,6 @@ abstract class PoolResizer {
     }
 
     /**
-     * API for {@link ConnectionManager} to implement. This represents a connection associated with
-     * a {@link PoolEntry}.
-     */
-    abstract static class ResizerConnection {
-        /**
-         * Dispatch a stream on this connection.
-         *
-         * @param sink The pending request that wants to acquire this connection
-         */
-        abstract void dispatch(PendingRequest sink) throws Exception;
-    }
-
-    /**
      * A local pool pair. It's local because it's associated with a fixed event loop, and most
      * operations are restricted to that loop. It's a pair because there's actually two pools, one
      * for HTTP/1 and one for HTTP/2 (also includes HTTP/3), since HTTP/2 can serve many requests
@@ -488,7 +494,7 @@ abstract class PoolResizer {
          */
         void openConnectionStep3() {
             try {
-                openNewConnection((EventLoop) loop);
+                listener.openNewConnection((EventLoop) loop);
             } catch (Exception e) {
                 onNewConnectionFailure(e);
             }
@@ -758,12 +764,13 @@ abstract class PoolResizer {
         abstract void preDispatch(PendingRequest request);
     }
 
-    final class Http1PoolEntry extends PoolEntry {
+    final class Http1PoolEntry extends PoolEntry implements Pool.Http1PoolEntry {
         Http1PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
         }
 
-        void onConnectionEstablished() {
+        @Override
+        public void onConnectionEstablished() {
             checkInEventLoop();
             if (poolPair.http1.connections.add(this)) {
                 markAvailable();
@@ -771,7 +778,8 @@ abstract class PoolResizer {
             }
         }
 
-        void onConnectionInactive() {
+        @Override
+        public void onConnectionInactive() {
             checkInEventLoop();
             poolPair.http1.removeAvailable(this);
             if (poolPair.http1.connections.remove(this)) {
@@ -780,7 +788,8 @@ abstract class PoolResizer {
             }
         }
 
-        void markAvailable() {
+        @Override
+        public void markAvailable() {
             checkInEventLoop();
             if (poolPair.http1.addAvailable(this)) {
                 if (log.isTraceEnabled()) {
@@ -790,7 +799,8 @@ abstract class PoolResizer {
             }
         }
 
-        void markUnavailable() {
+        @Override
+        public void markUnavailable() {
             if (poolPair.http1.removeAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became unavailable", this);
@@ -807,14 +817,15 @@ abstract class PoolResizer {
         }
     }
 
-    final class Http2PoolEntry extends PoolEntry {
+    final class Http2PoolEntry extends PoolEntry implements Pool.Http2PoolEntry {
         private int available = 0;
 
         Http2PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
         }
 
-        void onConnectionEstablished(int maxStreamCount) {
+        @Override
+        public void onConnectionEstablished(int maxStreamCount) {
             checkInEventLoop();
             if (poolPair.http2.connections.add(this)) {
                 markAvailable0(maxStreamCount);
@@ -822,7 +833,8 @@ abstract class PoolResizer {
             }
         }
 
-        void onConnectionInactive() {
+        @Override
+        public void onConnectionInactive() {
             checkInEventLoop();
             if (available > 0) {
                 available = 0;
@@ -834,7 +846,8 @@ abstract class PoolResizer {
             }
         }
 
-        void markAvailable() {
+        @Override
+        public void markAvailable() {
             markAvailable0(1);
         }
 
@@ -851,7 +864,8 @@ abstract class PoolResizer {
             }
         }
 
-        void markUnavailable() {
+        @Override
+        public void markUnavailable() {
             checkInEventLoop();
             if (log.isTraceEnabled()) {
                 log.trace("{} became unavailable", this);
@@ -909,7 +923,7 @@ abstract class PoolResizer {
     /**
      * An HTTP request that is waiting for a connection to run on.
      */
-    final class PendingRequest extends AtomicBoolean {
+    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest {
         private static final AtomicInteger NEXT_DEBUG_ID = new AtomicInteger(1);
 
         /**
@@ -956,8 +970,8 @@ abstract class PoolResizer {
          *
          * @return The flow
          */
-        @NonNull
-        ExecutionFlow<ConnectionManager.PoolHandle> flow() {
+        @Override
+        public @NonNull ExecutionFlow<ConnectionManager.PoolHandle> flow() {
             return sink;
         }
 
@@ -965,7 +979,8 @@ abstract class PoolResizer {
          * Kick off dispatching this request to a connection. Note that this must be called exactly
          * once.
          */
-        void dispatch() {
+        @Override
+        public void dispatch() {
             if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
                 tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
                 return;
@@ -984,7 +999,8 @@ abstract class PoolResizer {
          * Attempt to redispatch this connection. Unlike {@link #dispatch()}, can be called
          * multiple times, because it doesn't increase {@link #globalPending}.
          */
-        void redispatch() {
+        @Override
+        public void redispatch() {
             if (preferredPool == null) {
                 destPool = localPools.get(ThreadLocalRandom.current().nextInt(localPools.size()));
                 if (log.isTraceEnabled()) {
@@ -1104,8 +1120,8 @@ abstract class PoolResizer {
          *
          * @return The event loop, or {@code null} if unknown
          */
-        @Nullable
-        EventExecutor likelyEventLoop() {
+        @Override
+        public @Nullable EventExecutor likelyEventLoop() {
             LocalPoolPair pool = destPool;
             return pool == null ? null : pool.loop;
         }
@@ -1124,7 +1140,8 @@ abstract class PoolResizer {
             }
         }
 
-        boolean tryComplete(ConnectionManager.PoolHandle value) {
+        @Override
+        public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
                 if (globalPending != null) {
                     globalPending.decrement();
