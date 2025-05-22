@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -32,9 +33,11 @@ import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.compression.Brotli;
@@ -262,20 +265,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @param flush   {@code true} iff we should flush after this message
      * @param close   {@code true} iff the channel should be closed after this message
      */
-    private void write(Object message, boolean flush, boolean close) {
+    private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         if (close) {
-            ctx.writeAndFlush(message).addListener(ChannelFutureListener.CLOSE);
+            return ctx.writeAndFlush(message)
+                .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
+                .addListener(ChannelFutureListener.CLOSE);
         } else {
+            ChannelPromise promise = needsPromise ?
+                ctx.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
+                ctx.voidPromise();
             if (flush) {
                 // delay flush until readComplete if possible
                 if (reading) {
-                    ctx.write(message, ctx.voidPromise());
+                    ctx.write(message, promise);
                     flushPending = true;
+                    return promise;
                 } else {
-                    ctx.writeAndFlush(message, ctx.voidPromise());
+                    return ctx.writeAndFlush(message, promise);
                 }
             } else {
-                ctx.write(message, ctx.voidPromise());
+                return ctx.write(message, promise);
             }
         }
     }
@@ -741,6 +750,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The request that caused this response. This is used for compression decisions.
          */
         private final HttpRequest request;
+        private final Http1RequestEvent jfrEvent;
         /**
          * The handler that will perform the actual write operation.
          */
@@ -750,6 +760,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
+            if (NativeImageUtils.JFR_AVAILABLE && Http1RequestEvent.isTurnedOn()) {
+                this.jfrEvent = new Http1RequestEvent();
+                jfrEvent.begin();
+            } else {
+                this.jfrEvent = null;
+            }
         }
 
         /**
@@ -807,6 +823,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (!HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
                 closeAfterWrite();
+            }
+
+            if (jfrEvent != null) {
+                jfrEvent.populateResponse(message);
             }
         }
 
@@ -939,10 +959,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean close) {
             if (this.compressionSession == null) {
-                write(content, flush, close);
+                writePotentialEnd(content, flush, close);
             } else {
                 // slow path
                 writeCompressing0(content, flush, close);
+            }
+        }
+
+        void writePotentialEnd(Object content, boolean flush, boolean close) {
+            boolean record = outboundAccess.jfrEvent != null && content instanceof LastHttpContent;
+            ChannelFuture future = write(content, flush, close, record);
+            if (record) {
+                future.addListener((ChannelFutureListener) f -> {
+                    outboundAccess.jfrEvent.end();
+                    if (outboundAccess.jfrEvent.shouldCommit()) {
+                        outboundAccess.jfrEvent.populateChannel(ctx.channel());
+                        outboundAccess.jfrEvent.populateRequest(outboundAccess.request);
+                        outboundAccess.jfrEvent.commit();
+                    }
+                });
             }
         }
 
@@ -959,23 +994,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 compressionSession.fixContentLength(hr);
 
                 // this can happen in FullHttpResponse, just send the full body.
-                write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
+                write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false, false);
             }
             ByteBuf toSend = compressionSession.poll();
             // send the compressed buffer with the flags.
             if (toSend == null) {
                 if (last) {
                     HttpHeaders trailingHeaders = ((LastHttpContent) content).trailingHeaders();
-                    write(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
+                    writePotentialEnd(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
                 } else if (flush || close) {
                     // not sure if this can actually happen, but we need to forward a flush/close
-                    write(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close);
+                    write(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close, false);
                 } // else just don't send anything
             } else {
                 if (last) {
-                    write(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
+                    writePotentialEnd(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
                 } else {
-                    write(new DefaultHttpContent(toSend), flush, close);
+                    write(new DefaultHttpContent(toSend), flush, close, false);
                 }
             }
         }
@@ -1015,7 +1050,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void writeSome() {
             if (!written) {
-                write(outboundAccess.request.protocolVersion().equals(HttpVersion.HTTP_1_0) ? CONTINUE_10 : CONTINUE_11, true, false);
+                write(outboundAccess.request.protocolVersion().equals(HttpVersion.HTTP_1_0) ? CONTINUE_10 : CONTINUE_11, true, false, false);
                 written = true;
             }
             if (next != null) {
@@ -1087,7 +1122,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void writeSome() {
             if (initialMessage != null) {
-                write(initialMessage, false, false);
+                write(initialMessage, false, false, false);
                 initialMessage = null;
                 upstream.start();
             }
@@ -1167,7 +1202,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             if (!removed) {
                 if (initialMessage != null) {
-                    write(initialMessage, false, false);
+                    writePotentialEnd(initialMessage, false, false);
                     initialMessage = null;
                 }
 
