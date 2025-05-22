@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -80,6 +81,7 @@ abstract class MultiplexedServerHandler {
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        private final Http2RequestEvent jfrEvent;
         private HttpRequest request;
 
         private List<ByteBuf> bufferedContent;
@@ -91,6 +93,15 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean responseDone;
         private Compressor.Session compressionSession;
+
+        MultiplexedStream(int streamId) {
+            if (NativeImageUtils.JFR_AVAILABLE && Http2RequestEvent.isTurnedOn()) {
+                jfrEvent = new Http2RequestEvent();
+                jfrEvent.streamId = streamId;
+            } else {
+                jfrEvent = null;
+            }
+        }
 
         /**
          * Called when the controller consumes some HTTP request data.
@@ -294,7 +305,7 @@ abstract class MultiplexedServerHandler {
 
                     private void complete0() {
                         if (!responseDone) {
-                            writeData(Unpooled.EMPTY_BUFFER, true, ctx.voidPromise());
+                            writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
                             if (finish()) {
                                 flush();
                             }
@@ -373,10 +384,10 @@ abstract class MultiplexedServerHandler {
                 empty = content == null;
             }
 
-            writeHeaders(response, empty, ctx.voidPromise());
+            writeHeaders(response, empty, empty ? endPromise(response) : ctx.voidPromise());
             if (!empty) {
                 // bypass writeDataCompressing
-                writeData0(content, true, ctx.voidPromise());
+                writeData0(content, true, endPromise(response));
             } else if (content != null) {
                 content.release();
             }
@@ -384,6 +395,21 @@ abstract class MultiplexedServerHandler {
                 throw new IllegalStateException("Response already written");
             }
             flush();
+        }
+
+        private ChannelPromise endPromise(@NonNull HttpResponse response) {
+            if (jfrEvent == null) {
+                return ctx.voidPromise();
+            }
+            return ctx.newPromise().addListener((ChannelFutureListener) future -> {
+                jfrEvent.end();
+                if (jfrEvent.shouldCommit()) {
+                    jfrEvent.populateChannel(ctx.channel());
+                    jfrEvent.populateRequest(request);
+                    jfrEvent.populateResponse(response);
+                    jfrEvent.commit();
+                }
+            }).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
         }
 
         private void logStreamWriteFailure(Throwable cause) {

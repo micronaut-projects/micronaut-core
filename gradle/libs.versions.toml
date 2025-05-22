@@ -65,6 +65,7 @@ wiremock = "2.33.2"
 mimepull = "1.10.0"
 micronaut-sourcegen = "1.6.2"
 icu4j = "76.1"
+jfrunit = "1.0.0.Alpha2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -302,6 +303,8 @@ httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.r
 mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

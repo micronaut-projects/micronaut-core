@@ -365,7 +365,7 @@ final class Pool40 implements Pool {
     }
 
     @Override
-    public void forEachConnection(Consumer<Pool49.ResizerConnection> c) {
+    public void forEachConnection(Consumer<Pool.ResizerConnection> c) {
         http1Connections.forEach(c);
         http2Connections.forEach(c);
     }
