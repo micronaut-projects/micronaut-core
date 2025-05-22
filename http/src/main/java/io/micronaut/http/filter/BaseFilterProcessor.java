@@ -123,21 +123,21 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             if (method.isAnnotationPresent(RequestFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, RequestFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> withAsync(combined, MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry)), method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
             }
             if (method.isAnnotationPresent(ResponseFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> withAsync(combined, MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry)), method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
             }
         }
     }
 
-    private GenericHttpFilter withAsync(FilterMetadata metadata, GenericHttpFilter filter) {
+    private Executor getExecutor(FilterMetadata metadata) {
         if (metadata.executeOn != null) {
-            return new AsyncFilter((InternalHttpFilter) filter, beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn)));
+            return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
         } else {
-            return filter;
+            return null;
         }
     }
 

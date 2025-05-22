@@ -224,6 +224,16 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             public void update(AnnotationMetadata annotationMetadata) {
                 throw new IllegalStateException("Class element: [" + classElement + "] doesn't support type annotations!");
             }
+
+            @Override
+            public boolean wasCleared() {
+                return false;
+            }
+
+            @Override
+            public void markCleared() {
+                // no-op
+            }
         };
     }
 

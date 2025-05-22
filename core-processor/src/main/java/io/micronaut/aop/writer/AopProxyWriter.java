@@ -664,7 +664,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         String methodName = methodElement.getName();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, TypeDef.erasure(returnType));
+        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnType);
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
 
@@ -1510,15 +1510,15 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         private final String name;
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
-        private final TypeDef returnType;
+        private final String returnType;
         private final List<String> rawTypes;
 
-        public MethodRef(String name, List<ParameterElement> parameterElements, TypeDef returnType) {
+        public MethodRef(String name, List<ParameterElement> parameterElements, ClassElement returnType) {
             this.name = name;
             this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
             this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
             this.rawTypes = this.argumentTypes.stream().map(AopProxyWriter::toTypeString).toList();
-            this.returnType = returnType;
+            this.returnType = toTypeString(returnType);
         }
 
         @Override
