@@ -154,7 +154,7 @@ public class ConnectionManager {
 
     private final HttpVersionSelection httpVersion;
     private final Logger log;
-    private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
+    private final Map<DefaultHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
 
     private EventLoopGroup group;
@@ -256,8 +256,8 @@ public class ConnectionManager {
         }
         initBootstrap();
         running.set(true);
-        for (Pool pool : pools.values()) {
-            pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
+        for (PoolHolder pool : pools.values()) {
+            pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
         }
         ReferenceCountUtil.release(oldSslContext);
         ReferenceCountUtil.release(oldWebsocketSslContext);
@@ -309,8 +309,8 @@ public class ConnectionManager {
     @SuppressWarnings("unused")
     final List<Channel> getChannels() {
         List<Channel> channels = new ArrayList<>();
-        for (Pool pool : pools.values()) {
-            pool.forEachConnection(c -> channels.add(((Pool.ConnectionHolder) c).channel));
+        for (PoolHolder pool : pools.values()) {
+            pool.pool.forEachConnection(c -> channels.add(((PoolHolder.ConnectionHolder) c).channel));
         }
         return channels;
     }
@@ -324,14 +324,14 @@ public class ConnectionManager {
     @SuppressWarnings("unused")
     final int liveRequestCount() {
         AtomicInteger count = new AtomicInteger();
-        for (Pool pool : pools.values()) {
-            pool.forEachConnection(c -> {
-                if (c instanceof Pool.Http1ConnectionHolder holder) {
+        for (PoolHolder pool : pools.values()) {
+            pool.pool.forEachConnection(c -> {
+                if (c instanceof PoolHolder.Http1ConnectionHolder holder) {
                     if (holder.hasLiveRequests()) {
                         count.incrementAndGet();
                     }
                 } else {
-                    count.addAndGet(((Pool.Http2ConnectionHolder) c).liveRequests.get());
+                    count.addAndGet(((PoolHolder.Http2ConnectionHolder) c).liveRequests.get());
                 }
             });
         }
@@ -396,7 +396,7 @@ public class ConnectionManager {
     public final void shutdown() {
         if (running.compareAndSet(true, false)) {
 
-            for (Pool pool : pools.values()) {
+            for (PoolHolder pool : pools.values()) {
                 pool.shutdown();
             }
             pools.clear();
@@ -502,7 +502,7 @@ public class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
-        return pools.computeIfAbsent(requestKey, this::createPool).acquire(blockHint, preferredScheduler);
+        return pools.computeIfAbsent(requestKey, rk -> createPool(rk, group)).acquire(blockHint, preferredScheduler);
     }
 
     /**
@@ -781,7 +781,7 @@ public class ConnectionManager {
      * @param ch The plaintext channel
      * @param connectionCustomizer Customizer for the connection
      */
-    private void initHttp2(Pool pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
+    private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
             @Override
             protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
@@ -795,7 +795,7 @@ public class ConnectionManager {
                 ch.close();
             }
         });
-        Pool.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
+        PoolHolder.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
         ch.pipeline().addLast(multiplexHandler);
         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
             @Override
@@ -852,10 +852,11 @@ public class ConnectionManager {
      * Create a new connection pool. Overridden by tests.
      *
      * @param requestKey The request key (host + port)
+     * @param group
      * @return The pool
      */
-    Pool createPool(DefaultHttpClient.RequestKey requestKey) {
-        return new Pool(requestKey, group);
+    PoolHolder createPool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+        return new PoolHolder(requestKey, group);
     }
 
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
@@ -864,16 +865,16 @@ public class ConnectionManager {
 
     /**
      * Initializer for TLS channels. After ALPN we will proceed either with
-     * {@link #initHttp1(Channel)} or {@link #initHttp2(Pool, Channel, NettyClientCustomizer)}.
+     * {@link #initHttp1(Channel)} or {@link #initHttp2(PoolHolder, Channel, NettyClientCustomizer)}.
      */
     private final class AdaptiveAlpnChannelInitializer extends CustomizerAwareInitializer {
-        private final Pool pool;
+        private final PoolHolder pool;
 
         private final SslContext sslContext;
         private final String host;
         private final int port;
 
-        AdaptiveAlpnChannelInitializer(Pool pool,
+        AdaptiveAlpnChannelInitializer(PoolHolder pool,
                                        SslContext sslContext,
                                        String host,
                                        int port) {
@@ -946,12 +947,12 @@ public class ConnectionManager {
 
     /**
      * Initializer for H2C connections. Will proceed with
-     * {@link #initHttp2(Pool, Channel, NettyClientCustomizer)} when the upgrade is done.
+     * {@link #initHttp2(PoolHolder, Channel, NettyClientCustomizer)} when the upgrade is done.
      */
     private final class Http2UpgradeInitializer extends CustomizerAwareInitializer {
-        private final Pool pool;
+        private final PoolHolder pool;
 
-        Http2UpgradeInitializer(Pool pool) {
+        Http2UpgradeInitializer(PoolHolder pool) {
             this.pool = pool;
         }
 
@@ -998,14 +999,14 @@ public class ConnectionManager {
     }
 
     private final class Http3ChannelInitializer extends ChannelOutboundHandlerAdapter {
-        private final Pool pool;
+        private final PoolHolder pool;
 
         private final String host;
         private final int port;
 
         private NettyClientCustomizer bootstrappedCustomizer;
 
-        Http3ChannelInitializer(Pool pool, String host, int port) {
+        Http3ChannelInitializer(PoolHolder pool, String host, int port) {
             this.pool = pool;
             this.host = host;
             this.port = port;
@@ -1068,7 +1069,7 @@ public class ConnectionManager {
                                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                                     ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                                     ch.close();
-                                    pool.onNewConnectionFailure(ctx.channel().eventLoop(), cause);
+                                    pool.pool.onNewConnectionFailure(ctx.channel().eventLoop(), cause);
                                 }
                             },
                             null,
@@ -1084,7 +1085,7 @@ public class ConnectionManager {
                 .connect()
                 .addListener((GenericFutureListener<Future<QuicChannel>>) future -> {
                     if (!future.isSuccess()) {
-                        pool.onNewConnectionFailure(ch.eventLoop(), future.cause());
+                        pool.pool.onNewConnectionFailure(ch.eventLoop(), future.cause());
                     }
                 });
         }
@@ -1157,10 +1158,12 @@ public class ConnectionManager {
      * {@link DefaultHttpClient.RequestKey} (i.e. host, port and
      * protocol are the same for one pool).
      * <p>
-     * The superclass {@link PoolResizer} handles pool size management, this class just implements
+     * The superclass {@link Pool49} handles pool size management, this class just implements
      * the HTTP parts.
      */
-    class Pool extends PoolResizer {
+    final class PoolHolder implements Pool.Listener {
+        final Pool pool;
+
         private final DefaultHttpClient.RequestKey requestKey;
 
         /**
@@ -1170,17 +1173,20 @@ public class ConnectionManager {
         private final InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler() {
             @Override
             protected void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable cause) throws Exception {
-                Pool.this.onNewConnectionFailure(eventLoop, cause);
+                pool.onNewConnectionFailure(eventLoop, cause);
             }
         };
 
-        Pool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
-            super(log, configuration.getConnectionPoolConfiguration(), group);
+        PoolHolder(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
             this.requestKey = requestKey;
+            this.pool = switch (configuration.getConnectionPoolConfiguration().getVersion()) {
+                case V4_0 -> new Pool40(this, log, configuration.getConnectionPoolConfiguration(), (EventLoopGroup) group);
+                case V4_9 -> new Pool49(this, log, configuration.getConnectionPoolConfiguration(), group);
+            };
         }
 
         ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
-            PendingRequest sink = new PendingRequest(blockHint);
+            Pool.PendingRequest sink = pool.createPendingRequest(blockHint);
             sink.dispatch();
             if (preferredScheduler != null) {
                 EventExecutor destPool = sink.likelyEventLoop();
@@ -1202,7 +1208,7 @@ public class ConnectionManager {
         }
 
         @Override
-        void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
+        public Throwable wrapError(@Nullable Throwable error) {
             HttpClientException wrapped;
             if (error == null) {
                 // no failure observed, but channel closed
@@ -1210,15 +1216,15 @@ public class ConnectionManager {
             } else {
                 wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
             }
-            super.onNewConnectionFailure(eventLoop, wrapped);
+            return wrapped;
         }
 
         @Override
-        void openNewConnection(@NonNull EventLoop eventLoop) {
+        public void openNewConnection(@NonNull EventLoop eventLoop) {
             ChannelFuture channelFuture = openConnectionFuture(eventLoop);
             withPropagation(channelFuture, future -> {
                 if (!future.isSuccess()) {
-                    onNewConnectionFailure(eventLoop, future.cause());
+                    pool.onNewConnectionFailure(eventLoop, future.cause());
                 }
             });
         }
@@ -1267,13 +1273,13 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            forEachConnection(c -> ((ConnectionHolder) c).channel.close());
+            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
         }
 
         /**
          * Base class for one HTTP1/HTTP2 connection.
          */
-        abstract class ConnectionHolder extends ResizerConnection {
+        abstract sealed class ConnectionHolder implements Pool.ResizerConnection {
             final Channel channel;
             final NettyClientCustomizer connectionCustomizer;
             /**
@@ -1373,7 +1379,7 @@ public class ConnectionManager {
              * @param sink The request for a pool handle
              * @param ph The pool handle
              */
-            final void emitPoolHandle(PendingRequest sink, PoolHandle ph) {
+            final void emitPoolHandle(Pool.PendingRequest sink, PoolHandle ph) {
                 if (!sink.tryComplete(ph)) {
                     ph.release();
                 } else {
@@ -1385,7 +1391,7 @@ public class ConnectionManager {
             }
 
             @Override
-            public final void dispatch(PendingRequest sink) {
+            public final void dispatch(Pool.PendingRequest sink) {
                 if (channel.eventLoop().inEventLoop()) {
                     resetReadTimeout();
                     dispatch0(sink);
@@ -1403,7 +1409,7 @@ public class ConnectionManager {
              *
              * @param sink The request for a pool handle
              */
-            abstract void dispatch0(PendingRequest sink);
+            abstract void dispatch0(Pool.PendingRequest sink);
 
             /**
              * @return {@code true} iff there are any requests running on this connection.
@@ -1429,12 +1435,12 @@ public class ConnectionManager {
         }
 
         final class Http1ConnectionHolder extends ConnectionHolder {
-            private final Http1PoolEntry poolEntry;
+            private final Pool.Http1PoolEntry poolEntry;
             private volatile boolean hasLiveRequest = false;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
-                poolEntry = new Http1PoolEntry(channel.eventLoop(), this);
+                poolEntry = pool.createHttp1PoolEntry(channel.eventLoop(), this);
             }
 
             void init(boolean fireInitialPipelineBuilt) {
@@ -1463,7 +1469,7 @@ public class ConnectionManager {
             }
 
             @Override
-            void dispatch0(PendingRequest sink) {
+            void dispatch0(Pool.PendingRequest sink) {
                 if (!channel.isActive()) {
                     // make sure the request isn't dispatched to this connection again
                     windDownConnection();
@@ -1510,7 +1516,7 @@ public class ConnectionManager {
                 emitPoolHandle(sink, ph);
             }
 
-            private void returnPendingRequest(PendingRequest sink) {
+            private void returnPendingRequest(Pool.PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
                 hasLiveRequest = false;
                 if (!windDownConnection) {
@@ -1535,13 +1541,13 @@ public class ConnectionManager {
             }
         }
 
-        class Http2ConnectionHolder extends ConnectionHolder {
-            private final Http2PoolEntry poolEntry;
+        sealed class Http2ConnectionHolder extends ConnectionHolder {
+            private final Pool.Http2PoolEntry poolEntry;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
-                this.poolEntry = new Http2PoolEntry(channel.eventLoop(), this);
+                this.poolEntry = pool.createHttp2PoolEntry(channel.eventLoop(), this);
             }
 
             void init() {
@@ -1592,7 +1598,7 @@ public class ConnectionManager {
             }
 
             @Override
-            final void dispatch0(PendingRequest sink) {
+            final void dispatch0(Pool.PendingRequest sink) {
                 if (!channel.isActive() || windDownConnection) {
                     // make sure the request isn't dispatched to this connection again
                     windDownConnection();
@@ -1671,7 +1677,7 @@ public class ConnectionManager {
                 }
             }
 
-            private void returnPendingRequest(PendingRequest sink) {
+            private void returnPendingRequest(Pool.PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
                 if (!windDownConnection) {
                     poolEntry.markAvailable();

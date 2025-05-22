@@ -927,6 +927,9 @@ public abstract class HttpClientConfiguration {
         @NonNull
         private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
+        @NonNull
+        private PoolVersion version = PoolVersion.V4_9;
+
         /**
          * Whether connection pooling is enabled.
          * [available in the Netty HTTP client]
@@ -1089,6 +1092,26 @@ public abstract class HttpClientConfiguration {
         }
 
         /**
+         * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
+         * to {@code V4_0} for compatibility.
+         *
+         * @return The pool version
+         */
+        public @NonNull PoolVersion getVersion() {
+            return version;
+        }
+
+        /**
+         * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
+         * to {@code V4_0} for compatibility.
+         *
+         * @param version The pool version
+         */
+        public void setVersion(@NonNull PoolVersion version) {
+            this.version = version;
+        }
+
+        /**
          * Options for {@link #connectionLocality}.
          *
          * @since 4.8.0
@@ -1119,6 +1142,22 @@ public abstract class HttpClientConfiguration {
              * that you did not intend.
              */
             ENFORCED_ALWAYS,
+        }
+
+        /**
+         * Different pool implementation versions, for compatibility.
+         *
+         * @since 4.9.0
+         */
+        public enum PoolVersion {
+            /**
+             * The connection pool introduced in micronaut-core 4.0.0.
+             */
+            V4_0,
+            /**
+             * The connection pool introduced in micronaut-core 4.9.0.
+             */
+            V4_9
         }
     }
 

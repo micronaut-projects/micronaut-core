@@ -1,12 +1,13 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.util.concurrent.EventExecutor;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 final class EmbeddedConnectionManager extends ConnectionManager {
     final List<EmbeddedChannel> channels;
@@ -36,15 +37,10 @@ final class EmbeddedConnectionManager extends ConnectionManager {
     }
 
     @Override
-    Pool createPool(DefaultHttpClient.RequestKey requestKey) {
-        return new Pool(requestKey, channels.stream().map(EmbeddedChannel::eventLoop).toList()) {
-            int j = 0;
-
-            @Override
-            @Nullable
-            LocalPoolPair pickPreferredPool() {
-                return localPools.get((j++) % localPools.size());
-            }
-        };
+    PoolHolder createPool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+        PoolHolder pool = super.createPool(requestKey, channels.stream().map(EmbeddedChannel::eventLoop).toList());
+        AtomicInteger j = new AtomicInteger();
+        ((Pool49) pool.pool).pickPreferredPoolOverride = l -> l.get((j.getAndIncrement()) % l.size());
+        return pool;
     }
 }
